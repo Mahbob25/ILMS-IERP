@@ -1,0 +1,21 @@
+{
+    # Internal CA configuration
+    pki {
+        ca local {
+            name "LIMS Internal CA"
+            root_cn "LIMS Root CA"
+        }
+    }
+}
+
+lims.institute.local {
+    tls internal               # Self-signed local certificate via Internal CA
+    encode gzip
+
+    # API proxy — point to host for local dev
+    reverse_proxy /api/v1/* host.docker.internal:8000
+    reverse_proxy /uploads/* host.docker.internal:8000
+
+    # Frontend fallback
+    reverse_proxy * host.docker.internal:3000
+}

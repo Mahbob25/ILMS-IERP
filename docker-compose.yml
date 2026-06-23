@@ -1,0 +1,100 @@
+version: '3.8'
+
+networks:
+  lims-internal:
+    driver: bridge
+
+services:
+  database:
+    image: pgvector/pgvector:pg16
+    container_name: lims_database
+    restart: always
+    ports:
+      - "5440:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-lims}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-lims_secure_pass}
+      POSTGRES_DB: ${POSTGRES_DB:-lims}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./infrastructure/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - lims-internal
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+
+  # ──────────────────────────────────────────────────────────────
+  # Backend and Frontend are commented out for local development.
+  # Run them from the terminal instead:
+  #   Backend:  cd backend && .venv\Scripts\activate && uvicorn app.main:app --host 0.0.0.0 --port 8000
+  #   Frontend: cd frontend && npm run dev
+  # ──────────────────────────────────────────────────────────────
+
+  # backend:
+  #   build:
+  #     context: ./backend
+  #     dockerfile: Dockerfile
+  #   container_name: lims_backend
+  #   restart: always
+  #   environment:
+  #     DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-lims}:${POSTGRES_PASSWORD:-lims_secure_pass}@database:5432/${POSTGRES_DB:-lims}
+  #     JWT_SECRET_KEY: ${JWT_SECRET_KEY:-placeholder_secret_key_for_jwt}
+  #     ENVIRONMENT: production
+  #   depends_on:
+  #     - database
+  #   networks:
+  #     - lims-internal
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         cpus: '2.0'
+  #         memory: 2G
+
+  # frontend:
+  #   build:
+  #     context: ./frontend
+  #     dockerfile: Dockerfile
+  #   container_name: lims_frontend
+  #   restart: always
+  #   environment:
+  #     NEXT_PUBLIC_API_URL: https://lims.institute.local/api/v1
+  #   depends_on:
+  #     - backend
+  #   networks:
+  #     - lims-internal
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         cpus: '1.0'
+  #         memory: 512M
+
+  caddy:
+    image: caddy:latest
+    container_name: lims_caddy
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./infrastructure/caddy/Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - lims-internal
+    depends_on:
+      - database
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:

@@ -1,0 +1,212 @@
+{
+  "E:\\lms\\backend\\alembic\\env.py": {
+    "mtime": 1781814708.7248864,
+    "ast_hash": "b0b9165890a3d0844d0bdfce1b7622fb",
+    "semantic_hash": "b0b9165890a3d0844d0bdfce1b7622fb"
+  },
+  "E:\\lms\\backend\\alembic\\versions\\202606182315_initial_identity_setup.py": {
+    "mtime": 1781814747.2389107,
+    "ast_hash": "b8a1a78e3213bf84b6c6aa4b294ccdfd",
+    "semantic_hash": "b8a1a78e3213bf84b6c6aa4b294ccdfd"
+  },
+  "E:\\lms\\backend\\app\\core\\config.py": {
+    "mtime": 1781813585.7077353,
+    "ast_hash": "940104965d135b6d81c79d2bc11d30ab",
+    "semantic_hash": "940104965d135b6d81c79d2bc11d30ab"
+  },
+  "E:\\lms\\backend\\app\\db\\base.py": {
+    "mtime": 1781813713.9362524,
+    "ast_hash": "477caf2892c3b7fdf99d01b55149f203",
+    "semantic_hash": "477caf2892c3b7fdf99d01b55149f203"
+  },
+  "E:\\lms\\backend\\app\\db\\session.py": {
+    "mtime": 1781813602.5353708,
+    "ast_hash": "aa7fdb6e83b05880df4d49b65759cd5d",
+    "semantic_hash": "aa7fdb6e83b05880df4d49b65759cd5d"
+  },
+  "E:\\lms\\backend\\app\\main.py": {
+    "mtime": 1781814848.0299861,
+    "ast_hash": "9405eb62103be975b16ef28517d12faf",
+    "semantic_hash": "9405eb62103be975b16ef28517d12faf"
+  },
+  "E:\\lms\\backend\\app\\modules\\identity\\dependencies.py": {
+    "mtime": 1781814782.7539582,
+    "ast_hash": "ca7e0024a82962b6b0bd11573e38bf33",
+    "semantic_hash": "ca7e0024a82962b6b0bd11573e38bf33"
+  },
+  "E:\\lms\\backend\\app\\modules\\identity\\models.py": {
+    "mtime": 1781813673.2788897,
+    "ast_hash": "23b2eb3190c9ffe001cb84458f573189",
+    "semantic_hash": "23b2eb3190c9ffe001cb84458f573189"
+  },
+  "E:\\lms\\backend\\app\\modules\\identity\\router.py": {
+    "mtime": 1781814840.0173664,
+    "ast_hash": "4dc55c67d9779d938ca6e0d76067a8f2",
+    "semantic_hash": "4dc55c67d9779d938ca6e0d76067a8f2"
+  },
+  "E:\\lms\\backend\\app\\modules\\identity\\schemas.py": {
+    "mtime": 1781814813.6959958,
+    "ast_hash": "706ef4b030d77951d16fa53a249e8739",
+    "semantic_hash": "706ef4b030d77951d16fa53a249e8739"
+  },
+  "E:\\lms\\backend\\app\\modules\\identity\\security.py": {
+    "mtime": 1781814767.40717,
+    "ast_hash": "577efa9e5e1694058737ce776ac4f078",
+    "semantic_hash": "577efa9e5e1694058737ce776ac4f078"
+  },
+  "E:\\lms\\backend\\app\\modules\\identity\\service.py": {
+    "mtime": 1781814823.1056397,
+    "ast_hash": "53ab07fe775fc07498241bc7995be835",
+    "semantic_hash": "53ab07fe775fc07498241bc7995be835"
+  },
+  "E:\\lms\\frontend\\app\\[locale]\\(auth)\\login\\page.tsx": {
+    "mtime": 1781913262.1195219,
+    "ast_hash": "50f4098b205a43421a0a614b62338d40",
+    "semantic_hash": "50f4098b205a43421a0a614b62338d40"
+  },
+  "E:\\lms\\frontend\\app\\[locale]\\(dashboard)\\dashboard\\page.tsx": {
+    "mtime": 1781913278.5914264,
+    "ast_hash": "49356524e139119170f49b9727e3f907",
+    "semantic_hash": "49356524e139119170f49b9727e3f907"
+  },
+  "E:\\lms\\frontend\\app\\[locale]\\(dashboard)\\layout.tsx": {
+    "mtime": 1781913270.4038372,
+    "ast_hash": "42a568dd5faff41354673b4e21d37b44",
+    "semantic_hash": "42a568dd5faff41354673b4e21d37b44"
+  },
+  "E:\\lms\\frontend\\app\\[locale]\\layout.tsx": {
+    "mtime": 1781913254.433933,
+    "ast_hash": "91efbce47b55575a1d8c643224e23913",
+    "semantic_hash": "91efbce47b55575a1d8c643224e23913"
+  },
+  "E:\\lms\\frontend\\app\\layout.tsx": {
+    "mtime": 1781913285.3246474,
+    "ast_hash": "ac272a64f04d9394a589d08846182bdb",
+    "semantic_hash": "ac272a64f04d9394a589d08846182bdb"
+  },
+  "E:\\lms\\frontend\\app\\page.tsx": {
+    "mtime": 1781913282.1543727,
+    "ast_hash": "a9d8b33437d88388476c02a5faa7583b",
+    "semantic_hash": "a9d8b33437d88388476c02a5faa7583b"
+  },
+  "E:\\lms\\frontend\\components\\AuthContext.tsx": {
+    "mtime": 1781814930.5052054,
+    "ast_hash": "ec3ec57623dde51f8155a63457b9a98d",
+    "semantic_hash": "ec3ec57623dde51f8155a63457b9a98d"
+  },
+  "E:\\lms\\frontend\\lib\\api.ts": {
+    "mtime": 1781814899.000769,
+    "ast_hash": "4349d40caa7845309ce5d7b15285a43d",
+    "semantic_hash": "4349d40caa7845309ce5d7b15285a43d"
+  },
+  "E:\\lms\\frontend\\middleware.ts": {
+    "mtime": 1781814916.8405828,
+    "ast_hash": "e4a473234d5b24d0aafaf9ecc9f090d2",
+    "semantic_hash": "e4a473234d5b24d0aafaf9ecc9f090d2"
+  },
+  "E:\\lms\\frontend\\next.config.js": {
+    "mtime": 1781814876.6975732,
+    "ast_hash": "4d1e74979f761d46870270ef6ef299b2",
+    "semantic_hash": "4d1e74979f761d46870270ef6ef299b2"
+  },
+  "E:\\lms\\frontend\\package.json": {
+    "mtime": 1781814865.241558,
+    "ast_hash": "511004e97b4cf3e693f4b7725ba2a1eb",
+    "semantic_hash": "511004e97b4cf3e693f4b7725ba2a1eb"
+  },
+  "E:\\lms\\frontend\\postcss.config.js": {
+    "mtime": 1781815031.2355049,
+    "ast_hash": "854b38759e7a8b4b82306ae2d9a3a833",
+    "semantic_hash": "854b38759e7a8b4b82306ae2d9a3a833"
+  },
+  "E:\\lms\\frontend\\tailwind.config.js": {
+    "mtime": 1781815021.9680662,
+    "ast_hash": "9dd8dc70d86c55a6e3641965981f2f54",
+    "semantic_hash": "9dd8dc70d86c55a6e3641965981f2f54"
+  },
+  "E:\\lms\\frontend\\tsconfig.json": {
+    "mtime": 1781814941.7804654,
+    "ast_hash": "570e85507d1fb0c609255b9a0aa95595",
+    "semantic_hash": "570e85507d1fb0c609255b9a0aa95595"
+  },
+  "E:\\lms\\infrastructure\\postgres\\init.sql": {
+    "mtime": 1781813537.58664,
+    "ast_hash": "396be2cb682e1aa36094819c8fa94ea9",
+    "semantic_hash": "396be2cb682e1aa36094819c8fa94ea9"
+  },
+  "E:\\lms\\.agents\\skills\\graphify\\SKILL.md": {
+    "mtime": 1781912856.707938,
+    "ast_hash": "707be4eb520993d3e813fd11f383140b",
+    "semantic_hash": "707be4eb520993d3e813fd11f383140b"
+  },
+  "E:\\lms\\.agents\\skills\\graphify\\references\\add-watch.md": {
+    "mtime": 1781912811.7195826,
+    "ast_hash": "d59d027fe449f06aa03905a01184e779",
+    "semantic_hash": "d59d027fe449f06aa03905a01184e779"
+  },
+  "E:\\lms\\.agents\\skills\\graphify\\references\\exports.md": {
+    "mtime": 1781912811.7413957,
+    "ast_hash": "9da2a2152e60a22f07f05fed5158f287",
+    "semantic_hash": "9da2a2152e60a22f07f05fed5158f287"
+  },
+  "E:\\lms\\.agents\\skills\\graphify\\references\\extraction-spec.md": {
+    "mtime": 1781912811.744936,
+    "ast_hash": "2e620982acb506f557538cdcfb1ef6da",
+    "semantic_hash": "2e620982acb506f557538cdcfb1ef6da"
+  },
+  "E:\\lms\\.agents\\skills\\graphify\\references\\github-and-merge.md": {
+    "mtime": 1781912811.7459362,
+    "ast_hash": "cde13df085e4c492aeb7ba298a996d0d",
+    "semantic_hash": "cde13df085e4c492aeb7ba298a996d0d"
+  },
+  "E:\\lms\\.agents\\skills\\graphify\\references\\hooks.md": {
+    "mtime": 1781912811.748906,
+    "ast_hash": "3f545db6ce646650bb9de588f5512a27",
+    "semantic_hash": "3f545db6ce646650bb9de588f5512a27"
+  },
+  "E:\\lms\\.agents\\skills\\graphify\\references\\query.md": {
+    "mtime": 1781912811.7562473,
+    "ast_hash": "0b329f30b63b0bd89282848575c86428",
+    "semantic_hash": "0b329f30b63b0bd89282848575c86428"
+  },
+  "E:\\lms\\.agents\\skills\\graphify\\references\\transcribe.md": {
+    "mtime": 1781912811.8008635,
+    "ast_hash": "67b6a5fa6c0974e18f60db9f8932fbd8",
+    "semantic_hash": "67b6a5fa6c0974e18f60db9f8932fbd8"
+  },
+  "E:\\lms\\.agents\\skills\\graphify\\references\\update.md": {
+    "mtime": 1781912811.8109283,
+    "ast_hash": "2f78598160bfb12ab775831e0787b02a",
+    "semantic_hash": "2f78598160bfb12ab775831e0787b02a"
+  },
+  "E:\\lms\\backend\\requirements.txt": {
+    "mtime": 1781813552.1563764,
+    "ast_hash": "d0b07a6c32441ab81a35d0f9a1b732df",
+    "semantic_hash": "d0b07a6c32441ab81a35d0f9a1b732df"
+  },
+  "E:\\lms\\docker-compose.yml": {
+    "mtime": 1781813530.0486078,
+    "ast_hash": "cf4d04f63ffcdf075807fff13a8d90e5",
+    "semantic_hash": "cf4d04f63ffcdf075807fff13a8d90e5"
+  },
+  "E:\\lms\\docs\\Plan-v1.6.md": {
+    "mtime": 1781813028.864148,
+    "ast_hash": "80b7d5d23968e2a799be09af3081e37b",
+    "semantic_hash": "80b7d5d23968e2a799be09af3081e37b"
+  },
+  "E:\\lms\\docs\\active_task.md": {
+    "mtime": 1781913291.7232716,
+    "ast_hash": "bc0d7a921d6137fb802007c9b948ae6d",
+    "semantic_hash": "bc0d7a921d6137fb802007c9b948ae6d"
+  },
+  "E:\\lms\\docs\\build_plan.md": {
+    "mtime": 1781813140.5710702,
+    "ast_hash": "a90c57147e8ee9ad635b649683222b36",
+    "semantic_hash": "a90c57147e8ee9ad635b649683222b36"
+  },
+  "E:\\lms\\docs\\memory.md": {
+    "mtime": 1781913917.1232684,
+    "ast_hash": "d6714fed73eb7eeb70f81d77f3e987e4",
+    "semantic_hash": "d6714fed73eb7eeb70f81d77f3e987e4"
+  }
+}

@@ -1,0 +1,52 @@
+# --- Python / Backend ---
+__pycache__/
+*.py[cod]
+*.so
+*.egg-info/
+dist/
+build/
+*.egg
+.venv/
+.venv
+venv/
+env/
+*.log
+backend/backend_err.log
+backend/backend_out.log
+
+# --- Node / Frontend ---
+node_modules/
+.npm-cache/
+.next/
+out/
+
+# --- Environment files ---
+.env
+.env.local
+.env.*.local
+backend/.env
+frontend/.env
+
+# --- IDE / Editor ---
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# --- Docker ---
+.dockerignore
+
+# --- Alembic ---
+alembic/versions/*.pyc
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- Misc ---
+cookie.txt
+*.sqlite3
