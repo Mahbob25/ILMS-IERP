@@ -1,0 +1,271 @@
+"use client";
+
+import React, { useState, useEffect } from "react";
+import { useParams } from "next/navigation";
+import { apiClient } from "@/lib/api";
+import { useAuth } from "@/components/AuthContext";
+import { Loader2, Check, X, Clock, AlertCircle } from "lucide-react";
+
+interface CourseSection { id: string; course_id: string; term_id: string; teacher_id: string; }
+interface Course { id: string; name: string; code: string; }
+interface Term { id: string; name: string; }
+interface Student { id: string; student_code: string; full_name: string; }
+interface Enrollment { id: string; student_id: string; section_id: string; }
+interface AttendanceSession { id: string; section_id: string; date: string; }
+interface AttendanceRecord { id: string; session_id: string; student_id: string; status: string; }
+
+const STATUS_OPTIONS = ["present", "absent", "late", "excused"];
+
+export default function AttendancePage() {
+  const params = useParams();
+  const { user } = useAuth();
+  const locale = (params?.locale as string) || "ar";
+  const isRtl = locale === "ar";
+
+  const t = {
+    ar: {
+      title: "سجل الحضور",
+      subtitle: "تسجيل حضور الطلاب اليومي",
+      selectSection: "اختر الشعبة",
+      date: "التاريخ",
+      today: "اليوم",
+      createSession: "بدء جلسة حضور",
+      student: "الطالب",
+      status: "الحالة",
+      present: "حاضر",
+      absent: "غائب",
+      late: "متأخر",
+      excused: "معذور",
+      save: "حفظ",
+      loading: "جاري التحميل...",
+      noStudents: "لا يوجد طلاب مسجلين في هذه الشعبة",
+      noSection: "اختر شعبة لعرض سجل الحضور",
+      saved: "تم الحفظ",
+      existingSession: "توجد جلسة حضور لهذا التاريخ",
+    },
+    en: {
+      title: "Attendance",
+      subtitle: "Record daily student attendance",
+      selectSection: "Select Section",
+      date: "Date",
+      today: "Today",
+      createSession: "Start Attendance Session",
+      student: "Student",
+      status: "Status",
+      present: "Present",
+      absent: "Absent",
+      late: "Late",
+      excused: "Excused",
+      save: "Save",
+      loading: "Loading...",
+      noStudents: "No students enrolled in this section",
+      noSection: "Select a section to view attendance",
+      saved: "Saved",
+      existingSession: "Session already exists for this date",
+    },
+  }[locale === "en" ? "en" : "ar"];
+
+  const [sections, setSections] = useState<CourseSection[]>([]);
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [terms, setTerms] = useState<Term[]>([]);
+  const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
+  const [students, setStudents] = useState<Student[]>([]);
+  const [selectedSectionId, setSelectedSectionId] = useState("");
+  const [sessionDate, setSessionDate] = useState(new Date().toISOString().split("T")[0]);
+  const [currentSession, setCurrentSession] = useState<AttendanceSession | null>(null);
+  const [records, setRecords] = useState<Record<string, string>>({});
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [savedMsg, setSavedMsg] = useState(false);
+
+  const fetchData = async () => {
+    try {
+      const [sectRes, courseRes, termRes] = await Promise.all([
+        apiClient.get<CourseSection[]>("/academic/course-sections"),
+        apiClient.get<Course[]>("/academic/courses"),
+        apiClient.get<Term[]>("/academic/terms"),
+      ]);
+      setSections(sectRes.data);
+      setCourses(courseRes.data);
+      setTerms(termRes.data);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchData(); }, []);
+
+  const getCourseName = (id: string) => courses.find((c) => c.id === id)?.name || id;
+  const getTermName = (id: string) => terms.find((t) => t.id === id)?.name || "";
+
+  useEffect(() => {
+    if (!selectedSectionId) return;
+    (async () => {
+      try {
+        const [enrRes, sessRes] = await Promise.all([
+          apiClient.get<Enrollment[]>(`/academic/enrollments?section_id=${selectedSectionId}`),
+          apiClient.get<AttendanceSession[]>(`/lms/attendance/sessions?section_id=${selectedSectionId}`),
+        ]);
+        setEnrollments(enrRes.data);
+
+        const studentIds = enrRes.data.map((e) => e.student_id);
+        if (studentIds.length > 0) {
+          const studRes = await apiClient.get<Student[]>("/academic/students");
+          setStudents(studRes.data.filter((s) => studentIds.includes(s.id)));
+        } else {
+          setStudents([]);
+        }
+
+        const existing = sessRes.data.find((s) => s.date === sessionDate);
+        setCurrentSession(existing || null);
+
+        if (existing) {
+          const recRes = await apiClient.get<AttendanceRecord[]>(`/lms/attendance/sessions/${existing.id}`);
+          const recordMap: Record<string, string> = {};
+          recRes.data.forEach((r) => { recordMap[r.student_id] = r.status; });
+          setRecords(recordMap);
+        }
+      } catch (e) { console.error(e); }
+    })();
+  }, [selectedSectionId, sessionDate]);
+
+  const handleCreateOrSave = async () => {
+    setSaving(true);
+    setSavedMsg(false);
+    try {
+      let session = currentSession;
+      if (!session) {
+        const res = await apiClient.post("/lms/attendance/sessions", {
+          section_id: selectedSectionId,
+          date: sessionDate,
+        });
+        session = res.data;
+        setCurrentSession(session);
+      }
+      if (!session) return;
+      const recordsPayload = Object.entries(records).map(([student_id, status]) => ({
+        student_id,
+        status: status || "present",
+      }));
+      await apiClient.post(`/lms/attendance/sessions/${session.id}/records`, { records: recordsPayload });
+      setSavedMsg(true);
+      setTimeout(() => setSavedMsg(false), 3000);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const setStatus = (studentId: string, status: string) => {
+    setRecords((prev) => ({ ...prev, [studentId]: status }));
+  };
+
+  const statusIcon = (status: string) => {
+    switch (status) {
+      case "present": return <Check size={14} className="text-emerald-500" />;
+      case "absent": return <X size={14} className="text-red-500" />;
+      case "late": return <Clock size={14} className="text-amber-500" />;
+      case "excused": return <AlertCircle size={14} className="text-blue-500" />;
+      default: return null;
+    }
+  };
+
+  if (loading) {
+    return <div className="flex items-center justify-center h-48"><Loader2 className="animate-spin text-slate-400" size={24} /></div>;
+  }
+
+  const enrolledStudents = enrollments
+    .map((e) => students.find((s) => s.id === e.student_id))
+    .filter(Boolean) as Student[];
+
+  return (
+    <div className="space-y-6 max-w-6xl mx-auto animate-fade-in" dir={isRtl ? "rtl" : "ltr"}>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-xl font-bold text-slate-900">{t.title}</h2>
+          <p className="text-sm text-slate-500 mt-1">{t.subtitle}</p>
+        </div>
+      </div>
+
+      <div className="card p-5 space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label className="block text-xs font-medium text-slate-700 mb-1">{t.selectSection}</label>
+            <select value={selectedSectionId} onChange={(e) => setSelectedSectionId(e.target.value)} className="input-field">
+              <option value="">--</option>
+              {sections.map((sec) => (
+                <option key={sec.id} value={sec.id}>
+                  {getCourseName(sec.course_id)} - {getTermName(sec.term_id)}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-700 mb-1">{t.date}</label>
+            <input type="date" value={sessionDate} onChange={(e) => setSessionDate(e.target.value)} className="input-field" />
+          </div>
+          <div className="flex items-end">
+            {selectedSectionId && (
+              <button onClick={handleCreateOrSave} disabled={saving} className="btn-primary flex items-center gap-2">
+                {saving ? <Loader2 size={16} className="animate-spin" /> : null}
+                <span>{currentSession ? t.save : t.createSession}</span>
+              </button>
+            )}
+          </div>
+        </div>
+        {savedMsg && <p className="text-sm text-emerald-600 font-medium">{t.saved} ✓</p>}
+      </div>
+
+      {!selectedSectionId && (
+        <div className="card p-8 text-center text-sm text-slate-500">{t.noSection}</div>
+      )}
+
+      {selectedSectionId && enrolledStudents.length === 0 && (
+        <div className="card p-8 text-center text-sm text-slate-500">{t.noStudents}</div>
+      )}
+
+      {selectedSectionId && enrolledStudents.length > 0 && (
+        <div className="card overflow-hidden">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>{t.student}</th>
+                <th>{t.status}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {enrolledStudents.map((student, idx) => (
+                <tr key={student.id}>
+                  <td className="text-slate-400 text-xs">{idx + 1}</td>
+                  <td className="font-medium text-slate-900">{student.full_name}</td>
+                  <td>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {STATUS_OPTIONS.map((status) => (
+                        <button
+                          key={status}
+                          onClick={() => setStatus(student.id, status)}
+                          className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all duration-150 ${
+                            (records[student.id] || "present") === status
+                              ? "bg-brand-50 border-brand-300 text-brand-700"
+                              : "bg-white border-slate-200 text-slate-500 hover:bg-slate-50"
+                          }`}
+                        >
+                          {statusIcon(status)}
+                          <span>{t[status as keyof typeof t] || status}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}

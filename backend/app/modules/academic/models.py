@@ -63,6 +63,8 @@ class CourseSection(Base):
     course: Mapped[Course] = relationship(back_populates="sections")
     term: Mapped[Term] = relationship(back_populates="sections")
     enrollments: Mapped[list["Enrollment"]] = relationship(back_populates="section")
+    attendance_sessions: Mapped[list["AttendanceSession"]] = relationship(back_populates="section")
+    assignments: Mapped[list["Assignment"]] = relationship(back_populates="section")
 
 
 class Student(Base):

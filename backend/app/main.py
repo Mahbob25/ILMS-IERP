@@ -7,6 +7,7 @@ from slowapi.errors import RateLimitExceeded
 from app.core.config import settings
 from app.modules.identity.router import auth_router, users_router
 from app.modules.academic.router import academic_router
+from app.modules.lms.router import lms_router
 
 # Initialize rate limiter
 limiter = Limiter(key_func=get_remote_address)
@@ -35,6 +36,7 @@ app.add_middleware(
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(users_router, prefix="/api/v1")
 app.include_router(academic_router, prefix="/api/v1")
+app.include_router(lms_router, prefix="/api/v1")
 
 @app.get("/api/v1/health", tags=["system"])
 async def health_check():

@@ -19,7 +19,9 @@ import {
   Calendar,
   BookMarked,
   GraduationCap,
-  ClipboardList
+  ClipboardList,
+  ClipboardCheck,
+  Award
 } from "lucide-react";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -49,6 +51,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         sections: "الشعب الدراسية",
         students: "الطلاب",
         enrollments: "التسجيلات",
+        attendance: "الحضور",
+        gradebook: "سجل الدرجات",
         ingestion: "استيراد المناهج",
         systemHealth: "صحة النظام",
         backups: "النسخ الاحتياطي",
@@ -72,6 +76,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         sections: "Course Sections",
         students: "Students",
         enrollments: "Enrollments",
+        attendance: "Attendance",
+        gradebook: "Gradebook",
         ingestion: "Curriculum Ingestion",
         systemHealth: "System Health",
         backups: "Database Backups",
@@ -151,6 +157,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       name: t.menu.enrollments,
       href: `/${locale}/dashboard/enrollments`,
       icon: ClipboardList,
+      roles: ["superadmin", "admin", "teacher"]
+    },
+    {
+      name: t.menu.attendance,
+      href: `/${locale}/dashboard/attendance`,
+      icon: ClipboardCheck,
+      roles: ["superadmin", "admin", "teacher"]
+    },
+    {
+      name: t.menu.gradebook,
+      href: `/${locale}/dashboard/gradebook`,
+      icon: Award,
       roles: ["superadmin", "admin", "teacher"]
     },
     {
