@@ -21,7 +21,11 @@ import {
   GraduationCap,
   ClipboardList,
   ClipboardCheck,
-  Award
+  Award,
+  DollarSign,
+  Wallet,
+  CreditCard,
+  ShoppingCart
 } from "lucide-react";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -40,19 +44,24 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       logout: "تسجيل الخروج",
       roles: {
         superadmin: "مدير خارق",
-        admin: "مسؤول النظام",
+        manager: "مسؤول النظام",
+        secretary: "سكرتير",
         teacher: "معلم"
       },
       menu: {
         dashboard: "لوحة التحكم",
         users: "المستخدمين",
-        terms: "الفصول الدراسية",
         courses: "المقررات",
         sections: "الشعب الدراسية",
         students: "الطلاب",
         enrollments: "التسجيلات",
         attendance: "الحضور",
         gradebook: "سجل الدرجات",
+        payments: "المدفوعات",
+        expenses: "المصروفات",
+        teacherWallet: "محفظة المعلم",
+        dailyClosures: "الإغلاق اليومي",
+        pos: "نقطة البيع",
         ingestion: "استيراد المناهج",
         systemHealth: "صحة النظام",
         backups: "النسخ الاحتياطي",
@@ -65,19 +74,24 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       logout: "Log Out",
       roles: {
         superadmin: "Super Admin",
-        admin: "Administrator",
+        manager: "Manager",
+        secretary: "Secretary",
         teacher: "Teacher"
       },
       menu: {
         dashboard: "Dashboard",
         users: "User Management",
-        terms: "Academic Terms",
         courses: "Courses",
         sections: "Course Sections",
         students: "Students",
         enrollments: "Enrollments",
         attendance: "Attendance",
         gradebook: "Gradebook",
+        payments: "Payments",
+        expenses: "Expenses",
+        teacherWallet: "Teacher Wallet",
+        dailyClosures: "Daily Closures",
+        pos: "Point of Sale",
         ingestion: "Curriculum Ingestion",
         systemHealth: "System Health",
         backups: "Database Backups",
@@ -121,55 +135,79 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       name: t.menu.dashboard,
       href: `/${locale}/dashboard`,
       icon: Activity,
-      roles: ["superadmin", "admin", "teacher"]
+      roles: ["superadmin", "manager", "secretary", "teacher"]
     },
     {
       name: t.menu.users,
       href: `/${locale}/dashboard/users`,
       icon: Users,
-      roles: ["superadmin", "admin"]
-    },
-    {
-      name: t.menu.terms,
-      href: `/${locale}/dashboard/terms`,
-      icon: Calendar,
-      roles: ["superadmin", "admin", "teacher"]
+      roles: ["superadmin", "manager"]
     },
     {
       name: t.menu.courses,
       href: `/${locale}/dashboard/courses`,
       icon: BookOpen,
-      roles: ["superadmin", "admin", "teacher"]
+      roles: ["superadmin", "manager", "secretary", "teacher"]
     },
     {
       name: t.menu.sections,
       href: `/${locale}/dashboard/sections`,
       icon: BookMarked,
-      roles: ["superadmin", "admin", "teacher"]
+      roles: ["superadmin", "manager", "secretary", "teacher"]
     },
     {
       name: t.menu.students,
       href: `/${locale}/dashboard/students`,
       icon: GraduationCap,
-      roles: ["superadmin", "admin"]
+      roles: ["superadmin", "manager", "secretary"]
     },
     {
       name: t.menu.enrollments,
       href: `/${locale}/dashboard/enrollments`,
       icon: ClipboardList,
-      roles: ["superadmin", "admin", "teacher"]
+      roles: ["superadmin", "manager", "secretary", "teacher"]
     },
     {
       name: t.menu.attendance,
       href: `/${locale}/dashboard/attendance`,
       icon: ClipboardCheck,
-      roles: ["superadmin", "admin", "teacher"]
+      roles: ["superadmin", "manager", "secretary", "teacher"]
     },
     {
       name: t.menu.gradebook,
       href: `/${locale}/dashboard/gradebook`,
       icon: Award,
-      roles: ["superadmin", "admin", "teacher"]
+      roles: ["superadmin", "manager", "secretary", "teacher"]
+    },
+    {
+      name: t.menu.payments,
+      href: `/${locale}/dashboard/payments`,
+      icon: DollarSign,
+      roles: ["superadmin", "manager", "secretary"]
+    },
+    {
+      name: t.menu.expenses,
+      href: `/${locale}/dashboard/expenses`,
+      icon: Wallet,
+      roles: ["superadmin", "manager", "secretary"]
+    },
+    {
+      name: t.menu.teacherWallet,
+      href: `/${locale}/dashboard/teacher-wallet`,
+      icon: CreditCard,
+      roles: ["superadmin", "manager", "teacher"]
+    },
+    {
+      name: t.menu.dailyClosures,
+      href: `/${locale}/dashboard/daily-closures`,
+      icon: Calendar,
+      roles: ["superadmin", "manager", "secretary"]
+    },
+    {
+      name: t.menu.pos,
+      href: `/${locale}/dashboard/pos`,
+      icon: ShoppingCart,
+      roles: ["superadmin", "manager", "secretary"]
     },
     {
       name: t.menu.ingestion,
@@ -193,7 +231,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       name: t.menu.settings,
       href: `/${locale}/dashboard/settings`,
       icon: Settings,
-      roles: ["superadmin", "admin", "teacher"]
+      roles: ["superadmin", "manager", "secretary", "teacher"]
     }
   ].filter(item => item.roles.includes(user.role?.name ?? "") || (user.is_superadmin && item.roles.includes("superadmin")));
 

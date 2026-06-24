@@ -3,12 +3,13 @@ from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import joinedload
-from sqlalchemy import func, update
+from sqlalchemy import func, update, select as sa_select
 from app.modules.academic.models import Course, CourseSection, Student, Enrollment
 
 
 # --- Course CRUD ---
 async def create_course(db: AsyncSession, data: dict) -> Course:
+    data.pop("status", None)
     course = Course(**data)
     db.add(course)
     await db.flush()
@@ -17,6 +18,38 @@ async def create_course(db: AsyncSession, data: dict) -> Course:
 async def get_course(db: AsyncSession, course_id: uuid.UUID) -> Optional[Course]:
     result = await db.execute(select(Course).where(Course.id == course_id))
     return result.scalar_one_or_none()
+
+async def get_course_enrollment_count(db: AsyncSession, course_id: uuid.UUID) -> int:
+    result = await db.execute(
+        select(func.coalesce(func.sum(CourseSection.enrolled_count), 0))
+        .where(CourseSection.course_id == course_id)
+    )
+    return result.scalar() or 0
+
+async def activate_course(db: AsyncSession, course_id: uuid.UUID, teacher_percentage: float) -> Optional[Course]:
+    course = await get_course(db, course_id)
+    if not course:
+        return None
+    if course.status != "pending":
+        return None
+    enrolled = await get_course_enrollment_count(db, course_id)
+    min_req = course.min_students_required or 1
+    if enrolled < min_req:
+        return None
+    course.status = "active"
+    course.teacher_percentage = teacher_percentage
+    await db.flush()
+    return course
+
+async def complete_course(db: AsyncSession, course_id: uuid.UUID) -> Optional[Course]:
+    course = await get_course(db, course_id)
+    if not course:
+        return None
+    if course.status != "active":
+        return None
+    course.status = "completed"
+    await db.flush()
+    return course
 
 async def list_courses(db: AsyncSession) -> list[Course]:
     result = await db.execute(select(Course).order_by(Course.name))
@@ -110,13 +143,19 @@ async def delete_student(db: AsyncSession, student_id: uuid.UUID) -> bool:
 
 
 # --- Enrollment CRUD ---
-async def create_enrollment(db: AsyncSession, student_id: uuid.UUID, section_id: uuid.UUID) -> Optional[Enrollment]:
+async def create_enrollment(db: AsyncSession, student_id: uuid.UUID, section_id: uuid.UUID,
+                            agreed_price: Optional[float] = None, admin_discount: Optional[float] = None) -> Optional[Enrollment]:
     section = await get_course_section(db, section_id)
     if not section:
         return None
     if section.enrolled_count >= section.capacity:
         return None
-    enrollment = Enrollment(student_id=student_id, section_id=section_id)
+    enrollment = Enrollment(
+        student_id=student_id,
+        section_id=section_id,
+        agreed_price=agreed_price,
+        admin_discount=admin_discount,
+    )
     db.add(enrollment)
     section.enrolled_count += 1
     await db.flush()

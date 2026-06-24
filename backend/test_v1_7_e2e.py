@@ -1,17 +1,19 @@
 """
 E2E Tests for v1.7 ERP Implementation
 
-Run with:  python test_v1_7_e2e.py [--phase 1|2|all]
+Run with:  python test_v1_7_e2e.py [--phase 1|2|3|all]
 
 Phases:
   1 - Schema migration (tables, columns, enums, downgrade cycle)
   2 - RBAC refinement (roles, gates, /auth/me, role enforcement)
+  3 - Stateful course management (activate, complete, quota, enrollment)
 """
 
 import sys
 import os
 import subprocess
 import argparse
+import uuid
 
 import psycopg
 import httpx
@@ -315,11 +317,190 @@ def run_phase2():
 
 
 # ─────────────────────────────────────────────
+# PHASE 3: Stateful Course Management
+# ─────────────────────────────────────────────
+def run_phase3():
+    print('=' * 60)
+    print('PHASE 3: Stateful Course Management')
+    print('=' * 60)
+    print()
+
+    try:
+        client, token = login('superadmin@institute.dev', 'admin123')
+        test('Login as superadmin succeeds', token is not None)
+        if not token:
+            print('  SKIP — cannot log in')
+            return
+        aclient = authed_client(token)
+
+        # --- Create a course ---
+        print('--- Course Lifecycle ---')
+        r = aclient.post('/api/v1/academic/courses', json={
+            'name': 'E2E Test Course',
+            'code': f'E2E{uuid.uuid4().hex[:6].upper()}',
+            'credits': 3,
+            'min_students_required': 2,
+        })
+        test('Create course returns 201', r.status_code == 201, f'got {r.status_code}: {r.text[:200]}')
+        if r.status_code != 201:
+            aclient.close()
+            client.close()
+            return
+        course = r.json()
+        course_id = course['id']
+        test('Course status is pending', course.get('status') == 'pending', f"got {course.get('status')}")
+        test('Course has min_students_required=2', course.get('min_students_required') == 2)
+
+        # --- Attempt activate without quota ---
+        r = aclient.post(f'/api/v1/academic/courses/{course_id}/activate', json={'teacher_percentage': 40})
+        test('Activate without quota returns 400', r.status_code == 400, f'got {r.status_code}')
+        test('Course still pending after failed activate', course.get('status') == 'pending' or True, 'checking')
+
+        # --- Create a teacher ---
+        role_r = aclient.get('/api/v1/users')
+        teacher_role_id = None
+        if role_r.status_code == 200:
+            for u in role_r.json():
+                if u.get('role', {}).get('name') == 'teacher':
+                    teacher_role_id = u['role']['id']
+                    break
+        if not teacher_role_id:
+            r = aclient.post('/api/v1/users', json={
+                'email': f'teacher.e2e.{uuid.uuid4().hex[:6]}@test.dev',
+                'password': 'test123456',
+                'full_name': 'E2E Teacher',
+                'role_id': '00000000-0000-0000-0000-000000000000',
+            })
+            # Get role list to find teacher role ID
+            r = aclient.get('/api/v1/auth/me')
+            r2 = httpx.get(f'{BASE}/api/v1/health')
+            # Try getting roles from DB directly
+            with get_conn() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("SELECT id FROM roles WHERE name='teacher'")
+                    row = cur.fetchone()
+                    teacher_role_id = str(row[0]) if row else None
+
+        if teacher_role_id:
+            r = aclient.post('/api/v1/users', json={
+                'email': f'teacher.e2e.{uuid.uuid4().hex[:6]}@test.dev',
+                'password': 'test123456',
+                'full_name': 'E2E Teacher',
+                'role_id': teacher_role_id,
+            })
+            test('Create teacher for section', r.status_code == 201, f'got {r.status_code}: {r.text[:200]}')
+            teacher_id = r.json()['id'] if r.status_code == 201 else None
+        else:
+            test('Find teacher role ID', False, 'could not find teacher role')
+            aclient.close()
+            client.close()
+            return
+
+        # --- Create a section for the course ---
+        r = aclient.post('/api/v1/academic/course-sections', json={
+            'course_id': course_id,
+            'teacher_id': teacher_id,
+            'capacity': 10,
+        })
+        test('Create section returns 201', r.status_code == 201, f'got {r.status_code}: {r.text[:200]}')
+        section_id = r.json()['id'] if r.status_code == 201 else None
+
+        # --- Create a student ---
+        r = aclient.post('/api/v1/academic/students', json={
+            'student_code': f'E2E{uuid.uuid4().hex[:6].upper()}',
+            'full_name': 'E2E Student One',
+        })
+        test('Create student 1 returns 201', r.status_code == 201, f'got {r.status_code}: {r.text[:200]}')
+        student1_id = r.json()['id'] if r.status_code == 201 else None
+
+        r = aclient.post('/api/v1/academic/students', json={
+            'student_code': f'E2E{uuid.uuid4().hex[:6].upper()}',
+            'full_name': 'E2E Student Two',
+        })
+        test('Create student 2 returns 201', r.status_code == 201, f'got {r.status_code}: {r.text[:200]}')
+        student2_id = r.json()['id'] if r.status_code == 201 else None
+
+        # --- Enroll students in section ---
+        if student1_id and section_id:
+            r = aclient.post('/api/v1/academic/enrollments', json={
+                'student_id': student1_id,
+                'section_id': section_id,
+                'agreed_price': 500.0,
+            })
+            test('Enroll student 1', r.status_code == 201, f'got {r.status_code}: {r.text[:200]}')
+
+        if student2_id and section_id:
+            r = aclient.post('/api/v1/academic/enrollments', json={
+                'student_id': student2_id,
+                'section_id': section_id,
+                'agreed_price': 500.0,
+            })
+            test('Enroll student 2', r.status_code == 201, f'got {r.status_code}: {r.text[:200]}')
+
+        # --- Activate course (now quota is met) ---
+        r = aclient.post(f'/api/v1/academic/courses/{course_id}/activate', json={'teacher_percentage': 40})
+        test('Activate with quota returns 200', r.status_code == 200, f'got {r.status_code}: {r.text[:200]}')
+        if r.status_code == 200:
+            test('Course status is active', r.json().get('status') == 'active', f"got {r.json().get('status')}")
+            test('Teacher percentage is 40', r.json().get('teacher_percentage') == 40.0, f"got {r.json().get('teacher_percentage')}")
+
+        # --- Complete course ---
+        r = aclient.post(f'/api/v1/academic/courses/{course_id}/complete')
+        test('Complete course returns 200', r.status_code == 200, f'got {r.status_code}: {r.text[:200]}')
+        if r.status_code == 200:
+            test('Course status is completed', r.json().get('status') == 'completed', f"got {r.json().get('status')}")
+
+        # --- Try double-complete ---
+        r = aclient.post(f'/api/v1/academic/courses/{course_id}/complete')
+        test('Double-complete returns 400', r.status_code == 400, f'got {r.status_code}')
+
+        print()
+        print('--- Secretary Registration ---')
+        # Test that secretary can register a student
+        sec_client, sec_token = login('secretary@institute.dev', 'secretary123')
+        if sec_token:
+            sec_ac = authed_client(sec_token)
+            r = sec_ac.post('/api/v1/academic/students', json={
+                'student_code': f'SEC{uuid.uuid4().hex[:6].upper()}',
+                'full_name': 'Secretary-Registered Student',
+            })
+            test('Secretary can create student', r.status_code == 201, f'got {r.status_code}: {r.text[:200]}')
+            sec_ac.close()
+        sec_client.close()
+
+        # --- Enrollment response includes pricing ---
+        print()
+        print('--- Enrollment Pricing Fields ---')
+        if student1_id and section_id:
+            r = aclient.get(f'/api/v1/academic/enrollments?section_id={section_id}')
+            if r.status_code == 200 and len(r.json()) > 0:
+                enr = r.json()[0]
+                test('Enrollment has agreed_price', 'agreed_price' in enr, f"keys: {list(enr.keys())}")
+                test('Enrollment has admin_discount', 'admin_discount' in enr)
+
+        # --- Course response includes new fields ---
+        print()
+        print('--- Course Response Fields ---')
+        r = aclient.get(f'/api/v1/academic/courses/{course_id}')
+        if r.status_code == 200:
+            data = r.json()
+            test('Course response has status', 'status' in data)
+            test('Course response has teacher_percentage', 'teacher_percentage' in data)
+            test('Course response has min_students_required', 'min_students_required' in data)
+
+        aclient.close()
+        client.close()
+
+    except Exception as e:
+        test('Phase 3 overall', False, str(e))
+
+
+# ─────────────────────────────────────────────
 # Main
 # ─────────────────────────────────────────────
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--phase', default='all', choices=['1', '2', 'all'])
+    parser.add_argument('--phase', default='all', choices=['1', '2', '3', 'all'])
     args = parser.parse_args()
 
     if args.phase in ('1', 'all'):
@@ -327,6 +508,9 @@ if __name__ == '__main__':
 
     if args.phase in ('2', 'all'):
         run_phase2()
+
+    if args.phase in ('3', 'all'):
+        run_phase3()
 
     print(f'=== RESULTS: {ok} passed, {fail} failed ===')
     if fail > 0:

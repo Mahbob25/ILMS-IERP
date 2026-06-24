@@ -1,7 +1,7 @@
 import uuid
 from datetime import date, datetime
 from typing import Optional
-from sqlalchemy import String, Integer, Float, Date, DateTime, ForeignKey, Text, UniqueConstraint, CheckConstraint
+from sqlalchemy import String, Integer, Float, Date, DateTime, ForeignKey, Text, Enum as SAEnum, UniqueConstraint, CheckConstraint
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
@@ -18,7 +18,7 @@ class Course(Base):
     code: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     credits: Mapped[int] = mapped_column(Integer, default=3, server_default="3")
-    status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending", server_default="pending")
+    status: Mapped[str] = mapped_column(SAEnum('pending', 'active', 'completed', name='coursestatus'), nullable=False, default="pending", server_default="pending")
     teacher_percentage: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     min_students_required: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
 

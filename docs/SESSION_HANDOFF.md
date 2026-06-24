@@ -20,9 +20,18 @@ We are implementing the v1.7 update (see `docs/Plan-v1.7.md`) — pausing AI ing
 - `GET /api/v1/auth/me` endpoint returns `{id, email, full_name, role, is_superadmin}`
 - All routers updated: `admin` → `manager`/`secretary` in RoleChecker calls
 
+**Phase 3 — Stateful Course Management**
+- `academic/service.py`: added `activate_course()`, `complete_course()`, `get_course_enrollment_count()`
+- `academic/schemas.py`: added `status`, `teacher_percentage`, `min_students_required` to Course schema; added `CourseActivate`; added `agreed_price`, `admin_discount` to Enrollment schema
+- `academic/router.py`: added `POST /courses/{id}/activate`, `POST /courses/{id}/complete`; secretary can register students via enrollment
+- Frontend `courses/page.tsx`: status badges, quota progress bar (enrolled/min_students_required), Activate button with teacher % input, Complete button, student registration modal, Refresh button
+- Frontend sidebar: `admin` → `manager`/`secretary`; terms removed; new financial pages (payments, expenses, teacher-wallet, daily-closures, POS) added
+- `academic/models.py`: `status` uses `SAEnum('coursestatus')` to match DB enum type
+- `lms/models.py`: `expenses.type` and `daily_closures.status` use SAEnum to match DB enum types
+
 ### End-to-End Tests
-- `backend/test_v1_7_e2e.py` — run with `--phase 1`, `--phase 2`, or `--phase all`
-- 56/56 tests currently passing
+- `backend/test_v1_7_e2e.py` — run with `--phase 1`, `--phase 2`, `--phase 3`, or `--phase all`
+- 76/77 tests currently passing (1 health-check failure during sequential phase run due to migration restart; each phase passes in isolation)
 - Uses `psycopg` directly + `httpx` with manual Cookie header (httpx on Windows maps `localhost` → `localhost.local` in cookie jar, breaking auto-forwarding)
 
 ---
@@ -86,8 +95,8 @@ DB runs in Docker: `docker compose up -d database` (port 5440 mapped to host).
 cd backend
 python test_v1_7_e2e.py --phase 1    # Schema tests only
 python test_v1_7_e2e.py --phase 2    # RBAC tests only
-python test_v1_7_e2e.py --phase all  # All 56 tests
-python test_phase3.py                 # Original Phase 3 LMS tests (will need updating for new roles)
+python test_v1_7_e2e.py --phase 3    # Course lifecycle tests only
+python test_v1_7_e2e.py --phase all  # All phases (76 tests; run phases individually after migration to avoid restart)
 ```
 
 ---
@@ -96,7 +105,6 @@ python test_phase3.py                 # Original Phase 3 LMS tests (will need up
 
 | Phase | Description | Scope |
 |---|---|---|
-| **3** | Course Management Redesign — state machine (pending→active→completed), activation, quota, frontend rewrite | BE + FE |
 | **4** | Financial Engine — payments endpoint, revenue split, teacher wallets, print templates | BE + FE |
 | **5** | Expenses & Withdrawals — expenses CRUD, teacher withdrawal, secretary advances | BE + FE |
 | **6** | Daily Closure — auditing state machine, lock enforcement, unlock requests, ledger view | BE + FE |
@@ -112,9 +120,10 @@ python test_phase3.py                 # Original Phase 3 LMS tests (will need up
 1. **httpx + Windows cookie bug**: `localhost` resolves to `localhost.local` in cookie jar. Always use `authed_client(token)` helper that passes Cookie header manually.
 2. **Backend Start-Process**: Must use `Start-Process -NoNewWindow` (not `Start-Job`), because `Start-Job` dies when PowerShell session ends. Use Python `.venv\Scripts\python.exe`.
 3. **Roles are data, not code**: The `Role` model is generic (just `id` + `name`). Role changes happen via data migrations, not model changes.
-4. **Frontend not yet started**: No frontend work has been done in v1.7 yet. Phase 3 will be the first FE work.
-5. **Existing test_phase3.py** may break because it uses hardcoded role names like `admin`. Will need updating in Phase 3 or later.
+4. **DB enum types must match SQLAlchemy model**: Columns using PostgreSQL ENUMs (`coursestatus`, `expensetype`, `closurystatus`) must use `SAEnum('val1', 'val2', name='enum_name')` in SQLAlchemy models — plain `String` causes `DatatypeMismatchError`.
+5. **test_phase3.py** references hardcoded UUIDs and uses `admin` role name. Needs updating before use.
 6. **DB URL**: Backend config uses `database:5432` (Docker hostname). Local dev tools connect via `localhost:5440`. Python test uses `postgresql://lims:lims_secure_pass@localhost:5440/lims`.
 7. **`is_superadmin` still used**: The `is_superadmin` boolean on `users` table is still present and bypasses RoleChecker. Phase 8 will clean this up.
-8. **Course sections still exist**: `course_sections` table was kept for backward compat with LMS (attendance, assignments). Will be refactored in Phase 3.
+8. **Course sections still exist**: `course_sections` table kept for backward compat with LMS (attendance, assignments). Phase 4+ may refactor.
 9. **Terms routes removed**: All `/api/v1/academic/terms/*` endpoints are gone.
+10. **Frontend v1.7 work started**: Courses page rewritten with status badges, quota, activation. Sidebar updated with new roles and financial page links (pages not yet built).

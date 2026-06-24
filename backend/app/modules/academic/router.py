@@ -6,7 +6,7 @@ from app.db.session import get_db
 from app.modules.identity.models import User
 from app.modules.identity.dependencies import get_current_user, RoleChecker
 from app.modules.academic.schemas import (
-    CourseCreate, CourseUpdate, CourseResponse,
+    CourseCreate, CourseUpdate, CourseResponse, CourseActivate,
     CourseSectionCreate, CourseSectionUpdate, CourseSectionResponse,
     StudentCreate, StudentUpdate, StudentResponse,
     EnrollmentCreate, EnrollmentResponse,
@@ -54,6 +54,38 @@ async def delete_course(
     deleted = await academic_service.delete_course(db, course_id)
     if not deleted:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
+
+@academic_router.post("/courses/{course_id}/activate", response_model=CourseResponse)
+async def activate_course(
+    course_id: uuid.UUID,
+    data: CourseActivate,
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])),
+    db: AsyncSession = Depends(get_db)
+):
+    course = await academic_service.activate_course(db, course_id, data.teacher_percentage)
+    if not course:
+        enrolled = await academic_service.get_course_enrollment_count(db, course_id)
+        min_req = (await academic_service.get_course(db, course_id))
+        min_req = min_req.min_students_required if min_req else 1
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot activate: enrolled ({enrolled}) < minimum required ({min_req}) or course not in pending status"
+        )
+    return course
+
+@academic_router.post("/courses/{course_id}/complete", response_model=CourseResponse)
+async def complete_course(
+    course_id: uuid.UUID,
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager"])),
+    db: AsyncSession = Depends(get_db)
+):
+    course = await academic_service.complete_course(db, course_id)
+    if not course:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot complete: course not in active status"
+        )
+    return course
 
 
 # --- Course Sections ---
@@ -161,7 +193,10 @@ async def create_enrollment(
     current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])),
     db: AsyncSession = Depends(get_db)
 ):
-    enrollment = await academic_service.create_enrollment(db, data.student_id, data.section_id)
+    enrollment = await academic_service.create_enrollment(
+        db, data.student_id, data.section_id,
+        agreed_price=data.agreed_price, admin_discount=data.admin_discount
+    )
     if enrollment is None:
         section = await academic_service.get_course_section(db, data.section_id)
         if not section:

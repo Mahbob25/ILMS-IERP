@@ -10,12 +10,16 @@ class CourseCreate(BaseModel):
     code: str
     description: Optional[str] = None
     credits: int = 3
+    teacher_percentage: Optional[float] = None
+    min_students_required: Optional[int] = None
 
 class CourseUpdate(BaseModel):
     name: Optional[str] = None
     code: Optional[str] = None
     description: Optional[str] = None
     credits: Optional[int] = None
+    teacher_percentage: Optional[float] = None
+    min_students_required: Optional[int] = None
 
 class CourseResponse(BaseModel):
     id: uuid.UUID
@@ -23,9 +27,15 @@ class CourseResponse(BaseModel):
     code: str
     description: Optional[str] = None
     credits: int
+    status: str = "pending"
+    teacher_percentage: Optional[float] = None
+    min_students_required: Optional[int] = None
 
     class Config:
         from_attributes = True
+
+class CourseActivate(BaseModel):
+    teacher_percentage: float
 
 
 # --- Course Section ---
@@ -75,12 +85,16 @@ class StudentResponse(BaseModel):
 class EnrollmentCreate(BaseModel):
     student_id: uuid.UUID
     section_id: uuid.UUID
+    agreed_price: Optional[float] = None
+    admin_discount: Optional[float] = None
 
 class EnrollmentResponse(BaseModel):
     id: uuid.UUID
     student_id: uuid.UUID
     section_id: uuid.UUID
     enrolled_at: datetime
+    agreed_price: Optional[float] = None
+    admin_discount: Optional[float] = None
 
     class Config:
         from_attributes = True

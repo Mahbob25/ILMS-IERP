@@ -1,7 +1,7 @@
 import uuid
 from datetime import date, datetime
 from typing import Optional, TYPE_CHECKING
-from sqlalchemy import String, Integer, Float, Date, DateTime, ForeignKey, Text, UniqueConstraint
+from sqlalchemy import String, Integer, Float, Date, DateTime, ForeignKey, Text, Enum as SAEnum, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
@@ -160,7 +160,7 @@ class Expense(Base):
     recipient_name: Mapped[str] = mapped_column(String(255), nullable=False)
     date: Mapped[date] = mapped_column(Date, nullable=False)
     receipt_number: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True)
-    type: Mapped[str] = mapped_column(String(30), nullable=False, default="general_expense", server_default="general_expense")
+    type: Mapped[str] = mapped_column(SAEnum('general_expense', 'teacher_withdrawal', 'secretary_advance', name='expensetype'), nullable=False, default="general_expense", server_default="general_expense")
 
 
 class TeacherWallet(Base):
@@ -184,7 +184,7 @@ class DailyClosure(Base):
     __tablename__ = "daily_closures"
 
     date: Mapped[date] = mapped_column(Date, primary_key=True)
-    status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending", server_default="pending")
+    status: Mapped[str] = mapped_column(SAEnum('closed', 'pending', 'unlock_requested', name='closurystatus'), nullable=False, default="pending", server_default="pending")
     closed_by_manager_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
