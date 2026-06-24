@@ -15,7 +15,11 @@ import {
   Menu,
   X,
   User as UserIcon,
-  ShieldCheck
+  ShieldCheck,
+  Calendar,
+  BookMarked,
+  GraduationCap,
+  ClipboardList
 } from "lucide-react";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -40,7 +44,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       menu: {
         dashboard: "لوحة التحكم",
         users: "المستخدمين",
-        courses: "المناهج والدورات",
+        terms: "الفصول الدراسية",
+        courses: "المقررات",
+        sections: "الشعب الدراسية",
+        students: "الطلاب",
+        enrollments: "التسجيلات",
         ingestion: "استيراد المناهج",
         systemHealth: "صحة النظام",
         backups: "النسخ الاحتياطي",
@@ -59,7 +67,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       menu: {
         dashboard: "Dashboard",
         users: "User Management",
-        courses: "Curriculums & Courses",
+        terms: "Academic Terms",
+        courses: "Courses",
+        sections: "Course Sections",
+        students: "Students",
+        enrollments: "Enrollments",
         ingestion: "Curriculum Ingestion",
         systemHealth: "System Health",
         backups: "Database Backups",
@@ -112,9 +124,33 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       roles: ["superadmin", "admin"]
     },
     {
+      name: t.menu.terms,
+      href: `/${locale}/dashboard/terms`,
+      icon: Calendar,
+      roles: ["superadmin", "admin", "teacher"]
+    },
+    {
       name: t.menu.courses,
       href: `/${locale}/dashboard/courses`,
       icon: BookOpen,
+      roles: ["superadmin", "admin", "teacher"]
+    },
+    {
+      name: t.menu.sections,
+      href: `/${locale}/dashboard/sections`,
+      icon: BookMarked,
+      roles: ["superadmin", "admin", "teacher"]
+    },
+    {
+      name: t.menu.students,
+      href: `/${locale}/dashboard/students`,
+      icon: GraduationCap,
+      roles: ["superadmin", "admin"]
+    },
+    {
+      name: t.menu.enrollments,
+      href: `/${locale}/dashboard/enrollments`,
+      icon: ClipboardList,
       roles: ["superadmin", "admin", "teacher"]
     },
     {
