@@ -2,7 +2,7 @@
 
 ## Current Status
 
-We are implementing the v1.7 update (see `docs/Plan-v1.7.md`) — pausing AI ingestion (original Phases 4-6), building an ERP/Accounting system instead. Terms abolished, Courses become stateful, 4 financial tables added.
+Phase 4 (Financial Engine) backend and frontend code is written but **not yet verified** — backend was restarted but new endpoints not yet tested end-to-end. Frontend build not yet run.
 
 ### ✅ Completed
 
@@ -29,10 +29,29 @@ We are implementing the v1.7 update (see `docs/Plan-v1.7.md`) — pausing AI ing
 - `academic/models.py`: `status` uses `SAEnum('coursestatus')` to match DB enum type
 - `lms/models.py`: `expenses.type` and `daily_closures.status` use SAEnum to match DB enum types
 
+**Phase 4 — Financial Engine (BACKEND written, NOT yet end-to-end verified)**
+- `lms/schemas.py`: added `PaymentCreate`, `PaymentResponse`, `TeacherWalletResponse`
+- `lms/financial_service.py`: `create_payment()` with revenue split logic, `list_payments()`, `get_payment()`, `get_next_receipt_number()`, `get_teacher_wallet()`, `get_student_payment_summary()`
+  - Revenue split: Teacher_Share = amount × teacher_percentage / 100, credited to `teacher_wallets` immediately
+  - Admin discount deducted from Institute_Share only
+  - Receipt numbers format: `RCP-YYYYMMDD-NNNN` (sequential per day)
+- `lms/router.py`: `POST /payments`, `GET /payments`, `GET /payments/{id}`, `GET /payments/summary/{student_id}/{course_id}`, `GET /teacher-wallets/{teacher_id}`
+- `lms/router.py`: route order fixed (`/summary/` before `/{id}`) to avoid UUID parse conflict
+- Frontend `payments/page.tsx`: list table, create form (student/course/amount/date), receipt preview modal with print, refresh button
+- Backend imports verified (all modules load without errors)
+
+### ❌ Phase 4 — Not Yet Done
+- End-to-end verification: the backend was restarted but new `/payments` endpoints not called with real data
+- Revenue split correctness: need to test $100 @ 40% → wallet gets $40; discount scenario
+- Sequential receipt numbers: need to verify increment works
+- Frontend `npm run build` — not run yet, zero type errors unconfirmed
+- Student balance indicator not integrated into frontend (backend endpoint exists)
+- Phase 4 e2e test not added to `test_v1_7_e2e.py`
+
 ### End-to-End Tests
 - `backend/test_v1_7_e2e.py` — run with `--phase 1`, `--phase 2`, `--phase 3`, or `--phase all`
-- 76/77 tests currently passing (1 health-check failure during sequential phase run due to migration restart; each phase passes in isolation)
-- Uses `psycopg` directly + `httpx` with manual Cookie header (httpx on Windows maps `localhost` → `localhost.local` in cookie jar, breaking auto-forwarding)
+- 76/77 tests currently passing
+- Phase 4 test not yet written
 
 ---
 
@@ -51,14 +70,14 @@ We are implementing the v1.7 update (see `docs/Plan-v1.7.md`) — pausing AI ing
 ### Tables (18 total)
 `assignments`, `attendance_records`, `attendance_sessions`, `audit_logs`, `course_sections`, `courses`, `daily_closures`, `enrollments`, `expenses`, `grades`, `payments`, `refresh_tokens`, `roles`, `students`, `submissions`, `teacher_wallets`, `users`, `alembic_version`
 
-### Key Schema Changes
-- `courses` has: `id`, `name`, `code`, `description`, `credits`, `status` (coursestatus enum), `teacher_percentage`, `min_students_required`
-- `enrollments` has: `id`, `student_id`, `section_id`, `enrolled_at`, `agreed_price`, `admin_discount`
-- `course_sections` has: `id`, `course_id`, `teacher_id`, `capacity`, `enrolled_count` (NO `term_id`)
-- `payments`: `student_id`, `course_id`, `amount`, `date`, `receipt_number` (unique)
-- `expenses`: `amount`, `description`, `recipient_name`, `date`, `receipt_number` (unique), `type` (expensetype enum)
-- `teacher_wallets`: `teacher_id` (unique FK→users), `balance`, `last_updated`
-- `daily_closures`: `date` (PK), `status` (closurystatus enum), `closed_by_manager_id`
+### New API Endpoints (Phase 4)
+| Method | Path | Auth | Purpose |
+|---|---|---|---|
+| POST | `/api/v1/lms/payments` | manager/secretary/superadmin | Create payment with revenue split |
+| GET | `/api/v1/lms/payments` | all authenticated | List payments (filters: student_id, course_id, date_from, date_to) |
+| GET | `/api/v1/lms/payments/summary/{student_id}/{course_id}` | all authenticated | Student balance: total_paid, agreed_price, balance_remaining |
+| GET | `/api/v1/lms/payments/{payment_id}` | all authenticated | Single payment detail |
+| GET | `/api/v1/lms/teacher-wallets/{teacher_id}` | all authenticated | Teacher wallet balance |
 
 ---
 
@@ -79,6 +98,8 @@ We are implementing the v1.7 update (see `docs/Plan-v1.7.md`) — pausing AI ing
 
 ```powershell
 cd backend
+# Kill existing:
+Get-Process -Name python | Where-Object { $_.CommandLine -match "uvicorn" } | Stop-Process -Force
 # Start:
 Start-Process -NoNewWindow -FilePath ".venv\Scripts\python.exe" -ArgumentList "-m uvicorn app.main:app --host 0.0.0.0 --port 8000 --log-level warning"
 # Test:
@@ -89,29 +110,36 @@ DB runs in Docker: `docker compose up -d database` (port 5440 mapped to host).
 
 ---
 
-## How to Run Tests
+## How to Test Phase 4 (Quick Smoke Test)
 
 ```powershell
 cd backend
-python test_v1_7_e2e.py --phase 1    # Schema tests only
-python test_v1_7_e2e.py --phase 2    # RBAC tests only
-python test_v1_7_e2e.py --phase 3    # Course lifecycle tests only
-python test_v1_7_e2e.py --phase all  # All phases (76 tests; run phases individually after migration to avoid restart)
+# Login as superadmin, create payment, check wallet:
+& ".\.venv\Scripts\python.exe" -c "
+import httpx, json
+base = 'http://localhost:8000'
+c = httpx.Client(base_url=base)
+r = c.post('/api/v1/auth/login', json={'email':'superadmin@institute.dev','password':'admin123'})
+token = [h.split(';')[0].split('=',1)[1] for h in r.headers.get_list('set-cookie') if h.startswith('access_token=')][0]
+ac = httpx.Client(base_url=base, headers={'Cookie': f'access_token={token}'})
+# Create a course, section, student, enrollment, then payment
+print('Logged in, token:', token[:20])
+"
 ```
 
 ---
 
 ## Remaining Phases (from `docs/Plan-v1.7-implementation.md`)
 
-| Phase | Description | Scope |
-|---|---|---|
-| **4** | Financial Engine — payments endpoint, revenue split, teacher wallets, print templates | BE + FE |
-| **5** | Expenses & Withdrawals — expenses CRUD, teacher withdrawal, secretary advances | BE + FE |
-| **6** | Daily Closure — auditing state machine, lock enforcement, unlock requests, ledger view | BE + FE |
-| **7** | Frontend — RefreshButton component, role-based sidebar, POS data pages | FE only |
-| **8** | Role Data Cleanup — idempotent migration, remove `is_superadmin` from API responses | BE only |
-| **9** | POS Interface — streamlined payment UI with quick-amounts, keyboard shortcuts | FE only |
-| **10** | Integration Testing — comprehensive end-to-end test suite across all phases | BE + FE |
+| Phase | Description | Scope | Status |
+|---|---|---|---|
+| **4** | Financial Engine — payments endpoint, revenue split, teacher wallets, print templates | BE + FE | **Code written, needs verification** |
+| **5** | Expenses & Withdrawals — expenses CRUD, teacher withdrawal, secretary advances | BE + FE | Not started |
+| **6** | Daily Closure — auditing state machine, lock enforcement, unlock requests, ledger view | BE + FE | Not started |
+| **7** | Frontend — RefreshButton component, role-based sidebar, POS data pages | FE only | Not started |
+| **8** | Role Data Cleanup — idempotent migration, remove `is_superadmin` from API responses | BE only | Not started |
+| **9** | POS Interface — streamlined payment UI with quick-amounts, keyboard shortcuts | FE only | Not started |
+| **10** | Integration Testing — comprehensive end-to-end test suite across all phases | BE + FE | Not started |
 
 ---
 
@@ -126,4 +154,8 @@ python test_v1_7_e2e.py --phase all  # All phases (76 tests; run phases individu
 7. **`is_superadmin` still used**: The `is_superadmin` boolean on `users` table is still present and bypasses RoleChecker. Phase 8 will clean this up.
 8. **Course sections still exist**: `course_sections` table kept for backward compat with LMS (attendance, assignments). Phase 4+ may refactor.
 9. **Terms routes removed**: All `/api/v1/academic/terms/*` endpoints are gone.
-10. **Frontend v1.7 work started**: Courses page rewritten with status badges, quota, activation. Sidebar updated with new roles and financial page links (pages not yet built).
+10. **Frontend v1.7 work started**: Courses page rewritten with status badges, quota, activation. Sidebar updated with new roles and financial page links.
+11. **Phase 4 not yet verified**: Payment endpoints are coded but need end-to-end testing — run a quick smoke test (create course → section → student → enrollment → payment → check wallet) and verify `npm run build` passes.
+12. **Killing port 8000**: Use `netstat -ano | Select-String ":8000"` to find PID, then use a non-reserved variable name (e.g. `$procId`, not `$pid`) to `Stop-Process -Id $procId -Force`.
+
+(End of file - total 155 lines)

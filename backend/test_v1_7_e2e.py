@@ -1,12 +1,13 @@
 """
 E2E Tests for v1.7 ERP Implementation
 
-Run with:  python test_v1_7_e2e.py [--phase 1|2|3|all]
+Run with:  python test_v1_7_e2e.py [--phase 1|2|3|4|all]
 
 Phases:
   1 - Schema migration (tables, columns, enums, downgrade cycle)
   2 - RBAC refinement (roles, gates, /auth/me, role enforcement)
   3 - Stateful course management (activate, complete, quota, enrollment)
+  4 - Financial Engine (payments, revenue split, teacher wallets, receipt numbers)
 """
 
 import sys
@@ -101,6 +102,75 @@ def authed_client(token):
     client = httpx.Client(base_url=BASE)
     client.headers["Cookie"] = f"access_token={token}"
     return client
+
+
+def check_services(exit_on_fail=True):
+    """Verify backend, frontend, database, and Caddy are running. Informs user if not."""
+    import socket
+    all_ok = True
+
+    print('Checking required services...')
+    print()
+
+    # Backend (port 8000)
+    try:
+        r = httpx.get('http://localhost:8000/api/v1/health', timeout=5)
+        ok = r.status_code == 200
+        if ok:
+            print(f'  [OK] Backend   — http://localhost:8000/api/v1/health  (v{r.json().get("version","?")})')
+        else:
+            print(f'  [FAIL] Backend — http://localhost:8000/api/v1/health  (HTTP {r.status_code})')
+        all_ok = all_ok and ok
+    except Exception as e:
+        print(f'  [FAIL] Backend   — http://localhost:8000  — {e}')
+        all_ok = False
+
+    # Frontend (port 3000)
+    try:
+        r = httpx.get('http://localhost:3000', timeout=5)
+        if r.status_code < 500:
+            print(f'  [OK] Frontend  — http://localhost:3000  (HTTP {r.status_code})')
+        else:
+            print(f'  [FAIL] Frontend — http://localhost:3000  (HTTP {r.status_code})')
+            all_ok = False
+    except Exception as e:
+        print(f'  [FAIL] Frontend  — http://localhost:3000  — {e}')
+        all_ok = False
+
+    # Database (port 5440)
+    try:
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT version()")
+                ver = cur.fetchone()[0][:40]
+            print(f'  [OK] Database  — localhost:5440/lims  ({ver})')
+    except Exception as e:
+        print(f'  [FAIL] Database  — localhost:5440/lims  — {e}')
+        all_ok = False
+
+    # Caddy (port 80)
+    try:
+        r = httpx.get('http://localhost:80', timeout=5, follow_redirects=False)
+        print(f'  [OK] Caddy     — http://localhost:80  (HTTP {r.status_code})')
+    except Exception as e:
+        print(f'  [FAIL] Caddy     — http://localhost:80  — {e}')
+        all_ok = False
+
+    print()
+    if all_ok:
+        print('All services are running.')
+        print()
+    else:
+        print('Some services are not running. Please start them before running tests.')
+        print('  Backend:  Start-Process -NoNewWindow -FilePath ".venv/Scripts/python.exe" -ArgumentList "-m uvicorn app.main:app --host 0.0.0.0 --port 8000 --log-level warning" -WorkingDirectory "backend"')
+        print('  Frontend: Start-Process -NoNewWindow -FilePath "npm" -ArgumentList "run dev" -WorkingDirectory "frontend"')
+        print('  Database: docker compose up -d database  (from project root)')
+        print('  Caddy:    docker compose up -d caddy     (from project root)')
+        print()
+        if exit_on_fail:
+            sys.exit(1)
+
+    return all_ok
 
 
 # ─────────────────────────────────────────────
@@ -496,12 +566,292 @@ def run_phase3():
 
 
 # ─────────────────────────────────────────────
+# PHASE 4: Financial Engine
+# ─────────────────────────────────────────────
+def run_phase4():
+    print('=' * 60)
+    print('PHASE 4: Financial Engine — Payments, Revenue Split, Wallets')
+    print('=' * 60)
+    print()
+
+    try:
+        client, token = login('superadmin@institute.dev', 'admin123')
+        test('Login as superadmin succeeds', token is not None)
+        if not token:
+            print('  SKIP — cannot log in')
+            return
+        aclient = authed_client(token)
+
+        # --- Setup: create course, section, student, enrollment, activate ---
+        print('--- Test Setup ---')
+        r = aclient.post('/api/v1/academic/courses', json={
+            'name': 'E2E Finance Test Course',
+            'code': f'FIN{uuid.uuid4().hex[:6].upper()}',
+            'credits': 3,
+            'min_students_required': 1,
+        })
+        test('Create course returns 201', r.status_code == 201, f'got {r.status_code}')
+        if r.status_code != 201:
+            aclient.close(); client.close()
+            return
+        course = r.json()
+        course_id = course['id']
+
+        # Get teacher role ID from DB
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT id FROM roles WHERE name='teacher'")
+                row = cur.fetchone()
+                teacher_role_id = str(row[0]) if row else None
+        if not teacher_role_id:
+            test('Find teacher role ID', False)
+            aclient.close(); client.close()
+            return
+
+        r = aclient.post('/api/v1/users', json={
+            'email': f'teacher.fin.{uuid.uuid4().hex[:6]}@test.dev',
+            'password': 'test123456',
+            'full_name': 'Finance E2E Teacher',
+            'role_id': teacher_role_id,
+        })
+        test('Create teacher returns 201', r.status_code == 201, f'got {r.status_code}')
+        if r.status_code != 201:
+            aclient.close(); client.close()
+            return
+        teacher_id = r.json()['id']
+
+        r = aclient.post('/api/v1/academic/course-sections', json={
+            'course_id': course_id,
+            'teacher_id': teacher_id,
+            'capacity': 10,
+        })
+        test('Create section returns 201', r.status_code == 201, f'got {r.status_code}')
+        if r.status_code != 201:
+            aclient.close(); client.close()
+            return
+        section_id = r.json()['id']
+
+        r = aclient.post('/api/v1/academic/students', json={
+            'student_code': f'FIN{uuid.uuid4().hex[:6].upper()}',
+            'full_name': 'Finance E2E Student',
+        })
+        test('Create student returns 201', r.status_code == 201, f'got {r.status_code}')
+        if r.status_code != 201:
+            aclient.close(); client.close()
+            return
+        student_id = r.json()['id']
+
+        r = aclient.post('/api/v1/academic/enrollments', json={
+            'student_id': student_id,
+            'section_id': section_id,
+            'agreed_price': 500.0,
+            'admin_discount': 0.0,
+        })
+        test('Create enrollment with agreed_price', r.status_code == 201, f'got {r.status_code}')
+        if r.status_code != 201:
+            aclient.close(); client.close()
+            return
+
+        r = aclient.post(f'/api/v1/academic/courses/{course_id}/activate', json={'teacher_percentage': 40})
+        test('Activate course with 40% teacher share', r.status_code == 200, f'got {r.status_code}')
+        if r.status_code != 200:
+            aclient.close(); client.close()
+            return
+
+        # --- Payment: $100 @ 40% teacher share → wallet should get $40 ---
+        print()
+        print('--- Revenue Split Correctness ---')
+        r = aclient.post('/api/v1/lms/payments', json={
+            'student_id': student_id,
+            'course_id': course_id,
+            'amount': 100.0,
+        })
+        test('Create $100 payment returns 201', r.status_code == 201, f'got {r.status_code}: {r.text[:200]}')
+        if r.status_code != 201:
+            aclient.close(); client.close()
+            return
+        payment1 = r.json()
+        test('Payment has receipt_number', 'receipt_number' in payment1)
+        receipt1 = payment1.get('receipt_number', '')
+        test('Receipt format RCP-YYYYMMDD-NNNN', len(receipt1) > 0 and receipt1.startswith('RCP-'), f'got {receipt1}')
+        parts = receipt1.split('-')
+        test('Receipt has 4 parts', len(parts) == 4, f'got {receipt1}')
+        if len(parts) == 4:
+            test('Receipt seq is 4 digits', len(parts[3]) == 4, f'got {parts[3]}')
+        test('Receipt seq starts at 0001', receipt1.endswith('-0001'), f'got {receipt1}')
+
+        # Check teacher wallet credited $40
+        r = aclient.get(f'/api/v1/lms/teacher-wallets/{teacher_id}')
+        test('Teacher wallet endpoint returns 200', r.status_code == 200, f'got {r.status_code}')
+        if r.status_code == 200:
+            wallet = r.json()
+            expected_balance = 40.0
+            test(f'Teacher wallet balance = ${expected_balance} (40% of $100)', abs(wallet.get('balance', 0) - expected_balance) < 0.01, f"got {wallet.get('balance')}")
+            test('Wallet has teacher_id', wallet.get('teacher_id') == teacher_id)
+            test('Wallet has last_updated', 'last_updated' in wallet)
+
+        # --- Second payment: $50 → receipt increments ---
+        print()
+        print('--- Sequential Receipt Numbers ---')
+        r = aclient.post('/api/v1/lms/payments', json={
+            'student_id': student_id,
+            'course_id': course_id,
+            'amount': 50.0,
+        })
+        test('Create $50 payment returns 201', r.status_code == 201, f'got {r.status_code}')
+        if r.status_code == 201:
+            payment2 = r.json()
+            receipt2 = payment2.get('receipt_number', '')
+            test(f'Second receipt increments to {receipt2.replace("0001", "0002")}', receipt2.endswith('-0002'), f'got {receipt2}')
+
+        # Wallet should now have $40 + $20 = $60
+        if r.status_code == 201:
+            r = aclient.get(f'/api/v1/lms/teacher-wallets/{teacher_id}')
+            if r.status_code == 200:
+                wallet = r.json()
+                test('Wallet balance = $60 after second payment', abs(wallet.get('balance', 0) - 60.0) < 0.01, f"got {wallet.get('balance')}")
+
+        # --- Student payment summary ---
+        print()
+        print('--- Student Payment Summary ---')
+        r = aclient.get(f'/api/v1/lms/payments/summary/{student_id}/{course_id}')
+        test('Summary endpoint returns 200', r.status_code == 200, f'got {r.status_code}')
+        if r.status_code == 200:
+            summary = r.json()
+            test('Summary has total_paid=$150', abs(summary.get('total_paid', 0) - 150.0) < 0.01, f"got {summary.get('total_paid')}")
+            test('Summary has agreed_price=$500', abs(summary.get('agreed_price', 0) - 500.0) < 0.01, f"got {summary.get('agreed_price')}")
+            test('Summary has balance_remaining=$350', abs(summary.get('balance_remaining', 0) - 350.0) < 0.01, f"got {summary.get('balance_remaining')}")
+
+        # --- List payments ---
+        print()
+        print('--- List Payments ---')
+        r = aclient.get('/api/v1/lms/payments')
+        test('List payments returns 200', r.status_code == 200, f'got {r.status_code}')
+        if r.status_code == 200:
+            payments = r.json()
+            test('At least 2 payments in list', len(payments) >= 2, f'got {len(payments)}')
+
+        # Filter by student_id
+        r = aclient.get(f'/api/v1/lms/payments?student_id={student_id}')
+        test('Filter by student_id', r.status_code == 200, f'got {r.status_code}')
+        if r.status_code == 200:
+            filtered = r.json()
+            all_match = all(p.get('student_id') == student_id for p in filtered)
+            test('All filtered payments match student_id', all_match, f'got {len(filtered)} payments')
+
+        # --- Get single payment ---
+        print()
+        print('--- Get Single Payment ---')
+        r = aclient.get(f'/api/v1/lms/payments/{payment1["id"]}')
+        test('Get payment by ID returns 200', r.status_code == 200, f'got {r.status_code}')
+        if r.status_code == 200:
+            p = r.json()
+            test('Payment amount matches', abs(p.get('amount', 0) - 100.0) < 0.01, f"got {p.get('amount')}")
+            test('Payment receipt_number matches', p.get('receipt_number') == receipt1, f"got {p.get('receipt_number')}")
+
+        # --- Error: payment not found ---
+        fake_id = '00000000-0000-0000-0000-000000000000'
+        r = aclient.get(f'/api/v1/lms/payments/{fake_id}')
+        test('Non-existent payment returns 404', r.status_code == 404, f'got {r.status_code}')
+
+        # --- Error: create payment for non-existent course ---
+        r = aclient.post('/api/v1/lms/payments', json={
+            'student_id': student_id,
+            'course_id': fake_id,
+            'amount': 10.0,
+        })
+        test('Payment for non-existent course returns 404', r.status_code == 404, f'got {r.status_code}')
+
+        # --- Role gates: teacher cannot create payments ---
+        print()
+        print('--- Role Gate Enforcement ---')
+        r = aclient.get('/api/v1/users')
+        teacher_email = None
+        if r.status_code == 200:
+            for u in r.json():
+                if u.get('id') == teacher_id:
+                    teacher_email = u.get('email')
+                    break
+
+        if teacher_email:
+            t_client, t_token = login(teacher_email, 'test123456')
+            if t_token:
+                t_ac = authed_client(t_token)
+                r = t_ac.post('/api/v1/lms/payments', json={
+                    'student_id': student_id,
+                    'course_id': course_id,
+                    'amount': 10.0,
+                })
+                test('Teacher cannot create payment (403)', r.status_code == 403, f'got {r.status_code}')
+                t_ac.close()
+            t_client.close()
+
+        # --- Manager can create payment ---
+        print()
+        print('--- Manager Permissions ---')
+        m_client, m_token = login('manager@institute.dev', 'manager123')
+        if m_token:
+            m_ac = authed_client(m_token)
+            r = m_ac.post('/api/v1/lms/payments', json={
+                'student_id': student_id,
+                'course_id': course_id,
+                'amount': 25.0,
+            })
+            test('Manager can create payment', r.status_code == 201, f'got {r.status_code}')
+            m_ac.close()
+        m_client.close()
+
+        # --- Secretary can create payment ---
+        s_client, s_token = login('secretary@institute.dev', 'secretary123')
+        if s_token:
+            s_ac = authed_client(s_token)
+            r = s_ac.post('/api/v1/lms/payments', json={
+                'student_id': student_id,
+                'course_id': course_id,
+                'amount': 30.0,
+            })
+            test('Secretary can create payment', r.status_code == 201, f'got {r.status_code}')
+            s_ac.close()
+        s_client.close()
+
+        # --- Unauthenticated access ---
+        print()
+        print('--- Unauthenticated Access ---')
+        anon = httpx.Client(base_url=BASE)
+        r = anon.post('/api/v1/lms/payments', json={
+            'student_id': student_id, 'course_id': course_id, 'amount': 10.0,
+        })
+        test('Anonymous cannot create payment (401)', r.status_code == 401, f'got {r.status_code}')
+        r = anon.get('/api/v1/lms/payments')
+        test('Anonymous cannot list payments (401)', r.status_code == 401, f'got {r.status_code}')
+        anon.close()
+
+        print()
+        print('--- Cleanup ---')
+        # Teacher wallet should have $60 (from 2 payments: $100 + $50)
+        r = aclient.get(f'/api/v1/lms/teacher-wallets/{teacher_id}')
+        if r.status_code == 200:
+            wallet = r.json()
+            test('Final wallet balance = $60', abs(wallet.get('balance', 0) - 60.0) < 0.01, f"got {wallet.get('balance')}")
+
+        aclient.close()
+        client.close()
+
+    except Exception as e:
+        test('Phase 4 overall', False, str(e))
+
+
+# ─────────────────────────────────────────────
 # Main
 # ─────────────────────────────────────────────
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--phase', default='all', choices=['1', '2', '3', 'all'])
+    parser.add_argument('--phase', default='all', choices=['1', '2', '3', '4', 'all'])
+    parser.add_argument('--skip-checks', action='store_true', help='Skip service health checks')
     args = parser.parse_args()
+
+    if not args.skip_checks:
+        check_services()
 
     if args.phase in ('1', 'all'):
         run_phase1()
@@ -511,6 +861,9 @@ if __name__ == '__main__':
 
     if args.phase in ('3', 'all'):
         run_phase3()
+
+    if args.phase in ('4', 'all'):
+        run_phase4()
 
     print(f'=== RESULTS: {ok} passed, {fail} failed ===')
     if fail > 0:

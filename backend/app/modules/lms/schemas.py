@@ -91,3 +91,32 @@ class GradeResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# --- Payments ---
+class PaymentCreate(BaseModel):
+    student_id: uuid.UUID
+    course_id: uuid.UUID
+    amount: float
+    date: Optional[date] = None
+
+class PaymentResponse(BaseModel):
+    id: uuid.UUID
+    student_id: uuid.UUID
+    course_id: uuid.UUID
+    amount: float
+    date: date
+    receipt_number: str
+
+    class Config:
+        from_attributes = True
+
+
+# --- Teacher Wallet ---
+class TeacherWalletResponse(BaseModel):
+    teacher_id: uuid.UUID
+    balance: float
+    last_updated: datetime
+
+    class Config:
+        from_attributes = True

@@ -12,8 +12,11 @@ from app.modules.lms.schemas import (
     AttendanceRecordResponse, AttendanceSubmit,
     AssignmentCreate, AssignmentUpdate, AssignmentResponse,
     SubmissionResponse, GradeCreate, GradeResponse,
+    PaymentCreate, PaymentResponse,
+    TeacherWalletResponse,
 )
 from app.modules.lms import service as lms_service
+from app.modules.lms import financial_service
 from app.core.storage import save_upload
 
 lms_router = APIRouter(prefix="/lms", tags=["lms"])
@@ -168,3 +171,62 @@ async def list_grades(
     db: AsyncSession = Depends(get_db)
 ):
     return await lms_service.list_grades_for_assignment(db, assignment_id)
+
+
+# --- Payments ---
+@lms_router.post("/payments", response_model=PaymentResponse, status_code=status.HTTP_201_CREATED)
+async def create_payment(
+    data: PaymentCreate,
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])),
+    db: AsyncSession = Depends(get_db)
+):
+    payment = await financial_service.create_payment(
+        db, data.student_id, data.course_id, data.amount, data.date
+    )
+    if not payment:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
+    return payment
+
+@lms_router.get("/payments", response_model=list[PaymentResponse])
+async def list_payments(
+    student_id: Optional[uuid.UUID] = None,
+    course_id: Optional[uuid.UUID] = None,
+    date_from: Optional[date] = None,
+    date_to: Optional[date] = None,
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary", "teacher"])),
+    db: AsyncSession = Depends(get_db)
+):
+    return await financial_service.list_payments(db, student_id, course_id, date_from, date_to)
+
+@lms_router.get("/payments/summary/{student_id}/{course_id}")
+async def get_payment_summary(
+    student_id: uuid.UUID,
+    course_id: uuid.UUID,
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary", "teacher"])),
+    db: AsyncSession = Depends(get_db)
+):
+    return await financial_service.get_student_payment_summary(db, student_id, course_id)
+
+@lms_router.get("/payments/{payment_id}", response_model=PaymentResponse)
+async def get_payment(
+    payment_id: uuid.UUID,
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary", "teacher"])),
+    db: AsyncSession = Depends(get_db)
+):
+    payment = await financial_service.get_payment(db, payment_id)
+    if not payment:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Payment not found")
+    return payment
+
+
+# --- Teacher Wallets ---
+@lms_router.get("/teacher-wallets/{teacher_id}", response_model=TeacherWalletResponse)
+async def get_teacher_wallet(
+    teacher_id: uuid.UUID,
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary", "teacher"])),
+    db: AsyncSession = Depends(get_db)
+):
+    wallet = await financial_service.get_teacher_wallet(db, teacher_id)
+    if not wallet:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Teacher wallet not found")
+    return wallet
