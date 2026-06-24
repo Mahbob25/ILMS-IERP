@@ -6,7 +6,6 @@ from app.db.session import get_db
 from app.modules.identity.models import User
 from app.modules.identity.dependencies import get_current_user, RoleChecker
 from app.modules.academic.schemas import (
-    TermCreate, TermUpdate, TermResponse,
     CourseCreate, CourseUpdate, CourseResponse,
     CourseSectionCreate, CourseSectionUpdate, CourseSectionResponse,
     StudentCreate, StudentUpdate, StudentResponse,
@@ -15,46 +14,6 @@ from app.modules.academic.schemas import (
 from app.modules.academic import service as academic_service
 
 academic_router = APIRouter(prefix="/academic", tags=["academic"])
-
-
-# --- Terms ---
-@academic_router.get("/terms", response_model=list[TermResponse])
-async def list_terms(
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
-):
-    return await academic_service.list_terms(db)
-
-@academic_router.post("/terms", response_model=TermResponse, status_code=status.HTTP_201_CREATED)
-async def create_term(
-    data: TermCreate,
-    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "admin"])),
-    db: AsyncSession = Depends(get_db)
-):
-    return await academic_service.create_term(db, data.model_dump())
-
-@academic_router.put("/terms/{term_id}", response_model=TermResponse)
-async def update_term(
-    term_id: uuid.UUID,
-    data: TermUpdate,
-    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "admin"])),
-    db: AsyncSession = Depends(get_db)
-):
-    cleaned = {k: v for k, v in data.model_dump().items() if v is not None}
-    term = await academic_service.update_term(db, term_id, cleaned)
-    if not term:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Term not found")
-    return term
-
-@academic_router.delete("/terms/{term_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_term(
-    term_id: uuid.UUID,
-    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin"])),
-    db: AsyncSession = Depends(get_db)
-):
-    deleted = await academic_service.delete_term(db, term_id)
-    if not deleted:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Term not found")
 
 
 # --- Courses ---

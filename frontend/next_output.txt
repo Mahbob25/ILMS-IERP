@@ -15,3 +15,4 @@
  ○ Compiling /[locale]/login ...
  ✓ Compiled /[locale]/login in 1582ms (732 modules)
  GET /ar/login 200 in 3959ms
+[?25h

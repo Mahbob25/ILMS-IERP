@@ -15,7 +15,7 @@ limiter = Limiter(key_func=get_remote_address)
 app = FastAPI(
     title="LIMS API Server",
     description="Learning Institution Management System Core API Server (Lean MVP)",
-    version="1.6"
+    version="1.7"
 )
 
 # Attach rate limiter to app state and exception handler
@@ -41,4 +41,4 @@ app.include_router(lms_router, prefix="/api/v1")
 @app.get("/api/v1/health", tags=["system"])
 async def health_check():
     """Foundational api status health check."""
-    return {"status": "ok", "service": "lims-api-server", "version": "1.6"}
+    return {"status": "ok", "service": "lims-api-server", "version": "1.7"}

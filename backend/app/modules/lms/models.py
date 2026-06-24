@@ -130,3 +130,61 @@ class Grade(Base):
     submission: Mapped[Submission] = relationship(back_populates="grade")
 
 
+class Payment(Base):
+    __tablename__ = "payments"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4,
+        server_default="gen_random_uuid()"
+    )
+    student_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("students.id", ondelete="RESTRICT"), nullable=False
+    )
+    course_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("courses.id", ondelete="RESTRICT"), nullable=False
+    )
+    amount: Mapped[float] = mapped_column(Float, nullable=False)
+    date: Mapped[date] = mapped_column(Date, nullable=False)
+    receipt_number: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True)
+
+
+class Expense(Base):
+    __tablename__ = "expenses"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4,
+        server_default="gen_random_uuid()"
+    )
+    amount: Mapped[float] = mapped_column(Float, nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    recipient_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    date: Mapped[date] = mapped_column(Date, nullable=False)
+    receipt_number: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True)
+    type: Mapped[str] = mapped_column(String(30), nullable=False, default="general_expense", server_default="general_expense")
+
+
+class TeacherWallet(Base):
+    __tablename__ = "teacher_wallets"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4,
+        server_default="gen_random_uuid()"
+    )
+    teacher_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, unique=True
+    )
+    balance: Mapped[float] = mapped_column(Float, nullable=False, default=0, server_default="0")
+    last_updated: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False,
+        server_default="timezone('utc'::text, now())"
+    )
+
+
+class DailyClosure(Base):
+    __tablename__ = "daily_closures"
+
+    date: Mapped[date] = mapped_column(Date, primary_key=True)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending", server_default="pending")
+    closed_by_manager_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )

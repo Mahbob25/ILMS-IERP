@@ -1,25 +1,10 @@
 import uuid
 from datetime import date, datetime
-from sqlalchemy import String, Integer, Boolean, Date, DateTime, ForeignKey, Text, UniqueConstraint, CheckConstraint
+from typing import Optional
+from sqlalchemy import String, Integer, Float, Date, DateTime, ForeignKey, Text, UniqueConstraint, CheckConstraint
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
-
-
-class Term(Base):
-    __tablename__ = "terms"
-
-    id: Mapped[uuid.UUID] = mapped_column(
-        PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4,
-        server_default="gen_random_uuid()"
-    )
-    name: Mapped[str] = mapped_column(String(255), nullable=False)
-    code: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True)
-    start_date: Mapped[date] = mapped_column(Date, nullable=False)
-    end_date: Mapped[date] = mapped_column(Date, nullable=False)
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
-
-    sections: Mapped[list["CourseSection"]] = relationship(back_populates="term")
 
 
 class Course(Base):
@@ -33,6 +18,9 @@ class Course(Base):
     code: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     credits: Mapped[int] = mapped_column(Integer, default=3, server_default="3")
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending", server_default="pending")
+    teacher_percentage: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    min_students_required: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
 
     sections: Mapped[list["CourseSection"]] = relationship(back_populates="course")
 
@@ -51,9 +39,6 @@ class CourseSection(Base):
     course_id: Mapped[uuid.UUID] = mapped_column(
         PG_UUID(as_uuid=True), ForeignKey("courses.id", ondelete="CASCADE"), nullable=False
     )
-    term_id: Mapped[uuid.UUID] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("terms.id", ondelete="CASCADE"), nullable=False
-    )
     teacher_id: Mapped[uuid.UUID] = mapped_column(
         PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
     )
@@ -61,7 +46,6 @@ class CourseSection(Base):
     enrolled_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
 
     course: Mapped[Course] = relationship(back_populates="sections")
-    term: Mapped[Term] = relationship(back_populates="sections")
     enrollments: Mapped[list["Enrollment"]] = relationship(back_populates="section")
     attendance_sessions: Mapped[list["AttendanceSession"]] = relationship(back_populates="section")
     assignments: Mapped[list["Assignment"]] = relationship(back_populates="section")
@@ -101,6 +85,8 @@ class Enrollment(Base):
         DateTime, nullable=False,
         server_default="timezone('utc'::text, now())"
     )
+    agreed_price: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    admin_discount: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
 
     student: Mapped[Student] = relationship(back_populates="enrollments")
     section: Mapped[CourseSection] = relationship(back_populates="enrollments")

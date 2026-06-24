@@ -4,40 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import joinedload
 from sqlalchemy import func, update
-from app.modules.academic.models import Term, Course, CourseSection, Student, Enrollment
-
-
-# --- Term CRUD ---
-async def create_term(db: AsyncSession, data: dict) -> Term:
-    term = Term(**data)
-    db.add(term)
-    await db.flush()
-    return term
-
-async def get_term(db: AsyncSession, term_id: uuid.UUID) -> Optional[Term]:
-    result = await db.execute(select(Term).where(Term.id == term_id))
-    return result.scalar_one_or_none()
-
-async def list_terms(db: AsyncSession) -> list[Term]:
-    result = await db.execute(select(Term).order_by(Term.start_date.desc()))
-    return result.scalars().all()
-
-async def update_term(db: AsyncSession, term_id: uuid.UUID, data: dict) -> Optional[Term]:
-    term = await get_term(db, term_id)
-    if not term:
-        return None
-    for key, value in data.items():
-        setattr(term, key, value)
-    await db.flush()
-    return term
-
-async def delete_term(db: AsyncSession, term_id: uuid.UUID) -> bool:
-    term = await get_term(db, term_id)
-    if not term:
-        return False
-    await db.delete(term)
-    await db.flush()
-    return True
+from app.modules.academic.models import Course, CourseSection, Student, Enrollment
 
 
 # --- Course CRUD ---

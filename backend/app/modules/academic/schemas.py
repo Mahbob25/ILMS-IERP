@@ -4,33 +4,6 @@ from typing import Optional
 from pydantic import BaseModel, Field
 
 
-# --- Term ---
-class TermCreate(BaseModel):
-    name: str
-    code: str
-    start_date: date
-    end_date: date
-    is_active: bool = True
-
-class TermUpdate(BaseModel):
-    name: Optional[str] = None
-    code: Optional[str] = None
-    start_date: Optional[date] = None
-    end_date: Optional[date] = None
-    is_active: Optional[bool] = None
-
-class TermResponse(BaseModel):
-    id: uuid.UUID
-    name: str
-    code: str
-    start_date: date
-    end_date: date
-    is_active: bool
-
-    class Config:
-        from_attributes = True
-
-
 # --- Course ---
 class CourseCreate(BaseModel):
     name: str
@@ -58,20 +31,17 @@ class CourseResponse(BaseModel):
 # --- Course Section ---
 class CourseSectionCreate(BaseModel):
     course_id: uuid.UUID
-    term_id: uuid.UUID
     teacher_id: uuid.UUID
     capacity: int = 30
 
 class CourseSectionUpdate(BaseModel):
     course_id: Optional[uuid.UUID] = None
-    term_id: Optional[uuid.UUID] = None
     teacher_id: Optional[uuid.UUID] = None
     capacity: Optional[int] = None
 
 class CourseSectionResponse(BaseModel):
     id: uuid.UUID
     course_id: uuid.UUID
-    term_id: uuid.UUID
     teacher_id: uuid.UUID
     capacity: int
     enrolled_count: int
