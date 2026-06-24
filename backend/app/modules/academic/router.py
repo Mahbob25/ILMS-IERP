@@ -27,7 +27,7 @@ async def list_courses(
 @academic_router.post("/courses", response_model=CourseResponse, status_code=status.HTTP_201_CREATED)
 async def create_course(
     data: CourseCreate,
-    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "admin"])),
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])),
     db: AsyncSession = Depends(get_db)
 ):
     return await academic_service.create_course(db, data.model_dump())
@@ -36,7 +36,7 @@ async def create_course(
 async def update_course(
     course_id: uuid.UUID,
     data: CourseUpdate,
-    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "admin"])),
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])),
     db: AsyncSession = Depends(get_db)
 ):
     cleaned = {k: v for k, v in data.model_dump().items() if v is not None}
@@ -70,7 +70,7 @@ async def list_course_sections(
 @academic_router.post("/course-sections", response_model=CourseSectionResponse, status_code=status.HTTP_201_CREATED)
 async def create_course_section(
     data: CourseSectionCreate,
-    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "admin"])),
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])),
     db: AsyncSession = Depends(get_db)
 ):
     return await academic_service.create_course_section(db, data.model_dump())
@@ -79,7 +79,7 @@ async def create_course_section(
 async def update_course_section(
     section_id: uuid.UUID,
     data: CourseSectionUpdate,
-    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "admin"])),
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])),
     db: AsyncSession = Depends(get_db)
 ):
     cleaned = {k: v for k, v in data.model_dump().items() if v is not None}
@@ -102,7 +102,7 @@ async def delete_course_section(
 # --- Students ---
 @academic_router.get("/students", response_model=list[StudentResponse])
 async def list_students(
-    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "admin"])),
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])),
     db: AsyncSession = Depends(get_db)
 ):
     return await academic_service.list_students(db)
@@ -110,7 +110,7 @@ async def list_students(
 @academic_router.post("/students", response_model=StudentResponse, status_code=status.HTTP_201_CREATED)
 async def create_student(
     data: StudentCreate,
-    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "admin"])),
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])),
     db: AsyncSession = Depends(get_db)
 ):
     return await academic_service.create_student(db, data.model_dump())
@@ -119,7 +119,7 @@ async def create_student(
 async def update_student(
     student_id: uuid.UUID,
     data: StudentUpdate,
-    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "admin"])),
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])),
     db: AsyncSession = Depends(get_db)
 ):
     cleaned = {k: v for k, v in data.model_dump().items() if v is not None}
@@ -158,7 +158,7 @@ async def list_enrollments(
 @academic_router.post("/enrollments", response_model=EnrollmentResponse, status_code=status.HTTP_201_CREATED)
 async def create_enrollment(
     data: EnrollmentCreate,
-    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "admin"])),
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])),
     db: AsyncSession = Depends(get_db)
 ):
     enrollment = await academic_service.create_enrollment(db, data.student_id, data.section_id)
@@ -172,7 +172,7 @@ async def create_enrollment(
 @academic_router.delete("/enrollments/{enrollment_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_enrollment(
     enrollment_id: uuid.UUID,
-    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "admin"])),
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])),
     db: AsyncSession = Depends(get_db)
 ):
     deleted = await academic_service.delete_enrollment(db, enrollment_id)

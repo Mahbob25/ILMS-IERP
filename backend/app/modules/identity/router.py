@@ -17,7 +17,7 @@ from app.modules.identity.security import (
     ExpiredSignatureError,
     InvalidTokenError
 )
-from app.modules.identity.dependencies import get_current_user, RoleChecker, superadmin_gate
+from app.modules.identity.dependencies import get_current_user, RoleChecker, superadmin_gate, require_manager, require_secretary, require_teacher
 from app.modules.identity.service import create_audit_log
 
 auth_router = APIRouter(prefix="/auth", tags=["auth"])
@@ -226,15 +226,27 @@ async def logout(
     return {"status": "success"}
 
 
+@auth_router.get("/me")
+async def auth_me(current_user: User = Depends(get_current_user)):
+    """Return compact current user info (id, email, full_name, role)."""
+    return {
+        "id": str(current_user.id),
+        "email": current_user.email,
+        "full_name": current_user.full_name,
+        "role": current_user.role.name,
+        "is_superadmin": current_user.is_superadmin,
+    }
+
+
 # --- USER CRUD ENDPOINTS ---
 
 @users_router.post("", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 async def create_user(
     user_data: UserCreate,
-    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "admin"])),
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager"])),
     db: AsyncSession = Depends(get_db)
 ):
-    """Create a new user. SuperAdmin can create anyone; Admin can only create Teachers."""
+    """Create a new user. SuperAdmin can create anyone; Manager can only create Teachers."""
     # Retrieve target role
     role_query = select(Role).where(Role.id == user_data.role_id)
     role_result = await db.execute(role_query)
@@ -246,11 +258,11 @@ async def create_user(
             detail="Specified role ID does not exist"
         )
 
-    # Check hierarchy restrictions: Admin cannot create SuperAdmin/Admin users
+    # Check hierarchy restrictions: Manager cannot create SuperAdmin/Manager/Secretary users
     if not current_user.is_superadmin and target_role.name != "teacher":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Admins are only authorized to create Teacher accounts"
+            detail="Managers are only authorized to create Teacher accounts"
         )
 
     # Check duplicate email
@@ -294,14 +306,14 @@ async def create_user(
 
 @users_router.get("", response_model=List[UserResponse])
 async def list_users(
-    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "admin"])),
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager"])),
     db: AsyncSession = Depends(get_db)
 ):
-    """List all registered users. Admins see only Teachers, SuperAdmins see everyone."""
+    """List all registered users. Managers see only Teachers, SuperAdmins see everyone."""
     if current_user.is_superadmin:
         query = select(User).options(joinedload(User.role)).order_by(User.full_name)
     else:
-        # Admins see teachers only
+        # Managers see teachers only
         query = select(User).options(joinedload(User.role)).join(User.role).where(
             Role.name == "teacher"
         ).order_by(User.full_name)

@@ -78,3 +78,22 @@ async def superadmin_gate(current_user: User = Depends(get_current_user)) -> Use
             detail="Access denied: SuperAdmin credentials required"
         )
     return current_user
+
+
+def require_role(role_name: str):
+    """Factory that returns a dependency requiring a specific role (SuperAdmin bypass included)."""
+    async def _role_checker(current_user: User = Depends(get_current_user)) -> User:
+        if current_user.is_superadmin:
+            return current_user
+        if current_user.role.name != role_name:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Access denied: Requires role '{role_name}'"
+            )
+        return current_user
+    return _role_checker
+
+
+require_manager = require_role("manager")
+require_secretary = require_role("secretary")
+require_teacher = require_role("teacher")

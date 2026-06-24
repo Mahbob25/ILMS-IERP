@@ -23,7 +23,7 @@ lms_router = APIRouter(prefix="/lms", tags=["lms"])
 @lms_router.post("/attendance/sessions", response_model=AttendanceSessionResponse, status_code=status.HTTP_201_CREATED)
 async def create_attendance_session(
     data: AttendanceSessionCreate,
-    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "admin", "teacher"])),
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary", "teacher"])),
     db: AsyncSession = Depends(get_db)
 ):
     section = await get_course_section(db, data.section_id)
@@ -61,7 +61,7 @@ async def get_attendance_session(
 async def submit_attendance(
     session_id: uuid.UUID,
     data: AttendanceSubmit,
-    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "admin", "teacher"])),
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary", "teacher"])),
     db: AsyncSession = Depends(get_db)
 ):
     session = await lms_service.get_attendance_session(db, session_id)
@@ -85,7 +85,7 @@ async def list_assignments(
 @lms_router.post("/assignments", response_model=AssignmentResponse, status_code=status.HTTP_201_CREATED)
 async def create_assignment(
     data: AssignmentCreate,
-    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "admin", "teacher"])),
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary", "teacher"])),
     db: AsyncSession = Depends(get_db)
 ):
     section = await get_course_section(db, data.section_id)
@@ -99,7 +99,7 @@ async def create_assignment(
 async def update_assignment(
     assignment_id: uuid.UUID,
     data: AssignmentUpdate,
-    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "admin", "teacher"])),
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary", "teacher"])),
     db: AsyncSession = Depends(get_db)
 ):
     cleaned = {k: v for k, v in data.model_dump().items() if v is not None}
@@ -111,7 +111,7 @@ async def update_assignment(
 @lms_router.delete("/assignments/{assignment_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_assignment(
     assignment_id: uuid.UUID,
-    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "admin"])),
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager"])),
     db: AsyncSession = Depends(get_db)
 ):
     deleted = await lms_service.delete_assignment(db, assignment_id)
@@ -123,7 +123,7 @@ async def delete_assignment(
 @lms_router.get("/assignments/{assignment_id}/submissions", response_model=list[SubmissionResponse])
 async def list_submissions(
     assignment_id: uuid.UUID,
-    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "admin", "teacher"])),
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary", "teacher"])),
     db: AsyncSession = Depends(get_db)
 ):
     return await lms_service.list_submissions(db, assignment_id)
@@ -133,7 +133,7 @@ async def submit_assignment(
     assignment_id: uuid.UUID,
     student_id: str = Form(...),
     file: Optional[UploadFile] = File(None),
-    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "admin", "teacher"])),
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary", "teacher"])),
     db: AsyncSession = Depends(get_db)
 ):
     assignment = await lms_service.get_assignment(db, assignment_id)
@@ -153,7 +153,7 @@ async def submit_assignment(
 async def grade_submission(
     submission_id: uuid.UUID,
     data: GradeCreate,
-    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "admin", "teacher"])),
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary", "teacher"])),
     db: AsyncSession = Depends(get_db)
 ):
     grade = await lms_service.create_or_update_grade(db, submission_id, data.score, data.feedback, current_user.id)
@@ -164,7 +164,7 @@ async def grade_submission(
 @lms_router.get("/assignments/{assignment_id}/grades", response_model=list[GradeResponse])
 async def list_grades(
     assignment_id: uuid.UUID,
-    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "admin", "teacher"])),
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary", "teacher"])),
     db: AsyncSession = Depends(get_db)
 ):
     return await lms_service.list_grades_for_assignment(db, assignment_id)
