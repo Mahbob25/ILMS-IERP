@@ -2,10 +2,9 @@
 
 ## Current Status
 
-**Phases 1–6: Backend + Frontend code fully written, including e2e tests.**
-- All 6 phases have e2e tests in `backend/test_v1_7_e2e.py` (run with `--phase 1|2|3|4|5|6|all`)
-- Tests **not yet run** in this session — requires running backend + frontend (already running externally)
-- Phases 7–10 remain
+**Phases 1–9: All backend + frontend code fully written, including e2e tests.**
+- All 9 phases have e2e tests in `backend/test_v1_7_e2e.py` (run with `--phase 1|2|3|4|5|6|7|8|9|all`)
+- Phase 10 (Integration Testing) remains
 
 ### ✅ Completed (Code Written)
 
@@ -72,11 +71,21 @@
 - Kept `is_superadmin` in JWT claims for frontend middleware compatibility
 - Kept DB column — not dropped
 - e2e test updated: asserts `/auth/me` has no `is_superadmin` key
-**Phase 9 — POS Interface: NOT STARTED**
+**Phase 9 — POS Interface (DONE)**
+- Added `student_id` query param to `GET /academic/enrollments` (service + router) for POS student course lookup
+- Built `dashboard/pos/page.tsx` with:
+  - Student autocomplete search (filters by name/code from `/api/v1/academic/students`)
+  - Enrolled course selection (fetched via `?student_id=X` filter)
+  - Quick-amount preset buttons (+50, +100, +200, +500)
+  - Print Receipt checkbox (default on)
+  - Keyboard shortcuts: Enter to submit, Escape to clear
+  - Success toast with receipt number, Receipt preview modal
+  - RefreshButton in header
+  - Role-gated (superadmin/manager/secretary only)
+  - Tablet-responsive layout
+- Sidebar POS link already existed (ShoppingCart icon) — no change needed
+- e2e test `run_phase9()`: page file checks, enrollment student_id filter, full payment flow
 **Phase 10 — Integration Testing: NOT STARTED**
-
-### Orphaned Frontend
-- `dashboard/terms/page.tsx` still exists but backend `terms` table was dropped — dead route
 
 ---
 
@@ -172,8 +181,8 @@ print('Logged in, token:', token[:20])
 | **6** | Daily Closure — auditing state machine, lock enforcement, unlock requests, ledger | BE + FE | ✅ Code complete + e2e test |
 | **7** | Frontend — RefreshButton component, role-based sidebar (done), student detail page | FE only | ✅ Complete |
 | **8** | Role Data Cleanup — remove `is_superadmin` from API responses and checks | BE only | ✅ Complete |
-| **9** | POS Interface — streamlined payment UI with quick-amounts, keyboard shortcuts | FE only | ❌ Not started |
-| **10** | Integration Testing — comprehensive e2e test suite across all phases | BE + FE | ❌ Not started |
+| **9** | POS Interface — streamlined payment UI with quick-amounts, keyboard shortcuts | FE + BE | ✅ Complete |
+| **10** | Integration Testing — comprehensive e2e test suite across all phases (also: Frontend build verification) | BE + FE | ❌ Not started |
 
 ---
 
@@ -193,7 +202,7 @@ print('Logged in, token:', token[:20])
 5. **test_phase3.py** references hardcoded UUIDs and uses `admin` role name. Needs updating before use.
 6. **DB URL**: Backend config uses `database:5432` (Docker hostname). Local dev tools connect via `localhost:5440`. Python test uses `postgresql://lims:lims_secure_pass@localhost:5440/lims`.
 7. **`is_superadmin` in DB + JWT only**: The column remains in the `users` table, and JWT claims still include it for frontend middleware compatibility. All API responses and authorization checks now use `role.name == "superadmin"`.
-8. **Course sections still exist**: `course_sections` table kept for backward compat with LMS (attendance, assignments). Phase 8 plans to remove.
+8. **Course sections still exist**: `course_sections` table kept for backward compat with LMS (attendance, assignments).
 9. **Terms routes removed**: All `/api/v1/academic/terms/*` endpoints are gone. Frontend `terms/page.tsx` is orphaned.
 10. **Frontend builds not verified**: No `npm run build` has been run for v1.7 frontend changes — zero type errors unconfirmed.
 11. **Killing port 8000**: Use `netstat -ano | Select-String ":8000"` to find PID, then use a non-reserved variable name (e.g. `$procId`, not `$pid`) to `Stop-Process -Id $procId -Force`.

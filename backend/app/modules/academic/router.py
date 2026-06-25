@@ -175,6 +175,7 @@ async def delete_student(
 @academic_router.get("/enrollments", response_model=list[EnrollmentResponse])
 async def list_enrollments(
     section_id: Optional[uuid.UUID] = None,
+    student_id: Optional[uuid.UUID] = None,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
@@ -185,7 +186,7 @@ async def list_enrollments(
         section = await academic_service.get_course_section(db, section_id)
         if not section or section.teacher_id != teacher_id:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied to this section's enrollments")
-    return await academic_service.list_enrollments(db, section_id=section_id)
+    return await academic_service.list_enrollments(db, section_id=section_id, student_id=student_id)
 
 @academic_router.post("/enrollments", response_model=EnrollmentResponse, status_code=status.HTTP_201_CREATED)
 async def create_enrollment(

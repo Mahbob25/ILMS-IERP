@@ -165,10 +165,16 @@ async def get_enrollment(db: AsyncSession, enrollment_id: uuid.UUID) -> Optional
     result = await db.execute(select(Enrollment).where(Enrollment.id == enrollment_id))
     return result.scalar_one_or_none()
 
-async def list_enrollments(db: AsyncSession, section_id: Optional[uuid.UUID] = None) -> list[Enrollment]:
+async def list_enrollments(
+    db: AsyncSession,
+    section_id: Optional[uuid.UUID] = None,
+    student_id: Optional[uuid.UUID] = None,
+) -> list[Enrollment]:
     query = select(Enrollment).order_by(Enrollment.enrolled_at.desc())
     if section_id:
         query = query.where(Enrollment.section_id == section_id)
+    if student_id:
+        query = query.where(Enrollment.student_id == student_id)
     result = await db.execute(query)
     return result.scalars().all()
 

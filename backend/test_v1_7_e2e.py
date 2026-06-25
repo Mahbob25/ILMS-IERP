@@ -1,7 +1,7 @@
 """
 E2E Tests for v1.7 ERP Implementation
 
-Run with:  python test_v1_7_e2e.py [--phase 1|2|3|4|5|6|7|8|all]
+Run with:  python test_v1_7_e2e.py [--phase 1|2|3|4|5|6|7|8|9|all]
 
 Phases:
   1 - Schema migration (tables, columns, enums, downgrade cycle)
@@ -12,6 +12,7 @@ Phases:
   6 - Daily Closure (auditing state machine)
   7 - Frontend Refinements (RefreshButton, student detail, page availability)
   8 - Role Data Cleanup (is_superadmin removed from API, role-based auth checks)
+  9 - POS Interface (student autocomplete, enrolled courses, quick amounts, keyboard support)
 """
 
 import sys
@@ -1509,9 +1510,110 @@ def run_phase8():
     print()
 
 
+def run_phase9():
+    print('=' * 60)
+    print('PHASE 9: POS Interface — Quick Payment Recording')
+    print('=' * 60)
+    print()
+
+    print('--- POS Frontend Page ---')
+    try:
+        import os as _os
+        dashboard_dir = _os.path.join(_os.path.dirname(__file__), '..', 'frontend', 'app', '[locale]', '(dashboard)', 'dashboard')
+        pos_page = _os.path.join(dashboard_dir, 'pos', 'page.tsx')
+        test('POS page.tsx exists', _os.path.isfile(pos_page), f'path: {pos_page}')
+        if _os.path.isfile(pos_page):
+            with open(pos_page, 'r', encoding='utf-8') as f:
+                content = f.read()
+            test('POS page has student search', 'search' in content.lower() or 'Search' in content)
+            test('POS page has quick amounts', '+50' in content or '50' in content)
+            test('POS page has keyboard shortcut hints', 'Enter' in content or 'Escape' in content or 'Esc' in content)
+            test('POS page has print receipt toggle', 'printReceipt' in content or 'print_receipt' in content)
+            test('POS page uses RefreshButton', 'RefreshButton' in content)
+    except Exception as e:
+        test('Phase 9 POS page check', False, str(e))
+
+    # --- Student_id filter on enrollments ---
+    print()
+    print('--- Enrollments student_id filter ---')
+    try:
+        client, token = login('superadmin@institute.dev', 'admin123')
+        test('Login for enrollment test succeeds', token is not None)
+        if token:
+            ac = authed_client(token)
+            # Get all enrollments
+            r = ac.get('/api/v1/academic/enrollments')
+            test('List all enrollments works', r.status_code == 200, f'got {r.status_code}')
+            if r.status_code == 200:
+                enrollments = r.json()
+                if enrollments:
+                    # Filter by student_id from first enrollment
+                    sid = enrollments[0]['student_id']
+                    r2 = ac.get(f'/api/v1/academic/enrollments?student_id={sid}')
+                    test('Filter enrollments by student_id', r2.status_code == 200, f'got {r2.status_code}')
+                    if r2.status_code == 200:
+                        filtered = r2.json()
+                        test('Filtered enrollments all belong to student',
+                             all(e['student_id'] == sid for e in filtered),
+                             f'{len(filtered)} enrollments for student {sid[:8]}')
+            ac.close()
+        client.close()
+    except Exception as e:
+        test('Phase 9 enrollment filter check', False, str(e))
+
+    # --- POS flow: student search + enrolled courses + payment ---
+    print()
+    print('--- POS Payment Flow ---')
+    try:
+        client, token = login('superadmin@institute.dev', 'admin123')
+        test('Login for POS flow succeeds', token is not None)
+        if token:
+            ac = authed_client(token)
+            # Get a student with enrollments
+            r = ac.get('/api/v1/academic/students')
+            test('List students', r.status_code == 200, f'got {r.status_code}')
+            if r.status_code == 200:
+                students = r.json()
+                if students:
+                    student = students[0]
+                    # Get enrolled courses for this student
+                    r2 = ac.get(f'/api/v1/academic/enrollments?student_id={student["id"]}')
+                    test('Get enrollments for student', r2.status_code == 200, f'got {r2.status_code}')
+                    if r2.status_code == 200:
+                        enrollments = r2.json()
+                        if enrollments:
+                            # Get the section to find course_id
+                            section_id = enrollments[0]['section_id']
+                            r3 = ac.get('/api/v1/academic/course-sections')
+                            if r3.status_code == 200:
+                                sections = r3.json()
+                                section = next((s for s in sections if s['id'] == section_id), None)
+                                if section:
+                                    course_id = section['course_id']
+                                    # Create a payment (POS flow)
+                                    r4 = ac.post('/api/v1/lms/payments', json={
+                                        'student_id': student['id'],
+                                        'course_id': course_id,
+                                        'amount': 99.99,
+                                    })
+                                    test('POS payment created', r4.status_code == 201, f'got {r4.status_code}')
+                                    if r4.status_code == 201:
+                                        payment = r4.json()
+                                        test('POS payment has receipt_number', 'receipt_number' in payment, f'keys: {list(payment.keys())}')
+                                        test('POS payment has correct amount', payment['amount'] == 99.99, f'got {payment["amount"]}')
+                                        test('POS payment has student_id', payment['student_id'] == student['id'])
+            ac.close()
+        client.close()
+    except Exception as e:
+        test('Phase 9 POS flow check', False, str(e))
+
+    print()
+    print()
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--phase', default='all', choices=['1', '2', '3', '4', '5', '6', '7', '8', 'all'])
+    parser.add_argument('--phase', default='all', choices=['1', '2', '3', '4', '5', '6', '7', '8', '9', 'all'])
     parser.add_argument('--skip-checks', action='store_true', help='Skip service health checks')
     args = parser.parse_args()
 
@@ -1541,6 +1643,9 @@ if __name__ == '__main__':
 
     if args.phase in ('8', 'all'):
         run_phase8()
+
+    if args.phase in ('9', 'all'):
+        run_phase9()
 
     print(f'=== RESULTS: {ok} passed, {fail} failed ===')
     if fail > 0:
