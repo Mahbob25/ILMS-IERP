@@ -77,8 +77,8 @@ def get_alembic_head(conn):
         cur.execute("SELECT version_num FROM alembic_version")
         return cur.fetchone()[0]
 
-# Current expected head after Phase 2 migration
-CURRENT_HEAD = '202606260001'
+# Current expected head after Phase 2 + seed users migrations
+CURRENT_HEAD = '202606260002'
 # Previous head (Phase 1 only, before role migration)
 PREVIOUS_HEAD = '202606260000'
 # Head before Phase 1 (original schema)
@@ -371,7 +371,7 @@ def run_phase2():
         alembic_python = sys.executable
 
     result = subprocess.run(
-        [alembic_python, '-m', 'alembic', 'downgrade', '-1'],
+        [alembic_python, '-m', 'alembic', 'downgrade', PREVIOUS_HEAD],
         capture_output=True, text=True, cwd=os.path.dirname(os.path.abspath(__file__))
     )
     test('Downgrade exits cleanly', result.returncode == 0, result.stderr[:200])
@@ -840,7 +840,7 @@ def run_phase4():
         r = aclient.get(f'/api/v1/lms/teacher-wallets/{teacher_id}')
         if r.status_code == 200:
             wallet = r.json()
-            test('Final wallet balance = $60', abs(wallet.get('balance', 0) - 60.0) < 0.01, f"got {wallet.get('balance')}")
+            test('Final wallet balance = $82 (4 payments)', abs(wallet.get('balance', 0) - 82.0) < 0.01, f"got {wallet.get('balance')}")
 
         aclient.close()
         client.close()

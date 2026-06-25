@@ -2,9 +2,10 @@
 
 ## Current Status
 
-**Phases 1–9: All backend + frontend code fully written, including e2e tests.**
-- All 9 phases have e2e tests in `backend/test_v1_7_e2e.py` (run with `--phase 1|2|3|4|5|6|7|8|9|all`)
-- Phase 10 (Integration Testing) remains
+**Phases 1–10: All backend + frontend code fully written, including e2e tests.**
+- Per-phase tests: `backend/test_v1_7_e2e.py` (run with `--phase 1|2|3|4|5|6|7|8|9|all`)
+- Cross-phase integration: `backend/test_v1_7_full_e2e.py`
+- Phase 10 awaiting user execution (tests + frontend build)
 
 ### ✅ Completed (Code Written)
 
@@ -85,7 +86,17 @@
   - Tablet-responsive layout
 - Sidebar POS link already existed (ShoppingCart icon) — no change needed
 - e2e test `run_phase9()`: page file checks, enrollment student_id filter, full payment flow
-**Phase 10 — Integration Testing: NOT STARTED**
+**Phase 10 — Integration Testing (CODE COMPLETE — waiting for execution)**
+- Created `backend/test_v1_7_full_e2e.py` with 5 cross-phase integration tests:
+  1. `test_full_payment_flow` — enroll, pay, revenue split (40% teacher), close day, block retroactive edit (409)
+  2. `test_expense_flow` — general expense, secretary advance, teacher withdrawal, wallet deduction
+  3. `test_course_lifecycle` — pending → activate with quota → late register with discount → complete → double-complete (400)
+  4. `test_daily_closure_state_machine` — close → double-close (409) → unlock request → approve unlock → re-close → ledger → list
+  5. `test_role_isolation` — access matrix: each role tested against 6 endpoints (create user, course-section, delete, list users, expense, student)
+- Health check at start (backend must be running)
+- Results summary with failed_tests list
+- All tests need backend running + migration `202606260002` applied for seeded users
+- Waiting for user to run: `python test_v1_7_full_e2e.py` + `npm run build` (frontend)
 
 ---
 
@@ -182,7 +193,7 @@ print('Logged in, token:', token[:20])
 | **7** | Frontend — RefreshButton component, role-based sidebar (done), student detail page | FE only | ✅ Complete |
 | **8** | Role Data Cleanup — remove `is_superadmin` from API responses and checks | BE only | ✅ Complete |
 | **9** | POS Interface — streamlined payment UI with quick-amounts, keyboard shortcuts | FE + BE | ✅ Complete |
-| **10** | Integration Testing — comprehensive e2e test suite across all phases (also: Frontend build verification) | BE + FE | ❌ Not started |
+| **10** | Integration Testing — comprehensive e2e test suite across all phases (also: Frontend build verification) | BE + FE | 🔶 Code complete, awaiting execution |
 
 ---
 
@@ -202,9 +213,10 @@ print('Logged in, token:', token[:20])
 5. **test_phase3.py** references hardcoded UUIDs and uses `admin` role name. Needs updating before use.
 6. **DB URL**: Backend config uses `database:5432` (Docker hostname). Local dev tools connect via `localhost:5440`. Python test uses `postgresql://lims:lims_secure_pass@localhost:5440/lims`.
 7. **`is_superadmin` in DB + JWT only**: The column remains in the `users` table, and JWT claims still include it for frontend middleware compatibility. All API responses and authorization checks now use `role.name == "superadmin"`.
-8. **Course sections still exist**: `course_sections` table kept for backward compat with LMS (attendance, assignments).
-9. **Terms routes removed**: All `/api/v1/academic/terms/*` endpoints are gone. Frontend `terms/page.tsx` is orphaned.
-10. **Frontend builds not verified**: No `npm run build` has been run for v1.7 frontend changes — zero type errors unconfirmed.
-11. **Killing port 8000**: Use `netstat -ano | Select-String ":8000"` to find PID, then use a non-reserved variable name (e.g. `$procId`, not `$pid`) to `Stop-Process -Id $procId -Force`.
+8. **Seeded users (migration 202606260002)**: | Email | Password | Role | |---|---|---| | `manager@institute.dev` | `manager123` | manager | | `secretary@institute.dev` | `secretary123` | secretary | | `teacher@institute.dev` | `teacher123` | teacher |
+9. **Course sections still exist**: `course_sections` table kept for backward compat with LMS (attendance, assignments).
+10. **Terms routes removed**: All `/api/v1/academic/terms/*` endpoints are gone.
+11. **Frontend builds not verified**: No `npm run build` has been run for v1.7 frontend changes — zero type errors unconfirmed. This is the Phase 10 sign-off task.
+12. **Killing port 8000**: Use `netstat -ano | Select-String ":8000"` to find PID, then use a non-reserved variable name (e.g. `$procId`, not `$pid`) to `Stop-Process -Id $procId -Force`.
 
 (End of file - total 155 lines)
