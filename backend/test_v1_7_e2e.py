@@ -1,7 +1,7 @@
 """
 E2E Tests for v1.7 ERP Implementation
 
-Run with:  python test_v1_7_e2e.py [--phase 1|2|3|4|5|6|7|all]
+Run with:  python test_v1_7_e2e.py [--phase 1|2|3|4|5|6|7|8|all]
 
 Phases:
   1 - Schema migration (tables, columns, enums, downgrade cycle)
@@ -11,6 +11,7 @@ Phases:
   5 - Expenses, Withdrawals & Secretary Advances
   6 - Daily Closure (auditing state machine)
   7 - Frontend Refinements (RefreshButton, student detail, page availability)
+  8 - Role Data Cleanup (is_superadmin removed from API, role-based auth checks)
 """
 
 import sys
@@ -316,7 +317,7 @@ def run_phase2():
             test('/auth/me has id', 'id' in data)
             test('/auth/me has email', data.get('email') == 'superadmin@institute.dev')
             test('/auth/me has role superadmin', data.get('role') == 'superadmin')
-            test('/auth/me has is_superadmin true', data.get('is_superadmin') is True)
+            test('/auth/me no is_superadmin', 'is_superadmin' not in data)
             aclient.close()
         client.close()
     except Exception as e:
@@ -1389,9 +1390,128 @@ def run_phase7():
         import traceback
         traceback.print_exc()
         # Don't re-raise, just record failure
+def run_phase8():
+    print('=' * 60)
+    print('PHASE 8: Role Data Cleanup — is_superadmin removed from API')
+    print('=' * 60)
+    print()
+
+    print('--- Auth/me has no is_superadmin ---')
+    try:
+        client, token = login('superadmin@institute.dev', 'admin123')
+        test('Login as superadmin succeeds', token is not None)
+        if token:
+            ac = authed_client(token)
+            r = ac.get('/api/v1/auth/me')
+            test('/auth/me returns 200', r.status_code == 200, f'got {r.status_code}')
+            if r.status_code == 200:
+                data = r.json()
+                test('/auth/me no is_superadmin key', 'is_superadmin' not in data, f'keys: {list(data.keys())}')
+                test('/auth/me has role field', data.get('role') == 'superadmin')
+                test('/auth/me has email', data.get('email') == 'superadmin@institute.dev')
+            ac.close()
+
+            # --- JWT still has is_superadmin in claims ---
+            print()
+            print('--- JWT Claims (internal, for frontend middleware) ---')
+            # We can't directly decode the JWT from httpx (HttpOnly cookie), but the login
+            # endpoint sets the cookie. Verify the /auth/me endpoint still works without is_superadmin.
+            # The JWT claims include is_superadmin for frontend middleware — this is intentional.
+            print('  INFO  is_superadmin retained in JWT claims (frontend middleware compat)')
+            print('  INFO  DB column retained (not dropped)')
+        client.close()
+    except Exception as e:
+        test('Phase 8 auth/me check', False, str(e))
+
+    # --- Role-based auth still works via role.name ---
+    print()
+    print('--- Role-based auth enforcement ---')
+    try:
+        # Superadmin can access manager-only endpoints
+        client, token = login('superadmin@institute.dev', 'admin123')
+        test('Superadmin login for role test succeeds', token is not None)
+        if token:
+            ac = authed_client(token)
+            # List users requires manager+ — superadmin bypass via role.name
+            r = ac.get('/api/v1/users')
+            test('Superadmin can list users (role.name bypass)', r.status_code in (200, 307), f'got {r.status_code}')
+            ac.close()
+        client.close()
+    except Exception as e:
+        test('Phase 8 role enforcement check', False, str(e))
+
+    # --- Teacher can only see own sections ---
+    print()
+    print('--- Teacher scoping (role-based, no is_superadmin) ---')
+    try:
+        client, token = login('teacher.ee3f04@institute.dev', 'teacher123')
+        test('Teacher login succeeds', token is not None)
+        if token:
+            ac = authed_client(token)
+            r = ac.get('/api/v1/academic/course-sections')
+            test('Teacher can list own sections', r.status_code == 200, f'got {r.status_code}')
+            # Teacher should NOT be able to list all users
+            r2 = ac.get('/api/v1/users')
+            test('Teacher cannot list all users', r2.status_code == 403, f'got {r2.status_code}')
+            ac.close()
+        client.close()
+    except Exception as e:
+        test('Phase 8 teacher scoping check', False, str(e))
+
+    # --- superadmin_gate still works ---
+    print()
+    print('--- superadmin_gate enforcement ---')
+    try:
+        # Teacher cannot access superadmin-only endpoint (delete course-section)
+        client, token = login('teacher.ee3f04@institute.dev', 'teacher123')
+        if token:
+            ac = authed_client(token)
+            # Try deleting a non-existent section — should still fail at gate, not at DB
+            fake_id = '00000000-0000-0000-0000-000000000001'
+            r = ac.delete(f'/api/v1/academic/course-sections/{fake_id}')
+            test('Teacher blocked by superadmin_gate', r.status_code == 403, f'got {r.status_code}')
+            ac.close()
+        client.close()
+
+        # Superadmin CAN access the same endpoint (gate passes, error is 404 not 403)
+        client, token = login('superadmin@institute.dev', 'admin123')
+        if token:
+            ac = authed_client(token)
+            r = ac.delete(f'/api/v1/academic/course-sections/{fake_id}')
+            test('Superadmin bypasses superadmin_gate (expect 404 not 403)', r.status_code != 403, f'got {r.status_code}')
+            ac.close()
+        client.close()
+    except Exception as e:
+        test('Phase 8 superadmin_gate check', False, str(e))
+
+    # --- require_role still works ---
+    print()
+    print('--- require_role enforcement ---')
+    try:
+        # Teacher tries to create a student (requires secretary+)
+        client, token = login('teacher.ee3f04@institute.dev', 'teacher123')
+        if token:
+            ac = authed_client(token)
+            r = ac.post('/api/v1/academic/students', json={
+                'first_name': 'Test',
+                'last_name': 'Student',
+                'email': 'test.phase8@institute.dev',
+                'phone': '12345678',
+                'grade_level': 1
+            })
+            test('Teacher cannot create student (require_role blocks)', r.status_code == 403, f'got {r.status_code}')
+            ac.close()
+        client.close()
+    except Exception as e:
+        test('Phase 8 require_role check', False, str(e))
+
+    print()
+    print()
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--phase', default='all', choices=['1', '2', '3', '4', '5', '6', '7', 'all'])
+    parser.add_argument('--phase', default='all', choices=['1', '2', '3', '4', '5', '6', '7', '8', 'all'])
     parser.add_argument('--skip-checks', action='store_true', help='Skip service health checks')
     args = parser.parse_args()
 
@@ -1418,6 +1538,9 @@ if __name__ == '__main__':
 
     if args.phase in ('7', 'all'):
         run_phase7()
+
+    if args.phase in ('8', 'all'):
+        run_phase8()
 
     print(f'=== RESULTS: {ok} passed, {fail} failed ===')
     if fail > 0:

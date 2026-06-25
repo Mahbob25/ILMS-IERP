@@ -19,7 +19,6 @@ class UserResponse(BaseModel):
     full_name: str
     locale_pref: str
     is_active: bool
-    is_superadmin: bool
     role: RoleResponse
 
     class Config:

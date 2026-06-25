@@ -234,7 +234,6 @@ async def auth_me(current_user: User = Depends(get_current_user)):
         "email": current_user.email,
         "full_name": current_user.full_name,
         "role": current_user.role.name,
-        "is_superadmin": current_user.is_superadmin,
     }
 
 
@@ -259,7 +258,7 @@ async def create_user(
         )
 
     # Check hierarchy restrictions: Manager cannot create SuperAdmin/Manager/Secretary users
-    if not current_user.is_superadmin and target_role.name != "teacher":
+    if current_user.role.name != "superadmin" and target_role.name != "teacher":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Managers are only authorized to create Teacher accounts"
@@ -284,7 +283,6 @@ async def create_user(
         full_name=user_data.full_name,
         role_id=user_data.role_id,
         locale_pref=user_data.locale_pref or "ar",
-        is_superadmin=(target_role.name == "superadmin")
     )
     db.add(new_user)
     await db.flush()  # Populates user ID
@@ -310,7 +308,7 @@ async def list_users(
     db: AsyncSession = Depends(get_db)
 ):
     """List all registered users. Managers see only Teachers, SuperAdmins see everyone."""
-    if current_user.is_superadmin:
+    if current_user.role.name == "superadmin":
         query = select(User).options(joinedload(User.role)).order_by(User.full_name)
     else:
         # Managers see teachers only

@@ -95,7 +95,7 @@ async def list_course_sections(
     db: AsyncSession = Depends(get_db)
 ):
     teacher_id = None
-    if current_user.role.name == "teacher" and not current_user.is_superadmin:
+    if current_user.role.name == "teacher":
         teacher_id = current_user.id
     return await academic_service.list_course_sections(db, teacher_id=teacher_id)
 
@@ -179,7 +179,7 @@ async def list_enrollments(
     db: AsyncSession = Depends(get_db)
 ):
     teacher_id = None
-    if current_user.role.name == "teacher" and not current_user.is_superadmin:
+    if current_user.role.name == "teacher":
         teacher_id = current_user.id
     if section_id and teacher_id:
         section = await academic_service.get_course_section(db, section_id)

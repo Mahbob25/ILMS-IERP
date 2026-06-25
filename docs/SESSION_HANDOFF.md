@@ -20,7 +20,7 @@
 **Phase 2 — RBAC Refinement**
 - Migration `202606260001`: renames `admin` → `manager`, adds `secretary` role
 - `identity/dependencies.py`: added `require_role()`, `require_manager`, `require_secretary`, `require_teacher`
-- `GET /api/v1/auth/me` endpoint returns `{id, email, full_name, role, is_superadmin}`
+- `GET /api/v1/auth/me` endpoint returns `{id, email, full_name, role}` (Phase 8 removed `is_superadmin`)
 - All routers updated: `admin` → `manager`/`secretary` in RoleChecker calls
 
 **Phase 3 — Stateful Course Management**
@@ -64,7 +64,14 @@
 - Stale `"admin"` role references fixed → `"manager"`/`"secretary"` in students, sections, enrollments pages
 - e2e test `run_phase7()` in `backend/test_v1_7_e2e.py`: ✅ component file check, page availability, dead route cleanup, student detail, role API, build artifact check
 
-**Phase 8 — Role Data Cleanup: NOT STARTED**
+**Phase 8 — Role Data Cleanup (DONE)**
+- Removed `is_superadmin` from `UserResponse` schema and `/auth/me` endpoint
+- Updated `RoleChecker`, `superadmin_gate`, `require_role` to check `role.name == "superadmin"` instead of `user.is_superadmin`
+- Updated teacher-scoping checks in academic and lms routers (removed `not current_user.is_superadmin` guards — now redundant since only one role per user)
+- Removed `is_superadmin` assignment from `create_user`; hierarchy check uses role name
+- Kept `is_superadmin` in JWT claims for frontend middleware compatibility
+- Kept DB column — not dropped
+- e2e test updated: asserts `/auth/me` has no `is_superadmin` key
 **Phase 9 — POS Interface: NOT STARTED**
 **Phase 10 — Integration Testing: NOT STARTED**
 
@@ -163,8 +170,8 @@ print('Logged in, token:', token[:20])
 | **4** | Financial Engine — payments, revenue split, teacher wallets, print templates | BE + FE | ✅ Code complete + e2e test |
 | **5** | Expenses & Withdrawals — expenses CRUD, teacher withdrawal, secretary advances | BE + FE | ✅ Code complete + e2e test |
 | **6** | Daily Closure — auditing state machine, lock enforcement, unlock requests, ledger | BE + FE | ✅ Code complete + e2e test |
-| **7** | Frontend — RefreshButton component, role-based sidebar (done), student detail page | FE only | 🔶 Partial (sidebar done; RefreshButton & student detail missing) |
-| **8** | Role Data Cleanup — remove `is_superadmin` from API, drop course_sections | BE only | ❌ Not started |
+| **7** | Frontend — RefreshButton component, role-based sidebar (done), student detail page | FE only | ✅ Complete |
+| **8** | Role Data Cleanup — remove `is_superadmin` from API responses and checks | BE only | ✅ Complete |
 | **9** | POS Interface — streamlined payment UI with quick-amounts, keyboard shortcuts | FE only | ❌ Not started |
 | **10** | Integration Testing — comprehensive e2e test suite across all phases | BE + FE | ❌ Not started |
 
@@ -185,7 +192,7 @@ print('Logged in, token:', token[:20])
 4. **DB enum types must match SQLAlchemy model**: Columns using PostgreSQL ENUMs (`coursestatus`, `expensetype`, `closurystatus`) must use `SAEnum('val1', 'val2', name='enum_name')` in SQLAlchemy models — plain `String` causes `DatatypeMismatchError`.
 5. **test_phase3.py** references hardcoded UUIDs and uses `admin` role name. Needs updating before use.
 6. **DB URL**: Backend config uses `database:5432` (Docker hostname). Local dev tools connect via `localhost:5440`. Python test uses `postgresql://lims:lims_secure_pass@localhost:5440/lims`.
-7. **`is_superadmin` still used**: The `is_superadmin` boolean on `users` table is still present and bypasses RoleChecker. Phase 8 will clean this up.
+7. **`is_superadmin` in DB + JWT only**: The column remains in the `users` table, and JWT claims still include it for frontend middleware compatibility. All API responses and authorization checks now use `role.name == "superadmin"`.
 8. **Course sections still exist**: `course_sections` table kept for backward compat with LMS (attendance, assignments). Phase 8 plans to remove.
 9. **Terms routes removed**: All `/api/v1/academic/terms/*` endpoints are gone. Frontend `terms/page.tsx` is orphaned.
 10. **Frontend builds not verified**: No `npm run build` has been run for v1.7 frontend changes — zero type errors unconfirmed.

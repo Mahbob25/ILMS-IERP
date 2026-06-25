@@ -35,7 +35,7 @@ async def create_attendance_session(
     section = await get_course_section(db, data.section_id)
     if not section:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Section not found")
-    if current_user.role.name == "teacher" and not current_user.is_superadmin and section.teacher_id != current_user.id:
+    if current_user.role.name == "teacher" and section.teacher_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not your section")
     return await lms_service.create_attendance_session(db, data.section_id, data.date, current_user.id)
 
@@ -45,7 +45,7 @@ async def list_attendance_sessions(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    if current_user.role.name == "teacher" and not current_user.is_superadmin:
+    if current_user.role.name == "teacher":
         if section_id:
             section = await get_course_section(db, section_id)
             if not section or section.teacher_id != current_user.id:
@@ -73,7 +73,7 @@ async def submit_attendance(
     session = await lms_service.get_attendance_session(db, session_id)
     if not session:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
-    if current_user.role.name == "teacher" and not current_user.is_superadmin and session.created_by != current_user.id:
+    if current_user.role.name == "teacher" and session.created_by != current_user.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not your session")
     records_data = [r.model_dump() for r in data.records]
     return await lms_service.set_attendance_records(db, session_id, records_data)
@@ -97,7 +97,7 @@ async def create_assignment(
     section = await get_course_section(db, data.section_id)
     if not section:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Section not found")
-    if current_user.role.name == "teacher" and not current_user.is_superadmin and section.teacher_id != current_user.id:
+    if current_user.role.name == "teacher" and section.teacher_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not your section")
     return await lms_service.create_assignment(db, data.model_dump())
 
