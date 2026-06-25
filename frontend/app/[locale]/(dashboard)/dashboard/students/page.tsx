@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { useParams } from "next/navigation";
+import React, { useState, useEffect, useCallback } from "react";
+import { useParams, useRouter } from "next/navigation";
 import { apiClient } from "@/lib/api";
 import { useAuth } from "@/components/AuthContext";
-import { Plus, Pencil, Trash2, Loader2 } from "lucide-react";
+import RefreshButton from "@/components/RefreshButton";
+import { Plus, Pencil, Trash2, Loader2, Eye } from "lucide-react";
 
 interface Student {
   id: string;
@@ -15,6 +16,7 @@ interface Student {
 
 export default function StudentsPage() {
   const params = useParams();
+  const router = useRouter();
   const { user } = useAuth();
   const locale = (params?.locale as string) || "ar";
   const isRtl = locale === "ar";
@@ -65,7 +67,7 @@ export default function StudentsPage() {
   const [form, setForm] = useState({ student_code: "", full_name: "", email: "" });
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
-  const fetchStudents = async () => {
+  const fetchStudents = useCallback(async () => {
     try {
       const res = await apiClient.get<Student[]>("/academic/students");
       setStudents(res.data);
@@ -74,11 +76,11 @@ export default function StudentsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  useEffect(() => { fetchStudents(); }, []);
+  useEffect(() => { fetchStudents(); }, [fetchStudents]);
 
-  const canEdit = user?.is_superadmin || user?.role?.name === "admin";
+  const canEdit = user?.is_superadmin || user?.role?.name === "manager" || user?.role?.name === "secretary";
   const canDelete = user?.is_superadmin;
 
   const openCreate = () => {
@@ -141,12 +143,15 @@ export default function StudentsPage() {
           <h2 className="text-xl font-bold text-slate-900">{t.title}</h2>
           <p className="text-sm text-slate-500 mt-1">{t.subtitle}</p>
         </div>
-        {canEdit && (
-          <button onClick={openCreate} className="btn-primary flex items-center gap-2">
-            <Plus size={16} />
-            <span>{t.add}</span>
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          <RefreshButton onRefresh={fetchStudents} />
+          {canEdit && (
+            <button onClick={openCreate} className="btn-primary flex items-center gap-2">
+              <Plus size={16} />
+              <span>{t.add}</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {showForm && (
@@ -190,36 +195,50 @@ export default function StudentsPage() {
             </thead>
             <tbody>
               {students.map((student) => (
-                <tr key={student.id}>
-                  <td><span className="badge">{student.student_code}</span></td>
-                  <td className="font-medium text-slate-900">{student.full_name}</td>
-                  <td className="text-slate-600">{student.email || "—"}</td>
-                  {(canEdit || canDelete) && (
+                  <tr key={student.id}>
+                    <td><span className="badge">{student.student_code}</span></td>
                     <td>
-                      <div className="flex items-center gap-2">
-                        {canEdit && (
-                          <button onClick={() => openEdit(student)} className="btn-icon" title={t.edit}>
-                            <Pencil size={15} />
-                          </button>
-                        )}
-                        {canDelete && (
-                          <>
-                            {deleteConfirm === student.id ? (
-                              <div className="flex items-center gap-1">
-                                <button onClick={() => handleDelete(student.id)} className="text-xs px-2 py-1 rounded bg-red-500 text-white">{t.yes}</button>
-                                <button onClick={() => setDeleteConfirm(null)} className="text-xs px-2 py-1 rounded bg-slate-200 text-slate-700">{t.no}</button>
-                              </div>
-                            ) : (
-                              <button onClick={() => setDeleteConfirm(student.id)} className="btn-icon text-red-500" title={t.delete}>
-                                <Trash2 size={15} />
-                              </button>
-                            )}
-                          </>
-                        )}
-                      </div>
+                      <button
+                        onClick={() => router.push(`/${locale}/dashboard/students/${student.id}`)}
+                        className="font-medium text-brand-600 hover:text-brand-700 hover:underline text-left"
+                      >
+                        {student.full_name}
+                      </button>
                     </td>
-                  )}
-                </tr>
+                    <td className="text-slate-600">{student.email || "—"}</td>
+                    {(canEdit || canDelete) && (
+                      <td>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => router.push(`/${locale}/dashboard/students/${student.id}`)}
+                            className="btn-icon"
+                            title="View Details"
+                          >
+                            <Eye size={15} />
+                          </button>
+                          {canEdit && (
+                            <button onClick={() => openEdit(student)} className="btn-icon" title={t.edit}>
+                              <Pencil size={15} />
+                            </button>
+                          )}
+                          {canDelete && (
+                            <>
+                              {deleteConfirm === student.id ? (
+                                <div className="flex items-center gap-1">
+                                  <button onClick={() => handleDelete(student.id)} className="text-xs px-2 py-1 rounded bg-red-500 text-white">{t.yes}</button>
+                                  <button onClick={() => setDeleteConfirm(null)} className="text-xs px-2 py-1 rounded bg-slate-200 text-slate-700">{t.no}</button>
+                                </div>
+                              ) : (
+                                <button onClick={() => setDeleteConfirm(student.id)} className="btn-icon text-red-500" title={t.delete}>
+                                  <Trash2 size={15} />
+                                </button>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    )}
+                  </tr>
               ))}
             </tbody>
           </table>

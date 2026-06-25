@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { apiClient } from "@/lib/api";
 import { useAuth } from "@/components/AuthContext";
+import RefreshButton from "@/components/RefreshButton";
 import { Plus, Trash2, Loader2 } from "lucide-react";
 
 interface Enrollment {
@@ -79,7 +80,7 @@ export default function EnrollmentsPage() {
   const [form, setForm] = useState({ student_id: "", section_id: "" });
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       const [enrollRes, studRes, sectRes, courseRes, termRes] = await Promise.all([
         apiClient.get<Enrollment[]>("/academic/enrollments"),
@@ -98,11 +99,11 @@ export default function EnrollmentsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => { fetchData(); }, [fetchData]);
 
-  const canEdit = user?.is_superadmin || user?.role?.name === "admin";
+  const canEdit = user?.is_superadmin || user?.role?.name === "manager" || user?.role?.name === "secretary";
 
   const getStudentName = (id: string) => students.find((s) => s.id === id)?.full_name || id;
   const getStudentCode = (id: string) => students.find((s) => s.id === id)?.student_code || "";
@@ -155,12 +156,15 @@ export default function EnrollmentsPage() {
           <h2 className="text-xl font-bold text-slate-900">{t.title}</h2>
           <p className="text-sm text-slate-500 mt-1">{t.subtitle}</p>
         </div>
-        {canEdit && (
-          <button onClick={() => setShowForm(true)} className="btn-primary flex items-center gap-2">
-            <Plus size={16} />
-            <span>{t.add}</span>
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          <RefreshButton onRefresh={fetchData} />
+          {canEdit && (
+            <button onClick={() => setShowForm(true)} className="btn-primary flex items-center gap-2">
+              <Plus size={16} />
+              <span>{t.add}</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {showForm && (

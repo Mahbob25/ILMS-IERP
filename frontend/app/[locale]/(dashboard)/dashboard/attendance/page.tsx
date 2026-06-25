@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { apiClient } from "@/lib/api";
 import { useAuth } from "@/components/AuthContext";
+import RefreshButton from "@/components/RefreshButton";
 import { Loader2, Check, X, Clock, AlertCircle } from "lucide-react";
 
 interface CourseSection { id: string; course_id: string; term_id: string; teacher_id: string; }
@@ -78,7 +79,7 @@ export default function AttendancePage() {
   const [saving, setSaving] = useState(false);
   const [savedMsg, setSavedMsg] = useState(false);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       const [sectRes, courseRes, termRes] = await Promise.all([
         apiClient.get<CourseSection[]>("/academic/course-sections"),
@@ -93,9 +94,9 @@ export default function AttendancePage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => { fetchData(); }, [fetchData]);
 
   const getCourseName = (id: string) => courses.find((c) => c.id === id)?.name || id;
   const getTermName = (id: string) => terms.find((t) => t.id === id)?.name || "";
@@ -187,6 +188,9 @@ export default function AttendancePage() {
         <div>
           <h2 className="text-xl font-bold text-slate-900">{t.title}</h2>
           <p className="text-sm text-slate-500 mt-1">{t.subtitle}</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <RefreshButton onRefresh={fetchData} />
         </div>
       </div>
 

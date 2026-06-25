@@ -2,9 +2,12 @@
 
 ## Current Status
 
-Phase 4 (Financial Engine) backend and frontend code is written but **not yet verified** — backend was restarted but new endpoints not yet tested end-to-end. Frontend build not yet run.
+**Phases 1–6: Backend + Frontend code fully written, including e2e tests.**
+- All 6 phases have e2e tests in `backend/test_v1_7_e2e.py` (run with `--phase 1|2|3|4|5|6|all`)
+- Tests **not yet run** in this session — requires running backend + frontend (already running externally)
+- Phases 7–10 remain
 
-### ✅ Completed
+### ✅ Completed (Code Written)
 
 **Phase 1 — Database Schema Migration**
 - Migration `202606260000` creates: `payments`, `expenses`, `teacher_wallets`, `daily_closures`
@@ -24,34 +27,49 @@ Phase 4 (Financial Engine) backend and frontend code is written but **not yet ve
 - `academic/service.py`: added `activate_course()`, `complete_course()`, `get_course_enrollment_count()`
 - `academic/schemas.py`: added `status`, `teacher_percentage`, `min_students_required` to Course schema; added `CourseActivate`; added `agreed_price`, `admin_discount` to Enrollment schema
 - `academic/router.py`: added `POST /courses/{id}/activate`, `POST /courses/{id}/complete`; secretary can register students via enrollment
-- Frontend `courses/page.tsx`: status badges, quota progress bar (enrolled/min_students_required), Activate button with teacher % input, Complete button, student registration modal, Refresh button
-- Frontend sidebar: `admin` → `manager`/`secretary`; terms removed; new financial pages (payments, expenses, teacher-wallet, daily-closures, POS) added
-- `academic/models.py`: `status` uses `SAEnum('coursestatus')` to match DB enum type
-- `lms/models.py`: `expenses.type` and `daily_closures.status` use SAEnum to match DB enum types
+- Frontend `courses/page.tsx`: status badges, quota progress bar, Activate/Complete buttons, student registration modal, Refresh button
+- Frontend sidebar: `admin` → `manager`/`secretary`; terms removed; financial pages added
+- `academic/models.py`: `status` uses `SAEnum('coursestatus')`; `lms/models.py` uses SAEnum for expense/closure types
 
-**Phase 4 — Financial Engine (BACKEND written, NOT yet end-to-end verified)**
-- `lms/schemas.py`: added `PaymentCreate`, `PaymentResponse`, `TeacherWalletResponse`
-- `lms/financial_service.py`: `create_payment()` with revenue split logic, `list_payments()`, `get_payment()`, `get_next_receipt_number()`, `get_teacher_wallet()`, `get_student_payment_summary()`
-  - Revenue split: Teacher_Share = amount × teacher_percentage / 100, credited to `teacher_wallets` immediately
-  - Admin discount deducted from Institute_Share only
-  - Receipt numbers format: `RCP-YYYYMMDD-NNNN` (sequential per day)
-- `lms/router.py`: `POST /payments`, `GET /payments`, `GET /payments/{id}`, `GET /payments/summary/{student_id}/{course_id}`, `GET /teacher-wallets/{teacher_id}`
-- `lms/router.py`: route order fixed (`/summary/` before `/{id}`) to avoid UUID parse conflict
-- Frontend `payments/page.tsx`: list table, create form (student/course/amount/date), receipt preview modal with print, refresh button
-- Backend imports verified (all modules load without errors)
+**Phase 4 — Financial Engine (Payments & Revenue Split)**
+- `lms/schemas.py`: `PaymentCreate`, `PaymentResponse`, `TeacherWalletResponse`
+- `lms/financial_service.py`: `create_payment()` with revenue split, `list_payments()`, `get_payment()`, `get_next_receipt_number()`, `get_teacher_wallet()`, `get_student_payment_summary()`
+- Revenue split: Teacher_Share = amount × teacher_percentage / 100; admin_discount from Institute_Share only
+- Receipt numbers: `RCP-YYYYMMDD-NNNN`
+- `lms/router.py`: all endpoints for payments + teacher-wallets
+- Frontend `payments/page.tsx`: list, create form, receipt preview modal, print, refresh
+- e2e test `run_phase4()`: revenue split, receipts, summary, filters, role gates (572 lines)
 
-### ❌ Phase 4 — Not Yet Done
-- End-to-end verification: the backend was restarted but new `/payments` endpoints not called with real data
-- Revenue split correctness: need to test $100 @ 40% → wallet gets $40; discount scenario
-- Sequential receipt numbers: need to verify increment works
-- Frontend `npm run build` — not run yet, zero type errors unconfirmed
-- Student balance indicator not integrated into frontend (backend endpoint exists)
-- Phase 4 e2e test not added to `test_v1_7_e2e.py`
+**Phase 5 — Expenses, Withdrawals & Secretary Advances**
+- `lms/schemas.py`: `ExpenseCreate`, `ExpenseResponse`, `WithdrawRequest`, `WithdrawResponse`
+- `lms/financial_service.py`: `create_expense()`, `list_expenses()`, `get_expense()`, `teacher_withdraw()`, `get_next_voucher_number()`
+- `lms/router.py`: `POST/GET /expenses`, `GET /expenses/{id}`, `POST /teacher-wallets/withdraw`
+- Frontend `expenses/page.tsx`: list, filter by type, create form, voucher preview modal, print, refresh
+- Frontend `teacher-wallet/page.tsx`: balance display, withdraw form, history table, refresh
+- e2e test `run_phase5()`: all expense types, withdrawal, insufficient balance, role gates
 
-### End-to-End Tests
-- `backend/test_v1_7_e2e.py` — run with `--phase 1`, `--phase 2`, `--phase 3`, or `--phase all`
-- 76/77 tests currently passing
-- Phase 4 test not yet written
+**Phase 6 — Daily Closure (Auditing State Machine)**
+- `lms/schemas.py`: `DailyClosureResponse`, `DailyLedgerResponse`
+- `lms/financial_service.py`: `close_day()`, `request_unlock()`, `approve_unlock()`, `list_closures()`, `get_daily_ledger()`, `is_date_closed()`
+- `lms/router.py`: all closure + ledger endpoints with lock enforcement on close date
+- Frontend `daily-closures/page.tsx`: list with date filter, status badges, close/unlock/approve actions, ledger modal, refresh
+- e2e test `run_phase6()`: close, double-close (409), lock enforcement, unlock request/approve, re-close, ledger, list, role gates
+
+**Phase 7 — Frontend Refinements (DONE)**
+- Sidebar role-based filtering: ✅ layout.tsx filters menu items by `user.role?.name`
+- Reusable `RefreshButton` component: ✅ `components/RefreshButton.tsx` — debounced (500ms), spinning animation, tooltip
+- RefreshButton integrated into all data pages: ✅ courses, students, enrollments, sections, attendance, gradebook, payments, expenses, teacher-wallet, daily-closures
+- Student detail page with payment history + agreed_price + balance: ✅ `students/[id]/page.tsx`
+- Orphaned `terms/page.tsx` removed
+- Stale `"admin"` role references fixed → `"manager"`/`"secretary"` in students, sections, enrollments pages
+- e2e test `run_phase7()` in `backend/test_v1_7_e2e.py`: ✅ component file check, page availability, dead route cleanup, student detail, role API, build artifact check
+
+**Phase 8 — Role Data Cleanup: NOT STARTED**
+**Phase 9 — POS Interface: NOT STARTED**
+**Phase 10 — Integration Testing: NOT STARTED**
+
+### Orphaned Frontend
+- `dashboard/terms/page.tsx` still exists but backend `terms` table was dropped — dead route
 
 ---
 
@@ -70,14 +88,23 @@ Phase 4 (Financial Engine) backend and frontend code is written but **not yet ve
 ### Tables (18 total)
 `assignments`, `attendance_records`, `attendance_sessions`, `audit_logs`, `course_sections`, `courses`, `daily_closures`, `enrollments`, `expenses`, `grades`, `payments`, `refresh_tokens`, `roles`, `students`, `submissions`, `teacher_wallets`, `users`, `alembic_version`
 
-### New API Endpoints (Phase 4)
-| Method | Path | Auth | Purpose |
+### New API Endpoints (Phases 4–6)
+| Method | Path | Auth | Phase |
 |---|---|---|---|
-| POST | `/api/v1/lms/payments` | manager/secretary/superadmin | Create payment with revenue split |
-| GET | `/api/v1/lms/payments` | all authenticated | List payments (filters: student_id, course_id, date_from, date_to) |
-| GET | `/api/v1/lms/payments/summary/{student_id}/{course_id}` | all authenticated | Student balance: total_paid, agreed_price, balance_remaining |
-| GET | `/api/v1/lms/payments/{payment_id}` | all authenticated | Single payment detail |
-| GET | `/api/v1/lms/teacher-wallets/{teacher_id}` | all authenticated | Teacher wallet balance |
+| POST | `/api/v1/lms/payments` | manager/secretary/superadmin | 4 |
+| GET | `/api/v1/lms/payments` | all authenticated | 4 |
+| GET | `/api/v1/lms/payments/summary/{student_id}/{course_id}` | all authenticated | 4 |
+| GET | `/api/v1/lms/payments/{payment_id}` | all authenticated | 4 |
+| GET | `/api/v1/lms/teacher-wallets/{teacher_id}` | all authenticated | 4 |
+| POST | `/api/v1/lms/expenses` | manager/secretary/superadmin | 5 |
+| GET | `/api/v1/lms/expenses` | manager/secretary/superadmin | 5 |
+| GET | `/api/v1/lms/expenses/{expense_id}` | manager/secretary/superadmin | 5 |
+| POST | `/api/v1/lms/teacher-wallets/withdraw` | manager/secretary/superadmin | 5 |
+| POST | `/api/v1/lms/daily-closures/{date}/close` | manager/superadmin | 6 |
+| POST | `/api/v1/lms/daily-closures/{date}/unlock-request` | manager/secretary/superadmin | 6 |
+| POST | `/api/v1/lms/daily-closures/{date}/approve-unlock` | manager/superadmin | 6 |
+| GET | `/api/v1/lms/daily-closures` | manager/secretary/superadmin | 6 |
+| GET | `/api/v1/lms/daily-closures/{date}/ledger` | manager/secretary/superadmin | 6 |
 
 ---
 
@@ -133,17 +160,24 @@ print('Logged in, token:', token[:20])
 
 | Phase | Description | Scope | Status |
 |---|---|---|---|
-| **4** | Financial Engine — payments endpoint, revenue split, teacher wallets, print templates | BE + FE | **Code written, needs verification** |
-| **5** | Expenses & Withdrawals — expenses CRUD, teacher withdrawal, secretary advances | BE + FE | Not started |
-| **6** | Daily Closure — auditing state machine, lock enforcement, unlock requests, ledger view | BE + FE | Not started |
-| **7** | Frontend — RefreshButton component, role-based sidebar, POS data pages | FE only | Not started |
-| **8** | Role Data Cleanup — idempotent migration, remove `is_superadmin` from API responses | BE only | Not started |
-| **9** | POS Interface — streamlined payment UI with quick-amounts, keyboard shortcuts | FE only | Not started |
-| **10** | Integration Testing — comprehensive end-to-end test suite across all phases | BE + FE | Not started |
+| **4** | Financial Engine — payments, revenue split, teacher wallets, print templates | BE + FE | ✅ Code complete + e2e test |
+| **5** | Expenses & Withdrawals — expenses CRUD, teacher withdrawal, secretary advances | BE + FE | ✅ Code complete + e2e test |
+| **6** | Daily Closure — auditing state machine, lock enforcement, unlock requests, ledger | BE + FE | ✅ Code complete + e2e test |
+| **7** | Frontend — RefreshButton component, role-based sidebar (done), student detail page | FE only | 🔶 Partial (sidebar done; RefreshButton & student detail missing) |
+| **8** | Role Data Cleanup — remove `is_superadmin` from API, drop course_sections | BE only | ❌ Not started |
+| **9** | POS Interface — streamlined payment UI with quick-amounts, keyboard shortcuts | FE only | ❌ Not started |
+| **10** | Integration Testing — comprehensive e2e test suite across all phases | BE + FE | ❌ Not started |
 
 ---
 
-## Known Gotchas for Next Session
+## Session Rules (CRITICAL — Never break)
+
+1. **NEVER run or restart the backend or frontend yourself.** They are already running externally in separate terminals (Docker + Caddy also running). If you need a restart, **stop and ask the user** to do it.
+2. **NEVER run `npm run build`, `npm run dev`, or `uvicorn` directly.** Ask the user.
+3. **NEVER run Docker or docker-compose commands.** Docker is already running.
+4. **If you need to write e2e tests or verify something against live services, write the code only. Ask the user to execute.**
+
+## Known Gotchas
 
 1. **httpx + Windows cookie bug**: `localhost` resolves to `localhost.local` in cookie jar. Always use `authed_client(token)` helper that passes Cookie header manually.
 2. **Backend Start-Process**: Must use `Start-Process -NoNewWindow` (not `Start-Job`), because `Start-Job` dies when PowerShell session ends. Use Python `.venv\Scripts\python.exe`.
@@ -152,10 +186,9 @@ print('Logged in, token:', token[:20])
 5. **test_phase3.py** references hardcoded UUIDs and uses `admin` role name. Needs updating before use.
 6. **DB URL**: Backend config uses `database:5432` (Docker hostname). Local dev tools connect via `localhost:5440`. Python test uses `postgresql://lims:lims_secure_pass@localhost:5440/lims`.
 7. **`is_superadmin` still used**: The `is_superadmin` boolean on `users` table is still present and bypasses RoleChecker. Phase 8 will clean this up.
-8. **Course sections still exist**: `course_sections` table kept for backward compat with LMS (attendance, assignments). Phase 4+ may refactor.
-9. **Terms routes removed**: All `/api/v1/academic/terms/*` endpoints are gone.
-10. **Frontend v1.7 work started**: Courses page rewritten with status badges, quota, activation. Sidebar updated with new roles and financial page links.
-11. **Phase 4 not yet verified**: Payment endpoints are coded but need end-to-end testing — run a quick smoke test (create course → section → student → enrollment → payment → check wallet) and verify `npm run build` passes.
-12. **Killing port 8000**: Use `netstat -ano | Select-String ":8000"` to find PID, then use a non-reserved variable name (e.g. `$procId`, not `$pid`) to `Stop-Process -Id $procId -Force`.
+8. **Course sections still exist**: `course_sections` table kept for backward compat with LMS (attendance, assignments). Phase 8 plans to remove.
+9. **Terms routes removed**: All `/api/v1/academic/terms/*` endpoints are gone. Frontend `terms/page.tsx` is orphaned.
+10. **Frontend builds not verified**: No `npm run build` has been run for v1.7 frontend changes — zero type errors unconfirmed.
+11. **Killing port 8000**: Use `netstat -ano | Select-String ":8000"` to find PID, then use a non-reserved variable name (e.g. `$procId`, not `$pid`) to `Stop-Process -Id $procId -Force`.
 
 (End of file - total 155 lines)

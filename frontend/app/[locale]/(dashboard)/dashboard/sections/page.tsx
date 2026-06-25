@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { apiClient } from "@/lib/api";
 import { useAuth } from "@/components/AuthContext";
+import RefreshButton from "@/components/RefreshButton";
 import { Plus, Pencil, Trash2, Loader2 } from "lucide-react";
 
 interface CourseSection {
@@ -78,11 +79,11 @@ export default function SectionsPage() {
   const [form, setForm] = useState({ course_id: "", term_id: "", teacher_id: "", capacity: 30 });
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       const [sectionsRes, termsRes, coursesRes, teachersRes] = await Promise.all([
         apiClient.get<CourseSection[]>("/academic/course-sections"),
-        apiClient.get<Term[]>("/academic/terms"),
+        apiClient.get<Term[]>("/academic/terms").catch(() => ({ data: [] })),
         apiClient.get<Course[]>("/academic/courses"),
         apiClient.get<User[]>("/users"),
       ]);
@@ -95,11 +96,11 @@ export default function SectionsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => { fetchData(); }, [fetchData]);
 
-  const canEdit = user?.is_superadmin || user?.role?.name === "admin";
+  const canEdit = user?.is_superadmin || user?.role?.name === "manager" || user?.role?.name === "secretary";
   const canDelete = user?.is_superadmin;
 
   const getTermName = (id: string) => terms.find((t) => t.id === id)?.name || id;
@@ -165,12 +166,15 @@ export default function SectionsPage() {
           <h2 className="text-xl font-bold text-slate-900">{t.title}</h2>
           <p className="text-sm text-slate-500 mt-1">{t.subtitle}</p>
         </div>
-        {canEdit && (
-          <button onClick={openCreate} className="btn-primary flex items-center gap-2">
-            <Plus size={16} />
-            <span>{t.add}</span>
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          <RefreshButton onRefresh={fetchData} />
+          {canEdit && (
+            <button onClick={openCreate} className="btn-primary flex items-center gap-2">
+              <Plus size={16} />
+              <span>{t.add}</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {showForm && (
