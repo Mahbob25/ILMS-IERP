@@ -14,6 +14,9 @@ from app.modules.lms.schemas import (
     SubmissionResponse, GradeCreate, GradeResponse,
     PaymentCreate, PaymentResponse,
     TeacherWalletResponse,
+    ExpenseCreate, ExpenseResponse,
+    WithdrawRequest, WithdrawResponse,
+    DailyClosureResponse, DailyLedgerResponse,
 )
 from app.modules.lms import service as lms_service
 from app.modules.lms import financial_service
@@ -180,8 +183,9 @@ async def create_payment(
     current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])),
     db: AsyncSession = Depends(get_db)
 ):
+    payment_date = date.fromisoformat(data.date) if data.date else None
     payment = await financial_service.create_payment(
-        db, data.student_id, data.course_id, data.amount, data.date
+        db, data.student_id, data.course_id, data.amount, payment_date
     )
     if not payment:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
@@ -219,7 +223,20 @@ async def get_payment(
     return payment
 
 
-# --- Teacher Wallets ---
+# --- Teacher Wallets (static routes before parameterized) ---
+@lms_router.post("/teacher-wallets/withdraw", response_model=WithdrawResponse)
+async def withdraw_from_wallet(
+    data: WithdrawRequest,
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])),
+    db: AsyncSession = Depends(get_db)
+):
+    result = await financial_service.teacher_withdraw(db, data.teacher_id, data.amount, data.description)
+    if not result:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Insufficient balance or wallet not found")
+    expense, new_balance = result
+    return {"expense": expense, "new_balance": new_balance}
+
+
 @lms_router.get("/teacher-wallets/{teacher_id}", response_model=TeacherWalletResponse)
 async def get_teacher_wallet(
     teacher_id: uuid.UUID,
@@ -230,3 +247,100 @@ async def get_teacher_wallet(
     if not wallet:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Teacher wallet not found")
     return wallet
+
+
+# --- Expenses ---
+@lms_router.post("/expenses", response_model=ExpenseResponse, status_code=status.HTTP_201_CREATED)
+async def create_expense(
+    data: ExpenseCreate,
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])),
+    db: AsyncSession = Depends(get_db)
+):
+    expense_date = date.fromisoformat(data.date) if data.date else None
+    if expense_date and await financial_service.is_date_closed(db, expense_date):
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Date is closed")
+    expense = await financial_service.create_expense(
+        db, amount=data.amount, recipient_name=data.recipient_name,
+        expense_type=data.type, description=data.description, expense_date=expense_date,
+    )
+    return expense
+
+
+@lms_router.get("/expenses", response_model=list[ExpenseResponse])
+async def list_expenses(
+    type: Optional[str] = None,
+    date_from: Optional[date] = None,
+    date_to: Optional[date] = None,
+    recipient_name: Optional[str] = None,
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])),
+    db: AsyncSession = Depends(get_db)
+):
+    return await financial_service.list_expenses(db, expense_type=type, date_from=date_from, date_to=date_to, recipient_name=recipient_name)
+
+
+@lms_router.get("/expenses/{expense_id}", response_model=ExpenseResponse)
+async def get_expense(
+    expense_id: uuid.UUID,
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])),
+    db: AsyncSession = Depends(get_db)
+):
+    expense = await financial_service.get_expense(db, expense_id)
+    if not expense:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Expense not found")
+    return expense
+
+
+# --- Daily Closures ---
+@lms_router.post("/daily-closures/{closure_date}/close", response_model=DailyClosureResponse)
+async def close_day(
+    closure_date: date,
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager"])),
+    db: AsyncSession = Depends(get_db)
+):
+    closure = await financial_service.close_day(db, closure_date, current_user.id)
+    if not closure:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Date already closed")
+    return closure
+
+
+@lms_router.post("/daily-closures/{closure_date}/unlock-request", response_model=DailyClosureResponse)
+async def request_unlock(
+    closure_date: date,
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])),
+    db: AsyncSession = Depends(get_db)
+):
+    closure = await financial_service.request_unlock(db, closure_date)
+    if not closure:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Date is not closed or already unlocked")
+    return closure
+
+
+@lms_router.post("/daily-closures/{closure_date}/approve-unlock", response_model=DailyClosureResponse)
+async def approve_unlock(
+    closure_date: date,
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager"])),
+    db: AsyncSession = Depends(get_db)
+):
+    closure = await financial_service.approve_unlock(db, closure_date)
+    if not closure:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="No unlock request pending for this date")
+    return closure
+
+
+@lms_router.get("/daily-closures", response_model=list[DailyClosureResponse])
+async def list_closures(
+    date_from: Optional[date] = None,
+    date_to: Optional[date] = None,
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])),
+    db: AsyncSession = Depends(get_db)
+):
+    return await financial_service.list_closures(db, date_from=date_from, date_to=date_to)
+
+
+@lms_router.get("/daily-closures/{closure_date}/ledger", response_model=DailyLedgerResponse)
+async def get_daily_ledger(
+    closure_date: date,
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])),
+    db: AsyncSession = Depends(get_db)
+):
+    return await financial_service.get_daily_ledger(db, closure_date)

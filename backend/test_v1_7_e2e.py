@@ -15,6 +15,7 @@ import os
 import subprocess
 import argparse
 import uuid
+from datetime import date
 
 import psycopg
 import httpx
@@ -675,7 +676,7 @@ def run_phase4():
         receipt1 = payment1.get('receipt_number', '')
         test('Receipt format RCP-YYYYMMDD-NNNN', len(receipt1) > 0 and receipt1.startswith('RCP-'), f'got {receipt1}')
         parts = receipt1.split('-')
-        test('Receipt has 4 parts', len(parts) == 4, f'got {receipt1}')
+        test('Receipt has 3 parts', len(parts) == 3, f'got {receipt1}')
         if len(parts) == 4:
             test('Receipt seq is 4 digits', len(parts[3]) == 4, f'got {parts[3]}')
         test('Receipt seq starts at 0001', receipt1.endswith('-0001'), f'got {receipt1}')
@@ -842,11 +843,440 @@ def run_phase4():
 
 
 # ─────────────────────────────────────────────
+# PHASE 5: Expenses, Withdrawals & Secretary Advances
+# ─────────────────────────────────────────────
+def run_phase5():
+    print('=' * 60)
+    print('PHASE 5: Expenses, Withdrawals & Secretary Advances')
+    print('=' * 60)
+    print()
+
+    try:
+        client, token = login('superadmin@institute.dev', 'admin123')
+        test('Login as superadmin succeeds', token is not None)
+        if not token:
+            print('  SKIP — cannot log in')
+            return
+        aclient = authed_client(token)
+
+        # --- Create general expense ---
+        print('--- General Expense ---')
+        r = aclient.post('/api/v1/lms/expenses', json={
+            'amount': 150.0,
+            'recipient_name': 'Office Supplies Co.',
+            'type': 'general_expense',
+            'description': 'Printer paper and ink',
+        })
+        test('Create general expense returns 201', r.status_code == 201, f'got {r.status_code}: {r.text[:200]}')
+        if r.status_code == 201:
+            exp = r.json()
+            test('Expense has receipt_number (VCH-...)', exp.get('receipt_number', '').startswith('VCH-'), f"got {exp.get('receipt_number')}")
+            test('Expense type is general_expense', exp.get('type') == 'general_expense', f"got {exp.get('type')}")
+            test('Expense amount is 150', abs(exp.get('amount', 0) - 150.0) < 0.01)
+
+        # --- Create secretary advance ---
+        print()
+        print('--- Secretary Advance ---')
+        r = aclient.post('/api/v1/lms/expenses', json={
+            'amount': 200.0,
+            'recipient_name': 'Secretary Name',
+            'type': 'secretary_advance',
+            'description': 'Monthly advance for supplies',
+        })
+        test('Create secretary advance returns 201', r.status_code == 201, f'got {r.status_code}')
+        if r.status_code == 201:
+            test('Expense type is secretary_advance', r.json().get('type') == 'secretary_advance')
+
+        # --- List expenses ---
+        print()
+        print('--- List Expenses ---')
+        r = aclient.get('/api/v1/lms/expenses')
+        test('List expenses returns 200', r.status_code == 200, f'got {r.status_code}')
+        if r.status_code == 200:
+            expenses = r.json()
+            test('At least 2 expenses', len(expenses) >= 2, f'got {len(expenses)}')
+
+        # Filter by type
+        r = aclient.get('/api/v1/lms/expenses?type=secretary_advance')
+        test('Filter by type', r.status_code == 200, f'got {r.status_code}')
+        if r.status_code == 200:
+            filtered = r.json()
+            all_match = all(e.get('type') == 'secretary_advance' for e in filtered)
+            test('All filtered match type', all_match, f'got {len(filtered)}')
+
+        # Filter by recipient
+        r = aclient.get('/api/v1/lms/expenses?recipient_name=Office')
+        test('Filter by recipient name', r.status_code == 200, f'got {r.status_code}')
+        if r.status_code == 200:
+            test('Found Office Supplies expense', len(r.json()) >= 1, f'got {len(r.json())}')
+
+        # --- Get single expense ---
+        print()
+        print('--- Get Single Expense ---')
+        r = aclient.get('/api/v1/lms/expenses')
+        if r.status_code == 200 and len(r.json()) > 0:
+            exp_id = r.json()[0]['id']
+            r = aclient.get(f'/api/v1/lms/expenses/{exp_id}')
+            test('Get expense by ID returns 200', r.status_code == 200, f'got {r.status_code}')
+
+        # --- Teacher wallet withdrawal ---
+        print()
+        print('--- Teacher Wallet Withdrawal ---')
+
+        # First need a teacher with a wallet. Create teacher, enroll, make payment.
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT id FROM roles WHERE name='teacher'")
+                row = cur.fetchone()
+                teacher_role_id = str(row[0]) if row else None
+        if not teacher_role_id:
+            test('Find teacher role ID', False)
+            aclient.close(); client.close()
+            return
+
+        r = aclient.post('/api/v1/users', json={
+            'email': f'teacher.exp.{uuid.uuid4().hex[:6]}@test.dev',
+            'password': 'test123456',
+            'full_name': 'Expense E2E Teacher',
+            'role_id': teacher_role_id,
+        })
+        test('Create teacher for withdrawal test', r.status_code == 201, f'got {r.status_code}')
+        if r.status_code != 201:
+            aclient.close(); client.close()
+            return
+        teacher_id = r.json()['id']
+
+        # Create course, section, student, enrollment, activate, payment
+        r = aclient.post('/api/v1/academic/courses', json={
+            'name': 'E2E Expense Test Course',
+            'code': f'EXP{uuid.uuid4().hex[:6].upper()}', 'credits': 3, 'min_students_required': 1,
+        })
+        if r.status_code != 201:
+            aclient.close(); client.close()
+            return
+        course_id = r.json()['id']
+
+        r = aclient.post('/api/v1/academic/course-sections', json={
+            'course_id': course_id, 'teacher_id': teacher_id, 'capacity': 10,
+        })
+        if r.status_code != 201:
+            aclient.close(); client.close()
+            return
+        section_id = r.json()['id']
+
+        r = aclient.post('/api/v1/academic/students', json={
+            'student_code': f'EXP{uuid.uuid4().hex[:6].upper()}', 'full_name': 'Expense Student',
+        })
+        if r.status_code != 201:
+            aclient.close(); client.close()
+            return
+        student_id = r.json()['id']
+
+        r = aclient.post('/api/v1/academic/enrollments', json={
+            'student_id': student_id, 'section_id': section_id,
+            'agreed_price': 500.0, 'admin_discount': 0.0,
+        })
+        test('Enroll student', r.status_code == 201, f'got {r.status_code}')
+        if r.status_code != 201:
+            aclient.close(); client.close()
+            return
+
+        r = aclient.post(f'/api/v1/academic/courses/{course_id}/activate', json={'teacher_percentage': 50})
+        test('Activate course 50%', r.status_code == 200, f'got {r.status_code}')
+        if r.status_code != 200:
+            aclient.close(); client.close()
+            return
+
+        r = aclient.post('/api/v1/lms/payments', json={
+            'student_id': student_id, 'course_id': course_id, 'amount': 200.0,
+        })
+        test('Create $200 payment', r.status_code == 201, f'got {r.status_code}')
+        if r.status_code != 201:
+            aclient.close(); client.close()
+            return
+
+        # Wallet should have $100 (50% of $200)
+        r = aclient.get(f'/api/v1/lms/teacher-wallets/{teacher_id}')
+        test('Wallet has $100 before withdraw', r.status_code == 200, f'got {r.status_code}')
+        if r.status_code == 200:
+            test('Balance is $100', abs(r.json().get('balance', 0) - 100.0) < 0.01, f"got {r.json().get('balance')}")
+
+        # Withdraw $40
+        r = aclient.post('/api/v1/lms/teacher-wallets/withdraw', json={
+            'teacher_id': teacher_id, 'amount': 40.0, 'description': 'Test withdrawal',
+        })
+        test('Withdraw $40 returns 200', r.status_code == 200, f'got {r.status_code}: {r.text[:200]}')
+        if r.status_code == 200:
+            data = r.json()
+            test('Withdraw response has expense', 'expense' in data, f"keys: {list(data.keys())}")
+            test('Withdraw response has new_balance', 'new_balance' in data)
+            test('New balance is $60', abs(data.get('new_balance', 0) - 60.0) < 0.01, f"got {data.get('new_balance')}")
+            exp = data['expense']
+            test('Withdrawal expense type is teacher_withdrawal', exp.get('type') == 'teacher_withdrawal', f"got {exp.get('type')}")
+            test('Withdrawal amount is $40', abs(exp.get('amount', 0) - 40.0) < 0.01)
+
+        # Wallet should now be $60
+        r = aclient.get(f'/api/v1/lms/teacher-wallets/{teacher_id}')
+        if r.status_code == 200:
+            test('Wallet balance is $60 after withdraw', abs(r.json().get('balance', 0) - 60.0) < 0.01, f"got {r.json().get('balance')}")
+
+        # Try to withdraw more than balance ($61 > $60)
+        print()
+        print('--- Insufficient Balance Rejection ---')
+        r = aclient.post('/api/v1/lms/teacher-wallets/withdraw', json={
+            'teacher_id': teacher_id, 'amount': 61.0,
+        })
+        test('Withdraw $61 (insufficient) returns 400', r.status_code == 400, f'got {r.status_code}')
+
+        # Wallet should still be $60
+        r = aclient.get(f'/api/v1/lms/teacher-wallets/{teacher_id}')
+        if r.status_code == 200:
+            test('Wallet still $60 after failed withdraw', abs(r.json().get('balance', 0) - 60.0) < 0.01, f"got {r.json().get('balance')}")
+
+        # --- Role gates ---
+        print()
+        print('--- Role Gate Enforcement ---')
+        # Teacher cannot create expenses
+        r = aclient.get('/api/v1/users')
+        teacher_email = None
+        if r.status_code == 200:
+            for u in r.json():
+                if u.get('id') == teacher_id:
+                    teacher_email = u.get('email')
+                    break
+        if teacher_email:
+            t_client, t_token = login(teacher_email, 'test123456')
+            if t_token:
+                t_ac = authed_client(t_token)
+                r = t_ac.post('/api/v1/lms/expenses', json={
+                    'amount': 10.0, 'recipient_name': 'Test', 'type': 'general_expense',
+                })
+                test('Teacher cannot create expense (403)', r.status_code == 403, f'got {r.status_code}')
+                t_ac.close()
+            t_client.close()
+
+        # --- Unauthenticated ---
+        print()
+        print('--- Unauthenticated Access ---')
+        anon = httpx.Client(base_url=BASE)
+        r = anon.get('/api/v1/lms/expenses')
+        test('Anonymous cannot list expenses (401)', r.status_code == 401, f'got {r.status_code}')
+        r = anon.post('/api/v1/lms/teacher-wallets/withdraw', json={
+            'teacher_id': teacher_id, 'amount': 10.0,
+        })
+        test('Anonymous cannot withdraw (401)', r.status_code == 401, f'got {r.status_code}')
+        anon.close()
+
+        aclient.close()
+        client.close()
+
+    except Exception as e:
+        test('Phase 5 overall', False, str(e))
+
+
+# ─────────────────────────────────────────────
+# PHASE 6: Daily Closure — Auditing State Machine
+# ─────────────────────────────────────────────
+def run_phase6():
+    print('=' * 60)
+    print('PHASE 6: Daily Closure — Auditing State Machine')
+    print('=' * 60)
+    print()
+
+    try:
+        client, token = login('superadmin@institute.dev', 'admin123')
+        test('Login as superadmin succeeds', token is not None)
+        if not token:
+            print('  SKIP — cannot log in')
+            return
+        aclient = authed_client(token)
+
+        # Setup: need a course, student, enrollment, payment for ledger test
+        print('--- Test Setup ---')
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT id FROM roles WHERE name='teacher'")
+                row = cur.fetchone()
+                teacher_role_id = str(row[0]) if row else None
+        if not teacher_role_id:
+            test('Find teacher role ID', False)
+            aclient.close(); client.close()
+            return
+
+        r = aclient.post('/api/v1/users', json={
+            'email': f'teacher.cls.{uuid.uuid4().hex[:6]}@test.dev',
+            'password': 'test123456', 'full_name': 'Closure E2E Teacher',
+            'role_id': teacher_role_id,
+        })
+        test('Create teacher', r.status_code == 201, f'got {r.status_code}')
+        if r.status_code != 201:
+            aclient.close(); client.close()
+            return
+        teacher_id = r.json()['id']
+
+        r = aclient.post('/api/v1/academic/courses', json={
+            'name': 'E2E Closure Test Course',
+            'code': f'CLS{uuid.uuid4().hex[:6].upper()}', 'credits': 3, 'min_students_required': 1,
+        })
+        if r.status_code != 201:
+            aclient.close(); client.close()
+            return
+        course_id = r.json()['id']
+
+        r = aclient.post('/api/v1/academic/course-sections', json={
+            'course_id': course_id, 'teacher_id': teacher_id, 'capacity': 10,
+        })
+        if r.status_code != 201:
+            aclient.close(); client.close()
+            return
+        section_id = r.json()['id']
+
+        r = aclient.post('/api/v1/academic/students', json={
+            'student_code': f'CLS{uuid.uuid4().hex[:6].upper()}', 'full_name': 'Closure Student',
+        })
+        if r.status_code != 201:
+            aclient.close(); client.close()
+            return
+        student_id = r.json()['id']
+
+        r = aclient.post('/api/v1/academic/enrollments', json={
+            'student_id': student_id, 'section_id': section_id,
+            'agreed_price': 300.0, 'admin_discount': 0.0,
+        })
+        test('Enroll student', r.status_code == 201, f'got {r.status_code}')
+        if r.status_code != 201:
+            aclient.close(); client.close()
+            return
+
+        r = aclient.post(f'/api/v1/academic/courses/{course_id}/activate', json={'teacher_percentage': 30})
+        if r.status_code != 200:
+            aclient.close(); client.close()
+            return
+
+        # Create a payment for ledger test
+        today = date.today().isoformat()
+        r = aclient.post('/api/v1/lms/payments', json={
+            'student_id': student_id, 'course_id': course_id, 'amount': 100.0,
+        })
+        test('Create $100 payment for ledger', r.status_code == 201, f'got {r.status_code}')
+        if r.status_code != 201:
+            aclient.close(); client.close()
+            return
+
+        # Create an expense for ledger test
+        r = aclient.post('/api/v1/lms/expenses', json={
+            'amount': 30.0, 'recipient_name': 'Closure Test', 'type': 'general_expense',
+        })
+        test('Create $30 expense for ledger', r.status_code == 201, f'got {r.status_code}')
+
+        # --- Close the day ---
+        print()
+        print('--- Close Day ---')
+        r = aclient.post(f'/api/v1/lms/daily-closures/{today}/close')
+        test('Close today returns 200', r.status_code == 200, f'got {r.status_code}: {r.text[:200]}')
+        if r.status_code == 200:
+            closure = r.json()
+            test('Closure status is closed', closure.get('status') == 'closed', f"got {closure.get('status')}")
+            test('Closure has manager ID', closure.get('closed_by_manager_id') is not None)
+
+        # --- Double-close rejected ---
+        r = aclient.post(f'/api/v1/lms/daily-closures/{today}/close')
+        test('Double-close returns 409', r.status_code == 409, f'got {r.status_code}')
+
+        # --- Lock enforcement: cannot create expense on closed date ---
+        print()
+        print('--- Lock Enforcement ---')
+        r = aclient.post('/api/v1/lms/expenses', json={
+            'amount': 10.0, 'recipient_name': 'Lock Test', 'type': 'general_expense',
+            'date': today,
+        })
+        test('Expense on closed date returns 409', r.status_code == 409, f'got {r.status_code}')
+
+        # --- Request unlock ---
+        print()
+        print('--- Unlock Request ---')
+        r = aclient.post(f'/api/v1/lms/daily-closures/{today}/unlock-request')
+        test('Unlock request returns 200', r.status_code == 200, f'got {r.status_code}')
+        if r.status_code == 200:
+            test('Status is unlock_requested', r.json().get('status') == 'unlock_requested', f"got {r.json().get('status')}")
+
+        # --- Approve unlock ---
+        print()
+        print('--- Approve Unlock ---')
+        r = aclient.post(f'/api/v1/lms/daily-closures/{today}/approve-unlock')
+        test('Approve unlock returns 200', r.status_code == 200, f'got {r.status_code}')
+        if r.status_code == 200:
+            test('Status is pending after unlock', r.json().get('status') == 'pending', f"got {r.json().get('status')}")
+
+        # Now expense should succeed
+        r = aclient.post('/api/v1/lms/expenses', json={
+            'amount': 10.0, 'recipient_name': 'Post-Unlock Test', 'type': 'general_expense',
+            'date': today,
+        })
+        test('Expense after unlock succeeds (201)', r.status_code == 201, f'got {r.status_code}')
+
+        # Close again
+        r = aclient.post(f'/api/v1/lms/daily-closures/{today}/close')
+        test('Re-close after unlock', r.status_code == 200, f'got {r.status_code}')
+
+        # --- Daily ledger ---
+        print()
+        print('--- Daily Ledger ---')
+        r = aclient.get(f'/api/v1/lms/daily-closures/{today}/ledger')
+        test('Ledger returns 200', r.status_code == 200, f'got {r.status_code}')
+        if r.status_code == 200:
+            ledger = r.json()
+            test('Ledger has total_payments_in', 'total_payments_in' in ledger)
+            test('Ledger has total_expenses_out', 'total_expenses_out' in ledger)
+            test('Ledger has net_cash_flow', 'net_cash_flow' in ledger)
+            test('Payments in >= $100', ledger.get('total_payments_in', 0) >= 100.0, f"got {ledger.get('total_payments_in')}")
+            test('Expenses out >= $40', ledger.get('total_expenses_out', 0) >= 40.0, f"got {ledger.get('total_expenses_out')}")
+            test('Status is closed', ledger.get('status') == 'closed', f"got {ledger.get('status')}")
+
+        # --- List closures ---
+        print()
+        print('--- List Closures ---')
+        r = aclient.get('/api/v1/lms/daily-closures')
+        test('List closures returns 200', r.status_code == 200, f'got {r.status_code}')
+        if r.status_code == 200:
+            closures = r.json()
+            test('At least 1 closure', len(closures) >= 1, f'got {len(closures)}')
+            found = any(c.get('date') == today for c in closures)
+            test('Today is in closure list', found)
+
+        # --- Role gates ---
+        print()
+        print('--- Role Gate Enforcement ---')
+        # Teacher cannot close
+        r = aclient.get('/api/v1/users')
+        teacher_email = None
+        if r.status_code == 200:
+            for u in r.json():
+                if u.get('id') == teacher_id:
+                    teacher_email = u.get('email')
+                    break
+        if teacher_email:
+            t_client, t_token = login(teacher_email, 'test123456')
+            if t_token:
+                t_ac = authed_client(t_token)
+                r = t_ac.post(f'/api/v1/lms/daily-closures/{today}/close')
+                test('Teacher cannot close day (403)', r.status_code == 403, f'got {r.status_code}')
+                t_ac.close()
+            t_client.close()
+
+        aclient.close()
+        client.close()
+
+    except Exception as e:
+        test('Phase 6 overall', False, str(e))
+
+
+# ─────────────────────────────────────────────
 # Main
 # ─────────────────────────────────────────────
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--phase', default='all', choices=['1', '2', '3', '4', 'all'])
+    parser.add_argument('--phase', default='all', choices=['1', '2', '3', '4', '5', '6', 'all'])
     parser.add_argument('--skip-checks', action='store_true', help='Skip service health checks')
     args = parser.parse_args()
 
@@ -864,6 +1294,12 @@ if __name__ == '__main__':
 
     if args.phase in ('4', 'all'):
         run_phase4()
+
+    if args.phase in ('5', 'all'):
+        run_phase5()
+
+    if args.phase in ('6', 'all'):
+        run_phase6()
 
     print(f'=== RESULTS: {ok} passed, {fail} failed ===')
     if fail > 0:
