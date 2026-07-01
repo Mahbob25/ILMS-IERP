@@ -1,0 +1,780 @@
+{
+  "nodes": [
+    {
+      "id": "docs_dev_notes_caddyfile_switching",
+      "label": "Caddyfile Docker/Local Dev Switching",
+      "file_type": "rationale",
+      "source_file": "E:\\lms\\docs\\DEV_NOTES.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_plan_v1_6_lean_mvp",
+      "label": "Lean MVP Principle (4 Containers Only)",
+      "file_type": "rationale",
+      "source_file": "E:\\lms\\docs\\Plan-v1.6.md",
+      "source_location": "Changelog 1.6",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_plan_v1_6_pgvector",
+      "label": "pgvector in PostgreSQL (Single Source of Truth)",
+      "file_type": "concept",
+      "source_file": "E:\\lms\\docs\\Plan-v1.6.md",
+      "source_location": "Section 3, 10.4",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_plan_v1_6_backgroundtasks",
+      "label": "FastAPI BackgroundTasks (No Celery)",
+      "file_type": "concept",
+      "source_file": "E:\\lms\\docs\\Plan-v1.6.md",
+      "source_location": "Section 3, 7, 11",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_plan_v1_6_isolate_resume",
+      "label": "Isolate & Resume Checkpointing",
+      "file_type": "concept",
+      "source_file": "E:\\lms\\docs\\Plan-v1.6.md",
+      "source_location": "Section 11",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_plan_v1_6_caddy_internal_ca",
+      "label": "Caddy Internal CA (Local HTTPS)",
+      "file_type": "concept",
+      "source_file": "E:\\lms\\docs\\Plan-v1.6.md",
+      "source_location": "Section 6, 9",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_plan_v1_6_httponly_secure_cookies",
+      "label": "HttpOnly Secure Cookies Auth (JWT)",
+      "file_type": "concept",
+      "source_file": "E:\\lms\\docs\\Plan-v1.6.md",
+      "source_location": "Section 8, 9",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_plan_v1_6_circuit_breaker",
+      "label": "Circuit Breaker (pybreaker) for AI",
+      "file_type": "concept",
+      "source_file": "E:\\lms\\docs\\Plan-v1.6.md",
+      "source_location": "Section 3, 11",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_plan_v1_6_rag_semantic_search",
+      "label": "RAG Semantic Search via pgvector cosine",
+      "file_type": "concept",
+      "source_file": "E:\\lms\\docs\\Plan-v1.6.md",
+      "source_location": "Section 4.6, 10.4",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_plan_v1_6_hnsw_index",
+      "label": "HNSW Vector Index",
+      "file_type": "concept",
+      "source_file": "E:\\lms\\docs\\Plan-v1.6.md",
+      "source_location": "Section 5, 10.4",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_plan_v1_6_deterministic_chunk_id",
+      "label": "Deterministic chunk_id (MD5)",
+      "file_type": "concept",
+      "source_file": "E:\\lms\\docs\\Plan-v1.6.md",
+      "source_location": "Section 10.4, 11",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_plan_v1_6_modular_monolith",
+      "label": "Modular Monolith Backend (FastAPI)",
+      "file_type": "concept",
+      "source_file": "E:\\lms\\docs\\Plan-v1.6.md",
+      "source_location": "Section 7",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_plan_v1_6_sse_notifications",
+      "label": "SSE Notifications (asyncio.Queue, no Redis)",
+      "file_type": "concept",
+      "source_file": "E:\\lms\\docs\\Plan-v1.6.md",
+      "source_location": "Section 3",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_plan_v1_7_revenue_split",
+      "label": "Automated Revenue Split Engine",
+      "file_type": "concept",
+      "source_file": "E:\\lms\\docs\\Plan-v1.7.md",
+      "source_location": "Section 3.2",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_plan_v1_7_teacher_wallet",
+      "label": "Teacher Wallet (Digital Ledger)",
+      "file_type": "concept",
+      "source_file": "E:\\lms\\docs\\Plan-v1.7.md",
+      "source_location": "Section 3.3",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_plan_v1_7_daily_closure",
+      "label": "Daily Closure Auditing State Machine",
+      "file_type": "concept",
+      "source_file": "E:\\lms\\docs\\Plan-v1.7.md",
+      "source_location": "Section 4",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_plan_v1_7_stateful_courses",
+      "label": "Stateful Courses (pending/active/completed)",
+      "file_type": "concept",
+      "source_file": "E:\\lms\\docs\\Plan-v1.7.md",
+      "source_location": "Section 2",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_plan_v1_7_secretary_advances",
+      "label": "Secretary Advances (payroll tracking)",
+      "file_type": "concept",
+      "source_file": "E:\\lms\\docs\\Plan-v1.7.md",
+      "source_location": "Section 3.3",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_plan_v1_7_pos_interface",
+      "label": "POS Interface (rapid payment entry)",
+      "file_type": "concept",
+      "source_file": "E:\\lms\\docs\\Plan-v1.7.md",
+      "source_location": "Section 6",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_plan_v1_7_terms_abolished",
+      "label": "Terms Abolished (pivot to independent courses)",
+      "file_type": "rationale",
+      "source_file": "E:\\lms\\docs\\Plan-v1.7.md",
+      "source_location": "Header, Section 2",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_plan_v1_7_implementation_rbac_refinement",
+      "label": "v1.7 RBAC Refinement (4 roles: superadmin/manager/secretary/teacher)",
+      "file_type": "concept",
+      "source_file": "E:\\lms\\docs\\Plan-v1.7-implementation.md",
+      "source_location": "Phase 2",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_plan_v1_7_implementation_refresh_button",
+      "label": "RefreshButton Component (debounced reload)",
+      "file_type": "concept",
+      "source_file": "E:\\lms\\docs\\Plan-v1.7-implementation.md",
+      "source_location": "Phase 7",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_session_handoff_v1_7_status",
+      "label": "v1.7 ERP Implementation Status (Phases 1-10)",
+      "file_type": "document",
+      "source_file": "E:\\lms\\docs\\SESSION_HANDOFF.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_active_task_phase3_lms",
+      "label": "Active Task: Phase 3 LMS (Attendance/Assignments/Gradebook)",
+      "file_type": "document",
+      "source_file": "E:\\lms\\docs\\active_task.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_build_plan_phases",
+      "label": "LIMS Build Plan Phases (0-10)",
+      "file_type": "concept",
+      "source_file": "E:\\lms\\docs\\build_plan.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_frontend_design_rules_professional_minimalist",
+      "label": "Professional Minimalist Frontend Design",
+      "file_type": "rationale",
+      "source_file": "E:\\lms\\docs\\frontend-design-rules.md",
+      "source_location": "Section 1",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_memory_architecture_rules",
+      "label": "LIMS Architectural Memory (13 Immutable Rules)",
+      "file_type": "rationale",
+      "source_file": "E:\\lms\\docs\\memory.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_v2_plan_user_employee_separation",
+      "label": "User vs Employee Separation",
+      "file_type": "concept",
+      "source_file": "E:\\lms\\docs\\v2-plan-users-employees-separation.md",
+      "source_location": "Section 2.1",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_v2_plan_permission_system",
+      "label": "Configurable Permission System (role_permissions)",
+      "file_type": "concept",
+      "source_file": "E:\\lms\\docs\\v2-plan-users-employees-separation.md",
+      "source_location": "Section 2.2",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_v2_plan_permission_checker",
+      "label": "PermissionChecker Dependency (codename-based)",
+      "file_type": "concept",
+      "source_file": "E:\\lms\\docs\\v2-plan-users-employees-separation.md",
+      "source_location": "Section 3.6",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_v2_plan_employees_table",
+      "label": "Employees Table (HR fields separated from users)",
+      "file_type": "concept",
+      "source_file": "E:\\lms\\docs\\v2-plan-users-employees-separation.md",
+      "source_location": "Section 3.1",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_ver_phase_1_auth_verification",
+      "label": "Phase 1 Verification: Auth & Cookie Security",
+      "file_type": "document",
+      "source_file": "E:\\lms\\docs\\ver_phase_1.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_ver_phase_2_academic_verification",
+      "label": "Phase 2 Verification: Academic SIS CRUD",
+      "file_type": "document",
+      "source_file": "E:\\lms\\docs\\ver_phase_2.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "frontend_next_output_build",
+      "label": "Next.js 14.2.3 Dev Build Output",
+      "file_type": "document",
+      "source_file": "E:\\lms\\frontend\\next_output.txt",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "docs_build_plan_phases",
+      "target": "docs_plan_v1_6_lean_mvp",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "E:\\lms\\docs\\build_plan.md",
+      "source_location": "Header",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_plan_v1_7_implementation_rbac_refinement",
+      "target": "docs_plan_v1_7_stateful_courses",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "E:\\lms\\docs\\Plan-v1.7-implementation.md",
+      "source_location": "Context",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_session_handoff_v1_7_status",
+      "target": "docs_plan_v1_7_implementation_rbac_refinement",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "E:\\lms\\docs\\SESSION_HANDOFF.md",
+      "source_location": "Remaining Phases table",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_session_handoff_v1_7_status",
+      "target": "docs_memory_architecture_rules",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "E:\\lms\\docs\\SESSION_HANDOFF.md",
+      "source_location": "Architecture Rules section",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_memory_architecture_rules",
+      "target": "docs_plan_v1_6_lean_mvp",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "E:\\lms\\docs\\memory.md",
+      "source_location": "Section 1",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_memory_architecture_rules",
+      "target": "docs_plan_v1_6_pgvector",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "E:\\lms\\docs\\memory.md",
+      "source_location": "Section 3",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_memory_architecture_rules",
+      "target": "docs_plan_v1_6_backgroundtasks",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "E:\\lms\\docs\\memory.md",
+      "source_location": "Section 4",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_memory_architecture_rules",
+      "target": "docs_plan_v1_6_isolate_resume",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "E:\\lms\\docs\\memory.md",
+      "source_location": "Section 5",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_memory_architecture_rules",
+      "target": "docs_plan_v1_6_httponly_secure_cookies",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "E:\\lms\\docs\\memory.md",
+      "source_location": "Section 6",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_memory_architecture_rules",
+      "target": "docs_plan_v1_6_caddy_internal_ca",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "E:\\lms\\docs\\memory.md",
+      "source_location": "Section 7",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_memory_architecture_rules",
+      "target": "docs_plan_v1_6_sse_notifications",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "E:\\lms\\docs\\memory.md",
+      "source_location": "Section 9",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_ver_phase_1_auth_verification",
+      "target": "docs_plan_v1_6_httponly_secure_cookies",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "E:\\lms\\docs\\ver_phase_1.md",
+      "source_location": "Section 4, 6",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_ver_phase_1_auth_verification",
+      "target": "docs_build_plan_phases",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "E:\\lms\\docs\\ver_phase_1.md",
+      "source_location": "Title",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_ver_phase_2_academic_verification",
+      "target": "docs_build_plan_phases",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "E:\\lms\\docs\\ver_phase_2.md",
+      "source_location": "Title",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_active_task_phase3_lms",
+      "target": "docs_build_plan_phases",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "E:\\lms\\docs\\active_task.md",
+      "source_location": "Status",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_session_handoff_v1_7_status",
+      "target": "docs_plan_v1_7_revenue_split",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "E:\\lms\\docs\\SESSION_HANDOFF.md",
+      "source_location": "Phase 4",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_session_handoff_v1_7_status",
+      "target": "docs_plan_v1_7_daily_closure",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "E:\\lms\\docs\\SESSION_HANDOFF.md",
+      "source_location": "Phase 6",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_session_handoff_v1_7_status",
+      "target": "docs_plan_v1_7_teacher_wallet",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "E:\\lms\\docs\\SESSION_HANDOFF.md",
+      "source_location": "Phase 4-5",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_plan_v1_7_terms_abolished",
+      "target": "docs_plan_v1_7_stateful_courses",
+      "relation": "rationale_for",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "E:\\lms\\docs\\Plan-v1.7.md",
+      "source_location": "Section 2",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_plan_v1_6_lean_mvp",
+      "target": "docs_plan_v1_6_pgvector",
+      "relation": "rationale_for",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "E:\\lms\\docs\\Plan-v1.6.md",
+      "source_location": "Changelog 1.6.1",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_plan_v1_6_lean_mvp",
+      "target": "docs_plan_v1_6_backgroundtasks",
+      "relation": "rationale_for",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "E:\\lms\\docs\\Plan-v1.6.md",
+      "source_location": "Changelog 1.6.2",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_plan_v1_6_caddy_internal_ca",
+      "target": "docs_plan_v1_6_httponly_secure_cookies",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "E:\\lms\\docs\\Plan-v1.6.md",
+      "source_location": "Section 8",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_plan_v1_6_pgvector",
+      "target": "docs_plan_v1_6_rag_semantic_search",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "E:\\lms\\docs\\Plan-v1.6.md",
+      "source_location": "Section 4.6, 10.4",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_plan_v1_6_hnsw_index",
+      "target": "docs_plan_v1_6_rag_semantic_search",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "E:\\lms\\docs\\Plan-v1.6.md",
+      "source_location": "Section 5",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_plan_v1_6_deterministic_chunk_id",
+      "target": "docs_plan_v1_6_isolate_resume",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "E:\\lms\\docs\\Plan-v1.6.md",
+      "source_location": "Section 11",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_plan_v1_6_circuit_breaker",
+      "target": "docs_plan_v1_6_isolate_resume",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "E:\\lms\\docs\\Plan-v1.6.md",
+      "source_location": "Section 11",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_plan_v1_7_revenue_split",
+      "target": "docs_plan_v1_7_teacher_wallet",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "E:\\lms\\docs\\Plan-v1.7.md",
+      "source_location": "Section 3.2-3.3",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_plan_v1_7_daily_closure",
+      "target": "docs_plan_v1_7_revenue_split",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "E:\\lms\\docs\\Plan-v1.7.md",
+      "source_location": "Section 4",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_plan_v1_7_daily_closure",
+      "target": "docs_plan_v1_7_secretary_advances",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "E:\\lms\\docs\\Plan-v1.7.md",
+      "source_location": "Section 3.3, 4",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_v2_plan_permission_checker",
+      "target": "docs_plan_v1_7_implementation_rbac_refinement",
+      "relation": "semantically_similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "E:\\lms\\docs\\v2-plan-users-employees-separation.md",
+      "source_location": "Section 3.6",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_v2_plan_permission_system",
+      "target": "docs_plan_v1_7_implementation_rbac_refinement",
+      "relation": "semantically_similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.75,
+      "source_file": "E:\\lms\\docs\\v2-plan-users-employees-separation.md",
+      "source_location": "Section 2.2",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_v2_plan_user_employee_separation",
+      "target": "docs_v2_plan_employees_table",
+      "relation": "rationale_for",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "E:\\lms\\docs\\v2-plan-users-employees-separation.md",
+      "source_location": "Section 2.1, 3.1",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_v2_plan_permission_system",
+      "target": "docs_v2_plan_permission_checker",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "E:\\lms\\docs\\v2-plan-users-employees-separation.md",
+      "source_location": "Section 2.2, 3.6",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_dev_notes_caddyfile_switching",
+      "target": "docs_plan_v1_6_caddy_internal_ca",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "E:\\lms\\docs\\DEV_NOTES.md",
+      "source_location": "Caddyfile section",
+      "weight": 1.0
+    },
+    {
+      "source": "docs_session_handoff_v1_7_status",
+      "target": "docs_plan_v1_7_implementation_refresh_button",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "E:\\lms\\docs\\SESSION_HANDOFF.md",
+      "source_location": "Phase 7",
+      "weight": 1.0
+    }
+  ],
+  "hyperedges": [
+    {
+      "id": "lean_mvp_four_container_architecture",
+      "label": "Lean MVP 4-Container Architecture",
+      "nodes": [
+        "docs_plan_v1_6_lean_mvp",
+        "docs_plan_v1_6_pgvector",
+        "docs_plan_v1_6_backgroundtasks",
+        "docs_plan_v1_6_caddy_internal_ca",
+        "docs_plan_v1_6_modular_monolith"
+      ],
+      "relation": "participate_in",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "E:\\lms\\docs\\Plan-v1.6.md"
+    },
+    {
+      "id": "curriculum_ingestion_rag_pipeline",
+      "label": "Curriculum Ingestion & RAG Pipeline",
+      "nodes": [
+        "docs_plan_v1_6_pgvector",
+        "docs_plan_v1_6_hnsw_index",
+        "docs_plan_v1_6_rag_semantic_search",
+        "docs_plan_v1_6_deterministic_chunk_id",
+        "docs_plan_v1_6_isolate_resume",
+        "docs_plan_v1_6_circuit_breaker"
+      ],
+      "relation": "participate_in",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "E:\\lms\\docs\\Plan-v1.6.md"
+    },
+    {
+      "id": "v1_7_erp_financial_engine",
+      "label": "v1.7 ERP Financial Engine",
+      "nodes": [
+        "docs_plan_v1_7_revenue_split",
+        "docs_plan_v1_7_teacher_wallet",
+        "docs_plan_v1_7_daily_closure",
+        "docs_plan_v1_7_secretary_advances",
+        "docs_plan_v1_7_pos_interface"
+      ],
+      "relation": "participate_in",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "E:\\lms\\docs\\Plan-v1.7.md"
+    }
+  ],
+  "input_tokens": 18000,
+  "output_tokens": 4200
+}

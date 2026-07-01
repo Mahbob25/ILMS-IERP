@@ -57,8 +57,34 @@ export function middleware(request: NextRequest) {
   }
 
   // Redirect to dashboard if logged-in user tries to open login page
+  // Only redirect if the refresh token JWT is not expired (validates exp claim)
   if (cleanPath === '/login' && hasRefreshToken) {
-    return NextResponse.redirect(new URL(`/${pathnameLocale}/dashboard`, request.url));
+    const refreshToken = request.cookies.get('refresh_token')?.value;
+    let isRefreshTokenExpired = true;
+    if (refreshToken) {
+      try {
+        const parts = refreshToken.split('.');
+        if (parts.length === 3) {
+          const base64Url = parts[1];
+          const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+          const jsonPayload = decodeURIComponent(
+            atob(base64)
+              .split('')
+              .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+              .join('')
+          );
+          const payload = JSON.parse(jsonPayload);
+          if (payload.type === 'refresh' && payload.exp && typeof payload.exp === 'number') {
+            isRefreshTokenExpired = payload.exp * 1000 < Date.now();
+          }
+        }
+      } catch {
+        // Invalid JWT - treat as expired
+      }
+    }
+    if (!isRefreshTokenExpired) {
+      return NextResponse.redirect(new URL(`/${pathnameLocale}/dashboard`, request.url));
+    }
   }
 
   // Protect admin paths strictly for superadmins via JWT claim inspection

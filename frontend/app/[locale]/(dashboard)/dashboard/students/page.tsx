@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { apiClient } from "@/lib/api";
 import { useAuth } from "@/components/AuthContext";
 import RefreshButton from "@/components/RefreshButton";
+import ConfirmModal from "@/components/ConfirmModal";
 import { Plus, Pencil, Trash2, Loader2, Eye } from "lucide-react";
 
 interface Student {
@@ -36,6 +37,14 @@ export default function StudentsPage() {
       cancel: "إلغاء",
       loading: "جاري التحميل...",
       empty: "لا يوجد طلاب بعد",
+      confirmTitle: "تأكيد الحذف",
+      search: "بحث باسم أو رقم الطالب...",
+      showing: "عرض",
+      of: "من",
+      prev: "السابق",
+      next: "التالي",
+      deleted: "تم حذف الطالب بنجاح",
+      deleteFailed: "لا يمكن حذف الطالب لوجود تسجيلات مرتبطة به",
       confirmDelete: "هل أنت متأكد من حذف هذا الطالب؟",
       yes: "نعم",
       no: "لا",
@@ -54,6 +63,14 @@ export default function StudentsPage() {
       cancel: "Cancel",
       loading: "Loading...",
       empty: "No students yet",
+      confirmTitle: "Confirm Deletion",
+      search: "Search by name or code...",
+      showing: "Showing",
+      of: "of",
+      prev: "Previous",
+      next: "Next",
+      deleted: "Student deleted successfully",
+      deleteFailed: "Cannot delete student with existing enrollments",
       confirmDelete: "Are you sure you want to delete this student?",
       yes: "Yes",
       no: "No",
@@ -65,12 +82,21 @@ export default function StudentsPage() {
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState({ student_code: "", full_name: "", email: "" });
-  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Student | null>(null);
+  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const limit = 15;
 
-  const fetchStudents = useCallback(async () => {
+  const fetchStudents = useCallback(async (searchTerm = "", pageNum = 1) => {
+    setMessage(null);
     try {
-      const res = await apiClient.get<Student[]>("/academic/students");
-      setStudents(res.data);
+      const skip = (pageNum - 1) * limit;
+      const params = `?search=${encodeURIComponent(searchTerm)}&skip=${skip}&limit=${limit}&sort_by=full_name&sort_order=asc`;
+      const res = await apiClient.get<{ items: Student[]; total: number }>(`/academic/students${params}`);
+      setStudents(res.data.items);
+      setTotalCount(res.data.total);
     } catch (e) {
       console.error(e);
     } finally {
@@ -78,7 +104,29 @@ export default function StudentsPage() {
     }
   }, []);
 
-  useEffect(() => { fetchStudents(); }, [fetchStudents]);
+  const [searchTimeout, setSearchTimeout] = useState<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleSearchChange = (value: string) => {
+    setSearch(value);
+    if (searchTimeout) clearTimeout(searchTimeout);
+    setSearchTimeout(setTimeout(() => {
+      setPage(1);
+      fetchStudents(value, 1);
+    }, 400));
+  };
+
+  useEffect(() => {
+    setLoading(true);
+    fetchStudents();
+    return () => { if (searchTimeout) clearTimeout(searchTimeout); };
+  }, []);
+
+  useEffect(() => {
+    if (message) {
+      const timer = setTimeout(() => setMessage(null), 6000);
+      return () => clearTimeout(timer);
+    }
+  }, [message]);
 
   const canEdit = user?.is_superadmin || user?.role?.name === "manager" || user?.role?.name === "secretary";
   const canDelete = user?.is_superadmin;
@@ -112,7 +160,7 @@ export default function StudentsPage() {
       }
       setShowForm(false);
       setEditingId(null);
-      fetchStudents();
+      fetchStudents(search, page);
     } catch (e) {
       console.error(e);
     }
@@ -121,10 +169,13 @@ export default function StudentsPage() {
   const handleDelete = async (id: string) => {
     try {
       await apiClient.delete(`/academic/students/${id}`);
-      setDeleteConfirm(null);
-      fetchStudents();
-    } catch (e) {
-      console.error(e);
+      setDeleteTarget(null);
+      setMessage({ type: "success", text: t.deleted });
+      fetchStudents(search, page);
+    } catch (e: any) {
+      setDeleteTarget(null);
+      const detail = e?.response?.data?.detail || e?.message || "";
+      setMessage({ type: "error", text: detail || t.deleteFailed });
     }
   };
 
@@ -144,7 +195,7 @@ export default function StudentsPage() {
           <p className="text-sm text-slate-500 mt-1">{t.subtitle}</p>
         </div>
         <div className="flex items-center gap-2">
-          <RefreshButton onRefresh={fetchStudents} />
+          <RefreshButton onRefresh={() => fetchStudents(search, page)} />
           {canEdit && (
             <button onClick={openCreate} className="btn-primary flex items-center gap-2">
               <Plus size={16} />
@@ -153,6 +204,34 @@ export default function StudentsPage() {
           )}
         </div>
       </div>
+
+      <div className="flex items-center gap-3">
+        <div className="relative flex-1 max-w-sm">
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => handleSearchChange(e.target.value)}
+            placeholder={t.search}
+            className="input-field pl-9"
+          />
+          <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
+          </svg>
+        </div>
+        {search && (
+          <button onClick={() => { setSearch(""); setPage(1); fetchStudents("", 1); }} className="text-xs text-slate-500 hover:text-slate-700">
+            {t.cancel}
+          </button>
+        )}
+      </div>
+
+      {message && (
+        <div className={`px-4 py-3 rounded-lg text-sm font-medium ${
+          message.type === "success" ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-red-50 text-red-700 border border-red-200"
+        }`}>
+          {message.text}
+        </div>
+      )}
 
       {showForm && (
         <div className="card p-5 space-y-4">
@@ -222,18 +301,9 @@ export default function StudentsPage() {
                             </button>
                           )}
                           {canDelete && (
-                            <>
-                              {deleteConfirm === student.id ? (
-                                <div className="flex items-center gap-1">
-                                  <button onClick={() => handleDelete(student.id)} className="text-xs px-2 py-1 rounded bg-red-500 text-white">{t.yes}</button>
-                                  <button onClick={() => setDeleteConfirm(null)} className="text-xs px-2 py-1 rounded bg-slate-200 text-slate-700">{t.no}</button>
-                                </div>
-                              ) : (
-                                <button onClick={() => setDeleteConfirm(student.id)} className="btn-icon text-red-500" title={t.delete}>
-                                  <Trash2 size={15} />
-                                </button>
-                              )}
-                            </>
+                            <button onClick={() => setDeleteTarget(student)} className="btn-icon text-red-500" title={t.delete}>
+                              <Trash2 size={15} />
+                            </button>
                           )}
                         </div>
                       </td>
@@ -242,8 +312,34 @@ export default function StudentsPage() {
               ))}
             </tbody>
           </table>
+          <div className="flex items-center justify-between px-4 py-3 border-t border-slate-200 text-sm text-slate-600">
+            <span>{t.showing} {Math.min((page - 1) * limit + 1, totalCount)}–{Math.min(page * limit, totalCount)} {t.of} {totalCount}</span>
+            <div className="flex items-center gap-2">
+              <button
+                disabled={page <= 1}
+                onClick={() => { const p = page - 1; setPage(p); fetchStudents(search, p); }}
+                className="px-3 py-1 rounded border border-slate-300 text-sm disabled:opacity-40 hover:bg-slate-100"
+              >{t.prev}</button>
+              <button
+                disabled={page >= Math.ceil(totalCount / limit)}
+                onClick={() => { const p = page + 1; setPage(p); fetchStudents(search, p); }}
+                className="px-3 py-1 rounded border border-slate-300 text-sm disabled:opacity-40 hover:bg-slate-100"
+              >{t.next}</button>
+            </div>
+          </div>
         </div>
       )}
+
+      <ConfirmModal
+        open={deleteTarget !== null}
+        title={t.confirmTitle}
+        message={deleteTarget ? `${t.confirmDelete} (${deleteTarget.full_name})` : ""}
+        confirmLabel={t.yes}
+        cancelLabel={t.no}
+        isRtl={isRtl}
+        onConfirm={() => deleteTarget && handleDelete(deleteTarget.id)}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   );
 }

@@ -33,12 +33,19 @@ interface Enrollment {
   admin_discount: number | null;
 }
 
+interface PaymentSummary {
+  total_paid: number;
+  agreed_price: number | null;
+  admin_discount: number | null;
+  net_price: number | null;
+  balance_remaining: number | null;
+}
+
 interface PaymentResult {
   id: string;
   receipt_number: string;
   amount: number;
-  student_id: string;
-  course_id: string;
+  enrollment_id: string;
   date: string;
 }
 
@@ -81,6 +88,12 @@ export default function POSPage() {
       print: "طباعة",
       noAccess: "ليس لديك صلاحية الوصول إلى نقطة البيع",
       selectEnrolledCourse: "اختر مقرر الطالب",
+      remaining: "المتبقي",
+      netPrice: "صافي السعر",
+      totalPaid: "المدفوع",
+      positiveAmount: "يجب أن يكون المبلغ أكبر من صفر",
+      exceedsBalance: "المبلغ يتجاوز الرصيد المتبقي",
+      paymentFailed: "فشل تسجيل الدفعة",
     },
     en: {
       title: "Point of Sale",
@@ -113,6 +126,12 @@ export default function POSPage() {
       print: "Print",
       noAccess: "You do not have access to Point of Sale",
       selectEnrolledCourse: "Select student's course",
+      remaining: "Remaining",
+      netPrice: "Net Price",
+      totalPaid: "Total Paid",
+      positiveAmount: "Amount must be positive",
+      exceedsBalance: "Amount exceeds remaining balance",
+      paymentFailed: "Payment failed",
     },
   }[locale === "en" ? "en" : "ar"];
 
@@ -128,8 +147,10 @@ export default function POSPage() {
   const [courses, setCourses] = useState<Course[]>([]);
 
   const [selectedSectionId, setSelectedSectionId] = useState("");
+  const [selectedEnrollmentId, setSelectedEnrollmentId] = useState("");
   const [amount, setAmount] = useState("");
   const [printReceipt, setPrintReceipt] = useState(true);
+  const [summary, setSummary] = useState<PaymentSummary | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<PaymentResult | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -139,8 +160,8 @@ export default function POSPage() {
 
   const fetchStudents = useCallback(async () => {
     try {
-      const res = await apiClient.get<Student[]>("/academic/students");
-      setStudents(res.data);
+      const res = await apiClient.get<{ items: Student[]; total: number }>("/academic/students?limit=1000");
+      setStudents(res.data.items);
     } catch (e) {
       console.error(e);
     }
@@ -148,8 +169,8 @@ export default function POSPage() {
 
   const fetchCourses = useCallback(async () => {
     try {
-      const res = await apiClient.get<Course[]>("/academic/courses");
-      setCourses(res.data);
+      const res = await apiClient.get<{ items: Course[]; total: number }>("/academic/courses?limit=1000");
+      setCourses(res.data.items);
     } catch (e) {
       console.error(e);
     }
@@ -157,8 +178,8 @@ export default function POSPage() {
 
   const fetchCourseSections = useCallback(async () => {
     try {
-      const res = await apiClient.get<CourseSection[]>("/academic/course-sections");
-      setCourseSections(res.data);
+      const res = await apiClient.get<{ items: CourseSection[]; total: number }>("/academic/course-sections?limit=1000");
+      setCourseSections(res.data.items);
     } catch (e) {
       console.error(e);
     }
@@ -167,8 +188,8 @@ export default function POSPage() {
   const fetchEnrollments = useCallback(async (studentId: string) => {
     setLoadingEnrollments(true);
     try {
-      const res = await apiClient.get<Enrollment[]>(`/academic/enrollments?student_id=${studentId}`);
-      setEnrollments(res.data);
+      const res = await apiClient.get<{ items: Enrollment[]; total: number }>(`/academic/enrollments?student_id=${studentId}&limit=1000`);
+      setEnrollments(res.data.items);
     } catch (e) {
       console.error(e);
     } finally {
@@ -200,7 +221,9 @@ export default function POSPage() {
     setStudentQuery(student.full_name);
     setShowDropdown(false);
     setSelectedSectionId("");
+    setSelectedEnrollmentId("");
     setAmount("");
+    setSummary(null);
     setResult(null);
     setError("");
     fetchEnrollments(student.id);
@@ -211,7 +234,9 @@ export default function POSPage() {
     setStudentQuery("");
     setShowDropdown(false);
     setSelectedSectionId("");
+    setSelectedEnrollmentId("");
     setAmount("");
+    setSummary(null);
     setResult(null);
     setError("");
     setEnrollments([]);
@@ -227,11 +252,6 @@ export default function POSPage() {
     return course ? course.name : sectionId.slice(0, 8);
   };
 
-  const getCourseIdForSection = (sectionId: string): string | null => {
-    const section = courseSections.find((cs) => cs.id === sectionId);
-    return section ? section.course_id : null;
-  };
-
   const quickAmounts = [50, 100, 200, 500];
 
   const handleQuickAmount = (val: number) => {
@@ -239,19 +259,18 @@ export default function POSPage() {
   };
 
   const handleSubmit = async () => {
-    if (!selectedStudent || !selectedSectionId || !amount) return;
-    const courseId = getCourseIdForSection(selectedSectionId);
-    if (!courseId) {
-      setError("Could not determine course for selected section");
+    if (!selectedStudent || !selectedEnrollmentId || !amount) return;
+    const parsedAmount = parseFloat(amount);
+    if (parsedAmount <= 0) {
+      setError(t.positiveAmount);
       return;
     }
     setSubmitting(true);
     setError("");
     try {
       const payload: Record<string, unknown> = {
-        student_id: selectedStudent.id,
-        course_id: courseId,
-        amount: parseFloat(amount),
+        enrollment_id: selectedEnrollmentId,
+        amount: parsedAmount,
       };
       const res = await apiClient.post<PaymentResult>("/lms/payments", payload);
       setResult(res.data);
@@ -259,8 +278,15 @@ export default function POSPage() {
         setShowReceipt(res.data);
       }
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "Payment failed";
-      setError(msg);
+      const err = e as { response?: { data?: { detail?: string } } };
+      const detail = err?.response?.data?.detail || "";
+      if (detail.includes("exceeds remaining balance")) {
+        setError(t.exceedsBalance);
+      } else if (detail.includes("must be positive")) {
+        setError(t.positiveAmount);
+      } else {
+        setError(detail || t.paymentFailed);
+      }
     } finally {
       setSubmitting(false);
     }
@@ -410,11 +436,19 @@ export default function POSPage() {
                   return (
                     <button
                       key={enr.id}
-                      onClick={() => {
+                      onClick={async () => {
                         setSelectedSectionId(enr.section_id);
-                        setAmount(enr.agreed_price ? enr.agreed_price.toString() : "");
+                        setSelectedEnrollmentId(enr.id);
                         setResult(null);
                         setError("");
+                        try {
+                          const res = await apiClient.get<PaymentSummary>(`/lms/payments/summary/${enr.id}`);
+                          setSummary(res.data);
+                          setAmount(res.data.balance_remaining != null ? res.data.balance_remaining.toString() : "");
+                        } catch {
+                          setSummary(null);
+                          setAmount(enr.agreed_price ? Math.max(0, enr.agreed_price - (enr.admin_discount || 0)).toString() : "");
+                        }
                       }}
                       className={`w-full text-left p-3 rounded-xl border transition-colors ${
                         isSelected
@@ -446,6 +480,22 @@ export default function POSPage() {
         {/* Amount + Quick Amounts */}
         {selectedSectionId && (
           <div>
+            {summary && (
+              <div className="text-xs text-slate-600 space-y-0.5 mb-2 p-2 bg-slate-50 rounded-lg">
+                <div className="flex justify-between">
+                  <span>{t.netPrice}:</span>
+                  <span className="font-medium">{summary.net_price?.toFixed(2)} {t.sar}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>{t.totalPaid}:</span>
+                  <span className="font-medium">{summary.total_paid.toFixed(2)} {t.sar}</span>
+                </div>
+                <div className="flex justify-between text-emerald-700 font-semibold">
+                  <span>{t.remaining}:</span>
+                  <span>{summary.balance_remaining != null ? summary.balance_remaining.toFixed(2) : "—"} {t.sar}</span>
+                </div>
+              </div>
+            )}
             <label className="block text-xs font-medium text-slate-700 mb-1.5">{t.amount}</label>
             <div className="flex flex-wrap gap-2 mb-3">
               {quickAmounts.map((val) => (
@@ -467,8 +517,16 @@ export default function POSPage() {
                 type="number"
                 step="0.01"
                 min="0"
+                max={summary?.balance_remaining ?? ""}
                 value={amount}
-                onChange={(e) => setAmount(e.target.value)}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (summary?.balance_remaining != null && parseFloat(val) > summary.balance_remaining) {
+                    setAmount(summary.balance_remaining.toString());
+                  } else {
+                    setAmount(val);
+                  }
+                }}
                 placeholder={t.enterAmount}
                 className="input-field text-lg font-bold"
               />

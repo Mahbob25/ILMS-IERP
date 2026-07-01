@@ -11,9 +11,18 @@ interface Expense {
   amount: number;
   description: string | null;
   recipient_name: string;
+  recipient_id: string | null;
   date: string;
   receipt_number: string;
   type: string;
+}
+
+interface EligibleRecipient {
+  id: string;
+  full_name: string;
+  role: string;
+  available_limit: number;
+  is_eligible: boolean;
 }
 
 export default function ExpensesPage() {
@@ -58,6 +67,15 @@ export default function ExpensesPage() {
       secretaryAdvance: "سلفة سكرتير",
       filterType: "تصفية حسب النوع",
       all: "الكل",
+      availableBalance: "الرصيد المتاح",
+      remainingStipend: "المتبقي من الراتب",
+      selectRecipient: "اختر المستلم",
+      limitLabel: "الحد الأقصى",
+      eligible: "مؤهل",
+      notEligible: "غير مؤهل",
+      ineligibleRecipientWarning: "لا يمكن السحب: الرصيد غير كافٍ",
+      amountExceedsBalance: "المبلغ يتجاوز الرصيد المتاح",
+      recipientNotEligible: "المستلم غير مؤهل للسحب",
     },
     en: {
       title: "Expenses",
@@ -94,6 +112,15 @@ export default function ExpensesPage() {
       secretaryAdvance: "Secretary Advance",
       filterType: "Filter by Type",
       all: "All",
+      availableBalance: "Available Balance",
+      remainingStipend: "Remaining Stipend",
+      selectRecipient: "Select Recipient",
+      limitLabel: "Limit",
+      eligible: "Eligible",
+      notEligible: "Not Eligible",
+      ineligibleRecipientWarning: "Cannot deduct: insufficient balance",
+      amountExceedsBalance: "Amount exceeds available balance",
+      recipientNotEligible: "Recipient is not eligible for withdrawal",
     },
   }[locale === "en" ? "en" : "ar"];
 
@@ -103,9 +130,14 @@ export default function ExpensesPage() {
   const [showForm, setShowForm] = useState(false);
   const [showVoucher, setShowVoucher] = useState<Expense | null>(null);
   const [filterType, setFilterType] = useState("");
+  const [eligibleRecipients, setEligibleRecipients] = useState<EligibleRecipient[]>([]);
+  const [availableLimit, setAvailableLimit] = useState<number | null>(null);
+  const [selectedRecipientEligible, setSelectedRecipientEligible] = useState<boolean | null>(null);
+  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [form, setForm] = useState({
     amount: "",
     recipient_name: "",
+    recipient_id: "",
     description: "",
     type: "general_expense",
     date: new Date().toISOString().split("T")[0],
@@ -132,6 +164,58 @@ export default function ExpensesPage() {
 
   useEffect(() => { loadAll(); }, [loadAll]);
 
+  const fetchEligibleRecipients = useCallback(async (type: string) => {
+    if (type !== "teacher_withdrawal" && type !== "secretary_advance") {
+      setEligibleRecipients([]);
+      setAvailableLimit(null);
+      setSelectedRecipientEligible(null);
+      return;
+    }
+    try {
+      const res = await apiClient.get<EligibleRecipient[]>("/lms/expenses/eligible-recipients", { params: { type } });
+      setEligibleRecipients(res.data);
+    } catch (e) {
+      console.error(e);
+      setEligibleRecipients([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (showForm) {
+      fetchEligibleRecipients(form.type);
+      setForm((prev) => ({ ...prev, recipient_id: "", recipient_name: "" }));
+      setAvailableLimit(null);
+      setSelectedRecipientEligible(null);
+    }
+  }, [showForm, form.type, fetchEligibleRecipients]);
+
+  useEffect(() => {
+    if (message) {
+      const timer = setTimeout(() => setMessage(null), 6000);
+      return () => clearTimeout(timer);
+    }
+  }, [message]);
+
+  const handleTypeChange = (type: string) => {
+    setForm({ ...form, type, recipient_id: "", recipient_name: "" });
+    setAvailableLimit(null);
+    setSelectedRecipientEligible(null);
+    fetchEligibleRecipients(type);
+  };
+
+  const handleRecipientSelect = (id: string) => {
+    const recipient = eligibleRecipients.find((r) => r.id === id);
+    if (recipient) {
+      setForm({ ...form, recipient_id: id, recipient_name: recipient.full_name });
+      setAvailableLimit(recipient.available_limit);
+      setSelectedRecipientEligible(recipient.is_eligible);
+    } else {
+      setForm({ ...form, recipient_id: "", recipient_name: "" });
+      setAvailableLimit(null);
+      setSelectedRecipientEligible(null);
+    }
+  };
+
   const handleRefresh = async () => {
     setRefreshing(true);
     await fetchExpenses();
@@ -157,21 +241,34 @@ export default function ExpensesPage() {
   };
 
   const handleSave = async () => {
-    if (!form.amount || !form.recipient_name) return;
+    if (!form.amount) return;
+    if (form.type === "general_expense" && !form.recipient_name) return;
+    if ((form.type === "teacher_withdrawal" || form.type === "secretary_advance") && !form.recipient_id) return;
+    if (selectedRecipientEligible === false) {
+      setMessage({ type: "error", text: t.recipientNotEligible });
+      return;
+    }
+    const amount = parseFloat(form.amount);
+    if (availableLimit !== null && amount > availableLimit) {
+      setMessage({ type: "error", text: t.amountExceedsBalance });
+      return;
+    }
     try {
       const payload: Record<string, unknown> = {
-        amount: parseFloat(form.amount),
+        amount,
         recipient_name: form.recipient_name,
         type: form.type,
       };
+      if (form.recipient_id) payload.recipient_id = form.recipient_id;
       if (form.description) payload.description = form.description;
       if (form.date) payload.date = form.date;
       const res = await apiClient.post("/lms/expenses", payload);
       setShowForm(false);
       setShowVoucher(res.data);
       fetchExpenses();
-    } catch (e) {
-      console.error(e);
+    } catch (e: any) {
+      const msg = e?.response?.data?.detail || "Error creating expense";
+      alert(msg);
     }
   };
 
@@ -225,18 +322,53 @@ export default function ExpensesPage() {
 
       {showForm && (
         <div className="card p-5 space-y-4">
+          {message && (
+            <div className={`px-4 py-3 rounded-lg text-sm font-medium ${message.type === "success" ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-red-50 text-red-700 border border-red-200"}`}>
+              {message.text}
+            </div>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-medium text-slate-700 mb-1">{t.selectType}</label>
-              <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} className="input-field">
+              <select value={form.type} onChange={(e) => handleTypeChange(e.target.value)} className="input-field">
                 <option value="general_expense">{t.generalExpense}</option>
                 <option value="teacher_withdrawal">{t.teacherWithdrawal}</option>
                 <option value="secretary_advance">{t.secretaryAdvance}</option>
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">{t.enterRecipient}</label>
-              <input type="text" value={form.recipient_name} onChange={(e) => setForm({ ...form, recipient_name: e.target.value })} className="input-field" />
+              <label className="block text-xs font-medium text-slate-700 mb-1">
+                {t.enterRecipient}
+                {form.type === "secretary_advance" && <span className="text-purple-600 text-[10px] mr-2">({t.remainingStipend})</span>}
+              </label>
+              {form.type === "general_expense" ? (
+                <input type="text" value={form.recipient_name} onChange={(e) => setForm({ ...form, recipient_name: e.target.value })} className="input-field" />
+              ) : (
+                <div className="space-y-1">
+                  <select value={form.recipient_id} onChange={(e) => handleRecipientSelect(e.target.value)} className="input-field">
+                    <option value="">{t.selectRecipient}</option>
+                    {eligibleRecipients.map((r) => (
+                      <option key={r.id} value={r.id}>
+                        {r.full_name}
+                        {form.type === "secretary_advance" && ` (${r.available_limit.toFixed(2)} ${t.sar})`}
+                        {r.is_eligible
+                          ? ` ✓ ${t.eligible}`
+                          : ` ✗ ${t.notEligible}`}
+                      </option>
+                    ))}
+                  </select>
+                  {selectedRecipientEligible === false && (
+                    <p className="text-xs text-red-600 font-medium">
+                      ⚠ {t.ineligibleRecipientWarning}
+                    </p>
+                  )}
+                  {form.type === "secretary_advance" && selectedRecipientEligible === true && availableLimit !== null && (
+                    <p className="text-xs text-slate-500">
+                      {t.limitLabel}: <span className="font-semibold text-slate-800">{availableLimit.toFixed(2)} {t.sar}</span>
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
             <div>
               <label className="block text-xs font-medium text-slate-700 mb-1">{t.enterAmount}</label>
@@ -253,7 +385,7 @@ export default function ExpensesPage() {
           </div>
           <div className="flex gap-3 pt-2">
             <button onClick={handleSave} className="btn-primary">{t.save}</button>
-            <button onClick={() => setShowForm(false)} className="btn-secondary">{t.cancel}</button>
+            <button onClick={() => { setShowForm(false); setSelectedRecipientEligible(null); }} className="btn-secondary">{t.cancel}</button>
           </div>
         </div>
       )}

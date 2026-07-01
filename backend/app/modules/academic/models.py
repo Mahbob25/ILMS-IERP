@@ -1,7 +1,7 @@
 import uuid
-from datetime import date, datetime
+from datetime import date, datetime, time
 from typing import Optional
-from sqlalchemy import String, Integer, Float, Date, DateTime, ForeignKey, Text, Enum as SAEnum, UniqueConstraint, CheckConstraint
+from sqlalchemy import String, Integer, Float, Date, DateTime, Time, ForeignKey, Text, Enum as SAEnum, UniqueConstraint, CheckConstraint
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
@@ -18,11 +18,8 @@ class Course(Base):
     code: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     credits: Mapped[int] = mapped_column(Integer, default=3, server_default="3")
-    status: Mapped[str] = mapped_column(SAEnum('pending', 'active', 'completed', name='coursestatus'), nullable=False, default="pending", server_default="pending")
-    teacher_percentage: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-    min_students_required: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
 
-    sections: Mapped[list["CourseSection"]] = relationship(back_populates="course")
+    sections: Mapped[list["CourseSection"]] = relationship(back_populates="course", cascade="all, delete-orphan")
 
 
 class CourseSection(Base):
@@ -44,11 +41,20 @@ class CourseSection(Base):
     )
     capacity: Mapped[int] = mapped_column(Integer, default=30, server_default="30")
     enrolled_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    status: Mapped[str] = mapped_column(SAEnum('pending', 'active', 'completed', name='coursestatus'), nullable=False, default="pending", server_default="pending")
+    teacher_percentage: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    min_students_required: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    start_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    end_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    class_time: Mapped[Optional[time]] = mapped_column(Time, nullable=True)
+    class_duration_minutes: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    classroom: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    price: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
 
     course: Mapped[Course] = relationship(back_populates="sections")
-    enrollments: Mapped[list["Enrollment"]] = relationship(back_populates="section")
-    attendance_sessions: Mapped[list["AttendanceSession"]] = relationship(back_populates="section")
-    assignments: Mapped[list["Assignment"]] = relationship(back_populates="section")
+    enrollments: Mapped[list["Enrollment"]] = relationship(back_populates="section", cascade="all, delete-orphan")
+    attendance_sessions: Mapped[list["AttendanceSession"]] = relationship(back_populates="section", cascade="all, delete-orphan")
+    assignments: Mapped[list["Assignment"]] = relationship(back_populates="section", cascade="all, delete-orphan")
 
 
 class Student(Base):
@@ -90,3 +96,4 @@ class Enrollment(Base):
 
     student: Mapped[Student] = relationship(back_populates="enrollments")
     section: Mapped[CourseSection] = relationship(back_populates="enrollments")
+    payments: Mapped[list["Payment"]] = relationship(back_populates="enrollment")

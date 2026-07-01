@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { apiClient } from "@/lib/api";
 import { useAuth } from "@/components/AuthContext";
 import RefreshButton from "@/components/RefreshButton";
+import ConfirmModal from "@/components/ConfirmModal";
 import { Loader2, Plus, Pencil, Trash2, FileText } from "lucide-react";
 
 interface CourseSection { id: string; course_id: string; term_id: string; teacher_id: string; }
@@ -47,6 +48,8 @@ export default function GradebookPage() {
       noStudents: "لا يوجد طلاب مسجلين",
       loading: "جاري التحميل...",
       yes: "نعم",
+      confirmTitle: "تأكيد الحذف",
+      confirmDelete: "هل أنت متأكد من حذف هذا الواجب؟",
       no: "لا",
       notSubmitted: "لم يسلم",
       graded: "مقيم",
@@ -75,6 +78,8 @@ export default function GradebookPage() {
       noStudents: "No students enrolled",
       loading: "Loading...",
       yes: "Yes",
+      confirmTitle: "Confirm Deletion",
+      confirmDelete: "Are you sure you want to delete this assignment?",
       no: "No",
       notSubmitted: "Not submitted",
       graded: "Graded",
@@ -96,7 +101,7 @@ export default function GradebookPage() {
   const [showAssignmentForm, setShowAssignmentForm] = useState(false);
   const [editingAssignment, setEditingAssignment] = useState<string | null>(null);
   const [assignmentForm, setAssignmentForm] = useState({ title: "", description: "", max_score: 100, due_date: "" });
-  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Assignment | null>(null);
 
   // Grade modal
   const [gradeModal, setGradeModal] = useState<{ submissionId: string; score: number; feedback: string } | null>(null);
@@ -104,12 +109,12 @@ export default function GradebookPage() {
   const fetchData = useCallback(async () => {
     try {
       const [sectRes, courseRes, termRes] = await Promise.all([
-        apiClient.get<CourseSection[]>("/academic/course-sections"),
-        apiClient.get<Course[]>("/academic/courses"),
+        apiClient.get<{ items: CourseSection[]; total: number }>("/academic/course-sections?limit=1000"),
+        apiClient.get<{ items: Course[]; total: number }>("/academic/courses?limit=1000"),
         apiClient.get<Term[]>("/academic/terms"),
       ]);
-      setSections(sectRes.data);
-      setCourses(courseRes.data);
+      setSections(sectRes.data.items);
+      setCourses(courseRes.data.items);
       setTerms(termRes.data);
     } catch (e) { console.error(e); } finally { setLoading(false); }
   }, []);
@@ -124,15 +129,15 @@ export default function GradebookPage() {
       try {
         const [assignRes, enrRes] = await Promise.all([
           apiClient.get<Assignment[]>(`/lms/assignments?section_id=${selectedSectionId}`),
-          apiClient.get<Enrollment[]>(`/academic/enrollments?section_id=${selectedSectionId}`),
+          apiClient.get<{ items: Enrollment[]; total: number }>(`/academic/enrollments?section_id=${selectedSectionId}&limit=1000`),
         ]);
         setAssignments(assignRes.data);
-        setEnrollment(enrRes.data);
+        setEnrollment(enrRes.data.items);
 
-        const studentIds = enrRes.data.map((e) => e.student_id);
+        const studentIds = enrRes.data.items.map((e) => e.student_id);
         if (studentIds.length > 0) {
-          const studRes = await apiClient.get<Student[]>("/academic/students");
-          setStudents(studRes.data.filter((s) => studentIds.includes(s.id)));
+          const studRes = await apiClient.get<{ items: Student[]; total: number }>("/academic/students?limit=1000").catch(() => null);
+          setStudents(studRes ? studRes.data.items.filter((s) => studentIds.includes(s.id)) : []);
         } else {
           setStudents([]);
         }
@@ -177,11 +182,11 @@ export default function GradebookPage() {
   const handleDeleteAssignment = async (id: string) => {
     try {
       await apiClient.delete(`/lms/assignments/${id}`);
-      setDeleteConfirm(null);
+      setDeleteTarget(null);
       const res = await apiClient.get<Assignment[]>(`/lms/assignments?section_id=${selectedSectionId}`);
       setAssignments(res.data);
       if (selectedAssignmentId === id) setSelectedAssignmentId("");
-    } catch (e) { console.error(e); }
+    } catch (e) { setDeleteTarget(null); console.error(e); }
   };
 
   const handleGrade = async () => {
@@ -291,15 +296,9 @@ export default function GradebookPage() {
                       <>
                         <button onClick={(e) => { e.stopPropagation(); setAssignmentForm({ title: a.title, description: a.description || "", max_score: a.max_score, due_date: a.due_date ? new Date(a.due_date).toISOString().slice(0, 16) : "" }); setEditingAssignment(a.id); setShowAssignmentForm(true); }}
                           className="p-1 text-slate-400 hover:text-slate-600"><Pencil size={12} /></button>
-                        <button onClick={(e) => { e.stopPropagation(); setDeleteConfirm(a.id); }}
+                        <button onClick={(e) => { e.stopPropagation(); setDeleteTarget(a); }}
                           className="p-1 text-red-400 hover:text-red-600"><Trash2 size={12} /></button>
                       </>
-                    )}
-                    {deleteConfirm === a.id && (
-                      <div className="flex items-center gap-1 ml-1">
-                        <button onClick={(e) => { e.stopPropagation(); handleDeleteAssignment(a.id); }} className="text-[10px] px-1.5 py-0.5 rounded bg-red-500 text-white">{t.yes}</button>
-                        <button onClick={(e) => { e.stopPropagation(); setDeleteConfirm(null); }} className="text-[10px] px-1.5 py-0.5 rounded bg-slate-200 text-slate-700">{t.no}</button>
-                      </div>
                     )}
                   </button>
                 ))}
@@ -383,6 +382,17 @@ export default function GradebookPage() {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        open={deleteTarget !== null}
+        title={t.confirmTitle}
+        message={deleteTarget ? `${t.confirmDelete} (${deleteTarget.title})` : ""}
+        confirmLabel={t.yes}
+        cancelLabel={t.no}
+        isRtl={isRtl}
+        onConfirm={() => deleteTarget && handleDeleteAssignment(deleteTarget.id)}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   );
 }

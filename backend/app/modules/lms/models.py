@@ -7,7 +7,8 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
 
 if TYPE_CHECKING:
-    from app.modules.academic.models import CourseSection
+    from app.modules.academic.models import CourseSection, Enrollment
+    from app.modules.identity.models import User, Employee
 
 
 class AttendanceSession(Base):
@@ -137,15 +138,14 @@ class Payment(Base):
         PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4,
         server_default="gen_random_uuid()"
     )
-    student_id: Mapped[uuid.UUID] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("students.id", ondelete="RESTRICT"), nullable=False
-    )
-    course_id: Mapped[uuid.UUID] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("courses.id", ondelete="RESTRICT"), nullable=False
+    enrollment_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("enrollments.id", ondelete="RESTRICT"), nullable=False
     )
     amount: Mapped[float] = mapped_column(Float, nullable=False)
     date: Mapped[date] = mapped_column(Date, nullable=False)
     receipt_number: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True)
+
+    enrollment: Mapped["Enrollment"] = relationship(back_populates="payments")
 
 
 class Expense(Base):
@@ -158,6 +158,9 @@ class Expense(Base):
     amount: Mapped[float] = mapped_column(Float, nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     recipient_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    recipient_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("employees.id", ondelete="SET NULL"), nullable=True
+    )
     date: Mapped[date] = mapped_column(Date, nullable=False)
     receipt_number: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True)
     type: Mapped[str] = mapped_column(SAEnum('general_expense', 'teacher_withdrawal', 'secretary_advance', name='expensetype'), nullable=False, default="general_expense", server_default="general_expense")

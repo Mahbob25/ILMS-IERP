@@ -1,10 +1,24 @@
 import uuid
-from datetime import datetime, timezone
+import enum
+from datetime import date, datetime, timezone
 from typing import Optional, Dict, Any
-from sqlalchemy import String, Boolean, DateTime, ForeignKey, text
+from sqlalchemy import String, Boolean, DateTime, Date, Float, Text, ForeignKey, text, Enum as SAEnum
 from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
+
+
+class EmployeeType(str, enum.Enum):
+    TEACHER = "teacher"
+    MANAGER = "manager"
+    SECRETARY = "secretary"
+    CLEANER = "cleaner"
+    SECURITY = "security"
+    RECEPTIONIST = "receptionist"
+    ACCOUNTANT = "accountant"
+    MAINTENANCE = "maintenance"
+    OTHER = "other"
+
 
 class Role(Base):
     __tablename__ = "roles"
@@ -18,6 +32,45 @@ class Role(Base):
     name: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True)
 
     users: Mapped[list["User"]] = relationship(back_populates="role")
+    role_permissions: Mapped[list["RolePermission"]] = relationship(back_populates="role")
+
+
+class Employee(Base):
+    __tablename__ = "employees"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+        server_default=text("gen_random_uuid()")
+    )
+    full_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    employee_type: Mapped[EmployeeType] = mapped_column(
+        SAEnum(EmployeeType, name="employeetype", create_constraint=True, values_callable=lambda obj: [e.value for e in obj]),
+        nullable=False
+    )
+    phone_number: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    salary: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    hire_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    contract_end_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    address: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+        server_default=text("timezone('utc'::text, now())")
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+        server_default=text("timezone('utc'::text, now())"),
+        onupdate=lambda: datetime.now(timezone.utc).replace(tzinfo=None)
+    )
+
+    user: Mapped[Optional["User"]] = relationship(back_populates="employee", uselist=False)
+
 
 class User(Base):
     __tablename__ = "users"
@@ -36,13 +89,20 @@ class User(Base):
         ForeignKey("roles.id", ondelete="RESTRICT"),
         nullable=False
     )
+    employee_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("employees.id", ondelete="SET NULL"),
+        nullable=True
+    )
     locale_pref: Mapped[str] = mapped_column(String(10), default="ar", server_default="ar")
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
     is_superadmin: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
 
     role: Mapped[Role] = relationship(back_populates="users")
+    employee: Mapped[Optional[Employee]] = relationship(back_populates="user", uselist=False)
     refresh_tokens: Mapped[list["RefreshToken"]] = relationship(back_populates="user", cascade="all, delete-orphan")
     audit_logs: Mapped[list["AuditLog"]] = relationship(back_populates="user")
+
 
 class RefreshToken(Base):
     __tablename__ = "refresh_tokens"
@@ -63,6 +123,7 @@ class RefreshToken(Base):
     revoked: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
 
     user: Mapped[User] = relationship(back_populates="refresh_tokens")
+
 
 class AuditLog(Base):
     __tablename__ = "audit_logs"
@@ -89,3 +150,37 @@ class AuditLog(Base):
     )
 
     user: Mapped[Optional[User]] = relationship(back_populates="audit_logs")
+
+
+class Permission(Base):
+    __tablename__ = "permissions"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+        server_default=text("gen_random_uuid()")
+    )
+    codename: Mapped[str] = mapped_column(String(100), unique=True, nullable=False, index=True)
+    label: Mapped[str] = mapped_column(String(255), nullable=False)
+    group: Mapped[str] = mapped_column(String(50), nullable=False)
+
+    role_permissions: Mapped[list["RolePermission"]] = relationship(back_populates="permission")
+
+
+class RolePermission(Base):
+    __tablename__ = "role_permissions"
+
+    role_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("roles.id", ondelete="CASCADE"),
+        primary_key=True
+    )
+    permission_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("permissions.id", ondelete="CASCADE"),
+        primary_key=True
+    )
+
+    role: Mapped[Role] = relationship(back_populates="role_permissions")
+    permission: Mapped[Permission] = relationship(back_populates="role_permissions")

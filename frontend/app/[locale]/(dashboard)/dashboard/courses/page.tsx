@@ -4,7 +4,8 @@ import React, { useState, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { apiClient } from "@/lib/api";
 import { useAuth } from "@/components/AuthContext";
-import { Plus, Pencil, Trash2, Loader2, RefreshCw, Play, CheckCircle2, UserPlus } from "lucide-react";
+import ConfirmModal from "@/components/ConfirmModal";
+import { Plus, Pencil, Trash2, Loader2, RefreshCw } from "lucide-react";
 
 interface Course {
   id: string;
@@ -12,23 +13,6 @@ interface Course {
   code: string;
   description: string | null;
   credits: number;
-  status: string;
-  teacher_percentage: number | null;
-  min_students_required: number | null;
-}
-
-interface Section {
-  id: string;
-  course_id: string;
-  teacher_id: string;
-  capacity: number;
-  enrolled_count: number;
-}
-
-interface Student {
-  id: string;
-  student_code: string;
-  full_name: string;
 }
 
 export default function CoursesPage() {
@@ -45,9 +29,6 @@ export default function CoursesPage() {
       code: "الرمز",
       description: "الوصف",
       credits: "الوحدات",
-      status: "الحالة",
-      quota: "الحصة",
-      teacherPct: "نسبة المعلم",
       actions: "الإجراءات",
       add: "إضافة مقرر",
       edit: "تعديل",
@@ -56,22 +37,18 @@ export default function CoursesPage() {
       cancel: "إلغاء",
       loading: "جاري التحميل...",
       empty: "لا توجد مقررات دراسية بعد",
+      confirmTitle: "تأكيد الحذف",
       confirmDelete: "هل أنت متأكد من حذف هذا المقرر؟",
       yes: "نعم",
       no: "لا",
-      activate: "تفعيل",
-      complete: "إكمال",
-      pending: "قيد الانتظار",
-      active: "نشط",
-      completed: "مكتمل",
-      registerStudent: "تسجيل طالب",
-      minStudents: "الحد الأدنى للطلاب",
-      enrolled: "مسجل",
       refresh: "تحديث",
-      teacherPctLabel: "نسبة المعلم (%)",
-      selectStudent: "اختر الطالب",
-      selectSection: "اختر الشعبة",
-      register: "تسجيل",
+      search: "بحث باسم أو رمز المقرر...",
+      showing: "عرض",
+      of: "من",
+      prev: "السابق",
+      next: "التالي",
+      deleted: "تم حذف المقرر بنجاح",
+      paymentsExist: "لا يمكن حذف المقرر: يوجد شعب تحتوي على تسجيلات عليها مدفوعات",
     },
     en: {
       title: "Courses",
@@ -80,9 +57,6 @@ export default function CoursesPage() {
       code: "Code",
       description: "Description",
       credits: "Credits",
-      status: "Status",
-      quota: "Quota",
-      teacherPct: "Teacher %",
       actions: "Actions",
       add: "Add Course",
       edit: "Edit",
@@ -91,112 +65,79 @@ export default function CoursesPage() {
       cancel: "Cancel",
       loading: "Loading...",
       empty: "No courses yet",
+      confirmTitle: "Confirm Deletion",
       confirmDelete: "Are you sure you want to delete this course?",
       yes: "Yes",
       no: "No",
-      activate: "Activate",
-      complete: "Complete",
-      pending: "Pending",
-      active: "Active",
-      completed: "Completed",
-      registerStudent: "Register Student",
-      minStudents: "Min Students",
-      enrolled: "Enrolled",
       refresh: "Refresh",
-      teacherPctLabel: "Teacher Percentage (%)",
-      selectStudent: "Select Student",
-      selectSection: "Select Section",
-      register: "Register",
+      search: "Search by name or code...",
+      showing: "Showing",
+      of: "of",
+      prev: "Previous",
+      next: "Next",
+      deleted: "Course deleted successfully",
+      paymentsExist: "Cannot delete course: one or more sections have enrollments with payments",
     },
   }[locale === "en" ? "en" : "ar"];
 
   const [courses, setCourses] = useState<Course[]>([]);
-  const [sections, setSections] = useState<Section[]>([]);
-  const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState({ name: "", code: "", description: "", credits: 3, min_students_required: 0, teacher_percentage: "" });
-  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
-  const [activatePct, setActivatePct] = useState<Record<string, string>>({});
-  const [showRegister, setShowRegister] = useState<string | null>(null);
-  const [registerForm, setRegisterForm] = useState({ student_id: "", section_id: "" });
-  const [registerMsg, setRegisterMsg] = useState("");
+  const [form, setForm] = useState({ name: "", code: "", description: "", credits: 3 });
+  const [deleteTarget, setDeleteTarget] = useState<Course | null>(null);
+  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const limit = 15;
 
-  const fetchCourses = useCallback(async () => {
+  const fetchCourses = useCallback(async (searchTerm = "", pageNum = 1) => {
     try {
-      const res = await apiClient.get<Course[]>("/academic/courses");
-      setCourses(res.data);
+      const skip = (pageNum - 1) * limit;
+      const params = `?search=${encodeURIComponent(searchTerm)}&skip=${skip}&limit=${limit}&sort_by=name&sort_order=asc`;
+      const res = await apiClient.get<{ items: Course[]; total: number }>(`/academic/courses${params}`);
+      setCourses(res.data.items);
+      setTotalCount(res.data.total);
     } catch (e) {
       console.error(e);
     }
   }, []);
 
-  const fetchSections = useCallback(async () => {
-    try {
-      const res = await apiClient.get<Section[]>("/academic/course-sections");
-      setSections(res.data);
-    } catch (e) {
-      console.error(e);
-    }
-  }, []);
+  const [searchTimeout, setSearchTimeout] = useState<ReturnType<typeof setTimeout> | null>(null);
 
-  const fetchStudents = useCallback(async () => {
-    try {
-      const res = await apiClient.get<Student[]>("/academic/students");
-      setStudents(res.data);
-    } catch (e) {
-      console.error(e);
-    }
-  }, []);
+  const handleSearchChange = (value: string) => {
+    setSearch(value);
+    if (searchTimeout) clearTimeout(searchTimeout);
+    setSearchTimeout(setTimeout(() => {
+      setPage(1);
+      fetchCourses(value, 1);
+    }, 400));
+  };
 
-  const loadAll = useCallback(async () => {
+  useEffect(() => {
     setLoading(true);
-    await Promise.all([fetchCourses(), fetchSections(), fetchStudents()]);
-    setLoading(false);
-  }, [fetchCourses, fetchSections, fetchStudents]);
-
-  useEffect(() => { loadAll(); }, [loadAll]);
+    fetchCourses().finally(() => setLoading(false));
+    return () => { if (searchTimeout) clearTimeout(searchTimeout); };
+  }, []);
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await Promise.all([fetchCourses(), fetchSections()]);
+    await fetchCourses(search, page);
     setRefreshing(false);
   };
 
+  const totalPages = Math.ceil(totalCount / limit);
+
   const canEdit = user?.is_superadmin || user?.role?.name === "manager" || user?.role?.name === "secretary";
-  const canDelete = user?.is_superadmin;
-  const canActivate = user?.is_superadmin || user?.role?.name === "manager" || user?.role?.name === "secretary";
-  const canRegister = user?.is_superadmin || user?.role?.name === "manager" || user?.role?.name === "secretary";
-
-  const getEnrolledCount = (courseId: string) =>
-    sections.filter(s => s.course_id === courseId).reduce((sum, s) => sum + s.enrolled_count, 0);
-
-  const getMinRequired = (course: Course) => course.min_students_required || 1;
-
-  const statusBadge = (status: string) => {
-    const colors: Record<string, string> = {
-      pending: "bg-amber-50 text-amber-600 border-amber-200",
-      active: "bg-emerald-50 text-emerald-600 border-emerald-200",
-      completed: "bg-slate-100 text-slate-500 border-slate-200",
-    };
-    const labels: Record<string, string> = {
-      pending: t.pending,
-      active: t.active,
-      completed: t.completed,
-    };
-    return (
-      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${colors[status] || colors.pending}`}>
-        {labels[status] || status}
-      </span>
-    );
-  };
+  const canDelete = user?.is_superadmin || user?.role?.name === "manager" || user?.role?.name === "secretary";
 
   const openCreate = () => {
-    setForm({ name: "", code: "", description: "", credits: 3, min_students_required: 0, teacher_percentage: "" });
+    setForm({ name: "", code: "", description: "", credits: 3 });
     setEditingId(null);
     setShowForm(true);
+    setMessage(null);
   };
 
   const openEdit = (course: Course) => {
@@ -205,8 +146,6 @@ export default function CoursesPage() {
       code: course.code,
       description: course.description || "",
       credits: course.credits,
-      min_students_required: course.min_students_required || 0,
-      teacher_percentage: course.teacher_percentage?.toString() || "",
     });
     setEditingId(course.id);
     setShowForm(true);
@@ -220,8 +159,6 @@ export default function CoursesPage() {
         credits: form.credits,
       };
       if (form.description) payload.description = form.description;
-      if (form.min_students_required > 0) payload.min_students_required = form.min_students_required;
-      if (form.teacher_percentage) payload.teacher_percentage = parseFloat(form.teacher_percentage);
       if (editingId) {
         const cleaned: Record<string, unknown> = {};
         Object.entries(payload).forEach(([k, v]) => { if (v !== "" && v !== null && v !== undefined) cleaned[k] = v; });
@@ -240,47 +177,18 @@ export default function CoursesPage() {
   const handleDelete = async (id: string) => {
     try {
       await apiClient.delete(`/academic/courses/${id}`);
-      setDeleteConfirm(null);
+      setDeleteTarget(null);
+      setMessage({ type: "success", text: t.deleted });
       handleRefresh();
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  const handleActivate = async (courseId: string) => {
-    const pct = parseFloat(activatePct[courseId] || "0");
-    if (!pct || pct <= 0 || pct > 100) return;
-    try {
-      await apiClient.post(`/academic/courses/${courseId}/activate`, { teacher_percentage: pct });
-      setActivatePct(prev => ({ ...prev, [courseId]: "" }));
-      handleRefresh();
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  const handleComplete = async (courseId: string) => {
-    try {
-      await apiClient.post(`/academic/courses/${courseId}/complete`);
-      handleRefresh();
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  const handleRegister = async () => {
-    if (!registerForm.student_id || !registerForm.section_id) return;
-    try {
-      await apiClient.post("/academic/enrollments", {
-        student_id: registerForm.student_id,
-        section_id: registerForm.section_id,
-      });
-      setRegisterForm({ student_id: "", section_id: "" });
-      setRegisterMsg("");
-      setShowRegister(null);
-      handleRefresh();
-    } catch (e) {
-      setRegisterMsg("Registration failed");
+    } catch (e: unknown) {
+      setDeleteTarget(null);
+      const err = e as { response?: { data?: { detail?: string } } };
+      const detail = err?.response?.data?.detail || "Delete failed";
+      const known: Record<string, string> = {
+        "Cannot delete course: one or more sections have enrollments with payments": t.paymentsExist,
+        "Course not found": t.empty,
+      };
+      setMessage({ type: "error", text: known[detail] || detail });
     }
   };
 
@@ -312,6 +220,37 @@ export default function CoursesPage() {
         </div>
       </div>
 
+      <div className="flex items-center gap-3">
+        <div className="relative flex-1 max-w-sm">
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => handleSearchChange(e.target.value)}
+            placeholder={t.search}
+            className="input-field pl-9"
+          />
+          <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
+          </svg>
+        </div>
+        {search && (
+          <button onClick={() => { setSearch(""); setPage(1); fetchCourses("", 1); }} className="text-xs text-slate-500 hover:text-slate-700">
+            {t.cancel}
+          </button>
+        )}
+      </div>
+
+      {message && (
+        <div className={`px-4 py-3 rounded-lg text-sm font-medium ${
+          message.type === "success"
+            ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+            : "bg-red-50 text-red-700 border border-red-200"
+        }`}>
+          {message.text}
+          <button onClick={() => setMessage(null)} className="mr-2 float-end">&times;</button>
+        </div>
+      )}
+
       {showForm && (
         <div className="card p-5 space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -335,11 +274,6 @@ export default function CoursesPage() {
               <input type="number" value={form.credits} onChange={(e) => setForm({ ...form, credits: parseInt(e.target.value) || 0 })}
                 className="input-field" min={0} max={20} />
             </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">{t.minStudents}</label>
-              <input type="number" value={form.min_students_required} onChange={(e) => setForm({ ...form, min_students_required: parseInt(e.target.value) || 0 })}
-                className="input-field" min={0} />
-            </div>
           </div>
           <div className="flex gap-3 pt-2">
             <button onClick={handleSave} className="btn-primary">{t.save}</button>
@@ -357,137 +291,64 @@ export default function CoursesPage() {
               <tr>
                 <th>{t.name}</th>
                 <th>{t.code}</th>
-                <th>{t.status}</th>
-                <th>{t.quota}</th>
-                <th>{t.teacherPct}</th>
-                <th>{t.actions}</th>
+                <th>{t.credits}</th>
+                {(canEdit || canDelete) && <th>{t.actions}</th>}
               </tr>
             </thead>
             <tbody>
-              {courses.map((course) => {
-                const enrolled = getEnrolledCount(course.id);
-                const minReq = getMinRequired(course);
-                const quotaMet = enrolled >= minReq;
-                const courseSections = sections.filter(s => s.course_id === course.id);
-                return (
-                  <tr key={course.id}>
-                    <td className="font-medium text-slate-900">{course.name}</td>
-                    <td><span className="badge">{course.code}</span></td>
-                    <td>{statusBadge(course.status)}</td>
-                    <td>
-                      <div className="flex items-center gap-2">
-                        <div className="flex-1 bg-slate-100 rounded-full h-2 w-24">
-                          <div
-                            className={`h-2 rounded-full transition-all ${quotaMet ? "bg-emerald-500" : "bg-amber-400"}`}
-                            style={{ width: `${Math.min(100, (enrolled / minReq) * 100)}%` }}
-                          />
-                        </div>
-                        <span className="text-xs text-slate-500 whitespace-nowrap">
-                          {enrolled}/{minReq}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="text-slate-600">
-                      {course.teacher_percentage != null ? `${course.teacher_percentage}%` : "—"}
-                    </td>
+              {courses.map((course) => (
+                <tr key={course.id}>
+                  <td className="font-medium text-slate-900">{course.name}</td>
+                  <td><span className="badge">{course.code}</span></td>
+                  <td className="text-slate-600">{course.credits}</td>
+                  {(canEdit || canDelete) && (
                     <td>
                       <div className="flex items-center gap-1">
-                        {canEdit && course.status !== "completed" && (
+                        {canEdit && (
                           <button onClick={() => openEdit(course)} className="btn-icon" title={t.edit}>
                             <Pencil size={14} />
                           </button>
                         )}
                         {canDelete && (
-                          <>
-                            {deleteConfirm === course.id ? (
-                              <div className="flex items-center gap-1">
-                                <button onClick={() => handleDelete(course.id)} className="text-xs px-2 py-1 rounded bg-red-500 text-white">{t.yes}</button>
-                                <button onClick={() => setDeleteConfirm(null)} className="text-xs px-2 py-1 rounded bg-slate-200 text-slate-700">{t.no}</button>
-                              </div>
-                            ) : (
-                              <button onClick={() => setDeleteConfirm(course.id)} className="btn-icon text-red-500" title={t.delete}>
-                                <Trash2 size={14} />
-                              </button>
-                            )}
-                          </>
-                        )}
-                        {canActivate && course.status === "pending" && (
-                          <div className="flex items-center gap-1">
-                            <input
-                              type="number"
-                              placeholder="%"
-                              value={activatePct[course.id] || ""}
-                              onChange={(e) => setActivatePct(prev => ({ ...prev, [course.id]: e.target.value }))}
-                              className="w-14 text-xs px-1 py-1 border border-slate-200 rounded"
-                              min={1} max={100}
-                            />
-                            <button
-                              onClick={() => handleActivate(course.id)}
-                              disabled={!quotaMet || !activatePct[course.id]}
-                              className={`btn-icon ${quotaMet ? "text-emerald-600" : "text-slate-300"}`}
-                              title={t.activate}
-                            >
-                              <Play size={14} />
-                            </button>
-                          </div>
-                        )}
-                        {canActivate && course.status === "active" && (
-                          <button onClick={() => handleComplete(course.id)} className="btn-icon text-blue-600" title={t.complete}>
-                            <CheckCircle2 size={14} />
-                          </button>
-                        )}
-                        {canRegister && course.status === "pending" && courseSections.length > 0 && (
-                          <button onClick={() => { setShowRegister(course.id); setRegisterForm({ student_id: "", section_id: courseSections[0]?.id || "" }); }} className="btn-icon text-indigo-600" title={t.registerStudent}>
-                            <UserPlus size={14} />
+                          <button onClick={() => setDeleteTarget(course)} className="btn-icon text-red-500" title={t.delete}>
+                            <Trash2 size={14} />
                           </button>
                         )}
                       </div>
                     </td>
-                  </tr>
-                );
-              })}
+                  )}
+                </tr>
+              ))}
             </tbody>
           </table>
-        </div>
-      )}
-
-      {showRegister && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
-          <div className="bg-white rounded-xl p-6 w-full max-w-md space-y-4 shadow-xl">
-            <h3 className="text-lg font-bold text-slate-900">{t.registerStudent}</h3>
-            <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">{t.selectStudent}</label>
-              <select
-                value={registerForm.student_id}
-                onChange={(e) => setRegisterForm(prev => ({ ...prev, student_id: e.target.value }))}
-                className="input-field"
-              >
-                <option value="">—</option>
-                {students.map(s => (
-                  <option key={s.id} value={s.id}>{s.full_name} ({s.student_code})</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">{t.selectSection}</label>
-              <select
-                value={registerForm.section_id}
-                onChange={(e) => setRegisterForm(prev => ({ ...prev, section_id: e.target.value }))}
-                className="input-field"
-              >
-                {sections.filter(s => s.course_id === showRegister).map(s => (
-                  <option key={s.id} value={s.id}>{s.enrolled_count}/{s.capacity}</option>
-                ))}
-              </select>
-            </div>
-            {registerMsg && <p className="text-xs text-red-500">{registerMsg}</p>}
-            <div className="flex gap-3 pt-2">
-              <button onClick={handleRegister} className="btn-primary">{t.register}</button>
-              <button onClick={() => { setShowRegister(null); setRegisterMsg(""); }} className="btn-secondary">{t.cancel}</button>
+          <div className="flex items-center justify-between px-4 py-3 border-t border-slate-200 text-sm text-slate-600">
+            <span>{t.showing} {Math.min((page - 1) * limit + 1, totalCount)}–{Math.min(page * limit, totalCount)} {t.of} {totalCount}</span>
+            <div className="flex items-center gap-2">
+              <button
+                disabled={page <= 1}
+                onClick={() => { const p = page - 1; setPage(p); fetchCourses(search, p); }}
+                className="px-3 py-1 rounded border border-slate-300 text-sm disabled:opacity-40 hover:bg-slate-100"
+              >{t.prev}</button>
+              <button
+                disabled={page >= totalPages}
+                onClick={() => { const p = page + 1; setPage(p); fetchCourses(search, p); }}
+                className="px-3 py-1 rounded border border-slate-300 text-sm disabled:opacity-40 hover:bg-slate-100"
+              >{t.next}</button>
             </div>
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        open={deleteTarget !== null}
+        title={t.confirmTitle}
+        message={deleteTarget ? `${t.confirmDelete} (${deleteTarget.name})` : ""}
+        confirmLabel={t.yes}
+        cancelLabel={t.no}
+        isRtl={isRtl}
+        onConfirm={() => deleteTarget && handleDelete(deleteTarget.id)}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   );
 }

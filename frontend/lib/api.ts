@@ -13,13 +13,14 @@ export const apiClient = axios.create({
   },
 });
 
+let isRedirectingToLogin = false;
+
 // Response interceptor to handle global auth failures (e.g. 401 redirects)
 apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
 
-    // Check if error is 401 Unauthorized and not already retrying
     if (error.response?.status === 401 && !originalRequest._retry) {
       if (originalRequest.url === "/auth/login" || originalRequest.url === "/auth/refresh") {
         return Promise.reject(error);
@@ -27,22 +28,21 @@ apiClient.interceptors.response.use(
 
       originalRequest._retry = true;
       try {
-        // Attempt to silent refresh session cookies
         await axios.post(
           `${API_BASE_URL}/auth/refresh`,
           {},
           { withCredentials: true }
         );
-        // Retry original request
         return apiClient(originalRequest);
-      } catch (refreshError) {
-        if (typeof window !== "undefined") {
+      } catch {
+        if (typeof window !== "undefined" && !isRedirectingToLogin) {
           const locale = window.location.pathname.match(/^\/(en|ar)/)?.[1] || "ar";
-          if (!window.location.pathname.includes("/login")) {
+          if (!window.location.pathname.endsWith(`/${locale}/login`)) {
+            isRedirectingToLogin = true;
             window.location.href = `/${locale}/login`;
           }
         }
-        return Promise.reject(refreshError);
+        return new Promise<never>(() => {});
       }
     }
 

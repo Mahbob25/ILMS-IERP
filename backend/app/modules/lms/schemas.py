@@ -95,15 +95,13 @@ class GradeResponse(BaseModel):
 
 # --- Payments ---
 class PaymentCreate(BaseModel):
-    student_id: uuid.UUID
-    course_id: uuid.UUID
+    enrollment_id: uuid.UUID
     amount: float
     date: Optional[str] = None
 
 class PaymentResponse(BaseModel):
     id: uuid.UUID
-    student_id: uuid.UUID
-    course_id: uuid.UUID
+    enrollment_id: uuid.UUID
     amount: float
     date: date
     receipt_number: str
@@ -126,7 +124,8 @@ class TeacherWalletResponse(BaseModel):
 class ExpenseCreate(BaseModel):
     amount: float
     description: Optional[str] = None
-    recipient_name: str
+    recipient_name: Optional[str] = None
+    recipient_id: Optional[uuid.UUID] = None
     date: Optional[str] = None
     type: str = "general_expense"
 
@@ -135,6 +134,7 @@ class ExpenseResponse(BaseModel):
     amount: float
     description: Optional[str] = None
     recipient_name: str
+    recipient_id: Optional[uuid.UUID] = None
     date: date
     receipt_number: str
     type: str
@@ -143,15 +143,12 @@ class ExpenseResponse(BaseModel):
         from_attributes = True
 
 
-# --- Teacher Wallet Withdrawal ---
-class WithdrawRequest(BaseModel):
-    teacher_id: uuid.UUID
-    amount: float
-    description: Optional[str] = None
-
-class WithdrawResponse(BaseModel):
-    expense: ExpenseResponse
-    new_balance: float
+class EligibleRecipientResponse(BaseModel):
+    id: uuid.UUID
+    full_name: str
+    role: str
+    available_limit: float
+    is_eligible: bool
 
 
 # --- Daily Closures ---
@@ -169,3 +166,42 @@ class DailyLedgerResponse(BaseModel):
     total_expenses_out: float
     net_cash_flow: float
     status: str
+
+
+# --- Revenue ---
+class MonthlyRevenueItem(BaseModel):
+    month: str
+    revenue: float
+    expenses: float
+
+class CourseRevenueItem(BaseModel):
+    course_name: str
+    revenue: float
+    pct: float
+
+class TeacherRevenueItem(BaseModel):
+    teacher_name: str
+    revenue: float
+    pct: float
+
+class DailyRevenueItem(BaseModel):
+    date: str
+    revenue: float
+    expenses: float
+
+class RevenueComparison(BaseModel):
+    current_period: float
+    previous_period: float
+    change_pct: float
+
+class RevenueOverviewResponse(BaseModel):
+    total_revenue: float
+    total_expenses: float
+    net_revenue: float
+    transaction_count: int
+    avg_per_student: float
+    comparison: RevenueComparison
+    monthly_trend: list[MonthlyRevenueItem]
+    by_course: list[CourseRevenueItem]
+    by_teacher: list[TeacherRevenueItem]
+    daily_breakdown: list[DailyRevenueItem]

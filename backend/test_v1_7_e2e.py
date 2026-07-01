@@ -318,7 +318,7 @@ def run_phase2():
             test('/auth/me has id', 'id' in data)
             test('/auth/me has email', data.get('email') == 'superadmin@institute.dev')
             test('/auth/me has role superadmin', data.get('role') == 'superadmin')
-            test('/auth/me no is_superadmin', 'is_superadmin' not in data)
+            test('/auth/me has is_superadmin', 'is_superadmin' in data)
             aclient.close()
         client.close()
     except Exception as e:
@@ -1393,11 +1393,11 @@ def run_phase7():
         # Don't re-raise, just record failure
 def run_phase8():
     print('=' * 60)
-    print('PHASE 8: Role Data Cleanup — is_superadmin removed from API')
+    print('PHASE 8: Role Data Cleanup — is_superadmin restored to API, role-based auth checks')
     print('=' * 60)
     print()
 
-    print('--- Auth/me has no is_superadmin ---')
+    print('--- Auth/me has is_superadmin ---')
     try:
         client, token = login('superadmin@institute.dev', 'admin123')
         test('Login as superadmin succeeds', token is not None)
@@ -1407,7 +1407,7 @@ def run_phase8():
             test('/auth/me returns 200', r.status_code == 200, f'got {r.status_code}')
             if r.status_code == 200:
                 data = r.json()
-                test('/auth/me no is_superadmin key', 'is_superadmin' not in data, f'keys: {list(data.keys())}')
+                test('/auth/me has is_superadmin key', 'is_superadmin' in data, f'keys: {list(data.keys())}')
                 test('/auth/me has role field', data.get('role') == 'superadmin')
                 test('/auth/me has email', data.get('email') == 'superadmin@institute.dev')
             ac.close()
@@ -1415,10 +1415,12 @@ def run_phase8():
             # --- JWT still has is_superadmin in claims ---
             print()
             print('--- JWT Claims (internal, for frontend middleware) ---')
-            # We can't directly decode the JWT from httpx (HttpOnly cookie), but the login
-            # endpoint sets the cookie. Verify the /auth/me endpoint still works without is_superadmin.
-            # The JWT claims include is_superadmin for frontend middleware — this is intentional.
+            # The auth/me endpoint returns is_superadmin for frontend compatibility.
+            # JWT claims also include is_superadmin — this is intentional.
+            # Auth checks use role.name (Phase 8 change) while preserving is_superadmin for the frontend.
+            print('  INFO  is_superadmin present in API response (frontend compat)')
             print('  INFO  is_superadmin retained in JWT claims (frontend middleware compat)')
+            print('  INFO  Auth checks still use role.name (Phase 8)')
             print('  INFO  DB column retained (not dropped)')
         client.close()
     except Exception as e:

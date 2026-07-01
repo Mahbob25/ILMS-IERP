@@ -1,13 +1,21 @@
+import uuid
 import hashlib
 from datetime import datetime, timezone, timedelta
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, status, Response, Request, Cookie
+from fastapi import APIRouter, Depends, HTTPException, status, Response, Request, Cookie, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import joinedload
 from app.db.session import get_db
 from app.modules.identity.models import User, Role, RefreshToken
-from app.modules.identity.schemas import UserLogin, UserResponse, UserCreate, UserUpdate
+from app.modules.identity.schemas import (
+    UserLogin, UserResponse, UserCreate, UserUpdate,
+    TeacherResponse, TeacherDetailResponse,
+    RoleCreate, RoleResponse,
+    EmployeeResponse, EmployeeCreate, EmployeeUpdate, EmployeeDetailResponse,
+    GrantAccessRequest, LinkedUserInfo,
+    PermissionResponse, RolePermissionsResponse, RolePermissionsUpdate,
+)
 from app.modules.identity.security import (
     verify_password,
     get_password_hash,
@@ -17,19 +25,25 @@ from app.modules.identity.security import (
     ExpiredSignatureError,
     InvalidTokenError
 )
-from app.modules.identity.dependencies import get_current_user, RoleChecker, superadmin_gate, require_manager, require_secretary, require_teacher
-from app.modules.identity.service import create_audit_log
+from app.modules.identity.dependencies import (
+    get_current_user, RoleChecker, superadmin_gate,
+    require_manager, require_secretary, require_teacher,
+    PermissionChecker, VALID_SYSTEM_ROLES
+)
+from app.modules.identity import service as identity_service
 
 auth_router = APIRouter(prefix="/auth", tags=["auth"])
 users_router = APIRouter(prefix="/users", tags=["users"])
+employees_router = APIRouter(prefix="/employees", tags=["employees"])
+
+VALID_SYSTEM_ROLES_LIST = list(VALID_SYSTEM_ROLES)
+
 
 def _hash_token(token: str) -> str:
-    """Helper to SHA-256 hash refresh tokens for secure storage."""
     return hashlib.sha256(token.encode()).hexdigest()
 
+
 def _set_auth_cookies(response: Response, access_token: str, refresh_token: str) -> None:
-    """Helper to set access and refresh tokens in HttpOnly Secure cookies."""
-    # Set access token cookie (expires in 15 minutes)
     response.set_cookie(
         key="access_token",
         value=access_token,
@@ -37,9 +51,8 @@ def _set_auth_cookies(response: Response, access_token: str, refresh_token: str)
         secure=True,
         samesite="lax",
         path="/",
-        max_age=15 * 60  # 15 mins
+        max_age=15 * 60
     )
-    # Set refresh token cookie (expires in 7 days)
     response.set_cookie(
         key="refresh_token",
         value=refresh_token,
@@ -47,13 +60,16 @@ def _set_auth_cookies(response: Response, access_token: str, refresh_token: str)
         secure=True,
         samesite="lax",
         path="/",
-        max_age=7 * 24 * 60 * 60  # 7 days
+        max_age=7 * 24 * 60 * 60
     )
 
+
 def _clear_auth_cookies(response: Response) -> None:
-    """Helper to remove authentication cookies."""
-    response.delete_cookie(key="access_token", path="/")
-    response.delete_cookie(key="refresh_token", path="/")
+    response.delete_cookie(key="access_token", path="/", secure=True, httponly=True, samesite="lax")
+    response.delete_cookie(key="refresh_token", path="/", secure=True, httponly=True, samesite="lax")
+
+
+# --- Auth Endpoints ---
 
 @auth_router.post("/login", response_model=UserResponse)
 async def login(
@@ -62,15 +78,12 @@ async def login(
     response: Response,
     db: AsyncSession = Depends(get_db)
 ):
-    """Authenticate credentials, establish session, write cookies, and audit log."""
-    # Query user and load role
     query = select(User).options(joinedload(User.role)).where(User.email == login_data.email)
     result = await db.execute(query)
     user = result.scalar_one_or_none()
 
     if not user or not verify_password(login_data.password, user.password_hash):
-        # Audit log failed login
-        await create_audit_log(
+        await identity_service.create_audit_log(
             db=db,
             action="LOGIN_FAILED",
             payload={"email": login_data.email},
@@ -80,19 +93,24 @@ async def login(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password"
         )
-    
+
     if not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="User account is deactivated"
         )
 
-    # Generate JWT tokens
+    # Only allow system roles to log in
+    if user.role.name not in VALID_SYSTEM_ROLES:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account does not have system access"
+        )
+
     user_payload = {"sub": str(user.id), "role": user.role.name, "is_superadmin": user.is_superadmin}
     access_token = create_access_token(user_payload)
     refresh_token = create_refresh_token(user_payload)
 
-    # Save hash of refresh token in DB
     hashed_refresh = _hash_token(refresh_token)
     db_refresh_token = RefreshToken(
         user_id=user.id,
@@ -101,11 +119,9 @@ async def login(
     )
     db.add(db_refresh_token)
 
-    # Set HttpOnly cookies
     _set_auth_cookies(response, access_token, refresh_token)
 
-    # Audit log successful login
-    await create_audit_log(
+    await identity_service.create_audit_log(
         db=db,
         user_id=user.id,
         action="LOGIN_SUCCESS",
@@ -114,6 +130,7 @@ async def login(
 
     return user
 
+
 @auth_router.post("/refresh")
 async def refresh_token(
     request: Request,
@@ -121,7 +138,6 @@ async def refresh_token(
     refresh_token: Optional[str] = Cookie(None),
     db: AsyncSession = Depends(get_db)
 ):
-    """Perform refresh token rotation, invalidating old sessions."""
     if not refresh_token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -129,7 +145,6 @@ async def refresh_token(
         )
 
     try:
-        # Decode refresh token payload
         payload = decode_token(refresh_token)
         if payload.get("type") != "refresh":
             raise HTTPException(
@@ -138,14 +153,12 @@ async def refresh_token(
             )
         user_id_str = payload.get("sub")
     except (ExpiredSignatureError, InvalidTokenError):
-        # Expired or modified token
         _clear_auth_cookies(response)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired refresh token"
         )
 
-    # Verify token exists in database and is not revoked
     hashed_refresh = _hash_token(refresh_token)
     query = select(RefreshToken).options(joinedload(RefreshToken.user).joinedload(User.role)).where(
         RefreshToken.token_hash == hashed_refresh,
@@ -169,15 +182,12 @@ async def refresh_token(
             detail="User account is deactivated"
         )
 
-    # Perform Rotation: Mark old refresh token as revoked
     db_refresh.revoked = True
 
-    # Generate new tokens
     user_payload = {"sub": str(user.id), "role": user.role.name, "is_superadmin": user.is_superadmin}
     new_access_token = create_access_token(user_payload)
     new_refresh_token = create_refresh_token(user_payload)
 
-    # Store new refresh token hash
     new_hashed_refresh = _hash_token(new_refresh_token)
     new_db_refresh = RefreshToken(
         user_id=user.id,
@@ -186,11 +196,9 @@ async def refresh_token(
     )
     db.add(new_db_refresh)
 
-    # Set new cookies
     _set_auth_cookies(response, new_access_token, new_refresh_token)
 
-    # Audit log token rotation
-    await create_audit_log(
+    await identity_service.create_audit_log(
         db=db,
         user_id=user.id,
         action="TOKEN_ROTATED",
@@ -199,6 +207,7 @@ async def refresh_token(
 
     return {"status": "success"}
 
+
 @auth_router.post("/logout")
 async def logout(
     request: Request,
@@ -206,16 +215,15 @@ async def logout(
     refresh_token: Optional[str] = Cookie(None),
     db: AsyncSession = Depends(get_db)
 ):
-    """Revoke active session and clear authentication cookies."""
     if refresh_token:
         hashed_refresh = _hash_token(refresh_token)
         query = select(RefreshToken).where(RefreshToken.token_hash == hashed_refresh)
         result = await db.execute(query)
         db_refresh = result.scalar_one_or_none()
-        
+
         if db_refresh:
             db_refresh.revoked = True
-            await create_audit_log(
+            await identity_service.create_audit_log(
                 db=db,
                 user_id=db_refresh.user_id,
                 action="LOGOUT",
@@ -228,16 +236,24 @@ async def logout(
 
 @auth_router.get("/me")
 async def auth_me(current_user: User = Depends(get_current_user)):
-    """Return compact current user info (id, email, full_name, role)."""
     return {
         "id": str(current_user.id),
         "email": current_user.email,
         "full_name": current_user.full_name,
         "role": current_user.role.name,
+        "is_superadmin": current_user.is_superadmin,
     }
 
+@auth_router.get("/me/permissions")
+async def auth_me_permissions(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    perms = await identity_service.get_user_permissions(db, current_user)
+    return {"permissions": perms}
 
-# --- USER CRUD ENDPOINTS ---
+
+# --- User CRUD Endpoints ---
 
 @users_router.post("", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 async def create_user(
@@ -245,8 +261,6 @@ async def create_user(
     current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager"])),
     db: AsyncSession = Depends(get_db)
 ):
-    """Create a new user. SuperAdmin can create anyone; Manager can only create Teachers."""
-    # Retrieve target role
     role_query = select(Role).where(Role.id == user_data.role_id)
     role_result = await db.execute(role_query)
     target_role = role_result.scalar_one_or_none()
@@ -257,14 +271,12 @@ async def create_user(
             detail="Specified role ID does not exist"
         )
 
-    # Check hierarchy restrictions: Manager cannot create SuperAdmin/Manager/Secretary users
-    if current_user.role.name != "superadmin" and target_role.name != "teacher":
+    if current_user.role.name != "superadmin" and target_role.name in ("superadmin", "manager"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Managers are only authorized to create Teacher accounts"
+            detail="Managers cannot create SuperAdmin or Manager accounts"
         )
 
-    # Check duplicate email
     email_query = select(User).where(User.email == user_data.email)
     email_result = await db.execute(email_query)
     if email_result.scalar_one_or_none():
@@ -273,27 +285,24 @@ async def create_user(
             detail="Email address already registered"
         )
 
-    # Encrypt password
     hashed_password = get_password_hash(user_data.password)
 
-    # Create user object
     new_user = User(
         email=user_data.email,
         password_hash=hashed_password,
         full_name=user_data.full_name,
         role_id=user_data.role_id,
         locale_pref=user_data.locale_pref or "ar",
+        employee_id=user_data.employee_id,
     )
     db.add(new_user)
-    await db.flush()  # Populates user ID
+    await db.flush()
 
-    # Query again to eagerly load role for schema response
     query = select(User).options(joinedload(User.role)).where(User.id == new_user.id)
     res = await db.execute(query)
     created_user = res.scalar_one()
 
-    # Log user creation
-    await create_audit_log(
+    await identity_service.create_audit_log(
         db=db,
         user_id=current_user.id,
         action="USER_CREATED",
@@ -302,24 +311,353 @@ async def create_user(
 
     return created_user
 
+
 @users_router.get("", response_model=List[UserResponse])
 async def list_users(
-    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager"])),
+    role: Optional[str] = Query(None),
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])),
     db: AsyncSession = Depends(get_db)
 ):
-    """List all registered users. Managers see only Teachers, SuperAdmins see everyone."""
-    if current_user.role.name == "superadmin":
-        query = select(User).options(joinedload(User.role)).order_by(User.full_name)
-    else:
-        # Managers see teachers only
-        query = select(User).options(joinedload(User.role)).join(User.role).where(
-            Role.name == "teacher"
-        ).order_by(User.full_name)
-        
+    query = select(User).options(joinedload(User.role)).join(User.role)
+
+    if role:
+        query = query.where(Role.name == role)
+    elif current_user.role.name != "superadmin":
+        query = query.where(Role.name == "teacher")
+
+    query = query.order_by(User.full_name)
     result = await db.execute(query)
     return result.scalars().all()
 
+
 @users_router.get("/me", response_model=UserResponse)
 async def get_me(current_user: User = Depends(get_current_user)):
-    """Fetch current session user info."""
     return current_user
+
+
+@users_router.get("/roles", response_model=List[RoleResponse])
+async def list_roles(
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])),
+    db: AsyncSession = Depends(get_db)
+):
+    result = await db.execute(select(Role).order_by(Role.name))
+    return result.scalars().all()
+
+
+@users_router.post("/roles", response_model=RoleResponse, status_code=status.HTTP_201_CREATED)
+async def create_role(
+    data: RoleCreate,
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager"])),
+    db: AsyncSession = Depends(get_db)
+):
+    existing = await db.execute(select(Role).where(Role.name == data.name))
+    if existing.scalar_one_or_none():
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Role already exists")
+    return await identity_service.create_role(db, data.name)
+
+
+@users_router.get("/teachers", response_model=List[TeacherResponse])
+async def list_teachers(
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager"])),
+    db: AsyncSession = Depends(get_db)
+):
+    return await identity_service.get_teachers_with_stats(db)
+
+
+@users_router.get("/teachers/{teacher_id}", response_model=TeacherDetailResponse)
+async def get_teacher_detail(
+    teacher_id: uuid.UUID,
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])),
+    db: AsyncSession = Depends(get_db)
+):
+    result = await identity_service.get_teacher_detail(db, teacher_id)
+    if not result:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Teacher not found")
+    return result
+
+
+@users_router.get("/{user_id}", response_model=UserResponse)
+async def get_user(
+    user_id: uuid.UUID,
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager"])),
+    db: AsyncSession = Depends(get_db)
+):
+    user = await identity_service.get_user_by_id(db, user_id)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    if current_user.role.name != "superadmin" and user.role.name in ("superadmin", "manager"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Managers cannot view SuperAdmin or Manager accounts"
+        )
+    return user
+
+
+@users_router.put("/{user_id}", response_model=UserResponse)
+async def update_user(
+    user_id: uuid.UUID,
+    user_data: UserUpdate,
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager"])),
+    db: AsyncSession = Depends(get_db)
+):
+    user = await identity_service.get_user_by_id(db, user_id)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    if current_user.role.name != "superadmin" and user.role.name in ("superadmin", "manager"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Managers cannot update SuperAdmin or Manager accounts"
+        )
+
+    if user_data.email and user_data.email != user.email:
+        email_check = await db.execute(
+            select(User).where(User.email == user_data.email, User.id != user_id)
+        )
+        if email_check.scalar_one_or_none():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email already in use"
+            )
+
+    update_data = user_data.model_dump(exclude_unset=True)
+    updated = await identity_service.update_user(db, user, update_data)
+
+    await identity_service.create_audit_log(
+        db=db,
+        user_id=current_user.id,
+        action="USER_UPDATED",
+        payload={"updated_user_id": str(user_id)}
+    )
+    return updated
+
+
+@users_router.delete("/{user_id}", response_model=UserResponse)
+async def delete_user(
+    user_id: uuid.UUID,
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager"])),
+    db: AsyncSession = Depends(get_db)
+):
+    user = await identity_service.get_user_by_id(db, user_id)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    if current_user.id == user.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot deactivate yourself"
+        )
+
+    if current_user.role.name != "superadmin" and user.role.name in ("superadmin", "manager"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Managers cannot deactivate SuperAdmin or Manager accounts"
+        )
+
+    result = await identity_service.soft_delete_user(db, user)
+
+    await identity_service.create_audit_log(
+        db=db,
+        user_id=current_user.id,
+        action="USER_DEACTIVATED",
+        payload={"deactivated_user_id": str(user_id)}
+    )
+    return result
+
+
+# --- Employee Endpoints ---
+
+@employees_router.get("", response_model=List[EmployeeResponse])
+async def list_employees(
+    employee_type: Optional[str] = Query(None, description="Filter by employee type"),
+    search: Optional[str] = Query(None, description="Search by name"),
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager"])),
+    db: AsyncSession = Depends(get_db)
+):
+    return await identity_service.list_employees(db, employee_type=employee_type, search=search)
+
+
+@employees_router.post("", response_model=EmployeeResponse, status_code=status.HTTP_201_CREATED)
+async def create_employee(
+    data: EmployeeCreate,
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager"])),
+    db: AsyncSession = Depends(get_db)
+):
+    try:
+        employee = await identity_service.create_employee(db, data.model_dump())
+        await identity_service.create_audit_log(
+            db=db,
+            user_id=current_user.id,
+            action="EMPLOYEE_CREATED",
+            payload={"employee_id": str(employee.id), "employee_type": data.employee_type}
+        )
+        return employee
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@employees_router.get("/{employee_id}", response_model=EmployeeDetailResponse)
+async def get_employee_detail(
+    employee_id: uuid.UUID,
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager"])),
+    db: AsyncSession = Depends(get_db)
+):
+    result = await identity_service.get_employee_detail(db, employee_id)
+    if not result:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Employee not found")
+    return result
+
+
+@employees_router.put("/{employee_id}", response_model=EmployeeResponse)
+async def update_employee(
+    employee_id: uuid.UUID,
+    data: EmployeeUpdate,
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager"])),
+    db: AsyncSession = Depends(get_db)
+):
+    employee = await identity_service.get_employee_by_id(db, employee_id)
+    if not employee:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Employee not found")
+
+    try:
+        updated = await identity_service.update_employee(db, employee, data.model_dump(exclude_unset=True))
+        await identity_service.create_audit_log(
+            db=db,
+            user_id=current_user.id,
+            action="EMPLOYEE_UPDATED",
+            payload={"employee_id": str(employee_id)}
+        )
+        return updated
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@employees_router.delete("/{employee_id}", response_model=EmployeeResponse)
+async def delete_employee(
+    employee_id: uuid.UUID,
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager"])),
+    db: AsyncSession = Depends(get_db)
+):
+    employee = await identity_service.get_employee_by_id(db, employee_id)
+    if not employee:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Employee not found")
+
+    result = await identity_service.soft_delete_employee(db, employee)
+    await identity_service.create_audit_log(
+        db=db,
+        user_id=current_user.id,
+        action="EMPLOYEE_DEACTIVATED",
+        payload={"employee_id": str(employee_id)}
+    )
+    return result
+
+
+@employees_router.post("/{employee_id}/grant-access", response_model=UserResponse)
+async def grant_employee_access(
+    employee_id: uuid.UUID,
+    data: GrantAccessRequest,
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager"])),
+    db: AsyncSession = Depends(get_db)
+):
+    try:
+        user = await identity_service.grant_user_access(
+            db,
+            employee_id=employee_id,
+            email=data.email,
+            password=data.password,
+            full_name=data.full_name,
+            role_id=data.role_id,
+        )
+        await identity_service.create_audit_log(
+            db=db,
+            user_id=current_user.id,
+            action="USER_ACCESS_GRANTED",
+            payload={"employee_id": str(employee_id), "user_id": str(user.id)}
+        )
+        return user
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@employees_router.post("/{employee_id}/revoke-access", status_code=status.HTTP_200_OK)
+async def revoke_employee_access(
+    employee_id: uuid.UUID,
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager"])),
+    db: AsyncSession = Depends(get_db)
+):
+    await identity_service.revoke_user_access(db, employee_id)
+    await identity_service.create_audit_log(
+        db=db,
+        user_id=current_user.id,
+        action="USER_ACCESS_REVOKED",
+        payload={"employee_id": str(employee_id)}
+    )
+    return {"status": "success"}
+
+
+# --- Permission Endpoints ---
+
+permissions_router = APIRouter(prefix="/permissions", tags=["permissions"])
+
+
+@permissions_router.get("", response_model=List[PermissionResponse])
+async def list_permissions(
+    current_user: User = Depends(superadmin_gate),
+    db: AsyncSession = Depends(get_db)
+):
+    return await identity_service.get_all_permissions(db)
+
+
+@permissions_router.get("/roles/{role_id}", response_model=RolePermissionsResponse)
+async def get_role_permissions(
+    role_id: uuid.UUID,
+    current_user: User = Depends(superadmin_gate),
+    db: AsyncSession = Depends(get_db)
+):
+    codenames = await identity_service.get_role_permissions(db, role_id)
+    return RolePermissionsResponse(role_id=role_id, permission_codenames=codenames)
+
+
+@permissions_router.put("/roles/{role_id}", response_model=RolePermissionsResponse)
+async def set_role_permissions(
+    role_id: uuid.UUID,
+    data: RolePermissionsUpdate,
+    current_user: User = Depends(superadmin_gate),
+    db: AsyncSession = Depends(get_db)
+):
+    try:
+        await identity_service.set_role_permissions(db, role_id, data.permission_codenames)
+        await identity_service.create_audit_log(
+            db=db,
+            user_id=current_user.id,
+            action="ROLE_PERMISSIONS_UPDATED",
+            payload={"role_id": str(role_id)}
+        )
+        return RolePermissionsResponse(role_id=role_id, permission_codenames=data.permission_codenames)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+# --- Deprecated /users/employees redirect (backward compat) ---
+
+@users_router.get("/employees", response_model=List[EmployeeResponse])
+async def list_employees_deprecated(
+    roles: Optional[List[str]] = Query(None, description="Deprecated: use /employees instead"),
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager"])),
+    db: AsyncSession = Depends(get_db)
+):
+    # Redirect to new endpoint logic, ignore old roles param
+    return await identity_service.list_employees(db, employee_type=roles[0] if roles else None)
+
+
+@users_router.get("/employees/{user_id}", response_model=EmployeeDetailResponse)
+async def get_employee_detail_deprecated(
+    user_id: uuid.UUID,
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager"])),
+    db: AsyncSession = Depends(get_db)
+):
+    result = await identity_service.get_employee_detail(db, user_id)
+    if not result:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Employee not found")
+    return result

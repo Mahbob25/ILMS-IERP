@@ -4,8 +4,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import joinedload
 from app.db.session import get_db
-from app.modules.identity.models import User, Role
+from app.modules.identity.models import User, Role, Permission, RolePermission
 from app.modules.identity.security import decode_token, ExpiredSignatureError, InvalidTokenError
+
+VALID_SYSTEM_ROLES = {"superadmin", "manager", "teacher", "secretary"}
 
 async def get_current_user(
     access_token: Optional[str] = Cookie(None),
@@ -41,11 +43,10 @@ async def get_current_user(
             detail="Invalid token"
         )
 
-    # Fetch user along with role using joinedload to prevent LazyLoading issues in async context
     query = select(User).options(joinedload(User.role)).where(User.id == user_id_str, User.is_active == True)
     result = await db.execute(query)
     user = result.scalar_one_or_none()
-    
+
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -60,7 +61,6 @@ class RoleChecker:
 
     async def __call__(self, current_user: User = Depends(get_current_user)) -> User:
         if current_user.role.name == "superadmin":
-            # Superadmin bypasse normal role restrictions
             return current_user
 
         if current_user.role.name not in self.allowed_roles:
@@ -97,3 +97,32 @@ def require_role(role_name: str):
 require_manager = require_role("manager")
 require_secretary = require_role("secretary")
 require_teacher = require_role("teacher")
+
+
+class PermissionChecker:
+    """FastAPI dependency to check page-level permissions from the DB."""
+    def __init__(self, permission_codename: str):
+        self.permission_codename = permission_codename
+
+    async def __call__(
+        self,
+        current_user: User = Depends(get_current_user),
+        db: AsyncSession = Depends(get_db)
+    ) -> User:
+        if current_user.is_superadmin:
+            return current_user
+
+        result = await db.execute(
+            select(RolePermission)
+            .join(Permission, RolePermission.permission_id == Permission.id)
+            .where(
+                RolePermission.role_id == current_user.role_id,
+                Permission.codename == self.permission_codename,
+            )
+        )
+        if not result.first():
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Access denied: Missing permission '{self.permission_codename}'"
+            )
+        return current_user

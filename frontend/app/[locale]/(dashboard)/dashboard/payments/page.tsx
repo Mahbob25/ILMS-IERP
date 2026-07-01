@@ -8,23 +8,23 @@ import { Plus, Loader2, RefreshCw, Receipt, X, Eye } from "lucide-react";
 
 interface Payment {
   id: string;
-  student_id: string;
-  course_id: string;
+  enrollment_id: string;
   amount: number;
   date: string;
   receipt_number: string;
 }
 
-interface Student {
-  id: string;
-  student_code: string;
-  full_name: string;
-}
+interface Student { id: string; student_code: string; full_name: string; }
+interface Course { id: string; name: string; code: string; }
+interface CourseSection { id: string; course_id: string; }
+interface Enrollment { id: string; student_id: string; section_id: string; agreed_price: number | null; admin_discount: number | null; }
 
-interface Course {
-  id: string;
-  name: string;
-  code: string;
+interface PaymentSummary {
+  total_paid: number;
+  agreed_price: number | null;
+  admin_discount: number | null;
+  net_price: number | null;
+  balance_remaining: number | null;
 }
 
 export default function PaymentsPage() {
@@ -49,8 +49,8 @@ export default function PaymentsPage() {
       loading: "جاري التحميل...",
       empty: "لا توجد مدفوعات بعد",
       refresh: "تحديث",
+      selectEnrollment: "اختر التسجيل",
       selectStudent: "اختر الطالب",
-      selectCourse: "اختر المقرر",
       enterAmount: "أدخل المبلغ",
       receiptPreview: "معاينة الإيصال",
       paymentDate: "تاريخ الدفع",
@@ -62,6 +62,12 @@ export default function PaymentsPage() {
       cashier: "أمين الصندوق",
       studentSignature: "توقيع الطالب",
       paid: "مدفوع",
+      remaining: "المتبقي",
+      netPrice: "صافي السعر",
+      totalPaid: "المدفوع",
+      positiveAmount: "يجب أن يكون المبلغ أكبر من صفر",
+      exceedsBalance: "المبلغ يتجاوز الرصيد المتبقي",
+      paymentFailed: "فشل تسجيل الدفعة",
       sar: "ريال",
     },
     en: {
@@ -79,8 +85,8 @@ export default function PaymentsPage() {
       loading: "Loading...",
       empty: "No payments yet",
       refresh: "Refresh",
+      selectEnrollment: "Select Enrollment",
       selectStudent: "Select Student",
-      selectCourse: "Select Course",
       enterAmount: "Enter Amount",
       receiptPreview: "Receipt Preview",
       paymentDate: "Payment Date",
@@ -92,6 +98,12 @@ export default function PaymentsPage() {
       cashier: "Cashier",
       studentSignature: "Student Signature",
       paid: "Paid",
+      remaining: "Remaining",
+      netPrice: "Net Price",
+      totalPaid: "Total Paid",
+      positiveAmount: "Amount must be positive",
+      exceedsBalance: "Amount exceeds remaining balance",
+      paymentFailed: "Payment failed",
       sar: "SAR",
     },
   }[locale === "en" ? "en" : "ar"];
@@ -99,16 +111,19 @@ export default function PaymentsPage() {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
+  const [sections, setSections] = useState<CourseSection[]>([]);
+  const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [summary, setSummary] = useState<PaymentSummary | null>(null);
+  const [formError, setFormError] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [showReceipt, setShowReceipt] = useState<Payment | null>(null);
   const [form, setForm] = useState<{
-    student_id: string;
-    course_id: string;
+    enrollment_id: string;
     amount: string;
     date: string;
-  }>({ student_id: "", course_id: "", amount: "", date: new Date().toISOString().split("T")[0] });
+  }>({ enrollment_id: "", amount: "", date: new Date().toISOString().split("T")[0] });
 
   const canCreate = user?.is_superadmin || user?.role?.name === "manager" || user?.role?.name === "secretary";
 
@@ -121,19 +136,18 @@ export default function PaymentsPage() {
     }
   }, []);
 
-  const fetchStudents = useCallback(async () => {
+  const fetchLookups = useCallback(async () => {
     try {
-      const res = await apiClient.get<Student[]>("/academic/students");
-      setStudents(res.data);
-    } catch (e) {
-      console.error(e);
-    }
-  }, []);
-
-  const fetchCourses = useCallback(async () => {
-    try {
-      const res = await apiClient.get<Course[]>("/academic/courses");
-      setCourses(res.data);
+      const [studentsRes, coursesRes, sectionsRes, enrollmentsRes] = await Promise.all([
+        apiClient.get<{ items: Student[]; total: number }>("/academic/students?limit=1000"),
+        apiClient.get<{ items: Course[]; total: number }>("/academic/courses?limit=1000"),
+        apiClient.get<{ items: CourseSection[]; total: number }>("/academic/course-sections?limit=1000"),
+        apiClient.get<{ items: Enrollment[]; total: number }>("/academic/enrollments?limit=1000"),
+      ]);
+      setStudents(studentsRes.data.items);
+      setCourses(coursesRes.data.items);
+      setSections(sectionsRes.data.items);
+      setEnrollments(enrollmentsRes.data.items);
     } catch (e) {
       console.error(e);
     }
@@ -141,22 +155,33 @@ export default function PaymentsPage() {
 
   const loadAll = useCallback(async () => {
     setLoading(true);
-    await Promise.all([fetchPayments()]);
+    await Promise.all([fetchPayments(), fetchLookups()]);
     setLoading(false);
-  }, [fetchPayments]);
+  }, [fetchPayments, fetchLookups]);
 
   useEffect(() => { loadAll(); }, [loadAll]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await fetchPayments();
+    await Promise.all([fetchPayments(), fetchLookups()]);
     setRefreshing(false);
   };
 
   const openCreate = async () => {
-    await Promise.all([fetchStudents(), fetchCourses()]);
-    setForm({ student_id: "", course_id: "", amount: "", date: new Date().toISOString().split("T")[0] });
+    await fetchLookups();
+    setForm({ enrollment_id: "", amount: "", date: new Date().toISOString().split("T")[0] });
+    setSummary(null);
+    setFormError("");
     setShowForm(true);
+  };
+
+  const resolveEnrollment = (enrollmentId: string) => {
+    const enrollment = enrollments.find((e) => e.id === enrollmentId);
+    if (!enrollment) return null;
+    const student = students.find((s) => s.id === enrollment.student_id);
+    const section = sections.find((s) => s.id === enrollment.section_id);
+    const course = section ? courses.find((c) => c.id === section.course_id) : null;
+    return { enrollment, student, section, course };
   };
 
   const getStudentName = (id: string) => {
@@ -169,23 +194,40 @@ export default function PaymentsPage() {
     return c ? c.name : id.slice(0, 8);
   };
 
+  const enrollmentLabel = (enrollmentId: string) => {
+    const resolved = resolveEnrollment(enrollmentId);
+    if (!resolved) return enrollmentId.slice(0, 8);
+    return `${resolved.student?.full_name || "?"} - ${resolved.course?.name || "?"}`;
+  };
+
   const handleSave = async () => {
-    if (!form.student_id || !form.course_id || !form.amount) return;
+    if (!form.enrollment_id || !form.amount) return;
+    const parsedAmount = parseFloat(form.amount);
+    if (parsedAmount <= 0) {
+      setFormError(t.positiveAmount);
+      return;
+    }
     try {
       const payload: Record<string, unknown> = {
-        student_id: form.student_id,
-        course_id: form.course_id,
-        amount: parseFloat(form.amount),
+        enrollment_id: form.enrollment_id,
+        amount: parsedAmount,
       };
       if (form.date) payload.date = form.date;
       const res = await apiClient.post("/lms/payments", payload);
       setShowForm(false);
+      setFormError("");
       setShowReceipt(res.data);
       fetchPayments();
-      setStudents([]);
-      setCourses([]);
-    } catch (e) {
-      console.error(e);
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { detail?: string } } };
+      const detail = err?.response?.data?.detail || "";
+      if (detail.includes("exceeds remaining balance")) {
+        setFormError(t.exceedsBalance);
+      } else if (detail.includes("must be positive")) {
+        setFormError(t.positiveAmount);
+      } else {
+        setFormError(detail || t.paymentFailed);
+      }
     }
   };
 
@@ -196,13 +238,9 @@ export default function PaymentsPage() {
   const formatDate = (d: string) => {
     try {
       return new Date(d + "T00:00:00").toLocaleDateString(locale === "ar" ? "ar-SA" : "en-US", {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
+        year: "numeric", month: "short", day: "numeric",
       });
-    } catch {
-      return d;
-    }
+    } catch { return d; }
   };
 
   if (loading) {
@@ -237,57 +275,71 @@ export default function PaymentsPage() {
         <div className="card p-5 space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">{t.selectStudent}</label>
+              <label className="block text-xs font-medium text-slate-700 mb-1">{t.selectEnrollment}</label>
               <select
-                value={form.student_id}
-                onChange={(e) => setForm({ ...form, student_id: e.target.value })}
+                value={form.enrollment_id}
+                onChange={async (e) => {
+                  setForm({ ...form, enrollment_id: e.target.value, amount: "" });
+                  setSummary(null);
+                  setFormError("");
+                  if (!e.target.value) return;
+                  try {
+                    const res = await apiClient.get<PaymentSummary>(`/lms/payments/summary/${e.target.value}`);
+                    setSummary(res.data);
+                    if (res.data.balance_remaining != null) {
+                      setForm(prev => ({ ...prev, enrollment_id: e.target.value, amount: res.data!.balance_remaining!.toString() }));
+                    }
+                  } catch {
+                    // fallback
+                  }
+                }}
                 className="input-field"
               >
                 <option value="">--</option>
-                {students.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.full_name} ({s.student_code})
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">{t.selectCourse}</label>
-              <select
-                value={form.course_id}
-                onChange={(e) => setForm({ ...form, course_id: e.target.value })}
-                className="input-field"
-              >
-                <option value="">--</option>
-                {courses.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name} ({c.code})
-                  </option>
+                {enrollments.map((e) => (
+                  <option key={e.id} value={e.id}>{enrollmentLabel(e.id)}</option>
                 ))}
               </select>
             </div>
             <div>
               <label className="block text-xs font-medium text-slate-700 mb-1">{t.enterAmount}</label>
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                value={form.amount}
-                onChange={(e) => setForm({ ...form, amount: e.target.value })}
-                className="input-field"
-                placeholder="0.00"
-              />
+              {summary && (
+                <div className="text-xs text-slate-600 space-y-0.5 mb-2 p-2 bg-slate-50 rounded-lg">
+                  <div className="flex justify-between">
+                    <span>{t.netPrice}:</span>
+                    <span className="font-medium">{summary.net_price?.toFixed(2)} {t.sar}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>{t.totalPaid}:</span>
+                    <span className="font-medium">{summary.total_paid.toFixed(2)} {t.sar}</span>
+                  </div>
+                  <div className="flex justify-between text-emerald-700 font-semibold">
+                    <span>{t.remaining}:</span>
+                    <span>{summary.balance_remaining != null ? summary.balance_remaining.toFixed(2) : "—"} {t.sar}</span>
+                  </div>
+                </div>
+              )}
+              <input type="number" step="0.01" min="0" max={summary?.balance_remaining ?? ""} value={form.amount}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (summary?.balance_remaining != null && parseFloat(val) > summary.balance_remaining) {
+                    setForm({ ...form, amount: summary.balance_remaining.toString() });
+                  } else {
+                    setForm({ ...form, amount: val });
+                  }
+                }}
+                className="input-field" placeholder="0.00" />
             </div>
             <div>
               <label className="block text-xs font-medium text-slate-700 mb-1">{t.paymentDate}</label>
-              <input
-                type="date"
-                value={form.date}
+              <input type="date" value={form.date}
                 onChange={(e) => setForm({ ...form, date: e.target.value })}
-                className="input-field"
-              />
+                className="input-field" />
             </div>
           </div>
+          {formError && (
+            <div className="text-sm text-red-600 bg-red-50 p-3 rounded-lg">{formError}</div>
+          )}
           <div className="flex gap-3 pt-2">
             <button onClick={handleSave} className="btn-primary">{t.save}</button>
             <button onClick={() => setShowForm(false)} className="btn-secondary">{t.cancel}</button>
@@ -312,23 +364,18 @@ export default function PaymentsPage() {
             </thead>
             <tbody>
               {payments.map((payment) => {
-                const studentName = getStudentName(payment.student_id);
-                const courseName = getCourseName(payment.course_id);
+                const resolved = resolveEnrollment(payment.enrollment_id);
+                const studentName = resolved?.student?.full_name || payment.enrollment_id.slice(0, 8);
+                const courseName = resolved?.course?.name || payment.enrollment_id.slice(0, 8);
                 return (
                   <tr key={payment.id}>
                     <td><span className="badge badge-success">{payment.receipt_number}</span></td>
                     <td className="font-medium text-slate-900">{studentName}</td>
                     <td className="text-slate-600">{courseName}</td>
-                    <td className="font-semibold text-slate-900">
-                      {payment.amount.toFixed(2)} {t.sar}
-                    </td>
+                    <td className="font-semibold text-slate-900">{payment.amount.toFixed(2)} {t.sar}</td>
                     <td className="text-slate-500">{formatDate(payment.date)}</td>
                     <td>
-                      <button
-                        onClick={() => setShowReceipt(payment)}
-                        className="btn-icon"
-                        title={t.receiptPreview}
-                      >
+                      <button onClick={() => setShowReceipt(payment)} className="btn-icon" title={t.receiptPreview}>
                         <Eye size={15} />
                       </button>
                     </td>
@@ -366,13 +413,19 @@ export default function PaymentsPage() {
                 <div className="flex justify-between">
                   <span className="text-slate-500">{t.student}</span>
                   <span className="font-medium text-slate-900">
-                    {getStudentName(showReceipt.student_id)}
+                    {(() => {
+                      const r = resolveEnrollment(showReceipt.enrollment_id);
+                      return r?.student?.full_name || showReceipt.enrollment_id.slice(0, 8);
+                    })()}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-500">{t.course}</span>
                   <span className="text-slate-900">
-                    {getCourseName(showReceipt.course_id)}
+                    {(() => {
+                      const r = resolveEnrollment(showReceipt.enrollment_id);
+                      return r?.course?.name || showReceipt.enrollment_id.slice(0, 8);
+                    })()}
                   </span>
                 </div>
                 <div className="flex justify-between pt-2 border-t border-slate-200 text-base">

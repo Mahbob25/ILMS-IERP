@@ -36,8 +36,7 @@ interface Enrollment {
 
 interface Payment {
   id: string;
-  student_id: string;
-  course_id: string;
+  enrollment_id: string;
   amount: number;
   date: string;
   receipt_number: string;
@@ -119,33 +118,31 @@ export default function StudentDetailPage() {
     if (!studentId) return;
     try {
       const [studRes, enrollRes, sectRes, courseRes, payRes] = await Promise.all([
-        apiClient.get<Student[]>("/academic/students"),
-        apiClient.get<Enrollment[]>(`/academic/enrollments?student_id=${studentId}`),
-        apiClient.get<CourseSection[]>("/academic/course-sections"),
-        apiClient.get<Course[]>("/academic/courses"),
+        apiClient.get<{ items: Student[]; total: number }>("/academic/students?limit=1000"),
+        apiClient.get<{ items: Enrollment[]; total: number }>(`/academic/enrollments?student_id=${studentId}&limit=1000`),
+        apiClient.get<{ items: CourseSection[]; total: number }>("/academic/course-sections?limit=1000"),
+        apiClient.get<{ items: Course[]; total: number }>("/academic/courses?limit=1000"),
         apiClient.get<Payment[]>(`/lms/payments?student_id=${studentId}`),
       ]);
 
-      const found = studRes.data.find((s) => s.id === studentId) || null;
+      const found = studRes.data.items.find((s) => s.id === studentId) || null;
       setStudent(found);
-      setAllStudents(studRes.data);
-      setEnrollments(enrollRes.data);
-      setSections(sectRes.data);
-      setCourses(courseRes.data);
+      setAllStudents(studRes.data.items);
+      setEnrollments(enrollRes.data.items);
+      setSections(sectRes.data.items);
+      setCourses(courseRes.data.items);
       setPayments(payRes.data);
+      setLoading(false);
 
       const summaryMap: Record<string, PaymentSummary> = {};
-      for (const enrollment of enrollRes.data) {
-        const section = sectRes.data.find((s) => s.id === enrollment.section_id);
-        if (section) {
-          try {
-            const sumRes = await apiClient.get<PaymentSummary>(
-              `/lms/payments/summary/${studentId}/${section.course_id}`
-            );
-            summaryMap[section.course_id] = sumRes.data;
-          } catch {
-            // skip
-          }
+      for (const enrollment of enrollRes.data.items) {
+        try {
+          const sumRes = await apiClient.get<PaymentSummary>(
+            `/lms/payments/summary/${enrollment.id}`
+          );
+          summaryMap[enrollment.id] = sumRes.data;
+        } catch {
+          // skip
         }
       }
       setSummaries(summaryMap);
@@ -220,7 +217,7 @@ export default function StudentDetailPage() {
             <div className="space-y-3">
               {enrollments.map((enr) => {
                 const sectionInfo = getSectionCourse(enr.section_id);
-                const summary = summaries[sectionInfo.courseId];
+                const summary = summaries[enr.id];
                 return (
                   <div key={enr.id} className="border border-slate-200 rounded-xl p-4 space-y-2">
                     <p className="font-medium text-slate-900 text-sm">{sectionInfo.name}</p>
@@ -293,11 +290,13 @@ export default function StudentDetailPage() {
                 </thead>
                 <tbody>
                   {payments.map((pay) => {
-                    const course = courses.find((c) => c.id === pay.course_id);
+                    const enrollment = enrollments.find((e) => e.id === pay.enrollment_id);
+                    const section = enrollment ? sections.find((s) => s.id === enrollment.section_id) : null;
+                    const course = section ? courses.find((c) => c.id === section.course_id) : null;
                     return (
                       <tr key={pay.id}>
                         <td><span className="badge badge-success">{pay.receipt_number}</span></td>
-                        <td className="text-slate-700">{course?.name || pay.course_id.slice(0, 8)}</td>
+                        <td className="text-slate-700">{course?.name || pay.enrollment_id.slice(0, 8)}</td>
                         <td className="font-semibold text-slate-900">{pay.amount.toFixed(2)} {t.sar}</td>
                         <td className="text-slate-500">{formatDate(pay.date)}</td>
                       </tr>

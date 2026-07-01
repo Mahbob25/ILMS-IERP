@@ -14,9 +14,9 @@ from app.modules.lms.schemas import (
     SubmissionResponse, GradeCreate, GradeResponse,
     PaymentCreate, PaymentResponse,
     TeacherWalletResponse,
-    ExpenseCreate, ExpenseResponse,
-    WithdrawRequest, WithdrawResponse,
+    ExpenseCreate, ExpenseResponse, EligibleRecipientResponse,
     DailyClosureResponse, DailyLedgerResponse,
+    RevenueOverviewResponse,
 )
 from app.modules.lms import service as lms_service
 from app.modules.lms import financial_service
@@ -185,31 +185,30 @@ async def create_payment(
 ):
     payment_date = date.fromisoformat(data.date) if data.date else None
     payment = await financial_service.create_payment(
-        db, data.student_id, data.course_id, data.amount, payment_date
+        db, data.enrollment_id, data.amount, payment_date
     )
     if not payment:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Enrollment not found")
     return payment
 
 @lms_router.get("/payments", response_model=list[PaymentResponse])
 async def list_payments(
+    enrollment_id: Optional[uuid.UUID] = None,
     student_id: Optional[uuid.UUID] = None,
-    course_id: Optional[uuid.UUID] = None,
     date_from: Optional[date] = None,
     date_to: Optional[date] = None,
     current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary", "teacher"])),
     db: AsyncSession = Depends(get_db)
 ):
-    return await financial_service.list_payments(db, student_id, course_id, date_from, date_to)
+    return await financial_service.list_payments(db, enrollment_id, student_id, date_from, date_to)
 
-@lms_router.get("/payments/summary/{student_id}/{course_id}")
+@lms_router.get("/payments/summary/{enrollment_id}")
 async def get_payment_summary(
-    student_id: uuid.UUID,
-    course_id: uuid.UUID,
+    enrollment_id: uuid.UUID,
     current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary", "teacher"])),
     db: AsyncSession = Depends(get_db)
 ):
-    return await financial_service.get_student_payment_summary(db, student_id, course_id)
+    return await financial_service.get_student_payment_summary(db, enrollment_id)
 
 @lms_router.get("/payments/{payment_id}", response_model=PaymentResponse)
 async def get_payment(
@@ -223,20 +222,18 @@ async def get_payment(
     return payment
 
 
-# --- Teacher Wallets (static routes before parameterized) ---
-@lms_router.post("/teacher-wallets/withdraw", response_model=WithdrawResponse)
-async def withdraw_from_wallet(
-    data: WithdrawRequest,
-    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])),
+# --- Revenue Overview ---
+@lms_router.get("/revenue", response_model=RevenueOverviewResponse)
+async def get_revenue_overview(
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager"])),
     db: AsyncSession = Depends(get_db)
 ):
-    result = await financial_service.teacher_withdraw(db, data.teacher_id, data.amount, data.description)
-    if not result:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Insufficient balance or wallet not found")
-    expense, new_balance = result
-    return {"expense": expense, "new_balance": new_balance}
+    return await financial_service.get_revenue_overview(db, start_date, end_date)
 
 
+# --- Teacher Wallets ---
 @lms_router.get("/teacher-wallets/{teacher_id}", response_model=TeacherWalletResponse)
 async def get_teacher_wallet(
     teacher_id: uuid.UUID,
@@ -250,6 +247,17 @@ async def get_teacher_wallet(
 
 
 # --- Expenses ---
+@lms_router.get("/expenses/eligible-recipients", response_model=list[EligibleRecipientResponse])
+async def list_eligible_recipients(
+    type: str,
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])),
+    db: AsyncSession = Depends(get_db)
+):
+    if type not in ("teacher_withdrawal", "secretary_advance"):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid recipient type")
+    return await financial_service.get_eligible_recipients(db, type)
+
+
 @lms_router.post("/expenses", response_model=ExpenseResponse, status_code=status.HTTP_201_CREATED)
 async def create_expense(
     data: ExpenseCreate,
@@ -259,10 +267,14 @@ async def create_expense(
     expense_date = date.fromisoformat(data.date) if data.date else None
     if expense_date and await financial_service.is_date_closed(db, expense_date):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Date is closed")
-    expense = await financial_service.create_expense(
-        db, amount=data.amount, recipient_name=data.recipient_name,
-        expense_type=data.type, description=data.description, expense_date=expense_date,
-    )
+    try:
+        expense = await financial_service.create_expense(
+            db, amount=data.amount, recipient_name=data.recipient_name,
+            recipient_id=data.recipient_id,
+            expense_type=data.type, description=data.description, expense_date=expense_date,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     return expense
 
 

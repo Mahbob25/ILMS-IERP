@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from "react";
 import { apiClient } from "@/lib/api";
 
 export interface Role {
@@ -20,20 +20,31 @@ export interface User {
 
 interface AuthContextType {
   user: User | null;
+  permissions: string[];
   loading: boolean;
   login: (email: string, password: string) => Promise<User>;
   logout: () => Promise<void>;
   checkSession: () => Promise<User | null>;
+  refreshPermissions: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [permissions, setPermissions] = useState<string[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
 
-  // Checks if session cookie is valid and loads user profile
-  const checkSession = async (): Promise<User | null> => {
+  const refreshPermissions = useCallback(async () => {
+    try {
+      const res = await apiClient.get<{ permissions: string[] }>("/auth/me/permissions");
+      setPermissions(res.data.permissions);
+    } catch {
+      setPermissions([]);
+    }
+  }, []);
+
+  const checkSession = useCallback(async (): Promise<User | null> => {
     try {
       const response = await apiClient.get<User>("/users/me");
       setUser(response.data);
@@ -44,13 +55,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    checkSession();
   }, []);
 
-  const login = async (email: string, password: string): Promise<User> => {
+  useEffect(() => {
+    checkSession().then(() => refreshPermissions());
+  }, []);
+
+  useEffect(() => {
+    if (user) {
+      refreshPermissions();
+    }
+  }, [user?.role?.name]);
+
+  const login = useCallback(async (email: string, password: string): Promise<User> => {
     setLoading(true);
     try {
       const response = await apiClient.post<User>("/auth/login", { email, password });
@@ -62,23 +79,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const logout = async (): Promise<void> => {
+  const logout = useCallback(async (): Promise<void> => {
     setLoading(true);
     try {
       await apiClient.post("/auth/logout");
     } catch (error) {
-      // Proceed even if request fails
     } finally {
       setUser(null);
+      setPermissions([]);
       setLoading(false);
       window.location.href = "/login";
     }
-  };
+  }, []);
+
+  const contextValue = useMemo(
+    () => ({ user, permissions, loading, login, logout, checkSession, refreshPermissions }),
+    [user, permissions, loading, login, logout, checkSession, refreshPermissions]
+  );
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, checkSession }}>
+    <AuthContext.Provider value={contextValue}>
       {children}
     </AuthContext.Provider>
   );

@@ -25,14 +25,15 @@ import {
   DollarSign,
   Wallet,
   CreditCard,
-  ShoppingCart
+  ShoppingCart,
+  BarChart3
 } from "lucide-react";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const params = useParams();
   const pathname = usePathname();
-  const { user, loading, logout } = useAuth();
+  const { user, permissions, loading, logout } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const locale = (params?.locale as string) || "ar";
@@ -50,6 +51,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       },
       menu: {
         dashboard: "لوحة التحكم",
+        employees: "الموظفين",
         users: "المستخدمين",
         courses: "المقررات",
         sections: "الشعب الدراسية",
@@ -59,6 +61,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         gradebook: "سجل الدرجات",
         payments: "المدفوعات",
         expenses: "المصروفات",
+        revenue: "الإيرادات",
         teacherWallet: "محفظة المعلم",
         dailyClosures: "الإغلاق اليومي",
         pos: "نقطة البيع",
@@ -80,6 +83,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       },
       menu: {
         dashboard: "Dashboard",
+        employees: "Employees",
         users: "User Management",
         courses: "Courses",
         sections: "Course Sections",
@@ -89,6 +93,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         gradebook: "Gradebook",
         payments: "Payments",
         expenses: "Expenses",
+        revenue: "Revenue",
         teacherWallet: "Teacher Wallet",
         dailyClosures: "Daily Closures",
         pos: "Point of Sale",
@@ -129,111 +134,61 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     return null;
   }
 
-  // Sidebar navigation items based on User Role
-  const navigationItems = [
-    {
-      name: t.menu.dashboard,
-      href: `/${locale}/dashboard`,
-      icon: Activity,
-      roles: ["superadmin", "manager", "secretary", "teacher"]
-    },
-    {
-      name: t.menu.users,
-      href: `/${locale}/dashboard/users`,
-      icon: Users,
-      roles: ["superadmin", "manager"]
-    },
-    {
-      name: t.menu.courses,
-      href: `/${locale}/dashboard/courses`,
-      icon: BookOpen,
-      roles: ["superadmin", "manager", "secretary", "teacher"]
-    },
-    {
-      name: t.menu.sections,
-      href: `/${locale}/dashboard/sections`,
-      icon: BookMarked,
-      roles: ["superadmin", "manager", "secretary", "teacher"]
-    },
-    {
-      name: t.menu.students,
-      href: `/${locale}/dashboard/students`,
-      icon: GraduationCap,
-      roles: ["superadmin", "manager", "secretary"]
-    },
-    {
-      name: t.menu.enrollments,
-      href: `/${locale}/dashboard/enrollments`,
-      icon: ClipboardList,
-      roles: ["superadmin", "manager", "secretary", "teacher"]
-    },
-    {
-      name: t.menu.attendance,
-      href: `/${locale}/dashboard/attendance`,
-      icon: ClipboardCheck,
-      roles: ["superadmin", "manager", "secretary", "teacher"]
-    },
-    {
-      name: t.menu.gradebook,
-      href: `/${locale}/dashboard/gradebook`,
-      icon: Award,
-      roles: ["superadmin", "manager", "secretary", "teacher"]
-    },
-    {
-      name: t.menu.payments,
-      href: `/${locale}/dashboard/payments`,
-      icon: DollarSign,
-      roles: ["superadmin", "manager", "secretary"]
-    },
-    {
-      name: t.menu.expenses,
-      href: `/${locale}/dashboard/expenses`,
-      icon: Wallet,
-      roles: ["superadmin", "manager", "secretary"]
-    },
-    {
-      name: t.menu.teacherWallet,
-      href: `/${locale}/dashboard/teacher-wallet`,
-      icon: CreditCard,
-      roles: ["superadmin", "manager", "teacher"]
-    },
-    {
-      name: t.menu.dailyClosures,
-      href: `/${locale}/dashboard/daily-closures`,
-      icon: Calendar,
-      roles: ["superadmin", "manager", "secretary"]
-    },
-    {
-      name: t.menu.pos,
-      href: `/${locale}/dashboard/pos`,
-      icon: ShoppingCart,
-      roles: ["superadmin", "manager", "secretary"]
-    },
-    {
-      name: t.menu.ingestion,
-      href: `/${locale}/dashboard/ingestion`,
-      icon: FileText,
-      roles: ["superadmin", "teacher"]
-    },
-    {
-      name: t.menu.systemHealth,
-      href: `/${locale}/dashboard/health`,
-      icon: Activity,
-      roles: ["superadmin"]
-    },
-    {
-      name: t.menu.backups,
-      href: `/${locale}/dashboard/backups`,
-      icon: Database,
-      roles: ["superadmin"]
-    },
-    {
-      name: t.menu.settings,
-      href: `/${locale}/dashboard/settings`,
-      icon: Settings,
-      roles: ["superadmin", "manager", "secretary", "teacher"]
+  // Permission to role fallback mapping (when permissions aren't loaded yet)
+  const PAGE_PERMISSION_MAP: Record<string, string[]> = {
+    "page_dashboard": ["superadmin", "manager", "secretary", "teacher"],
+    "page_users": ["superadmin"],
+    "page_employees": ["superadmin", "manager"],
+    "page_roles": ["superadmin"],
+    "page_courses": ["superadmin", "manager", "secretary", "teacher"],
+    "page_sections": ["superadmin", "manager", "secretary", "teacher"],
+    "page_students": ["superadmin", "manager", "secretary"],
+    "page_enrollments": ["superadmin", "manager", "secretary", "teacher"],
+    "page_attendance": ["superadmin", "manager", "secretary", "teacher"],
+    "page_gradebook": ["superadmin", "manager", "secretary", "teacher"],
+    "page_payments": ["superadmin", "manager", "secretary"],
+    "page_expenses": ["superadmin", "manager", "secretary"],
+    "page_revenue": ["superadmin", "manager"],
+    "page_teacher_wallet": ["superadmin", "manager", "teacher"],
+    "page_daily_closures": ["superadmin", "manager", "secretary"],
+    "page_pos": ["superadmin", "manager", "secretary"],
+    "page_ingestion": ["superadmin", "teacher"],
+    "page_health": ["superadmin"],
+    "page_backups": ["superadmin"],
+    "page_settings": ["superadmin", "manager", "secretary", "teacher"],
+  };
+
+  const hasPageAccess = (permissionCodename: string): boolean => {
+    if (user?.is_superadmin) return true;
+    if (permissions.length > 0) {
+      return permissions.includes(permissionCodename);
     }
-  ].filter(item => item.roles.includes(user.role?.name ?? "") || (user.is_superadmin && item.roles.includes("superadmin")));
+    const fallbackRoles = PAGE_PERMISSION_MAP[permissionCodename] || [];
+    return fallbackRoles.includes(user?.role?.name ?? "");
+  };
+
+  const navigationItems = [
+    { name: t.menu.dashboard, href: `/${locale}/dashboard`, icon: Activity, permission: "page_dashboard" },
+    { name: t.menu.users, href: `/${locale}/dashboard/users`, icon: Users, permission: "page_users" },
+    { name: t.menu.employees, href: `/${locale}/dashboard/employees`, icon: Users, permission: "page_employees" },
+    { name: "Roles", href: `/${locale}/dashboard/roles`, icon: ShieldCheck, permission: "page_roles" },
+    { name: t.menu.courses, href: `/${locale}/dashboard/courses`, icon: BookOpen, permission: "page_courses" },
+    { name: t.menu.sections, href: `/${locale}/dashboard/sections`, icon: BookMarked, permission: "page_sections" },
+    { name: t.menu.students, href: `/${locale}/dashboard/students`, icon: GraduationCap, permission: "page_students" },
+    { name: t.menu.enrollments, href: `/${locale}/dashboard/enrollments`, icon: ClipboardList, permission: "page_enrollments" },
+    { name: t.menu.attendance, href: `/${locale}/dashboard/attendance`, icon: ClipboardCheck, permission: "page_attendance" },
+    { name: t.menu.gradebook, href: `/${locale}/dashboard/gradebook`, icon: Award, permission: "page_gradebook" },
+    { name: t.menu.payments, href: `/${locale}/dashboard/payments`, icon: DollarSign, permission: "page_payments" },
+    { name: t.menu.expenses, href: `/${locale}/dashboard/expenses`, icon: Wallet, permission: "page_expenses" },
+    { name: t.menu.revenue, href: `/${locale}/dashboard/revenue`, icon: BarChart3, permission: "page_revenue" },
+    { name: t.menu.teacherWallet, href: `/${locale}/dashboard/teacher-wallet`, icon: CreditCard, permission: "page_teacher_wallet" },
+    { name: t.menu.dailyClosures, href: `/${locale}/dashboard/daily-closures`, icon: Calendar, permission: "page_daily_closures" },
+    { name: t.menu.pos, href: `/${locale}/dashboard/pos`, icon: ShoppingCart, permission: "page_pos" },
+    { name: t.menu.ingestion, href: `/${locale}/dashboard/ingestion`, icon: FileText, permission: "page_ingestion" },
+    { name: t.menu.systemHealth, href: `/${locale}/dashboard/health`, icon: Activity, permission: "page_health" },
+    { name: t.menu.backups, href: `/${locale}/dashboard/backups`, icon: Database, permission: "page_backups" },
+    { name: t.menu.settings, href: `/${locale}/dashboard/settings`, icon: Settings, permission: "page_settings" },
+  ].filter(item => hasPageAccess(item.permission));
 
   const currentRoleLabel = user.is_superadmin
     ? t.roles.superadmin
@@ -328,7 +283,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </header>
 
         {/* Dynamic Route Content */}
-        <main className="flex-1 overflow-y-auto p-4 md:p-6 relative z-0">
+        <main className="flex-1 overflow-y-auto p-4 md:p-6">
           {children}
         </main>
       </div>

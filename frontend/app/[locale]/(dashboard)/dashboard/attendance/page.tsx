@@ -82,12 +82,12 @@ export default function AttendancePage() {
   const fetchData = useCallback(async () => {
     try {
       const [sectRes, courseRes, termRes] = await Promise.all([
-        apiClient.get<CourseSection[]>("/academic/course-sections"),
-        apiClient.get<Course[]>("/academic/courses"),
+        apiClient.get<{ items: CourseSection[]; total: number }>("/academic/course-sections?limit=1000"),
+        apiClient.get<{ items: Course[]; total: number }>("/academic/courses?limit=1000"),
         apiClient.get<Term[]>("/academic/terms"),
       ]);
-      setSections(sectRes.data);
-      setCourses(courseRes.data);
+      setSections(sectRes.data.items);
+      setCourses(courseRes.data.items);
       setTerms(termRes.data);
     } catch (e) {
       console.error(e);
@@ -106,15 +106,15 @@ export default function AttendancePage() {
     (async () => {
       try {
         const [enrRes, sessRes] = await Promise.all([
-          apiClient.get<Enrollment[]>(`/academic/enrollments?section_id=${selectedSectionId}`),
+          apiClient.get<{ items: Enrollment[]; total: number }>(`/academic/enrollments?section_id=${selectedSectionId}&limit=1000`),
           apiClient.get<AttendanceSession[]>(`/lms/attendance/sessions?section_id=${selectedSectionId}`),
         ]);
-        setEnrollments(enrRes.data);
+        setEnrollments(enrRes.data.items);
 
-        const studentIds = enrRes.data.map((e) => e.student_id);
+        const studentIds = enrRes.data.items.map((e) => e.student_id);
         if (studentIds.length > 0) {
-          const studRes = await apiClient.get<Student[]>("/academic/students");
-          setStudents(studRes.data.filter((s) => studentIds.includes(s.id)));
+          const studRes = await apiClient.get<{ items: Student[]; total: number }>("/academic/students?limit=1000").catch(() => null);
+          setStudents(studRes ? studRes.data.items.filter((s) => studentIds.includes(s.id)) : []);
         } else {
           setStudents([]);
         }
