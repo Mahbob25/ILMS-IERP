@@ -11,11 +11,12 @@ export interface Role {
 export interface User {
   id: string;
   email: string;
-  full_name: string;
+  full_name: string | null;
   locale_pref: string;
   is_active: boolean;
   is_superadmin: boolean;
   role: Role;
+  employee_id: string | null;
 }
 
 interface AuthContextType {

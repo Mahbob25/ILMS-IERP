@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import joinedload
 from app.db.session import get_db
-from app.modules.identity.models import User, Role, RefreshToken
+from app.modules.identity.models import User, Role, Employee, RefreshToken
 from app.modules.identity.schemas import (
     UserLogin, UserResponse, UserCreate, UserUpdate,
     TeacherResponse, TeacherDetailResponse,
@@ -78,7 +78,7 @@ async def login(
     response: Response,
     db: AsyncSession = Depends(get_db)
 ):
-    query = select(User).options(joinedload(User.role)).where(User.email == login_data.email)
+    query = select(User).options(joinedload(User.role), joinedload(User.employee)).where(User.email == login_data.email)
     result = await db.execute(query)
     user = result.scalar_one_or_none()
 
@@ -239,7 +239,7 @@ async def auth_me(current_user: User = Depends(get_current_user)):
     return {
         "id": str(current_user.id),
         "email": current_user.email,
-        "full_name": current_user.full_name,
+        "full_name": current_user.employee.full_name if current_user.employee else None,
         "role": current_user.role.name,
         "is_superadmin": current_user.is_superadmin,
     }
@@ -285,12 +285,24 @@ async def create_user(
             detail="Email address already registered"
         )
 
+    if not user_data.employee_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="employee_id is required: every user must be linked to an employee"
+        )
+
+    employee_check = await db.execute(select(Employee).where(Employee.id == user_data.employee_id))
+    if not employee_check.scalar_one_or_none():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Specified employee does not exist"
+        )
+
     hashed_password = get_password_hash(user_data.password)
 
     new_user = User(
         email=user_data.email,
         password_hash=hashed_password,
-        full_name=user_data.full_name,
         role_id=user_data.role_id,
         locale_pref=user_data.locale_pref or "ar",
         employee_id=user_data.employee_id,
@@ -298,7 +310,7 @@ async def create_user(
     db.add(new_user)
     await db.flush()
 
-    query = select(User).options(joinedload(User.role)).where(User.id == new_user.id)
+    query = select(User).options(joinedload(User.role), joinedload(User.employee)).where(User.id == new_user.id)
     res = await db.execute(query)
     created_user = res.scalar_one()
 
@@ -318,14 +330,14 @@ async def list_users(
     current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])),
     db: AsyncSession = Depends(get_db)
 ):
-    query = select(User).options(joinedload(User.role)).join(User.role)
+    query = select(User).options(joinedload(User.role), joinedload(User.employee)).join(User.role)
 
     if role:
         query = query.where(Role.name == role)
     elif current_user.role.name != "superadmin":
         query = query.where(Role.name == "teacher")
 
-    query = query.order_by(User.full_name)
+    query = query.order_by(User.email)
     result = await db.execute(query)
     return result.scalars().all()
 
@@ -566,7 +578,6 @@ async def grant_employee_access(
             employee_id=employee_id,
             email=data.email,
             password=data.password,
-            full_name=data.full_name,
             role_id=data.role_id,
         )
         await identity_service.create_audit_log(

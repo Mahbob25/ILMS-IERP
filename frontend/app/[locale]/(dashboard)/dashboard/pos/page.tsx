@@ -370,7 +370,7 @@ export default function POSPage() {
         <div className="relative">
           <label className="block text-xs font-medium text-slate-700 mb-1.5">{t.student}</label>
           <div className="relative">
-            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <Search size={16} className="absolute start-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               ref={searchRef}
               type="text"
@@ -388,10 +388,10 @@ export default function POSPage() {
               onFocus={() => setShowDropdown(true)}
               onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
               placeholder={t.searchStudent}
-              className="input-field pl-10"
+              className="input-field ps-10"
             />
             {selectedStudent && (
-              <button onClick={handleClear} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+              <button onClick={handleClear} className="absolute end-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
                 <X size={16} />
               </button>
             )}
@@ -405,12 +405,12 @@ export default function POSPage() {
                   <button
                     key={s.id}
                     onMouseDown={() => handleSelectStudent(s)}
-                    className={`w-full text-left px-3 py-2 text-sm hover:bg-slate-50 transition-colors ${
+                    className={`w-full text-start px-3 py-2 text-sm hover:bg-slate-50 transition-colors ${
                       selectedStudent?.id === s.id ? "bg-slate-50 font-medium" : ""
                     }`}
                   >
                     <span className="text-slate-900">{s.full_name}</span>
-                    <span className="text-slate-400 text-xs mr-2">({s.student_code})</span>
+                    <span className="text-slate-400 text-xs ms-2">({s.student_code})</span>
                   </button>
                 ))
               )}
@@ -450,7 +450,7 @@ export default function POSPage() {
                           setAmount(enr.agreed_price ? Math.max(0, enr.agreed_price - (enr.admin_discount || 0)).toString() : "");
                         }
                       }}
-                      className={`w-full text-left p-3 rounded-xl border transition-colors ${
+                      className={`w-full text-start p-3 rounded-xl border transition-colors ${
                         isSelected
                           ? "border-emerald-400 bg-emerald-50"
                           : "border-slate-200 hover:border-slate-300"
@@ -530,7 +530,7 @@ export default function POSPage() {
                 placeholder={t.enterAmount}
                 className="input-field text-lg font-bold"
               />
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">{t.sar}</span>
+              <span className="absolute start-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">{t.sar}</span>
             </div>
           </div>
         )}
@@ -580,7 +580,7 @@ export default function POSPage() {
       <div className="text-center text-xs text-slate-400 space-x-2">
         <kbd className="px-1.5 py-0.5 bg-slate-100 rounded text-slate-500 text-[11px] font-mono">Enter</kbd>
         <span>{isRtl ? "للتسجيل" : "to submit"}</span>
-        <kbd className="px-1.5 py-0.5 bg-slate-100 rounded text-slate-500 text-[11px] font-mono mr-2">Esc</kbd>
+        <kbd className="px-1.5 py-0.5 bg-slate-100 rounded text-slate-500 text-[11px] font-mono ms-2">Esc</kbd>
         <span>{isRtl ? "للحذف" : "to clear"}</span>
       </div>
 

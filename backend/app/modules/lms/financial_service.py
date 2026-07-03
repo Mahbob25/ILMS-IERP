@@ -9,7 +9,7 @@ from sqlalchemy.orm import joinedload
 
 from app.modules.lms.models import Payment, TeacherWallet, Expense, DailyClosure
 from app.modules.academic.models import Course, CourseSection, Enrollment
-from app.modules.identity.models import User, Role, Employee, EmployeeType
+from app.modules.identity.models import Employee, EmployeeType
 
 
 async def get_next_receipt_number(db: AsyncSession, payment_date: date) -> str:
@@ -54,8 +54,9 @@ async def create_payment(
     )
     total_paid_before = float(total_paid_result.scalar() or 0.0)
     agreed_price = enrollment.agreed_price or 0
-    discount = enrollment.admin_discount or 0
-    net_price = agreed_price - discount
+    discount_pct = enrollment.admin_discount or 0
+    discount_amount = agreed_price * discount_pct / 100.0
+    net_price = agreed_price - discount_amount
     if net_price <= 0:
         net_price = max(agreed_price, 1)
     remaining = net_price - total_paid_before
@@ -78,9 +79,7 @@ async def create_payment(
     section = enrollment.section
     teacher_pct = section.teacher_percentage or 0
 
-    gross_teacher_entitlement = agreed_price * teacher_pct / 100.0
-    teacher_share = amount * gross_teacher_entitlement / net_price if net_price > 0 else 0.0
-    teacher_share = min(teacher_share, amount)
+    teacher_share = amount * teacher_pct / 100.0
 
     if teacher_share > 0:
         teacher_id = section.teacher_id
@@ -135,6 +134,18 @@ async def get_teacher_wallet(db: AsyncSession, teacher_id: uuid.UUID) -> Optiona
     return result.scalar_one_or_none()
 
 
+async def get_teacher_withdrawals(db: AsyncSession, employee_id: uuid.UUID) -> list[Expense]:
+    result = await db.execute(
+        select(Expense)
+        .where(
+            Expense.type == "teacher_withdrawal",
+            Expense.recipient_id == employee_id,
+        )
+        .order_by(Expense.date.desc(), Expense.receipt_number.desc())
+    )
+    return result.scalars().all()
+
+
 # ─────────────────────────────────────────────
 # Expenses
 # ─────────────────────────────────────────────
@@ -144,17 +155,15 @@ async def get_eligible_recipients(db: AsyncSession, recipient_type: str) -> list
 
     if recipient_type == "teacher_withdrawal":
         employees_result = await db.execute(
-            select(Employee).options(joinedload(Employee.user))
+            select(Employee)
             .where(Employee.employee_type == EmployeeType.TEACHER, Employee.is_active == True)
         )
-        teachers = employees_result.unique().scalars().all()
+        teachers = employees_result.scalars().all()
 
         result = []
         for emp in teachers:
-            if not emp.user:
-                continue
             wallet_result = await db.execute(
-                select(TeacherWallet).where(TeacherWallet.teacher_id == emp.user.id)
+                select(TeacherWallet).where(TeacherWallet.teacher_id == emp.id)
             )
             wallet = wallet_result.scalar_one_or_none()
             balance = wallet.balance if wallet else 0
@@ -244,23 +253,14 @@ async def create_expense(
             raise ValueError("Recipient not found")
         if not employee.is_active:
             raise ValueError("Recipient is not active")
-
-        linked_user = None
-        if employee.user:
-            linked_user = employee.user
-
         expected_type = EmployeeType.TEACHER if expense_type == "teacher_withdrawal" else EmployeeType.SECRETARY
         if employee.employee_type != expected_type:
             raise ValueError(f"Recipient must be a {expected_type.value}")
-
-        # Auto-fill recipient_name from employee record
         recipient_name = employee.full_name
 
         if expense_type == "teacher_withdrawal":
-            if not linked_user:
-                raise ValueError("Teacher has no linked user account for wallet access")
             wallet_result = await db.execute(
-                select(TeacherWallet).where(TeacherWallet.teacher_id == linked_user.id)
+                select(TeacherWallet).where(TeacherWallet.teacher_id == employee.id)
             )
             wallet = wallet_result.scalar_one_or_none()
             if not wallet or wallet.balance < amount:
@@ -299,21 +299,13 @@ async def create_expense(
 
     # Auto-deduct wallet for teacher withdrawal
     if expense_type == "teacher_withdrawal" and recipient_id:
-        linked_user_id = None
-        emp_result = await db.execute(
-            select(Employee).options(joinedload(Employee.user)).where(Employee.id == recipient_id)
+        wallet_result = await db.execute(
+            select(TeacherWallet).where(TeacherWallet.teacher_id == recipient_id)
         )
-        emp = emp_result.scalar_one_or_none()
-        if emp and emp.user:
-            linked_user_id = emp.user.id
-        if linked_user_id:
-            wallet_result = await db.execute(
-                select(TeacherWallet).where(TeacherWallet.teacher_id == linked_user_id)
-            )
-            wallet = wallet_result.scalar_one_or_none()
-            if wallet:
-                wallet.balance -= amount
-                wallet.last_updated = datetime.now(timezone.utc).replace(tzinfo=None)
+        wallet = wallet_result.scalar_one_or_none()
+        if wallet:
+            wallet.balance -= amount
+            wallet.last_updated = datetime.now(timezone.utc).replace(tzinfo=None)
 
     await db.flush()
     return expense
@@ -531,13 +523,13 @@ async def get_revenue_overview(
     # revenue by teacher
     by_teacher_result = await db.execute(
         text("""
-            SELECT u.full_name AS teacher_name, SUM(p.amount) AS revenue
+            SELECT emp.full_name AS teacher_name, SUM(p.amount) AS revenue
             FROM payments p
             JOIN enrollments e ON p.enrollment_id = e.id
             JOIN course_sections cs ON e.section_id = cs.id
-            JOIN users u ON cs.teacher_id = u.id
+            JOIN employees emp ON cs.teacher_id = emp.id
             WHERE p.date >= :start AND p.date <= :end
-            GROUP BY u.full_name
+            GROUP BY emp.full_name
             ORDER BY revenue DESC
         """),
         {"start": period_start, "end": period_end}
@@ -612,7 +604,8 @@ async def get_student_payment_summary(
 
     agreed_price = enrollment.agreed_price if enrollment else None
     admin_discount = enrollment.admin_discount if enrollment else None
-    net_price = (agreed_price - admin_discount) if (agreed_price is not None and admin_discount is not None) else agreed_price
+    discount_amount = (agreed_price * admin_discount / 100.0) if (agreed_price is not None and admin_discount is not None) else None
+    net_price = (agreed_price - discount_amount) if (agreed_price is not None and discount_amount is not None) else agreed_price
     balance_remaining = (net_price - total_paid) if net_price is not None else None
 
     return {

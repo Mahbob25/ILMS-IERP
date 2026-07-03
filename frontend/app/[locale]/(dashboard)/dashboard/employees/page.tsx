@@ -108,7 +108,7 @@ export default function EmployeesPage() {
   const [grantTarget, setGrantTarget] = useState<Employee | null>(null);
   const [revokeTarget, setRevokeTarget] = useState<Employee | null>(null);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
-  const [grantForm, setGrantForm] = useState({ email: "", password: "", full_name: "", role_id: "" });
+  const [grantForm, setGrantForm] = useState({ email: "", password: "", role_id: "" });
 
   const fetchEmployees = useCallback(async () => {
     setMessage(null);
@@ -207,7 +207,7 @@ export default function EmployeesPage() {
     try {
       await apiClient.post(`/employees/${grantTarget.id}/grant-access`, grantForm);
       setGrantTarget(null);
-      setGrantForm({ email: "", password: "", full_name: "", role_id: "" });
+      setGrantForm({ email: "", password: "", role_id: "" });
       setMessage({ type: "success", text: t.userCreated });
       fetchEmployees();
     } catch (e: any) {
@@ -244,11 +244,11 @@ export default function EmployeesPage() {
         </div>
         <div className="flex items-center gap-2">
           <div className="relative">
-            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <Search size={16} className="absolute start-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text" value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder={t.search} className="input-field pl-9 pr-3 w-48"
+              placeholder={t.search} className="input-field ps-9 pe-3 w-48"
             />
           </div>
           <RefreshButton onRefresh={fetchEmployees} />
@@ -352,7 +352,7 @@ export default function EmployeesPage() {
                   <td>
                     <button
                       onClick={() => router.push(`/${locale}/dashboard/employees/${emp.id}`)}
-                      className="font-medium text-brand-600 hover:text-brand-700 hover:underline text-left flex items-center gap-2"
+                      className="font-medium text-brand-600 hover:text-brand-700 hover:underline text-start flex items-center gap-2"
                     >
                       <Users size={14} className="text-slate-400" />
                       {emp.full_name}
@@ -397,7 +397,7 @@ export default function EmployeesPage() {
                         ) : (
                           <button onClick={() => {
                             setGrantTarget(emp);
-                            setGrantForm({ email: "", password: "", full_name: emp.full_name, role_id: roles.find(r => r.name === "teacher")?.id || "" });
+                            setGrantForm({ email: "", password: "", role_id: roles.find(r => r.name === "teacher")?.id || "" });
                           }} className="btn-icon text-emerald-500" title={t.grantAccess}>
                             <UserCheck size={15} />
                           </button>

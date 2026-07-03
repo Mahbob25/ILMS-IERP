@@ -76,7 +76,7 @@ async def list_course_sections(
 ):
     teacher_id = None
     if current_user.role.name == "teacher":
-        teacher_id = current_user.id
+        teacher_id = current_user.employee_id
     return await academic_service.list_course_sections(
         db, teacher_id=teacher_id, search=search, status=status,
         skip=skip, limit=limit, sort_by=sort_by, sort_order=sort_order
@@ -201,12 +201,12 @@ async def list_enrollments(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    teacher_id = None
+    teacher_employee_id = None
     if current_user.role.name == "teacher":
-        teacher_id = current_user.id
-    if section_id and teacher_id:
+        teacher_employee_id = current_user.employee_id
+    if section_id and teacher_employee_id:
         section = await academic_service.get_course_section(db, section_id)
-        if not section or section.teacher_id != teacher_id:
+        if not section or section.teacher_id != teacher_employee_id:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied to this section's enrollments")
     return await academic_service.list_enrollments(
         db, section_id=section_id, student_id=student_id, search=search,

@@ -227,9 +227,9 @@ export default function CoursesPage() {
             value={search}
             onChange={(e) => handleSearchChange(e.target.value)}
             placeholder={t.search}
-            className="input-field pl-9"
+            className="input-field ps-9"
           />
-          <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg className="absolute start-3 top-1/2 -translate-y-1/2 text-slate-400" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
           </svg>
         </div>
@@ -247,7 +247,7 @@ export default function CoursesPage() {
             : "bg-red-50 text-red-700 border border-red-200"
         }`}>
           {message.text}
-          <button onClick={() => setMessage(null)} className="mr-2 float-end">&times;</button>
+          <button onClick={() => setMessage(null)} className="ms-2 float-end">&times;</button>
         </div>
       )}
 

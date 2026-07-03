@@ -6,7 +6,7 @@ from sqlalchemy.future import select
 from sqlalchemy.orm import joinedload
 from sqlalchemy import func
 from app.modules.identity.models import User, Role, Employee, EmployeeType, Permission, RolePermission, AuditLog
-from app.modules.lms.models import TeacherWallet, AttendanceSession, Grade, Submission
+from app.modules.lms.models import TeacherWallet, AttendanceSession, Assignment, Grade, Submission
 from app.modules.academic.models import CourseSection, Course
 from app.modules.identity.schemas import SectionInfo, RecentActivity
 from app.modules.identity.security import get_password_hash
@@ -31,17 +31,12 @@ async def create_audit_log(
 
 
 async def get_teachers_with_stats(db: AsyncSession) -> list[dict]:
-    role_result = await db.execute(select(Role).where(Role.name == "teacher"))
-    teacher_role = role_result.scalar_one_or_none()
-    if not teacher_role:
-        return []
-
-    users_result = await db.execute(
-        select(User).options(joinedload(User.role)).where(
-            User.role_id == teacher_role.id
-        ).order_by(User.full_name)
+    employees_result = await db.execute(
+        select(Employee).where(
+            Employee.employee_type == EmployeeType.TEACHER
+        ).order_by(Employee.full_name)
     )
-    teachers = users_result.scalars().all()
+    teachers = employees_result.scalars().all()
 
     result = []
     for t in teachers:
@@ -49,36 +44,35 @@ async def get_teachers_with_stats(db: AsyncSession) -> list[dict]:
             select(func.count()).select_from(CourseSection).where(CourseSection.teacher_id == t.id)
         ) or 0
 
-        wallet = await db.scalar(
-            select(TeacherWallet.balance).where(TeacherWallet.teacher_id == t.id)
-        ) or 0.0
+        wallet = await db.execute(
+            select(TeacherWallet).where(TeacherWallet.teacher_id == t.id)
+        )
+        wallet_obj = wallet.scalar_one_or_none()
 
         result.append({
             "id": t.id,
-            "email": t.email,
             "full_name": t.full_name,
-            "locale_pref": t.locale_pref,
+            "employee_type": t.employee_type.value,
             "is_active": t.is_active,
-            "is_superadmin": t.is_superadmin,
-            "role": t.role,
             "sections_count": sections_count,
-            "wallet_balance": float(wallet),
+            "wallet_balance": float(wallet_obj.balance) if wallet_obj else 0.0,
+            "wallet_last_updated": wallet_obj.last_updated.isoformat() if wallet_obj and wallet_obj.last_updated else None,
         })
     return result
 
 
-async def get_teacher_detail(db: AsyncSession, teacher_id: uuid.UUID) -> Optional[dict]:
+async def get_teacher_detail(db: AsyncSession, employee_id: uuid.UUID) -> Optional[dict]:
     result = await db.execute(
-        select(User).options(joinedload(User.role)).where(User.id == teacher_id)
+        select(Employee).options(joinedload(Employee.user)).where(Employee.id == employee_id)
     )
-    teacher = result.scalar_one_or_none()
-    if not teacher:
+    emp = result.scalar_one_or_none()
+    if not emp:
         return None
 
     sections_result = await db.execute(
         select(CourseSection)
         .options(joinedload(CourseSection.course))
-        .where(CourseSection.teacher_id == teacher_id)
+        .where(CourseSection.teacher_id == employee_id)
     )
     sections = sections_result.unique().scalars().all()
 
@@ -88,21 +82,23 @@ async def get_teacher_detail(db: AsyncSession, teacher_id: uuid.UUID) -> Optiona
             course_name=s.course.name,
             enrolled_count=s.enrolled_count,
             capacity=s.capacity,
-            status=s.course.status,
+            status=s.status,
         )
         for s in sections
     ]
 
     section_ids = [s.id for s in sections]
     recent_activity = []
+    user_id = emp.user.id if emp.user else None
 
-    if section_ids:
+    if section_ids and user_id:
         grades_result = await db.execute(
             select(Grade)
             .join(Submission, Grade.submission_id == Submission.id)
-            .join(CourseSection, Submission.assignment_id == CourseSection.id)
+            .join(Assignment, Submission.assignment_id == Assignment.id)
+            .join(CourseSection, Assignment.section_id == CourseSection.id)
             .where(
-                Grade.graded_by == teacher_id,
+                Grade.graded_by == user_id,
                 CourseSection.id.in_(section_ids),
             )
             .order_by(Grade.graded_at.desc())
@@ -118,7 +114,7 @@ async def get_teacher_detail(db: AsyncSession, teacher_id: uuid.UUID) -> Optiona
         sessions_result = await db.execute(
             select(AttendanceSession)
             .where(
-                AttendanceSession.created_by == teacher_id,
+                AttendanceSession.created_by == user_id,
                 AttendanceSession.section_id.in_(section_ids),
             )
             .order_by(AttendanceSession.created_at.desc())
@@ -135,15 +131,15 @@ async def get_teacher_detail(db: AsyncSession, teacher_id: uuid.UUID) -> Optiona
     recent_activity = recent_activity[:10]
 
     wallet_result = await db.execute(
-        select(TeacherWallet.balance).where(TeacherWallet.teacher_id == teacher_id)
+        select(TeacherWallet.balance).where(TeacherWallet.teacher_id == employee_id)
     )
     wallet_balance = float(wallet_result.scalar() or 0.0)
 
     return {
-        "id": teacher.id,
-        "full_name": teacher.full_name,
-        "email": teacher.email,
-        "is_active": teacher.is_active,
+        "id": emp.id,
+        "full_name": emp.full_name,
+        "email": emp.user.email if emp.user else None,
+        "is_active": emp.is_active,
         "wallet_balance": wallet_balance,
         "sections": section_infos,
         "recent_activity": recent_activity,
@@ -152,7 +148,7 @@ async def get_teacher_detail(db: AsyncSession, teacher_id: uuid.UUID) -> Optiona
 
 async def get_user_by_id(db: AsyncSession, user_id: uuid.UUID) -> Optional[User]:
     result = await db.execute(
-        select(User).options(joinedload(User.role)).where(User.id == user_id)
+        select(User).options(joinedload(User.role), joinedload(User.employee)).where(User.id == user_id)
     )
     return result.scalar_one_or_none()
 
@@ -250,7 +246,6 @@ async def get_employee_detail(db: AsyncSession, employee_id: uuid.UUID) -> Optio
         linked_user = {
             "id": user.id,
             "email": user.email,
-            "full_name": user.full_name,
             "role_name": user.role.name,
             "is_active": user.is_active,
             "is_superadmin": user.is_superadmin,
@@ -326,7 +321,6 @@ async def grant_user_access(
     employee_id: uuid.UUID,
     email: str,
     password: str,
-    full_name: str,
     role_id: uuid.UUID,
 ) -> User:
     employee = await get_employee_by_id(db, employee_id)
@@ -341,7 +335,6 @@ async def grant_user_access(
     new_user = User(
         email=email,
         password_hash=hashed_password,
-        full_name=full_name,
         role_id=role_id,
         employee_id=employee_id,
         locale_pref="ar",
@@ -350,7 +343,7 @@ async def grant_user_access(
     await db.flush()
 
     result = await db.execute(
-        select(User).options(joinedload(User.role)).where(User.id == new_user.id)
+        select(User).options(joinedload(User.role), joinedload(User.employee)).where(User.id == user.id)
     )
     return result.scalar_one()
 

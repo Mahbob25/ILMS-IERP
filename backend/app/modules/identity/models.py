@@ -1,11 +1,15 @@
 import uuid
 import enum
 from datetime import date, datetime, timezone
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, TYPE_CHECKING
 from sqlalchemy import String, Boolean, DateTime, Date, Float, Text, ForeignKey, text, Enum as SAEnum
 from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
+
+if TYPE_CHECKING:
+    from app.modules.academic.models import CourseSection
+    from app.modules.lms.models import TeacherWallet, Expense
 
 
 class EmployeeType(str, enum.Enum):
@@ -70,6 +74,9 @@ class Employee(Base):
     )
 
     user: Mapped[Optional["User"]] = relationship(back_populates="employee", uselist=False)
+    sections: Mapped[list["CourseSection"]] = relationship(back_populates="teacher_employee")
+    wallet: Mapped[Optional["TeacherWallet"]] = relationship(back_populates="teacher_employee", uselist=False)
+    expenses: Mapped[list["Expense"]] = relationship(back_populates="recipient_employee")
 
 
 class User(Base):
@@ -83,7 +90,6 @@ class User(Base):
     )
     email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
-    full_name: Mapped[str] = mapped_column(String(255), nullable=False)
     role_id: Mapped[uuid.UUID] = mapped_column(
         PG_UUID(as_uuid=True),
         ForeignKey("roles.id", ondelete="RESTRICT"),
@@ -102,6 +108,10 @@ class User(Base):
     employee: Mapped[Optional[Employee]] = relationship(back_populates="user", uselist=False)
     refresh_tokens: Mapped[list["RefreshToken"]] = relationship(back_populates="user", cascade="all, delete-orphan")
     audit_logs: Mapped[list["AuditLog"]] = relationship(back_populates="user")
+
+    @property
+    def full_name(self) -> Optional[str]:
+        return self.employee.full_name if self.employee else None
 
 
 class RefreshToken(Base):

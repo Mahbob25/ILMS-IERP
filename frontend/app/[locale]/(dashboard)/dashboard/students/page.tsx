@@ -212,9 +212,9 @@ export default function StudentsPage() {
             value={search}
             onChange={(e) => handleSearchChange(e.target.value)}
             placeholder={t.search}
-            className="input-field pl-9"
+            className="input-field ps-9"
           />
-          <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg className="absolute start-3 top-1/2 -translate-y-1/2 text-slate-400" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
           </svg>
         </div>
@@ -279,7 +279,7 @@ export default function StudentsPage() {
                     <td>
                       <button
                         onClick={() => router.push(`/${locale}/dashboard/students/${student.id}`)}
-                        className="font-medium text-brand-600 hover:text-brand-700 hover:underline text-left"
+                        className="font-medium text-brand-600 hover:text-brand-700 hover:underline text-start"
                       >
                         {student.full_name}
                       </button>

@@ -93,7 +93,6 @@ class EmployeeDetailResponse(BaseModel):
 class LinkedUserInfo(BaseModel):
     id: uuid.UUID
     email: EmailStr
-    full_name: str
     role_name: str
     is_active: bool
     is_superadmin: bool
@@ -101,7 +100,6 @@ class LinkedUserInfo(BaseModel):
 class GrantAccessRequest(BaseModel):
     email: EmailStr
     password: str = Field(..., min_length=6)
-    full_name: str
     role_id: uuid.UUID
 
 # --- User Schemas ---
@@ -109,7 +107,7 @@ class GrantAccessRequest(BaseModel):
 class UserResponse(BaseModel):
     id: uuid.UUID
     email: EmailStr
-    full_name: str
+    full_name: Optional[str] = None
     locale_pref: str
     is_active: bool
     is_superadmin: bool
@@ -122,7 +120,6 @@ class UserResponse(BaseModel):
 class UserCreate(BaseModel):
     email: EmailStr
     password: str = Field(..., min_length=6, description="Password must be at least 6 characters")
-    full_name: str
     role_id: uuid.UUID
     locale_pref: Optional[str] = "ar"
     employee_id: Optional[uuid.UUID] = None
@@ -130,7 +127,6 @@ class UserCreate(BaseModel):
 class UserUpdate(BaseModel):
     email: Optional[EmailStr] = None
     password: Optional[str] = Field(None, min_length=6)
-    full_name: Optional[str] = None
     role_id: Optional[uuid.UUID] = None
     locale_pref: Optional[str] = None
     is_active: Optional[bool] = None
@@ -153,14 +149,22 @@ class RecentActivity(BaseModel):
     detail: str
     timestamp: str
 
-class TeacherResponse(UserResponse):
+class TeacherResponse(BaseModel):
+    id: uuid.UUID
+    full_name: str
+    employee_type: str
+    is_active: bool
     sections_count: int = 0
     wallet_balance: float = 0.0
+    wallet_last_updated: Optional[str] = None
+
+    class Config:
+        from_attributes = True
 
 class TeacherDetailResponse(BaseModel):
     id: uuid.UUID
     full_name: str
-    email: EmailStr
+    email: Optional[EmailStr] = None
     is_active: bool
     wallet_balance: float
     sections: list[SectionInfo]

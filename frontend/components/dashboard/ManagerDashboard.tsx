@@ -133,7 +133,7 @@ export default function ManagerDashboard() {
         </div>
         <button
           onClick={() => router.push(`/${locale}/dashboard/revenue`)}
-          className="card p-5 flex items-center gap-4 group hover:ring-2 hover:ring-brand-200 transition-all text-right"
+          className="card p-5 flex items-center gap-4 group hover:ring-2 hover:ring-brand-200 transition-all text-end"
         >
           <div className="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
             <DollarSign size={24} />

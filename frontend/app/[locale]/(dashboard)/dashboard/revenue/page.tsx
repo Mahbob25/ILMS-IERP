@@ -134,23 +134,24 @@ export default function RevenuePage() {
 
   const getDateRange = useCallback(() => {
     const now = new Date();
-    const end = now.toISOString().split("T")[0];
+    const toLocal = (d: Date) => d.toLocaleDateString("sv-SE");
+    const end = toLocal(now);
     let start: string;
     switch (period) {
       case "7d":
-        start = new Date(now.getTime() - 7 * 86400000).toISOString().split("T")[0];
+        start = toLocal(new Date(now.getTime() - 7 * 86400000));
         break;
       case "30d":
-        start = new Date(now.getTime() - 30 * 86400000).toISOString().split("T")[0];
+        start = toLocal(new Date(now.getTime() - 30 * 86400000));
         break;
       case "90d":
-        start = new Date(now.getTime() - 90 * 86400000).toISOString().split("T")[0];
+        start = toLocal(new Date(now.getTime() - 90 * 86400000));
         break;
       case "year":
         start = `${now.getFullYear()}-01-01`;
         break;
       default:
-        start = customFrom || new Date(now.getTime() - 30 * 86400000).toISOString().split("T")[0];
+        start = customFrom || toLocal(new Date(now.getTime() - 30 * 86400000));
     }
     return { start_date: start, end_date: customTo || end };
   }, [period, customFrom, customTo, fetchKey]);
@@ -252,7 +253,7 @@ export default function RevenuePage() {
           </button>
         ))}
         {period === "custom" && (
-          <div className="flex items-center gap-2 mr-2">
+          <div className="flex items-center gap-2 ms-2">
             <input
               type="date"
               value={customFrom}

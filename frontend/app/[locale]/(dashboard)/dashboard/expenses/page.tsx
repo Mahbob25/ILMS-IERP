@@ -339,7 +339,7 @@ export default function ExpensesPage() {
             <div>
               <label className="block text-xs font-medium text-slate-700 mb-1">
                 {t.enterRecipient}
-                {form.type === "secretary_advance" && <span className="text-purple-600 text-[10px] mr-2">({t.remainingStipend})</span>}
+                {form.type === "secretary_advance" && <span className="text-purple-600 text-[10px] ms-2">({t.remainingStipend})</span>}
               </label>
               {form.type === "general_expense" ? (
                 <input type="text" value={form.recipient_name} onChange={(e) => setForm({ ...form, recipient_name: e.target.value })} className="input-field" />

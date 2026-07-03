@@ -215,13 +215,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <button
                   key={item.name}
                   onClick={() => router.push(item.href)}
-                  className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 ${
+                  className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all duration-150 ${
                     isActive
                       ? "bg-brand-50 text-brand-600 border border-brand-100"
-                      : "text-slate-600 hover:text-slate-900 hover:bg-slate-50 border border-transparent"
+                      : "text-slate-700 hover:text-slate-900 hover:bg-slate-50 border border-transparent"
                   }`}
                 >
-                  <Icon size={18} />
+                  <Icon size={20} />
                   <span>{item.name}</span>
                 </button>
               );
@@ -235,8 +235,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <UserIcon size={18} className="text-slate-500" />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-xs font-semibold text-slate-900 truncate">{user.full_name}</p>
-                <p className="text-[10px] text-slate-500 truncate">{user.email}</p>
+                <p className="text-sm font-semibold text-slate-900 truncate">{user.full_name}</p>
+                <p className="text-xs text-slate-500 truncate">{user.email}</p>
               </div>
             </div>
             <button
@@ -274,7 +274,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             {/* Language Switch */}
             <button
               onClick={handleLanguageToggle}
-              className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-900 transition-colors duration-150 py-1.5 px-3 rounded-lg bg-slate-900/60 hover:bg-slate-900 border border-slate-200"
+              className="flex items-center gap-1.5 text-xs text-slate-600 hover:text-slate-900 transition-colors duration-150 py-1.5 px-3 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200"
             >
               <Globe size={13} />
               <span>{t.langToggle}</span>

@@ -165,6 +165,8 @@ class Expense(Base):
     receipt_number: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True)
     type: Mapped[str] = mapped_column(SAEnum('general_expense', 'teacher_withdrawal', 'secretary_advance', name='expensetype'), nullable=False, default="general_expense", server_default="general_expense")
 
+    recipient_employee: Mapped[Optional["Employee"]] = relationship(back_populates="expenses")
+
 
 class TeacherWallet(Base):
     __tablename__ = "teacher_wallets"
@@ -174,13 +176,15 @@ class TeacherWallet(Base):
         server_default="gen_random_uuid()"
     )
     teacher_id: Mapped[uuid.UUID] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, unique=True
+        PG_UUID(as_uuid=True), ForeignKey("employees.id", ondelete="CASCADE"), nullable=False, unique=True
     )
     balance: Mapped[float] = mapped_column(Float, nullable=False, default=0, server_default="0")
     last_updated: Mapped[datetime] = mapped_column(
         DateTime, nullable=False,
         server_default="timezone('utc'::text, now())"
     )
+
+    teacher_employee: Mapped["Employee"] = relationship(back_populates="wallet")
 
 
 class DailyClosure(Base):

@@ -19,7 +19,7 @@ async def teacher_dashboard(
     current_user: User = Depends(RoleChecker(allowed_roles=["teacher"])),
     db: AsyncSession = Depends(get_db),
 ):
-    return await dashboard_service.get_teacher_dashboard(db, current_user.id)
+    return await dashboard_service.get_teacher_dashboard(db, current_user.employee_id)
 
 
 @dashboard_router.get("/secretary", response_model=SecretaryDashboardResponse)

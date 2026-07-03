@@ -34,7 +34,7 @@ export default function EnrollmentsPage() {
       section: "الشعبة",
       enrolledAt: "تاريخ التسجيل",
       price: "السعر",
-      discount: "الخصم",
+      discount: "الخصم (%)",
       actions: "الإجراءات",
       add: "تسجيل طالب",
       delete: "حذف",
@@ -64,7 +64,7 @@ export default function EnrollmentsPage() {
       section: "Section",
       enrolledAt: "Enrolled At",
       price: "Price",
-      discount: "Discount",
+      discount: "Discount (%)",
       actions: "Actions",
       add: "Enroll Student",
       delete: "Delete",
@@ -235,9 +235,9 @@ export default function EnrollmentsPage() {
             value={search}
             onChange={(e) => handleSearchChange(e.target.value)}
             placeholder={t.search}
-            className="input-field pl-9"
+            className="input-field ps-9"
           />
-          <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg className="absolute start-3 top-1/2 -translate-y-1/2 text-slate-400" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
           </svg>
         </div>
@@ -310,11 +310,11 @@ export default function EnrollmentsPage() {
                 <tr key={enrollment.id}>
                   <td className="font-medium text-slate-900">
                     {getStudentName(enrollment.student_id)}
-                    <span className="text-xs text-slate-400 mr-1">({getStudentCode(enrollment.student_id)})</span>
+                    <span className="text-xs text-slate-400 ms-1">({getStudentCode(enrollment.student_id)})</span>
                   </td>
                   <td className="text-slate-600">{getSectionCourse(enrollment.section_id)}</td>
                   <td className="text-slate-600">{enrollment.agreed_price != null ? `${enrollment.agreed_price}` : "—"}</td>
-                  <td className="text-slate-600">{enrollment.admin_discount != null ? `${enrollment.admin_discount}` : "—"}</td>
+                  <td className="text-slate-600">{enrollment.admin_discount != null ? `${enrollment.admin_discount}%` : "—"}</td>
                   <td className="text-slate-500 text-xs">
                     {new Date(enrollment.enrolled_at).toLocaleDateString(locale === "ar" ? "ar-SA" : "en-US")}
                   </td>

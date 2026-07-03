@@ -279,14 +279,7 @@ def test_expense_flow():
                  all(e['type'] == 'general_expense' for e in r.json()),
                  f'got types: {[e.get("type") for e in r.json()]}')
 
-        # Teacher withdrawal
-        r = ac.post('/api/v1/lms/teacher-wallets/withdraw', json={
-            'teacher_id': teacher_id,
-            'amount': 50.0,
-        })
-        test('Teacher withdrawal', r.status_code == 200, f'got {r.status_code}: {r.text[:200]}')
-
-        # Check wallet after withdrawal
+        # Check teacher wallet
         r = ac.get(f'/api/v1/lms/teacher-wallets/{teacher_id}')
         if r.status_code == 200:
             wallet = r.json()

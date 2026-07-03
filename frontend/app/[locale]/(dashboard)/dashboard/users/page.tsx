@@ -19,7 +19,7 @@ interface RoleInfo {
 interface AppUser {
   id: string;
   email: string;
-  full_name: string;
+  full_name: string | null;
   locale_pref: string;
   is_active: boolean;
   is_superadmin: boolean;
@@ -130,7 +130,7 @@ export default function UsersPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState<string>("all");
-  const [form, setForm] = useState({ full_name: "", email: "", password: "", role_id: "", locale_pref: "ar" });
+  const [form, setForm] = useState({ email: "", password: "", role_id: "", locale_pref: "ar" });
   const [toggleTarget, setToggleTarget] = useState<AppUser | null>(null);
   const [toggleAction, setToggleAction] = useState<"deactivate" | "reactivate">("deactivate");
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -168,7 +168,7 @@ export default function UsersPage() {
 
   const filteredUsers = users.filter((u) => {
     const matchesSearch =
-      u.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (u.full_name || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
       u.email.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesRole = roleFilter === "all" || u.role.name === roleFilter;
     return matchesSearch && matchesRole;
@@ -176,7 +176,6 @@ export default function UsersPage() {
 
   const openCreate = () => {
     setForm({
-      full_name: "",
       email: "",
       password: "",
       role_id: roles.find((r) => r.name === "teacher")?.id || roles[0]?.id || "",
@@ -188,7 +187,6 @@ export default function UsersPage() {
 
   const openEdit = (target: AppUser) => {
     setForm({
-      full_name: target.full_name,
       email: target.email,
       password: "",
       role_id: target.role.id,
@@ -202,7 +200,6 @@ export default function UsersPage() {
     try {
       if (editingId) {
         const payload: Record<string, unknown> = {};
-        if (form.full_name) payload.full_name = form.full_name;
         if (form.email) payload.email = form.email;
         if (form.password) payload.password = form.password;
         payload.role_id = form.role_id;
@@ -210,7 +207,6 @@ export default function UsersPage() {
         await apiClient.put(`/users/${editingId}`, payload);
       } else {
         await apiClient.post("/users", {
-          full_name: form.full_name,
           email: form.email,
           password: form.password,
           role_id: form.role_id,
@@ -274,13 +270,13 @@ export default function UsersPage() {
         </div>
         <div className="flex items-center gap-2">
           <div className="relative">
-            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <Search size={16} className="absolute start-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder={t.search}
-              className="input-field pl-9 pr-3 w-56"
+              className="input-field ps-9 pe-3 w-56"
             />
           </div>
           <RefreshButton onRefresh={fetchUsers} />
@@ -342,9 +338,10 @@ export default function UsersPage() {
               <label className="block text-xs font-medium text-slate-700 mb-1">{t.fullName}</label>
               <input
                 type="text"
-                value={form.full_name}
-                onChange={(e) => setForm({ ...form, full_name: e.target.value })}
-                className="input-field"
+                value={editingId ? (users.find(u => u.id === editingId)?.full_name || "") : ""}
+                className="input-field bg-slate-50 text-slate-500"
+                disabled
+                placeholder={t.fullName}
               />
             </div>
             <div>

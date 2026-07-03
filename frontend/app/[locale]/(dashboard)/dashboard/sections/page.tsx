@@ -26,7 +26,7 @@ interface CourseSection {
 }
 
 interface Course { id: string; name: string; code: string; }
-interface User { id: string; full_name: string; email: string; }
+interface Employee { id: string; full_name: string; employee_type: string; }
 interface Student { id: string; student_code: string; full_name: string; }
 
 export default function SectionsPage() {
@@ -142,7 +142,7 @@ export default function SectionsPage() {
 
   const [sections, setSections] = useState<CourseSection[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
-  const [teachers, setTeachers] = useState<User[]>([]);
+  const [teachers, setTeachers] = useState<Employee[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -162,7 +162,7 @@ export default function SectionsPage() {
   const fetchLookups = useCallback(async () => {
     const [coursesRes, teachersRes, studentsRes] = await Promise.all([
       apiClient.get<{ items: Course[]; total: number }>("/academic/courses?limit=1000").catch(() => null),
-      apiClient.get<User[]>("/users?role=teacher").catch(() => null),
+      apiClient.get<Employee[]>("/employees?employee_type=teacher").catch(() => null),
       apiClient.get<{ items: Student[]; total: number }>("/academic/students?limit=1000").catch(() => null),
     ]);
     if (coursesRes) setCourses(coursesRes.data.items);
@@ -383,9 +383,9 @@ export default function SectionsPage() {
             value={search}
             onChange={(e) => handleSearchChange(e.target.value)}
             placeholder={t.search}
-            className="input-field pl-9"
+            className="input-field ps-9"
           />
-          <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg className="absolute start-3 top-1/2 -translate-y-1/2 text-slate-400" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
           </svg>
         </div>
@@ -410,7 +410,7 @@ export default function SectionsPage() {
             : "bg-red-50 text-red-700 border border-red-200"
         }`}>
           {message.text}
-          <button onClick={() => setMessage(null)} className="mr-2 float-end">&times;</button>
+          <button onClick={() => setMessage(null)} className="ms-2 float-end">&times;</button>
         </div>
       )}
 

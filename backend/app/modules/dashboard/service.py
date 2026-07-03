@@ -10,18 +10,18 @@ from app.modules.lms.models import (
     Payment, Expense, TeacherWallet, DailyClosure,
     AttendanceSession, Assignment, Submission, Grade
 )
-from app.modules.identity.models import User, AuditLog
+from app.modules.identity.models import User, Employee, AuditLog
 from app.modules.dashboard.schemas import (
     SectionInfo, TodaySession, RecentPayment,
     DailyTransaction, UnlockRequest, AuditLogEntry,
 )
 
 
-async def get_teacher_dashboard(db: AsyncSession, teacher_id: uuid.UUID) -> dict:
+async def get_teacher_dashboard(db: AsyncSession, employee_id: uuid.UUID) -> dict:
     sections_result = await db.execute(
         select(CourseSection)
         .options(joinedload(CourseSection.course))
-        .where(CourseSection.teacher_id == teacher_id)
+        .where(CourseSection.teacher_id == employee_id)
     )
     sections = sections_result.unique().scalars().all()
 
@@ -36,18 +36,28 @@ async def get_teacher_dashboard(db: AsyncSession, teacher_id: uuid.UUID) -> dict
         for s in sections
     ]
 
-    today = date.today()
-    sessions_result = await db.execute(
-        select(AttendanceSession)
-        .options(
-            joinedload(AttendanceSession.section).joinedload(CourseSection.course)
-        )
-        .where(
-            AttendanceSession.date == today,
-            AttendanceSession.created_by == teacher_id,
-        )
+    section_ids = [s.id for s in sections]
+
+    emp_result = await db.execute(
+        select(Employee).options(joinedload(Employee.user)).where(Employee.id == employee_id)
     )
-    today_sessions = sessions_result.unique().scalars().all()
+    emp = emp_result.scalar_one_or_none()
+    user_id = emp.user.id if emp and emp.user else None
+
+    today = date.today()
+    today_sessions = []
+    if user_id:
+        sessions_result = await db.execute(
+            select(AttendanceSession)
+            .options(
+                joinedload(AttendanceSession.section).joinedload(CourseSection.course)
+            )
+            .where(
+                AttendanceSession.date == today,
+                AttendanceSession.created_by == user_id,
+            )
+        )
+        today_sessions = sessions_result.unique().scalars().all()
 
     today_sessions_data = [
         TodaySession(
@@ -60,7 +70,6 @@ async def get_teacher_dashboard(db: AsyncSession, teacher_id: uuid.UUID) -> dict
     ]
 
     pending_grading = 0
-    section_ids = [s.id for s in sections]
     if section_ids:
         grading_result = await db.execute(
             select(func.count())
@@ -75,7 +84,7 @@ async def get_teacher_dashboard(db: AsyncSession, teacher_id: uuid.UUID) -> dict
         pending_grading = grading_result.scalar() or 0
 
     wallet_result = await db.execute(
-        select(TeacherWallet).where(TeacherWallet.teacher_id == teacher_id)
+        select(TeacherWallet).where(TeacherWallet.teacher_id == employee_id)
     )
     wallet = wallet_result.scalar_one_or_none()
     wallet_balance = wallet.balance if wallet else 0.0
@@ -84,7 +93,7 @@ async def get_teacher_dashboard(db: AsyncSession, teacher_id: uuid.UUID) -> dict
         select(Payment)
         .join(Enrollment, Payment.enrollment_id == Enrollment.id)
         .join(CourseSection, Enrollment.section_id == CourseSection.id)
-        .where(CourseSection.teacher_id == teacher_id)
+        .where(CourseSection.teacher_id == employee_id)
         .order_by(Payment.date.desc())
         .limit(5)
     )
@@ -218,9 +227,8 @@ async def get_manager_dashboard(db: AsyncSession) -> dict:
 
     teachers_result = await db.execute(
         select(func.count())
-        .select_from(User)
-        .join(User.role)
-        .where(User.role.has(name="teacher"))
+        .select_from(Employee)
+        .where(Employee.employee_type == "teacher")
     )
     total_teachers = teachers_result.scalar() or 0
 
@@ -289,7 +297,7 @@ async def get_superadmin_dashboard(db: AsyncSession) -> dict:
 
     audit_result = await db.execute(
         select(AuditLog)
-        .options(joinedload(AuditLog.user))
+        .options(joinedload(AuditLog.user).joinedload(User.employee))
         .order_by(AuditLog.timestamp.desc())
         .limit(10)
     )
@@ -297,7 +305,7 @@ async def get_superadmin_dashboard(db: AsyncSession) -> dict:
     for log in audit_result.unique().scalars().all():
         audit_logs.append(AuditLogEntry(
             id=log.id,
-            user_name=log.user.full_name if log.user else None,
+            user_name=log.user.employee.full_name if log.user and log.user.employee else None,
             action=log.action,
             timestamp=log.timestamp,
         ))

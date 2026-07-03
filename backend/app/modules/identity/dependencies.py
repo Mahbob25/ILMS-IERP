@@ -43,7 +43,7 @@ async def get_current_user(
             detail="Invalid token"
         )
 
-    query = select(User).options(joinedload(User.role)).where(User.id == user_id_str, User.is_active == True)
+    query = select(User).options(joinedload(User.role), joinedload(User.employee)).where(User.id == user_id_str, User.is_active == True)
     result = await db.execute(query)
     user = result.scalar_one_or_none()
 

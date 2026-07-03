@@ -23,7 +23,7 @@
     @apply bg-slate-50 border-b border-slate-200;
   }
   .data-table thead th {
-    @apply px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider;
+    @apply px-4 py-3 text-start text-xs font-semibold text-slate-500 uppercase tracking-wider;
   }
   .data-table tbody tr {
     @apply border-b border-slate-100 hover:bg-slate-50/50 transition-colors;

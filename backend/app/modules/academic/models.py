@@ -1,10 +1,13 @@
 import uuid
 from datetime import date, datetime, time
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 from sqlalchemy import String, Integer, Float, Date, DateTime, Time, ForeignKey, Text, Enum as SAEnum, UniqueConstraint, CheckConstraint
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
+
+if TYPE_CHECKING:
+    from app.modules.identity.models import Employee
 
 
 class Course(Base):
@@ -37,7 +40,7 @@ class CourseSection(Base):
         PG_UUID(as_uuid=True), ForeignKey("courses.id", ondelete="CASCADE"), nullable=False
     )
     teacher_id: Mapped[uuid.UUID] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
+        PG_UUID(as_uuid=True), ForeignKey("employees.id", ondelete="RESTRICT"), nullable=False
     )
     capacity: Mapped[int] = mapped_column(Integer, default=30, server_default="30")
     enrolled_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
@@ -52,6 +55,7 @@ class CourseSection(Base):
     price: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
 
     course: Mapped[Course] = relationship(back_populates="sections")
+    teacher_employee: Mapped["Employee"] = relationship(back_populates="sections")
     enrollments: Mapped[list["Enrollment"]] = relationship(back_populates="section", cascade="all, delete-orphan")
     attendance_sessions: Mapped[list["AttendanceSession"]] = relationship(back_populates="section", cascade="all, delete-orphan")
     assignments: Mapped[list["Assignment"]] = relationship(back_populates="section", cascade="all, delete-orphan")

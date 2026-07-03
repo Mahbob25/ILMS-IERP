@@ -35,7 +35,7 @@ async def create_attendance_session(
     section = await get_course_section(db, data.section_id)
     if not section:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Section not found")
-    if current_user.role.name == "teacher" and section.teacher_id != current_user.id:
+    if current_user.role.name == "teacher" and section.teacher_id != current_user.employee_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not your section")
     return await lms_service.create_attendance_session(db, data.section_id, data.date, current_user.id)
 
@@ -48,7 +48,7 @@ async def list_attendance_sessions(
     if current_user.role.name == "teacher":
         if section_id:
             section = await get_course_section(db, section_id)
-            if not section or section.teacher_id != current_user.id:
+            if not section or section.teacher_id != current_user.employee_id:
                 raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not your section")
     return await lms_service.list_attendance_sessions(db, section_id=section_id)
 
@@ -97,7 +97,7 @@ async def create_assignment(
     section = await get_course_section(db, data.section_id)
     if not section:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Section not found")
-    if current_user.role.name == "teacher" and section.teacher_id != current_user.id:
+    if current_user.role.name == "teacher" and section.teacher_id != current_user.employee_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not your section")
     return await lms_service.create_assignment(db, data.model_dump())
 
@@ -234,16 +234,27 @@ async def get_revenue_overview(
 
 
 # --- Teacher Wallets ---
-@lms_router.get("/teacher-wallets/{teacher_id}", response_model=TeacherWalletResponse)
+@lms_router.get("/teacher-wallets/{employee_id}", response_model=TeacherWalletResponse)
 async def get_teacher_wallet(
-    teacher_id: uuid.UUID,
+    employee_id: uuid.UUID,
     current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary", "teacher"])),
     db: AsyncSession = Depends(get_db)
 ):
-    wallet = await financial_service.get_teacher_wallet(db, teacher_id)
+    wallet = await financial_service.get_teacher_wallet(db, employee_id)
     if not wallet:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Teacher wallet not found")
     return wallet
+
+
+@lms_router.get("/teacher-wallets/{employee_id}/withdrawals", response_model=list[ExpenseResponse])
+async def get_teacher_withdrawals(
+    employee_id: uuid.UUID,
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary", "teacher"])),
+    db: AsyncSession = Depends(get_db)
+):
+    if current_user.role and current_user.role.name == "teacher" and current_user.employee_id != employee_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cannot view other teachers' withdrawals")
+    return await financial_service.get_teacher_withdrawals(db, employee_id)
 
 
 # --- Expenses ---
