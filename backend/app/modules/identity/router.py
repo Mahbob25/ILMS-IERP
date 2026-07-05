@@ -31,6 +31,7 @@ from app.modules.identity.dependencies import (
     PermissionChecker, VALID_SYSTEM_ROLES
 )
 from app.modules.identity import service as identity_service
+from app.core.rate_limit import limiter
 
 auth_router = APIRouter(prefix="/auth", tags=["auth"])
 users_router = APIRouter(prefix="/users", tags=["users"])
@@ -72,6 +73,7 @@ def _clear_auth_cookies(response: Response) -> None:
 # --- Auth Endpoints ---
 
 @auth_router.post("/login", response_model=UserResponse)
+@limiter.limit("3/minute")
 async def login(
     login_data: UserLogin,
     request: Request,
@@ -82,7 +84,17 @@ async def login(
     result = await db.execute(query)
     user = result.scalar_one_or_none()
 
+    if user and user.locked_until and user.locked_until.replace(tzinfo=timezone.utc) > datetime.now(timezone.utc):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid email or password"
+        )
+
     if not user or not verify_password(login_data.password, user.password_hash):
+        if user:
+            user.failed_login_attempts += 1
+            if user.failed_login_attempts >= 5:
+                user.locked_until = (datetime.now(timezone.utc) + timedelta(minutes=15)).replace(tzinfo=None)
         await identity_service.create_audit_log(
             db=db,
             action="LOGIN_FAILED",
@@ -93,6 +105,9 @@ async def login(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password"
         )
+
+    user.failed_login_attempts = 0
+    user.locked_until = None
 
     if not user.is_active:
         raise HTTPException(
@@ -132,6 +147,7 @@ async def login(
 
 
 @auth_router.post("/refresh")
+@limiter.limit("10/minute")
 async def refresh_token(
     request: Request,
     response: Response,
@@ -256,8 +272,10 @@ async def auth_me_permissions(
 # --- User CRUD Endpoints ---
 
 @users_router.post("", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+@limiter.limit("10/minute")
 async def create_user(
     user_data: UserCreate,
+    request: Request,
     current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager"])),
     db: AsyncSession = Depends(get_db)
 ):
@@ -614,7 +632,7 @@ permissions_router = APIRouter(prefix="/permissions", tags=["permissions"])
 
 @permissions_router.get("", response_model=List[PermissionResponse])
 async def list_permissions(
-    current_user: User = Depends(superadmin_gate),
+    current_user: User = Depends(PermissionChecker("page_roles")),
     db: AsyncSession = Depends(get_db)
 ):
     return await identity_service.get_all_permissions(db)
@@ -623,7 +641,7 @@ async def list_permissions(
 @permissions_router.get("/roles/{role_id}", response_model=RolePermissionsResponse)
 async def get_role_permissions(
     role_id: uuid.UUID,
-    current_user: User = Depends(superadmin_gate),
+    current_user: User = Depends(PermissionChecker("page_roles")),
     db: AsyncSession = Depends(get_db)
 ):
     codenames = await identity_service.get_role_permissions(db, role_id)
@@ -634,7 +652,7 @@ async def get_role_permissions(
 async def set_role_permissions(
     role_id: uuid.UUID,
     data: RolePermissionsUpdate,
-    current_user: User = Depends(superadmin_gate),
+    current_user: User = Depends(PermissionChecker("page_roles")),
     db: AsyncSession = Depends(get_db)
 ):
     try:

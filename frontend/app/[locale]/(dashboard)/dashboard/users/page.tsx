@@ -6,6 +6,8 @@ import { apiClient } from "@/lib/api";
 import { useAuth } from "@/components/AuthContext";
 import RefreshButton from "@/components/RefreshButton";
 import ConfirmModal from "@/components/ConfirmModal";
+import Modal from "@/components/Modal";
+import Select from "@/components/ui/Select";
 import {
   Plus, Pencil, Trash2, Loader2, Search, Shield,
   UserCog, UserCheck, User, Users as UsersIcon,
@@ -328,12 +330,9 @@ export default function UsersPage() {
         </div>
       )}
 
-      {showForm && (
-        <div className="card p-5 space-y-4">
-          <h3 className="text-sm font-bold text-slate-900">
-            {editingId ? t.editTitle : t.createTitle}
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <Modal open={showForm} onClose={() => setShowForm(false)} title={editingId ? t.editTitle : t.createTitle} size="xl">
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <div>
               <label className="block text-xs font-medium text-slate-700 mb-1">{t.fullName}</label>
               <input
@@ -365,15 +364,11 @@ export default function UsersPage() {
             </div>
             <div>
               <label className="block text-xs font-medium text-slate-700 mb-1">{t.role}</label>
-              <select
+              <Select
                 value={form.role_id}
-                onChange={(e) => setForm({ ...form, role_id: e.target.value })}
-                className="input-field"
-              >
-                {roleOptions.map((r) => (
-                  <option key={r.id} value={r.id} className="capitalize">{r.name}</option>
-                ))}
-              </select>
+                onChange={(value) => setForm({ ...form, role_id: value })}
+                options={roleOptions.map((r) => ({ value: r.id, label: r.name }))}
+              />
             </div>
           </div>
           <div className="flex gap-3 pt-2">
@@ -381,7 +376,7 @@ export default function UsersPage() {
             <button onClick={() => setShowForm(false)} className="btn-secondary">{t.cancel}</button>
           </div>
         </div>
-      )}
+      </Modal>
 
       {filteredUsers.length === 0 ? (
         <div className="card p-8 text-center text-sm text-slate-500">{t.empty}</div>

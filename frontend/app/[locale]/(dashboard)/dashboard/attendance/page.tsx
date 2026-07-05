@@ -5,11 +5,11 @@ import { useParams } from "next/navigation";
 import { apiClient } from "@/lib/api";
 import { useAuth } from "@/components/AuthContext";
 import RefreshButton from "@/components/RefreshButton";
+import Select from "@/components/ui/Select";
 import { Loader2, Check, X, Clock, AlertCircle } from "lucide-react";
 
-interface CourseSection { id: string; course_id: string; term_id: string; teacher_id: string; }
+interface CourseSection { id: string; course_id: string; teacher_id: string; }
 interface Course { id: string; name: string; code: string; }
-interface Term { id: string; name: string; }
 interface Student { id: string; student_code: string; full_name: string; }
 interface Enrollment { id: string; student_id: string; section_id: string; }
 interface AttendanceSession { id: string; section_id: string; date: string; }
@@ -68,7 +68,6 @@ export default function AttendancePage() {
 
   const [sections, setSections] = useState<CourseSection[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
-  const [terms, setTerms] = useState<Term[]>([]);
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [selectedSectionId, setSelectedSectionId] = useState("");
@@ -81,14 +80,12 @@ export default function AttendancePage() {
 
   const fetchData = useCallback(async () => {
     try {
-      const [sectRes, courseRes, termRes] = await Promise.all([
+      const [sectRes, courseRes] = await Promise.all([
         apiClient.get<{ items: CourseSection[]; total: number }>("/academic/course-sections?limit=1000"),
         apiClient.get<{ items: Course[]; total: number }>("/academic/courses?limit=1000"),
-        apiClient.get<Term[]>("/academic/terms"),
       ]);
       setSections(sectRes.data.items);
       setCourses(courseRes.data.items);
-      setTerms(termRes.data);
     } catch (e) {
       console.error(e);
     } finally {
@@ -99,7 +96,6 @@ export default function AttendancePage() {
   useEffect(() => { fetchData(); }, [fetchData]);
 
   const getCourseName = (id: string) => courses.find((c) => c.id === id)?.name || id;
-  const getTermName = (id: string) => terms.find((t) => t.id === id)?.name || "";
 
   useEffect(() => {
     if (!selectedSectionId) return;
@@ -198,14 +194,12 @@ export default function AttendancePage() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label className="block text-xs font-medium text-slate-700 mb-1">{t.selectSection}</label>
-            <select value={selectedSectionId} onChange={(e) => setSelectedSectionId(e.target.value)} className="input-field">
-              <option value="">--</option>
-              {sections.map((sec) => (
-                <option key={sec.id} value={sec.id}>
-                  {getCourseName(sec.course_id)} - {getTermName(sec.term_id)}
-                </option>
-              ))}
-            </select>
+            <Select
+              value={selectedSectionId}
+              onChange={setSelectedSectionId}
+              options={sections.map((sec) => ({ value: sec.id, label: getCourseName(sec.course_id) }))}
+              placeholder="--"
+            />
           </div>
           <div>
             <label className="block text-xs font-medium text-slate-700 mb-1">{t.date}</label>

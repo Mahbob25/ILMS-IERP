@@ -323,6 +323,17 @@ async def grant_user_access(
     password: str,
     role_id: uuid.UUID,
 ) -> User:
+    if len(password) < 8:
+        raise ValueError("Password must be at least 8 characters")
+    if not any(c.islower() for c in password):
+        raise ValueError("Password must contain at least one lowercase letter")
+    if not any(c.isupper() for c in password):
+        raise ValueError("Password must contain at least one uppercase letter")
+    if not any(c.isdigit() for c in password):
+        raise ValueError("Password must contain at least one digit")
+    if not any(c in "!@#$%^&*()_+-=[]{}|;':\",./<>?" for c in password):
+        raise ValueError("Password must contain at least one special character")
+
     employee = await get_employee_by_id(db, employee_id)
     if not employee:
         raise ValueError("Employee not found")
@@ -343,7 +354,7 @@ async def grant_user_access(
     await db.flush()
 
     result = await db.execute(
-        select(User).options(joinedload(User.role), joinedload(User.employee)).where(User.id == user.id)
+        select(User).options(joinedload(User.role), joinedload(User.employee)).where(User.id == new_user.id)
     )
     return result.scalar_one()
 

@@ -1,10 +1,12 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useParams } from "next/navigation";
 import { apiClient } from "@/lib/api";
 import { useAuth } from "@/components/AuthContext";
 import ConfirmModal from "@/components/ConfirmModal";
+import Modal from "@/components/Modal";
+import Select from "@/components/ui/Select";
 import { Plus, Trash2, Loader2, RefreshCw } from "lucide-react";
 
 interface Enrollment {
@@ -56,6 +58,14 @@ export default function EnrollmentsPage() {
       prev: "السابق",
       next: "التالي",
       refresh: "تحديث",
+      searchStudent: "ابحث عن طالب بالاسم أو الرقم...",
+      newStudent: "طالب جديد",
+      orNewStudent: "+ إضافة طالب جديد",
+      studentCodeLabel: "رقم الطالب",
+      fullNameLabel: "الاسم الكامل",
+      emailLabel: "البريد الإلكتروني",
+      noResults: "لا توجد نتائج",
+      createStudentTitle: "إضافة طالب جديد",
     },
     en: {
       title: "Enrollments",
@@ -86,6 +96,14 @@ export default function EnrollmentsPage() {
       prev: "Previous",
       next: "Next",
       refresh: "Refresh",
+      searchStudent: "Search student by name or code...",
+      newStudent: "New Student",
+      orNewStudent: "+ Add new student",
+      studentCodeLabel: "Student Code",
+      fullNameLabel: "Full Name",
+      emailLabel: "Email",
+      noResults: "No results",
+      createStudentTitle: "Add New Student",
     },
   }[locale === "en" ? "en" : "ar"];
 
@@ -94,8 +112,13 @@ export default function EnrollmentsPage() {
   const [sections, setSections] = useState<CourseSection[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
+  const [showEnrollModal, setShowEnrollModal] = useState(false);
+  const [showCreateStudentModal, setShowCreateStudentModal] = useState(false);
   const [form, setForm] = useState({ student_id: "", section_id: "", admin_discount: "" });
+  const [createStudentForm, setCreateStudentForm] = useState({ student_code: "", full_name: "", email: "" });
+  const [studentSearch, setStudentSearch] = useState("");
+  const [showStudentDropdown, setShowStudentDropdown] = useState(false);
+  const [studentSearchResults, setStudentSearchResults] = useState<Student[]>([]);
   const [deleteTarget, setDeleteTarget] = useState<Enrollment | null>(null);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [search, setSearch] = useState("");
@@ -144,10 +167,13 @@ export default function EnrollmentsPage() {
     setLoading(true);
     fetchLookups();
     fetchEnrollments();
-    return () => { if (searchTimeout) clearTimeout(searchTimeout); };
+    return () => {
+      if (searchTimeout) clearTimeout(searchTimeout);
+      if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    };
   }, []);
 
-  const canEdit = user?.is_superadmin || user?.role?.name === "manager" || user?.role?.name === "secretary";
+  const canEdit = user?.role?.name === "superadmin" || user?.role?.name === "manager" || user?.role?.name === "secretary";
 
   const getStudentName = (id: string) => students.find((s) => s.id === id)?.full_name || id;
   const getStudentCode = (id: string) => students.find((s) => s.id === id)?.student_code || "";
@@ -165,14 +191,37 @@ export default function EnrollmentsPage() {
     }
   }, [message]);
 
-  const openCreate = () => {
+  const openEnrollModal = () => {
     setMessage(null);
     setForm({ student_id: "", section_id: "", admin_discount: "" });
-    setShowForm(true);
+    setStudentSearch("");
+    setShowStudentDropdown(false);
+    setShowEnrollModal(true);
+  };
+
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleStudentSearch = (query: string) => {
+    setStudentSearch(query);
+    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    if (!query.trim()) {
+      setStudentSearchResults(students);
+      return;
+    }
+    searchTimeoutRef.current = setTimeout(async () => {
+      try {
+        const res = await apiClient.get<{ items: Student[]; total: number }>(
+          `/academic/students?search=${encodeURIComponent(query)}&limit=20`
+        );
+        setStudentSearchResults(res.data.items);
+      } catch {
+        setStudentSearchResults([]);
+      }
+    }, 300);
   };
 
   const handleSave = async () => {
-    if (!form.student_id || !form.section_id) return;
+    if (!form.section_id || !form.student_id) return;
     try {
       const payload: Record<string, unknown> = {
         student_id: form.student_id,
@@ -180,10 +229,33 @@ export default function EnrollmentsPage() {
       };
       if (form.admin_discount) payload.admin_discount = parseFloat(form.admin_discount);
       await apiClient.post("/academic/enrollments", payload);
-      setShowForm(false);
+      setShowEnrollModal(false);
+      fetchLookups();
       fetchEnrollments(search, page);
-    } catch (e) {
-      console.error(e);
+    } catch (e: any) {
+      const detail = e?.response?.data?.detail || e?.message || "Failed to save enrollment";
+      setMessage({ type: "error", text: detail });
+    }
+  };
+
+  const handleCreateStudent = async () => {
+    if (!createStudentForm.student_code || !createStudentForm.full_name) return;
+    try {
+      const payload: Record<string, unknown> = {
+        student_code: createStudentForm.student_code,
+        full_name: createStudentForm.full_name,
+      };
+      if (createStudentForm.email) payload.email = createStudentForm.email;
+      const res = await apiClient.post<Student>("/academic/students", payload);
+      const newStud = res.data;
+      setStudents(prev => [...prev, newStud]);
+      setForm(prev => ({ ...prev, student_id: newStud.id }));
+      setStudentSearch(`${newStud.full_name} (${newStud.student_code})`);
+      setShowCreateStudentModal(false);
+      setCreateStudentForm({ student_code: "", full_name: "", email: "" });
+    } catch (e: any) {
+      const detail = e?.response?.data?.detail || e?.message || "Failed to create student";
+      setMessage({ type: "error", text: detail });
     }
   };
 
@@ -220,7 +292,7 @@ export default function EnrollmentsPage() {
             <RefreshCw size={16} />
           </button>
           {canEdit && (
-            <button onClick={openCreate} className="btn-primary flex items-center gap-2">
+            <button onClick={openEnrollModal} className="btn-primary flex items-center gap-2">
               <Plus size={16} />
               <span>{t.add}</span>
             </button>
@@ -256,26 +328,67 @@ export default function EnrollmentsPage() {
         </div>
       )}
 
-      {showForm && (
-        <div className="card p-5 space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
+      {/* Enrollment Modal */}
+      <Modal open={showEnrollModal} onClose={() => setShowEnrollModal(false)} title={t.add} size="xl">
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="relative">
               <label className="block text-xs font-medium text-slate-700 mb-1">{t.selectStudent}</label>
-              <select value={form.student_id} onChange={(e) => setForm({ ...form, student_id: e.target.value })}
-                className="input-field">
-                <option value="">—</option>
-                {students.map((s) => <option key={s.id} value={s.id}>{s.full_name} ({s.student_code})</option>)}
-              </select>
+              <input
+                type="text"
+                value={studentSearch}
+                onChange={(e) => handleStudentSearch(e.target.value)}
+                onFocus={() => {
+                  setShowStudentDropdown(true);
+                  setStudentSearchResults(students);
+                }}
+                onBlur={() => setTimeout(() => setShowStudentDropdown(false), 200)}
+                placeholder={t.searchStudent}
+                className="input-field"
+              />
+              {showStudentDropdown && (
+                <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                  {studentSearchResults.length === 0 ? (
+                    <div className="px-3 py-2 text-sm text-slate-500">{t.noResults}</div>
+                  ) : (
+                    studentSearchResults.map((s) => (
+                      <button
+                        key={s.id}
+                        type="button"
+                        onClick={() => {
+                          setForm({ ...form, student_id: s.id });
+                          setStudentSearch(`${s.full_name} (${s.student_code})`);
+                          setShowStudentDropdown(false);
+                        }}
+                        className="w-full text-start px-3 py-2 text-sm hover:bg-slate-50"
+                      >
+                        <span className="font-medium">{s.full_name}</span>
+                        <span className="text-slate-400 ms-2">{s.student_code}</span>
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  setShowStudentDropdown(false);
+                  setCreateStudentForm({ student_code: "", full_name: "", email: "" });
+                  setShowCreateStudentModal(true);
+                }}
+                className="mt-1 text-xs text-brand-600 hover:text-brand-700 font-medium"
+              >
+                {t.orNewStudent}
+              </button>
             </div>
             <div>
               <label className="block text-xs font-medium text-slate-700 mb-1">{t.selectSection}</label>
-              <select value={form.section_id} onChange={(e) => setForm({ ...form, section_id: e.target.value })}
-                className="input-field">
-                <option value="">—</option>
-                {sections.map((s) => (
-                  <option key={s.id} value={s.id}>{getSectionCourse(s.id)}</option>
-                ))}
-              </select>
+              <Select
+                value={form.section_id}
+                onChange={(value) => setForm({ ...form, section_id: value })}
+                options={sections.map((s) => ({ value: s.id, label: getSectionCourse(s.id) }))}
+                placeholder="—"
+              />
             </div>
             <div>
               <label className="block text-xs font-medium text-slate-700 mb-1">{t.discount}</label>
@@ -285,10 +398,37 @@ export default function EnrollmentsPage() {
           </div>
           <div className="flex gap-3 pt-2">
             <button onClick={handleSave} className="btn-primary">{t.save}</button>
-            <button onClick={() => setShowForm(false)} className="btn-secondary">{t.cancel}</button>
+            <button onClick={() => setShowEnrollModal(false)} className="btn-secondary">{t.cancel}</button>
           </div>
         </div>
-      )}
+      </Modal>
+
+      {/* Create Student Modal */}
+      <Modal open={showCreateStudentModal} onClose={() => setShowCreateStudentModal(false)} title={t.createStudentTitle} size="xl">
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-xs font-medium text-slate-700 mb-1">{t.studentCodeLabel}</label>
+              <input type="text" value={createStudentForm.student_code} onChange={(e) => setCreateStudentForm({ ...createStudentForm, student_code: e.target.value })}
+                className="input-field" autoFocus />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-700 mb-1">{t.fullNameLabel}</label>
+              <input type="text" value={createStudentForm.full_name} onChange={(e) => setCreateStudentForm({ ...createStudentForm, full_name: e.target.value })}
+                className="input-field" />
+            </div>
+            <div className="md:col-span-2">
+              <label className="block text-xs font-medium text-slate-700 mb-1">{t.emailLabel}</label>
+              <input type="email" value={createStudentForm.email} onChange={(e) => setCreateStudentForm({ ...createStudentForm, email: e.target.value })}
+                className="input-field" />
+            </div>
+          </div>
+          <div className="flex gap-3 pt-2">
+            <button onClick={handleCreateStudent} className="btn-primary">{t.save}</button>
+            <button onClick={() => setShowCreateStudentModal(false)} className="btn-secondary">{t.cancel}</button>
+          </div>
+        </div>
+      </Modal>
 
       {enrollments.length === 0 ? (
         <div className="card p-8 text-center text-sm text-slate-500">{t.empty}</div>

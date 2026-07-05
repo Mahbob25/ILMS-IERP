@@ -1,7 +1,7 @@
 import uuid
 from datetime import date, datetime
 from typing import Optional, TYPE_CHECKING
-from sqlalchemy import String, Integer, Float, Date, DateTime, ForeignKey, Text, Enum as SAEnum, UniqueConstraint
+from sqlalchemy import String, Integer, Float, Date, DateTime, ForeignKey, Text, Enum as SAEnum, UniqueConstraint, Numeric
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
@@ -22,14 +22,14 @@ class AttendanceSession(Base):
         server_default="gen_random_uuid()"
     )
     section_id: Mapped[uuid.UUID] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("course_sections.id", ondelete="CASCADE"), nullable=False
+        PG_UUID(as_uuid=True), ForeignKey("course_sections.id", ondelete="CASCADE"), nullable=False, index=True
     )
     date: Mapped[date] = mapped_column(Date, nullable=False)
     created_by: Mapped[uuid.UUID] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
+        PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), nullable=False, index=True
     )
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, nullable=False,
+        DateTime(timezone=True), nullable=False,
         server_default="timezone('utc'::text, now())"
     )
 
@@ -48,10 +48,10 @@ class AttendanceRecord(Base):
         server_default="gen_random_uuid()"
     )
     session_id: Mapped[uuid.UUID] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("attendance_sessions.id", ondelete="CASCADE"), nullable=False
+        PG_UUID(as_uuid=True), ForeignKey("attendance_sessions.id", ondelete="CASCADE"), nullable=False, index=True
     )
     student_id: Mapped[uuid.UUID] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("students.id", ondelete="CASCADE"), nullable=False
+        PG_UUID(as_uuid=True), ForeignKey("students.id", ondelete="CASCADE"), nullable=False, index=True
     )
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="present", server_default="present")
 
@@ -66,16 +66,17 @@ class Assignment(Base):
         server_default="gen_random_uuid()"
     )
     section_id: Mapped[uuid.UUID] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("course_sections.id", ondelete="CASCADE"), nullable=False
+        PG_UUID(as_uuid=True), ForeignKey("course_sections.id", ondelete="CASCADE"), nullable=False, index=True
     )
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    due_date: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    due_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     max_score: Mapped[int] = mapped_column(Integer, nullable=False, default=100, server_default="100")
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, nullable=False,
+        DateTime(timezone=True), nullable=False,
         server_default="timezone('utc'::text, now())"
     )
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     section: Mapped["CourseSection"] = relationship(back_populates="assignments")
     submissions: Mapped[list["Submission"]] = relationship(back_populates="assignment", cascade="all, delete-orphan")
@@ -92,13 +93,13 @@ class Submission(Base):
         server_default="gen_random_uuid()"
     )
     assignment_id: Mapped[uuid.UUID] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("assignments.id", ondelete="CASCADE"), nullable=False
+        PG_UUID(as_uuid=True), ForeignKey("assignments.id", ondelete="CASCADE"), nullable=False, index=True
     )
     student_id: Mapped[uuid.UUID] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("students.id", ondelete="CASCADE"), nullable=False
+        PG_UUID(as_uuid=True), ForeignKey("students.id", ondelete="CASCADE"), nullable=False, index=True
     )
     submitted_at: Mapped[datetime] = mapped_column(
-        DateTime, nullable=False,
+        DateTime(timezone=True), nullable=False,
         server_default="timezone('utc'::text, now())"
     )
     file_path: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
@@ -118,13 +119,13 @@ class Grade(Base):
     submission_id: Mapped[uuid.UUID] = mapped_column(
         PG_UUID(as_uuid=True), ForeignKey("submissions.id", ondelete="CASCADE"), unique=True, nullable=False
     )
-    score: Mapped[float] = mapped_column(Float, nullable=False)
+    score: Mapped[float] = mapped_column(Numeric(5, 2), nullable=False)
     feedback: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     graded_by: Mapped[uuid.UUID] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
+        PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), nullable=False, index=True
     )
     graded_at: Mapped[datetime] = mapped_column(
-        DateTime, nullable=False,
+        DateTime(timezone=True), nullable=False,
         server_default="timezone('utc'::text, now())"
     )
 
@@ -139,9 +140,9 @@ class Payment(Base):
         server_default="gen_random_uuid()"
     )
     enrollment_id: Mapped[uuid.UUID] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("enrollments.id", ondelete="RESTRICT"), nullable=False
+        PG_UUID(as_uuid=True), ForeignKey("enrollments.id", ondelete="RESTRICT"), nullable=False, index=True
     )
-    amount: Mapped[float] = mapped_column(Float, nullable=False)
+    amount: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
     date: Mapped[date] = mapped_column(Date, nullable=False)
     receipt_number: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True)
 
@@ -155,11 +156,11 @@ class Expense(Base):
         PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4,
         server_default="gen_random_uuid()"
     )
-    amount: Mapped[float] = mapped_column(Float, nullable=False)
+    amount: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     recipient_name: Mapped[str] = mapped_column(String(255), nullable=False)
     recipient_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("employees.id", ondelete="SET NULL"), nullable=True
+        PG_UUID(as_uuid=True), ForeignKey("employees.id", ondelete="SET NULL"), nullable=True, index=True
     )
     date: Mapped[date] = mapped_column(Date, nullable=False)
     receipt_number: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True)
@@ -178,9 +179,9 @@ class TeacherWallet(Base):
     teacher_id: Mapped[uuid.UUID] = mapped_column(
         PG_UUID(as_uuid=True), ForeignKey("employees.id", ondelete="CASCADE"), nullable=False, unique=True
     )
-    balance: Mapped[float] = mapped_column(Float, nullable=False, default=0, server_default="0")
+    balance: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False, default=0, server_default="0")
     last_updated: Mapped[datetime] = mapped_column(
-        DateTime, nullable=False,
+        DateTime(timezone=True), nullable=False,
         server_default="timezone('utc'::text, now())"
     )
 
@@ -193,5 +194,5 @@ class DailyClosure(Base):
     date: Mapped[date] = mapped_column(Date, primary_key=True)
     status: Mapped[str] = mapped_column(SAEnum('closed', 'pending', 'unlock_requested', name='closurystatus'), nullable=False, default="pending", server_default="pending")
     closed_by_manager_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+        PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
     )

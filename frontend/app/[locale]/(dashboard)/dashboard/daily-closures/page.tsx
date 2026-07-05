@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { apiClient } from "@/lib/api";
 import { useAuth } from "@/components/AuthContext";
+import Modal from "@/components/Modal";
 import { Loader2, RefreshCw, Lock, Unlock, Eye, X } from "lucide-react";
 
 interface DailyClosure {
@@ -275,45 +276,35 @@ export default function DailyClosuresPage() {
         </div>
       )}
 
-      {showLedger && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full">
-            <div className="p-6 space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-bold text-slate-900">{t.ledger}</h3>
-                <button onClick={() => setShowLedger(null)} className="btn-icon"><X size={18} /></button>
-              </div>
-              <div className="border-t border-slate-200 pt-4 space-y-3 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-slate-500">{t.date}</span>
-                  <span className="font-medium text-slate-900">{formatDate(showLedger.date)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">{t.status}</span>
-                  <span>{statusBadge(showLedger.status)}</span>
-                </div>
-                <div className="flex justify-between pt-2 border-t border-slate-100">
-                  <span className="text-slate-600">{t.paymentsIn}</span>
-                  <span className="font-semibold text-emerald-600">{showLedger.total_payments_in.toFixed(2)} {t.sar}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-600">{t.expensesOut}</span>
-                  <span className="font-semibold text-red-600">{showLedger.total_expenses_out.toFixed(2)} {t.sar}</span>
-                </div>
-                <div className="flex justify-between pt-2 border-t border-slate-200 text-base">
-                  <span className="font-bold text-slate-900">{t.netCash}</span>
-                  <span className={`font-bold ${showLedger.net_cash_flow >= 0 ? "text-emerald-600" : "text-red-600"}`}>
-                    {showLedger.net_cash_flow.toFixed(2)} {t.sar}
-                  </span>
-                </div>
-              </div>
-            </div>
-            <div className="border-t border-slate-200 p-4 flex justify-end">
-              <button onClick={() => setShowLedger(null)} className="btn-secondary">{t.close}</button>
-            </div>
+      <Modal open={showLedger !== null} onClose={() => setShowLedger(null)} title={t.ledger}>
+        <div className="border-t border-slate-200 pt-4 space-y-3 text-sm">
+          <div className="flex justify-between">
+            <span className="text-slate-500">{t.date}</span>
+            <span className="font-medium text-slate-900">{showLedger ? formatDate(showLedger.date) : ""}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-slate-500">{t.status}</span>
+            <span>{showLedger ? statusBadge(showLedger.status) : null}</span>
+          </div>
+          <div className="flex justify-between pt-2 border-t border-slate-100">
+            <span className="text-slate-600">{t.paymentsIn}</span>
+            <span className="font-semibold text-emerald-600">{showLedger ? `${showLedger.total_payments_in.toFixed(2)} ${t.sar}` : ""}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-slate-600">{t.expensesOut}</span>
+            <span className="font-semibold text-red-600">{showLedger ? `${showLedger.total_expenses_out.toFixed(2)} ${t.sar}` : ""}</span>
+          </div>
+          <div className="flex justify-between pt-2 border-t border-slate-200 text-base">
+            <span className="font-bold text-slate-900">{t.netCash}</span>
+            <span className={`font-bold ${showLedger && showLedger.net_cash_flow >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+              {showLedger ? `${showLedger.net_cash_flow.toFixed(2)} ${t.sar}` : ""}
+            </span>
           </div>
         </div>
-      )}
+        <div className="border-t border-slate-200 flex justify-end pt-4">
+          <button onClick={() => setShowLedger(null)} className="btn-secondary">{t.close}</button>
+        </div>
+      </Modal>
     </div>
   );
 }

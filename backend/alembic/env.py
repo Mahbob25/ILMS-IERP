@@ -11,7 +11,7 @@ from alembic import context
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 
 from app.core.config import settings
-from app.db.base import Base
+from app.db.base import Base, naming_convention
 from app.modules.identity.models import Role, User, RefreshToken, AuditLog, Employee, Permission, RolePermission
 from app.modules.academic.models import Course, CourseSection, Student, Enrollment
 from app.modules.lms.models import AttendanceSession, AttendanceRecord, Assignment, Submission, Grade, Payment, Expense, TeacherWallet, DailyClosure
@@ -38,6 +38,7 @@ def run_migrations_offline() -> None:
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
+        naming_convention=naming_convention,
     )
 
     with context.begin_transaction():
@@ -53,7 +54,8 @@ def run_migrations_online() -> None:
 
     with connectable.connect() as connection:
         context.configure(
-            connection=connection, target_metadata=target_metadata
+            connection=connection, target_metadata=target_metadata,
+            naming_convention=naming_convention,
         )
 
         with context.begin_transaction():

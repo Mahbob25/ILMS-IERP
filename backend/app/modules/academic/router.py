@@ -9,7 +9,7 @@ from app.modules.academic.schemas import (
     CourseCreate, CourseUpdate, CourseResponse,
     CourseSectionCreate, CourseSectionUpdate, CourseSectionResponse, SectionActivate,
     StudentCreate, StudentUpdate, StudentResponse,
-    EnrollmentCreate, EnrollmentResponse,
+    EnrollmentCreate, EnrollmentCreateWithStudent, EnrollmentResponse,
     PaginatedResponse,
 )
 from app.modules.academic import service as academic_service
@@ -220,8 +220,32 @@ async def create_enrollment(
     db: AsyncSession = Depends(get_db)
 ):
     enrollment = await academic_service.create_enrollment(
-        db, data.student_id, data.section_id,
+        db, section_id=data.section_id, student_id=data.student_id,
         admin_discount=data.admin_discount
+    )
+    if enrollment is None:
+        section = await academic_service.get_course_section(db, data.section_id)
+        if not section:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Section not found")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Section is full or enrollment already exists")
+    return enrollment
+
+@academic_router.post("/enrollments/with-student", response_model=EnrollmentResponse, status_code=status.HTTP_201_CREATED)
+async def create_enrollment_with_student(
+    data: EnrollmentCreateWithStudent,
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])),
+    db: AsyncSession = Depends(get_db)
+):
+    student_data = None
+    if not data.student_id and data.student_code and data.full_name:
+        student_data = {
+            "student_code": data.student_code,
+            "full_name": data.full_name,
+            "email": data.email,
+        }
+    enrollment = await academic_service.create_enrollment(
+        db, section_id=data.section_id, student_id=data.student_id,
+        admin_discount=data.admin_discount, student_data=student_data
     )
     if enrollment is None:
         section = await academic_service.get_course_section(db, data.section_id)

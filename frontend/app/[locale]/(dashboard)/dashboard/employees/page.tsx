@@ -6,6 +6,8 @@ import { apiClient } from "@/lib/api";
 import { useAuth } from "@/components/AuthContext";
 import RefreshButton from "@/components/RefreshButton";
 import ConfirmModal from "@/components/ConfirmModal";
+import Modal from "@/components/Modal";
+import Select from "@/components/ui/Select";
 import {
   Plus, Pencil, Trash2, Loader2, Eye, Search, Users, X,
   UserCheck, UserX, Shield,
@@ -71,6 +73,7 @@ export default function EmployeesPage() {
       grantTitle: "منح صلاحية وصول للنظام", revokeConfirm: "هل أنت متأكد من سحب صلاحية الوصول؟",
       email: "البريد الإلكتروني", password: "كلمة المرور", role: "الدور",
       userCreated: "تم إنشاء حساب المستخدم بنجاح",
+      passwordHint: "8 أحرف على الأقل: حرف كبير، حرف صغير، رقم، رمز خاص",
     },
     en: {
       title: "Employee Management", subtitle: "Manage employee records (HR data)",
@@ -89,6 +92,7 @@ export default function EmployeesPage() {
       grantTitle: "Grant System Access", revokeConfirm: "Are you sure you want to revoke system access?",
       email: "Email", password: "Password", role: "Role",
       userCreated: "User account created successfully",
+      passwordHint: "Min 8 chars: uppercase, lowercase, digit, special character",
     },
   }[locale === "en" ? "en" : "ar"];
 
@@ -109,6 +113,7 @@ export default function EmployeesPage() {
   const [revokeTarget, setRevokeTarget] = useState<Employee | null>(null);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [grantForm, setGrantForm] = useState({ email: "", password: "", role_id: "" });
+  const [grantError, setGrantError] = useState<string | null>(null);
 
   const fetchEmployees = useCallback(async () => {
     setMessage(null);
@@ -185,8 +190,9 @@ export default function EmployeesPage() {
       setEditingId(null);
       fetchEmployees();
     } catch (e: any) {
-      const detail = e?.response?.data?.detail || "Error";
-      setMessage({ type: "error", text: detail });
+      const detail = e?.response?.data?.detail;
+      const text = Array.isArray(detail) ? detail.map((d: any) => d.msg).join("; ") : (detail || "Error");
+      setMessage({ type: "error", text });
     }
   };
 
@@ -198,7 +204,9 @@ export default function EmployeesPage() {
       fetchEmployees();
     } catch (e: any) {
       setDeleteTarget(null);
-      setMessage({ type: "error", text: e?.response?.data?.detail || t.deleteFailed });
+      const detail = e?.response?.data?.detail;
+      const text = Array.isArray(detail) ? detail.map((d: any) => d.msg).join("; ") : (detail || t.deleteFailed);
+      setMessage({ type: "error", text });
     }
   };
 
@@ -211,7 +219,21 @@ export default function EmployeesPage() {
       setMessage({ type: "success", text: t.userCreated });
       fetchEmployees();
     } catch (e: any) {
-      setMessage({ type: "error", text: e?.response?.data?.detail || "Error" });
+      const detail = e?.response?.data?.detail;
+      let text = Array.isArray(detail) ? detail.map((d: any) => d.msg).join("; ") : (detail || "Error");
+      if (locale === "ar") {
+        const arMap: Record<string, string> = {
+          "Password must be at least 8 characters": "يجب أن تتكون كلمة المرور من 8 أحرف على الأقل",
+          "Password must contain at least one lowercase letter": "يجب أن تحتوي كلمة المرور على حرف صغير واحد على الأقل",
+          "Password must contain at least one uppercase letter": "يجب أن تحتوي كلمة المرور على حرف كبير واحد على الأقل",
+          "Password must contain at least one digit": "يجب أن تحتوي كلمة المرور على رقم واحد على الأقل",
+          "Password must contain at least one special character": "يجب أن تحتوي كلمة المرور على رمز خاص واحد على الأقل",
+          "Employee not found": "الموظف غير موجود",
+          "Email already registered": "البريد الإلكتروني مسجل بالفعل",
+        };
+        text = arMap[text] || text;
+      }
+      setGrantError(text);
     }
   };
 
@@ -284,23 +306,20 @@ export default function EmployeesPage() {
         </div>
       )}
 
-      {showForm && (
-        <div className="card p-5 space-y-4">
-          <h3 className="text-sm font-bold text-slate-900">
-            {editingId ? t.editTitle : t.createTitle}
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <Modal open={showForm} onClose={() => setShowForm(false)} title={editingId ? t.editTitle : t.createTitle} size="xl">
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div>
               <label className="block text-xs font-medium text-slate-700 mb-1">{t.fullName}</label>
               <input type="text" value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} className="input-field" />
             </div>
             <div>
               <label className="block text-xs font-medium text-slate-700 mb-1">{t.type}</label>
-              <select value={form.employee_type} onChange={(e) => setForm({ ...form, employee_type: e.target.value })} className="input-field">
-                {EMPLOYEE_TYPES.map((type) => (
-                  <option key={type} value={type} className="capitalize">{type}</option>
-                ))}
-              </select>
+              <Select
+                value={form.employee_type}
+                onChange={(value) => setForm({ ...form, employee_type: value })}
+                options={EMPLOYEE_TYPES.map((type) => ({ value: type, label: type }))}
+              />
             </div>
             <div>
               <label className="block text-xs font-medium text-slate-700 mb-1">{t.phone}</label>
@@ -328,7 +347,7 @@ export default function EmployeesPage() {
             <button onClick={() => setShowForm(false)} className="btn-secondary">{t.cancel}</button>
           </div>
         </div>
-      )}
+      </Modal>
 
       {filteredEmployees.length === 0 ? (
         <div className="card p-8 text-center text-sm text-slate-500">{t.empty}</div>
@@ -423,38 +442,37 @@ export default function EmployeesPage() {
         onConfirm={() => deleteTarget && handleDelete(deleteTarget.id)}
         onCancel={() => setDeleteTarget(null)} />
 
-      {/* Grant Access Modal */}
-      {grantTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-sm">
-          <div className="bg-white rounded-xl shadow-xl p-6 w-96 space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-bold text-slate-900">{t.grantTitle}</h3>
-              <button onClick={() => setGrantTarget(null)} className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
+      <Modal open={grantTarget !== null} onClose={() => { setGrantTarget(null); setGrantError(null); }} title={t.grantTitle} size="xl">
+        <div className="space-y-6">
+          <p className="text-xs text-slate-500">{grantTarget?.full_name}</p>
+          {grantError && (
+            <div className="px-4 py-3 rounded-lg text-sm font-medium bg-red-50 text-red-700 border border-red-200">
+              {grantError}
             </div>
-            <p className="text-xs text-slate-500">{grantTarget.full_name}</p>
-            <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">{t.email}</label>
-              <input type="email" value={grantForm.email} onChange={(e) => setGrantForm({ ...grantForm, email: e.target.value })} className="input-field" />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">{t.password}</label>
-              <input type="password" value={grantForm.password} onChange={(e) => setGrantForm({ ...grantForm, password: e.target.value })} className="input-field" />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">{t.role}</label>
-              <select value={grantForm.role_id} onChange={(e) => setGrantForm({ ...grantForm, role_id: e.target.value })} className="input-field">
-                {roles.filter(r => r.name !== "superadmin").map(r => (
-                  <option key={r.id} value={r.id} className="capitalize">{r.name}</option>
-                ))}
-              </select>
-            </div>
-            <div className="flex gap-3 pt-1">
-              <button onClick={handleGrantAccess} className="btn-primary">{t.save}</button>
-              <button onClick={() => setGrantTarget(null)} className="btn-secondary">{t.cancel}</button>
-            </div>
+          )}
+          <div>
+            <label className="block text-xs font-medium text-slate-700 mb-1">{t.email}</label>
+            <input type="email" value={grantForm.email} onChange={(e) => setGrantForm({ ...grantForm, email: e.target.value })} className="input-field" />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-700 mb-1">{t.password}</label>
+            <input type="password" value={grantForm.password} onChange={(e) => setGrantForm({ ...grantForm, password: e.target.value })} className="input-field" />
+            <p className="text-xs text-slate-400 mt-1">{t.passwordHint}</p>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-700 mb-1">{t.role}</label>
+            <Select
+              value={grantForm.role_id}
+              onChange={(value) => setGrantForm({ ...grantForm, role_id: value })}
+              options={roles.filter(r => r.name !== "superadmin").map(r => ({ value: r.id, label: r.name }))}
+            />
+          </div>
+          <div className="flex gap-3 pt-1">
+            <button onClick={handleGrantAccess} className="btn-primary">{t.save}</button>
+            <button onClick={() => { setGrantTarget(null); setGrantError(null); }} className="btn-secondary">{t.cancel}</button>
           </div>
         </div>
-      )}
+      </Modal>
 
       <ConfirmModal open={revokeTarget !== null} title={t.revokeAccess}
         message={revokeTarget ? `${t.revokeConfirm} (${revokeTarget.full_name})` : ""}

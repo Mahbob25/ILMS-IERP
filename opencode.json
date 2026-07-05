@@ -1,0 +1,20 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "model": "anthropic/claude-sonnet-4-5",
+  "small_model": "anthropic/claude-haiku-4-5",
+  "instructions": [
+    ".opencode/instructions/INSTRUCTIONS.md",
+    ".opencode/skills/coding-standards/SKILL.md",
+    ".opencode/skills/backend-patterns/SKILL.md",
+    ".opencode/skills/frontend-patterns/SKILL.md",
+    ".opencode/skills/frontend-slides/SKILL.md",
+    ".opencode/skills/security-review/SKILL.md",
+    ".opencode/skills/tdd-workflow/SKILL.md",
+    ".opencode/skills/strategic-compact/SKILL.md",
+    ".opencode/skills/eval-harness/SKILL.md",
+    ".opencode/skills/verification-loop/SKILL.md",
+    ".opencode/skills/api-design/SKILL.md",
+    ".opencode/skills/e2e-testing/SKILL.md"
+  ],
+  "plugin": ["./.opencode/plugins"]
+}

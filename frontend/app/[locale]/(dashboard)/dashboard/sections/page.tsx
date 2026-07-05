@@ -6,6 +6,8 @@ import { apiClient } from "@/lib/api";
 import { useAuth } from "@/components/AuthContext";
 import RefreshButton from "@/components/RefreshButton";
 import ConfirmModal from "@/components/ConfirmModal";
+import Modal from "@/components/Modal";
+import Select from "@/components/ui/Select";
 import { Plus, Pencil, Trash2, Loader2, Play, CheckCircle2, UserPlus } from "lucide-react";
 
 interface CourseSection {
@@ -389,13 +391,17 @@ export default function SectionsPage() {
             <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
           </svg>
         </div>
-        <select value={statusFilter} onChange={(e) => handleStatusFilterChange(e.target.value)}
-          className="input-field w-44">
-          <option value="">{t.allStatuses}</option>
-          <option value="pending">{t.pending}</option>
-          <option value="active">{t.active}</option>
-          <option value="completed">{t.completed}</option>
-        </select>
+        <Select
+          value={statusFilter}
+          onChange={handleStatusFilterChange}
+          options={[
+            { value: "pending", label: t.pending },
+            { value: "active", label: t.active },
+            { value: "completed", label: t.completed },
+          ]}
+          placeholder={t.allStatuses}
+          className="w-44"
+        />
         {search && (
           <button onClick={() => { setSearch(""); setPage(1); fetchSections("", statusFilter, 1); }} className="text-xs text-slate-500 hover:text-slate-700">
             {t.cancel}
@@ -414,24 +420,26 @@ export default function SectionsPage() {
         </div>
       )}
 
-      {showForm && (
-        <div className="card p-5 space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <Modal open={showForm} onClose={() => setShowForm(false)} title={editingId ? t.edit : t.add} size="xl">
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label className="block text-xs font-medium text-slate-700 mb-1">{t.course}</label>
-              <select value={form.course_id} onChange={(e) => setForm({ ...form, course_id: e.target.value })}
-                className="input-field">
-                <option value="">--</option>
-                {courses.map((c) => <option key={c.id} value={c.id}>{c.name} ({c.code})</option>)}
-              </select>
+              <Select
+                value={form.course_id}
+                onChange={(value) => setForm({ ...form, course_id: value })}
+                options={courses.map((c) => ({ value: c.id, label: `${c.name} (${c.code})` }))}
+                placeholder="--"
+              />
             </div>
             <div>
               <label className="block text-xs font-medium text-slate-700 mb-1">{t.teacher}</label>
-              <select value={form.teacher_id} onChange={(e) => setForm({ ...form, teacher_id: e.target.value })}
-                className="input-field">
-                <option value="">--</option>
-                {teachers.map((u) => <option key={u.id} value={u.id}>{u.full_name}</option>)}
-              </select>
+              <Select
+                value={form.teacher_id}
+                onChange={(value) => setForm({ ...form, teacher_id: value })}
+                options={teachers.map((u) => ({ value: u.id, label: u.full_name }))}
+                placeholder="--"
+              />
             </div>
             <div>
               <label className="block text-xs font-medium text-slate-700 mb-1">{t.capacity}</label>
@@ -479,7 +487,7 @@ export default function SectionsPage() {
             <button onClick={() => setShowForm(false)} className="btn-secondary">{t.cancel}</button>
           </div>
         </div>
-      )}
+      </Modal>
 
       {sections.length === 0 ? (
         <div className="card p-8 text-center text-sm text-slate-500">{t.empty}</div>
@@ -613,45 +621,38 @@ export default function SectionsPage() {
         </div>
       )}
 
-      {showRegister && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
-          <div className="bg-white rounded-xl p-6 w-full max-w-md space-y-4 shadow-xl">
-            <h3 className="text-lg font-bold text-slate-900">{t.registerStudent}</h3>
-            <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">{t.selectStudent}</label>
-              <select
-                value={registerForm.student_id}
-                onChange={(e) => setRegisterForm(prev => ({ ...prev, student_id: e.target.value }))}
-                className="input-field"
-              >
-                <option value="">—</option>
-                {students.map(s => (
-                  <option key={s.id} value={s.id}>{s.full_name} ({s.student_code})</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">Discount</label>
-              <input type="number" value={registerForm.admin_discount}
-                onChange={(e) => setRegisterForm(prev => ({ ...prev, admin_discount: e.target.value }))}
-                className="input-field" min={0} placeholder="0" />
-            </div>
-            {(() => {
-              const sec = sections.find(s => s.id === showRegister);
-              return sec?.price != null ? (
-                <div className="text-sm text-slate-600">
-                  <span className="font-medium">Price: </span>
-                  {sec.price}
-                </div>
-              ) : null;
-            })()}
-            <div className="flex gap-3 pt-2">
-              <button onClick={handleRegister} className="btn-primary">{t.register}</button>
-              <button onClick={() => { setShowRegister(null); }} className="btn-secondary">{t.cancel}</button>
-            </div>
+      <Modal open={showRegister !== null} onClose={() => setShowRegister(null)} title={t.registerStudent} size="xl">
+        <div className="space-y-6">
+          <div>
+            <label className="block text-xs font-medium text-slate-700 mb-1">{t.selectStudent}</label>
+            <Select
+              value={registerForm.student_id}
+              onChange={(value) => setRegisterForm(prev => ({ ...prev, student_id: value }))}
+              options={students.map((s) => ({ value: s.id, label: `${s.full_name} (${s.student_code})` }))}
+              placeholder="—"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-700 mb-1">Discount</label>
+            <input type="number" value={registerForm.admin_discount}
+              onChange={(e) => setRegisterForm(prev => ({ ...prev, admin_discount: e.target.value }))}
+              className="input-field" min={0} placeholder="0" />
+          </div>
+          {(() => {
+            const sec = sections.find(s => s.id === showRegister);
+            return sec?.price != null ? (
+              <div className="text-sm text-slate-600">
+                <span className="font-medium">Price: </span>
+                {sec.price}
+              </div>
+            ) : null;
+          })()}
+          <div className="flex gap-3 pt-2">
+            <button onClick={handleRegister} className="btn-primary">{t.register}</button>
+            <button onClick={() => { setShowRegister(null); }} className="btn-secondary">{t.cancel}</button>
           </div>
         </div>
-      )}
+      </Modal>
 
       <ConfirmModal
         open={deleteTarget !== null}

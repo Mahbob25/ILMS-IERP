@@ -26,7 +26,8 @@ import {
   Wallet,
   CreditCard,
   ShoppingCart,
-  BarChart3
+  BarChart3,
+  AlertCircle
 } from "lucide-react";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -166,6 +167,47 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     const fallbackRoles = PAGE_PERMISSION_MAP[permissionCodename] || [];
     return fallbackRoles.includes(user?.role?.name ?? "");
   };
+
+  // Centralized route-level guard — prevents direct URL access bypassing the sidebar
+  const ROUTE_PERMISSION_MAP: Record<string, string> = {
+    "dashboard": "page_dashboard",
+    "dashboard/users": "page_users",
+    "dashboard/employees": "page_employees",
+    "dashboard/roles": "page_roles",
+    "dashboard/courses": "page_courses",
+    "dashboard/sections": "page_sections",
+    "dashboard/students": "page_students",
+    "dashboard/enrollments": "page_enrollments",
+    "dashboard/attendance": "page_attendance",
+    "dashboard/gradebook": "page_gradebook",
+    "dashboard/payments": "page_payments",
+    "dashboard/expenses": "page_expenses",
+    "dashboard/revenue": "page_revenue",
+    "dashboard/teacher-wallet": "page_teacher_wallet",
+    "dashboard/daily-closures": "page_daily_closures",
+    "dashboard/pos": "page_pos",
+    "dashboard/ingestion": "page_ingestion",
+    "dashboard/health": "page_health",
+    "dashboard/backups": "page_backups",
+    "dashboard/settings": "page_settings",
+  };
+
+  const routeKey = pathname.split("/").slice(2).join("/").replace(/\/$/, "");
+  const matchedRoute = Object.keys(ROUTE_PERMISSION_MAP)
+    .sort((a, b) => b.length - a.length)
+    .find(route => routeKey === route || routeKey.startsWith(route + "/"));
+
+  if (matchedRoute) {
+    const requiredPermission = ROUTE_PERMISSION_MAP[matchedRoute];
+    if (!hasPageAccess(requiredPermission)) {
+      return (
+        <div className="max-w-6xl mx-auto text-center py-20">
+          <AlertCircle className="mx-auto text-red-400 mb-4" size={48} />
+          <p className="text-red-500 font-medium">Access denied</p>
+        </div>
+      );
+    }
+  }
 
   const navigationItems = [
     { name: t.menu.dashboard, href: `/${locale}/dashboard`, icon: Activity, permission: "page_dashboard" },

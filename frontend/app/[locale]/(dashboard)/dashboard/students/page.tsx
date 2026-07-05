@@ -6,6 +6,7 @@ import { apiClient } from "@/lib/api";
 import { useAuth } from "@/components/AuthContext";
 import RefreshButton from "@/components/RefreshButton";
 import ConfirmModal from "@/components/ConfirmModal";
+import Modal from "@/components/Modal";
 import { Plus, Pencil, Trash2, Loader2, Eye } from "lucide-react";
 
 interface Student {
@@ -233,9 +234,9 @@ export default function StudentsPage() {
         </div>
       )}
 
-      {showForm && (
-        <div className="card p-5 space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <Modal open={showForm} onClose={() => setShowForm(false)} title={editingId ? t.edit : t.add} size="xl">
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label className="block text-xs font-medium text-slate-700 mb-1">{t.studentCode}</label>
               <input type="text" value={form.student_code} onChange={(e) => setForm({ ...form, student_code: e.target.value })}
@@ -257,7 +258,7 @@ export default function StudentsPage() {
             <button onClick={() => setShowForm(false)} className="btn-secondary">{t.cancel}</button>
           </div>
         </div>
-      )}
+      </Modal>
 
       {students.length === 0 ? (
         <div className="card p-8 text-center text-sm text-slate-500">{t.empty}</div>

@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { apiClient } from "@/lib/api";
 import { useAuth } from "@/components/AuthContext";
+import Modal from "@/components/Modal";
 import {
   Loader2, RefreshCw, Wallet, ChevronDown, ChevronUp,
   DollarSign, Users, X, Plus,
@@ -554,110 +555,92 @@ function AdminWalletOverview({ locale }: { locale: string }) {
         </div>
       )}
 
-      {/* Process Withdrawal Modal */}
-      {modalTeacher && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-          onClick={closeWithdrawModal}
-          onKeyDown={(e) => e.key === "Escape" && closeWithdrawModal()}
-        >
-          <div
-            className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 p-6"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {modalSuccess ? (
-              <div className="text-center py-6">
-                <div className="w-14 h-14 rounded-full bg-emerald-100 mx-auto flex items-center justify-center mb-3">
-                  <svg className="w-6 h-6 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                  </svg>
-                </div>
-                <p className="text-sm font-semibold text-slate-900">{t.withdrawalSuccess}</p>
-              </div>
-            ) : (
-              <>
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-sm font-bold text-slate-900">{t.processWithdrawal}</h3>
-                  <button onClick={closeWithdrawModal} className="btn-icon" tabIndex={-1}>
-                    <X size={16} />
-                  </button>
-                </div>
-                <p className="text-xs text-slate-500 mb-4">{modalTeacher.full_name}</p>
-
-                <form
-                  onSubmit={(e) => { e.preventDefault(); handleSubmitWithdrawal(); }}
-                  className="space-y-4"
-                >
-                  <div>
-                    <label className="block text-xs font-medium text-slate-700 mb-1.5">{t.withdrawalAmount}</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0.01"
-                      max={modalTeacher.wallet_balance}
-                      value={modalAmount}
-                      onChange={(e) => {
-                        setModalAmount(e.target.value);
-                        const v = parseFloat(e.target.value);
-                        setModalPreviewBalance(isNaN(v) ? null : modalTeacher.wallet_balance - v);
-                      }}
-                      className="input-field"
-                      placeholder="0.00"
-                      autoFocus
-                    />
-                    <div className="flex items-center justify-between mt-1.5">
-                      <p className="text-xs text-slate-400">
-                        {t.balance}: {formatCurrency(modalTeacher.wallet_balance)} {t.sar}
-                      </p>
-                      {modalPreviewBalance !== null && modalPreviewBalance >= 0 && (
-                        <p className="text-xs text-slate-500">
-                          {t.balanceAfter}: {formatCurrency(modalPreviewBalance)} {t.sar}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-700 mb-1.5">{t.withdrawalDesc}</label>
-                    <textarea
-                      value={modalDesc}
-                      onChange={(e) => setModalDesc(e.target.value)}
-                      className="input-field min-h-[60px] resize-none"
-                      rows={2}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-700 mb-1.5">{t.withdrawalDate}</label>
-                    <input
-                      type="date"
-                      value={modalDate}
-                      onChange={(e) => setModalDate(e.target.value)}
-                      className="input-field"
-                    />
-                  </div>
-
-                  {modalError && (
-                    <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{modalError}</p>
-                  )}
-
-                  <div className="flex items-center justify-end gap-2 pt-2">
-                    <button type="button" onClick={closeWithdrawModal} className="btn-secondary text-xs px-4 py-2">
-                      {t.cancel}
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={modalSubmitting}
-                      className="btn-primary text-xs px-4 py-2 flex items-center gap-1"
-                    >
-                      {modalSubmitting && <Loader2 size={12} className="animate-spin" />}
-                      {t.confirm}
-                    </button>
-                  </div>
-                </form>
-              </>
-            )}
+      <Modal open={modalTeacher !== null} onClose={closeWithdrawModal} title={modalSuccess ? t.withdrawalSuccess : t.processWithdrawal}>
+        {modalSuccess ? (
+          <div className="text-center py-6">
+            <div className="w-14 h-14 rounded-full bg-emerald-100 mx-auto flex items-center justify-center mb-3">
+              <svg className="w-6 h-6 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <p className="text-sm font-semibold text-slate-900">{t.withdrawalSuccess}</p>
           </div>
-        </div>
-      )}
+        ) : (
+          <div className="space-y-4">
+            <p className="text-xs text-slate-500">{modalTeacher?.full_name}</p>
+
+            <form
+              onSubmit={(e) => { e.preventDefault(); handleSubmitWithdrawal(); }}
+              className="space-y-4"
+            >
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1.5">{t.withdrawalAmount}</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  max={modalTeacher?.wallet_balance}
+                  value={modalAmount}
+                  onChange={(e) => {
+                    setModalAmount(e.target.value);
+                    const v = parseFloat(e.target.value);
+                    setModalPreviewBalance(isNaN(v) ? null : (modalTeacher ? modalTeacher.wallet_balance - v : null));
+                  }}
+                  className="input-field"
+                  placeholder="0.00"
+                  autoFocus
+                />
+                <div className="flex items-center justify-between mt-1.5">
+                  <p className="text-xs text-slate-400">
+                    {t.balance}: {modalTeacher ? `${formatCurrency(modalTeacher.wallet_balance)} ${t.sar}` : ""}
+                  </p>
+                  {modalPreviewBalance !== null && modalPreviewBalance >= 0 && (
+                    <p className="text-xs text-slate-500">
+                      {t.balanceAfter}: {formatCurrency(modalPreviewBalance)} {t.sar}
+                    </p>
+                  )}
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1.5">{t.withdrawalDesc}</label>
+                <textarea
+                  value={modalDesc}
+                  onChange={(e) => setModalDesc(e.target.value)}
+                  className="input-field min-h-[60px] resize-none"
+                  rows={2}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1.5">{t.withdrawalDate}</label>
+                <input
+                  type="date"
+                  value={modalDate}
+                  onChange={(e) => setModalDate(e.target.value)}
+                  className="input-field"
+                />
+              </div>
+
+              {modalError && (
+                <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{modalError}</p>
+              )}
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button type="button" onClick={closeWithdrawModal} className="btn-secondary text-xs px-4 py-2">
+                  {t.cancel}
+                </button>
+                <button
+                  type="submit"
+                  disabled={modalSubmitting}
+                  className="btn-primary text-xs px-4 py-2 flex items-center gap-1"
+                >
+                  {modalSubmitting && <Loader2 size={12} className="animate-spin" />}
+                  {t.confirm}
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }

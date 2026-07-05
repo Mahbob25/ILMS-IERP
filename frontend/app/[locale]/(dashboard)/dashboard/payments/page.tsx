@@ -4,6 +4,8 @@ import React, { useState, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { apiClient } from "@/lib/api";
 import { useAuth } from "@/components/AuthContext";
+import Modal from "@/components/Modal";
+import Select from "@/components/ui/Select";
 import { Plus, Loader2, RefreshCw, Receipt, X, Eye } from "lucide-react";
 
 interface Payment {
@@ -271,35 +273,31 @@ export default function PaymentsPage() {
         </div>
       </div>
 
-      {showForm && (
-        <div className="card p-5 space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <Modal open={showForm} onClose={() => setShowForm(false)} title={t.add} size="xl">
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label className="block text-xs font-medium text-slate-700 mb-1">{t.selectEnrollment}</label>
-              <select
+              <Select
                 value={form.enrollment_id}
-                onChange={async (e) => {
-                  setForm({ ...form, enrollment_id: e.target.value, amount: "" });
+                onChange={async (value) => {
+                  setForm({ ...form, enrollment_id: value, amount: "" });
                   setSummary(null);
                   setFormError("");
-                  if (!e.target.value) return;
+                  if (!value) return;
                   try {
-                    const res = await apiClient.get<PaymentSummary>(`/lms/payments/summary/${e.target.value}`);
+                    const res = await apiClient.get<PaymentSummary>(`/lms/payments/summary/${value}`);
                     setSummary(res.data);
                     if (res.data.balance_remaining != null) {
-                      setForm(prev => ({ ...prev, enrollment_id: e.target.value, amount: res.data!.balance_remaining!.toString() }));
+                      setForm(prev => ({ ...prev, enrollment_id: value, amount: res.data!.balance_remaining!.toString() }));
                     }
                   } catch {
                     // fallback
                   }
                 }}
-                className="input-field"
-              >
-                <option value="">--</option>
-                {enrollments.map((e) => (
-                  <option key={e.id} value={e.id}>{enrollmentLabel(e.id)}</option>
-                ))}
-              </select>
+                options={enrollments.map((e) => ({ value: e.id, label: enrollmentLabel(e.id) }))}
+                placeholder="--"
+              />
             </div>
             <div>
               <label className="block text-xs font-medium text-slate-700 mb-1">{t.enterAmount}</label>
@@ -345,7 +343,7 @@ export default function PaymentsPage() {
             <button onClick={() => setShowForm(false)} className="btn-secondary">{t.cancel}</button>
           </div>
         </div>
-      )}
+      </Modal>
 
       {payments.length === 0 ? (
         <div className="card p-8 text-center text-sm text-slate-500">{t.empty}</div>
@@ -387,69 +385,51 @@ export default function PaymentsPage() {
         </div>
       )}
 
-      {showReceipt && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6 space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-bold text-slate-900">{t.receiptTitle}</h3>
-                <button onClick={() => setShowReceipt(null)} className="btn-icon">
-                  <X size={18} />
-                </button>
-              </div>
-              <div className="border-t border-slate-200 pt-4 space-y-3 text-sm">
-                <div className="text-center pb-4 border-b border-slate-100">
-                  <h4 className="text-base font-bold text-slate-900">{t.instituteName}</h4>
-                  <p className="text-slate-500 mt-1">{t.receiptTitle}</p>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">{t.receiptNumber}</span>
-                  <span className="font-semibold text-slate-900">{showReceipt.receipt_number}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">{t.date}</span>
-                  <span className="text-slate-900">{formatDate(showReceipt.date)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">{t.student}</span>
-                  <span className="font-medium text-slate-900">
-                    {(() => {
-                      const r = resolveEnrollment(showReceipt.enrollment_id);
-                      return r?.student?.full_name || showReceipt.enrollment_id.slice(0, 8);
-                    })()}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">{t.course}</span>
-                  <span className="text-slate-900">
-                    {(() => {
-                      const r = resolveEnrollment(showReceipt.enrollment_id);
-                      return r?.course?.name || showReceipt.enrollment_id.slice(0, 8);
-                    })()}
-                  </span>
-                </div>
-                <div className="flex justify-between pt-2 border-t border-slate-200 text-base">
-                  <span className="font-bold text-slate-900">{t.paid}</span>
-                  <span className="font-bold text-emerald-600">
-                    {showReceipt.amount.toFixed(2)} {t.sar}
-                  </span>
-                </div>
-                <div className="flex justify-between pt-8 text-xs text-slate-400">
-                  <span>{t.cashier}: _________________</span>
-                  <span>{t.studentSignature}: _________________</span>
-                </div>
-              </div>
-            </div>
-            <div className="border-t border-slate-200 p-4 flex gap-3 justify-end">
-              <button onClick={handlePrint} className="btn-primary flex items-center gap-2">
-                <Receipt size={16} />
-                <span>{t.print}</span>
-              </button>
-              <button onClick={() => setShowReceipt(null)} className="btn-secondary">{t.close}</button>
-            </div>
+      <Modal open={showReceipt !== null} onClose={() => setShowReceipt(null)} title={t.receiptTitle} size="lg">
+        <div className="border-t border-slate-200 pt-4 space-y-3 text-sm">
+          <div className="text-center pb-4 border-b border-slate-100">
+            <h4 className="text-base font-bold text-slate-900">{t.instituteName}</h4>
+            <p className="text-slate-500 mt-1">{t.receiptTitle}</p>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-slate-500">{t.receiptNumber}</span>
+            <span className="font-semibold text-slate-900">{showReceipt?.receipt_number}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-slate-500">{t.date}</span>
+            <span className="text-slate-900">{showReceipt ? formatDate(showReceipt.date) : ""}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-slate-500">{t.student}</span>
+            <span className="font-medium text-slate-900">
+              {showReceipt ? (resolveEnrollment(showReceipt.enrollment_id)?.student?.full_name || showReceipt.enrollment_id.slice(0, 8)) : ""}
+            </span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-slate-500">{t.course}</span>
+            <span className="text-slate-900">
+              {showReceipt ? (resolveEnrollment(showReceipt.enrollment_id)?.course?.name || showReceipt.enrollment_id.slice(0, 8)) : ""}
+            </span>
+          </div>
+          <div className="flex justify-between pt-2 border-t border-slate-200 text-base">
+            <span className="font-bold text-slate-900">{t.paid}</span>
+            <span className="font-bold text-emerald-600">
+              {showReceipt ? `${showReceipt.amount.toFixed(2)} ${t.sar}` : ""}
+            </span>
+          </div>
+          <div className="flex justify-between pt-8 text-xs text-slate-400">
+            <span>{t.cashier}: _________________</span>
+            <span>{t.studentSignature}: _________________</span>
           </div>
         </div>
-      )}
+        <div className="border-t border-slate-200 flex gap-3 justify-end pt-4">
+          <button onClick={handlePrint} className="btn-primary flex items-center gap-2">
+            <Receipt size={16} />
+            <span>{t.print}</span>
+          </button>
+          <button onClick={() => setShowReceipt(null)} className="btn-secondary">{t.close}</button>
+        </div>
+      </Modal>
     </div>
   );
 }

@@ -5,7 +5,9 @@ import { useParams, useRouter } from "next/navigation";
 import { apiClient } from "@/lib/api";
 import { useAuth } from "@/components/AuthContext";
 import RefreshButton from "@/components/RefreshButton";
-import { Loader2, ArrowLeft, Wallet, DollarSign } from "lucide-react";
+import Modal from "@/components/Modal";
+import Select from "@/components/ui/Select";
+import { Loader2, ArrowLeft, Wallet, DollarSign, Plus, X } from "lucide-react";
 
 interface Student {
   id: string;
@@ -79,6 +81,13 @@ export default function StudentDetailPage() {
       paid: "مدفوع",
       overpaid: "زيادة",
       remaining: "متبقي",
+      quickEnroll: "تسجيل سريع",
+      selectSection: "اختر الشعبة",
+      discount: "الخصم (%)",
+      enroll: "تسجيل",
+      enrollSuccess: "تم التسجيل بنجاح",
+      enrollError: "فشل التسجيل",
+      cancel: "إلغاء",
     },
     en: {
       title: "Student",
@@ -102,6 +111,13 @@ export default function StudentDetailPage() {
       paid: "Paid",
       overpaid: "Overpaid",
       remaining: "Remaining",
+      quickEnroll: "Quick Enroll",
+      selectSection: "Select Section",
+      discount: "Discount (%)",
+      enroll: "Enroll",
+      enrollSuccess: "Enrolled successfully",
+      enrollError: "Enrollment failed",
+      cancel: "Cancel",
     },
   }[locale === "en" ? "en" : "ar"];
 
@@ -113,6 +129,10 @@ export default function StudentDetailPage() {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [summaries, setSummaries] = useState<Record<string, PaymentSummary>>({});
   const [loading, setLoading] = useState(true);
+  const [showQuickEnroll, setShowQuickEnroll] = useState(false);
+  const [quickEnrollSectionId, setQuickEnrollSectionId] = useState("");
+  const [quickEnrollDiscount, setQuickEnrollDiscount] = useState("");
+  const [quickEnrollMsg, setQuickEnrollMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   const fetchStudent = useCallback(async () => {
     if (!studentId) return;
@@ -154,6 +174,26 @@ export default function StudentDetailPage() {
   }, [studentId]);
 
   useEffect(() => { fetchStudent(); }, [fetchStudent]);
+
+  const handleQuickEnroll = async () => {
+    if (!quickEnrollSectionId) return;
+    try {
+      const payload: Record<string, unknown> = {
+        student_id: studentId,
+        section_id: quickEnrollSectionId,
+      };
+      if (quickEnrollDiscount) payload.admin_discount = parseFloat(quickEnrollDiscount);
+      await apiClient.post("/academic/enrollments", payload);
+      setQuickEnrollMsg({ type: "success", text: t.enrollSuccess });
+      setShowQuickEnroll(false);
+      setQuickEnrollSectionId("");
+      setQuickEnrollDiscount("");
+      fetchStudent();
+    } catch (e: any) {
+      const detail = e?.response?.data?.detail || e?.message || t.enrollError;
+      setQuickEnrollMsg({ type: "error", text: detail });
+    }
+  };
 
   const getSectionCourse = (sectionId: string) => {
     const sect = sections.find((s) => s.id === sectionId);
@@ -202,7 +242,15 @@ export default function StudentDetailPage() {
             </p>
           </div>
         </div>
-        <RefreshButton onRefresh={fetchStudent} />
+        <div className="flex items-center gap-2">
+          <RefreshButton onRefresh={fetchStudent} />
+          {(user?.role?.name === "superadmin" || user?.role?.name === "manager" || user?.role?.name === "secretary") && (
+            <button onClick={() => { setShowQuickEnroll(true); setQuickEnrollMsg(null); }} className="btn-primary flex items-center gap-2">
+              <Plus size={16} />
+              <span>{t.quickEnroll}</span>
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -308,6 +356,40 @@ export default function StudentDetailPage() {
           )}
         </div>
       </div>
+
+      <Modal open={showQuickEnroll} onClose={() => setShowQuickEnroll(false)} title={t.quickEnroll} size="xl">
+        <div className="space-y-6">
+          {quickEnrollMsg && (
+            <div className={`px-4 py-3 rounded-lg text-sm font-medium ${
+              quickEnrollMsg.type === "success" ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-red-50 text-red-700 border border-red-200"
+            }`}>
+              {quickEnrollMsg.text}
+            </div>
+          )}
+          <div>
+            <label className="block text-xs font-medium text-slate-700 mb-1">{t.selectSection}</label>
+            <Select
+              value={quickEnrollSectionId}
+              onChange={setQuickEnrollSectionId}
+              options={sections.map((s) => ({ value: s.id, label: getSectionCourse(s.id).name }))}
+              placeholder="—"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-700 mb-1">{t.discount}</label>
+            <input type="number" value={quickEnrollDiscount} onChange={(e) => setQuickEnrollDiscount(e.target.value)}
+              className="input-field" min={0} />
+          </div>
+          <div className="flex gap-3 pt-2">
+            <button onClick={handleQuickEnroll} disabled={!quickEnrollSectionId} className="btn-primary flex-1">
+              {t.enroll}
+            </button>
+            <button onClick={() => setShowQuickEnroll(false)} className="btn-secondary flex-1">
+              {t.cancel}
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

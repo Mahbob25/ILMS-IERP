@@ -108,6 +108,14 @@ class EnrollmentCreate(BaseModel):
     section_id: uuid.UUID
     admin_discount: Optional[float] = None
 
+class EnrollmentCreateWithStudent(BaseModel):
+    student_id: Optional[uuid.UUID] = None
+    section_id: uuid.UUID
+    admin_discount: Optional[float] = None
+    student_code: Optional[str] = None
+    full_name: Optional[str] = None
+    email: Optional[str] = None
+
 class EnrollmentResponse(BaseModel):
     id: uuid.UUID
     student_id: uuid.UUID

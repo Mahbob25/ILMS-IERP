@@ -1,17 +1,14 @@
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
+from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
+from app.core.rate_limit import limiter
 
 from app.core.config import settings
 from app.modules.identity.router import auth_router, users_router, employees_router, permissions_router
 from app.modules.academic.router import academic_router
 from app.modules.lms.router import lms_router
 from app.modules.dashboard.router import dashboard_router
-
-# Initialize rate limiter
-limiter = Limiter(key_func=get_remote_address)
 
 app = FastAPI(
     title="LIMS API Server",

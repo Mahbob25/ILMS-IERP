@@ -1,7 +1,7 @@
 from typing import Optional
 from datetime import date
 import uuid
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 # --- Role Schemas ---
 
@@ -97,9 +97,22 @@ class LinkedUserInfo(BaseModel):
     is_active: bool
     is_superadmin: bool
 
+def _validate_password_strength(v: Optional[str]) -> Optional[str]:
+    if v is None:
+        return v
+    if not any(c.islower() for c in v):
+        raise ValueError("Password must contain at least one lowercase letter")
+    if not any(c.isupper() for c in v):
+        raise ValueError("Password must contain at least one uppercase letter")
+    if not any(c.isdigit() for c in v):
+        raise ValueError("Password must contain at least one digit")
+    if not any(c in "!@#$%^&*()_+-=[]{}|;':\",./<>?" for c in v):
+        raise ValueError("Password must contain at least one special character")
+    return v
+
 class GrantAccessRequest(BaseModel):
     email: EmailStr
-    password: str = Field(..., min_length=6)
+    password: str
     role_id: uuid.UUID
 
 # --- User Schemas ---
@@ -119,18 +132,22 @@ class UserResponse(BaseModel):
 
 class UserCreate(BaseModel):
     email: EmailStr
-    password: str = Field(..., min_length=6, description="Password must be at least 6 characters")
+    password: str = Field(..., min_length=8, description="Password must be at least 8 characters with uppercase, lowercase, and digit")
     role_id: uuid.UUID
     locale_pref: Optional[str] = "ar"
     employee_id: Optional[uuid.UUID] = None
 
+    _validate_password = field_validator("password")(_validate_password_strength)
+
 class UserUpdate(BaseModel):
     email: Optional[EmailStr] = None
-    password: Optional[str] = Field(None, min_length=6)
+    password: Optional[str] = Field(None, min_length=8)
     role_id: Optional[uuid.UUID] = None
     locale_pref: Optional[str] = None
     is_active: Optional[bool] = None
     employee_id: Optional[uuid.UUID] = None
+
+    _validate_password = field_validator("password")(_validate_password_strength)
 
 # --- Teacher/Detail Schemas (unchanged) ---
 

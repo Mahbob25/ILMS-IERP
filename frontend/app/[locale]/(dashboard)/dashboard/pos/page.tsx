@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useParams } from "next/navigation";
 import { apiClient } from "@/lib/api";
 import { useAuth } from "@/components/AuthContext";
+import Modal from "@/components/Modal";
 import { Search, Loader2, RefreshCw, Receipt, X, Plus, Check } from "lucide-react";
 import RefreshButton from "@/components/RefreshButton";
 
@@ -584,62 +585,49 @@ export default function POSPage() {
         <span>{isRtl ? "للحذف" : "to clear"}</span>
       </div>
 
-      {/* Receipt Modal */}
-      {showReceipt && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6 space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-bold text-slate-900">{t.receiptTitle}</h3>
-                <button onClick={() => setShowReceipt(null)} className="btn-icon">
-                  <X size={18} />
-                </button>
-              </div>
-              <div className="border-t border-slate-200 pt-4 space-y-3 text-sm">
-                <div className="text-center pb-4 border-b border-slate-100">
-                  <h4 className="text-base font-bold text-slate-900">{t.instituteName}</h4>
-                  <p className="text-slate-500 mt-1">{t.receiptTitle}</p>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">{t.receiptNumber}</span>
-                  <span className="font-semibold text-slate-900 font-mono">{showReceipt.receipt_number}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">{t.date}</span>
-                  <span className="text-slate-900">{formatDate(showReceipt.date)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">{t.student}</span>
-                  <span className="font-medium text-slate-900">{selectedStudent?.full_name || ""}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">{t.course}</span>
-                  <span className="text-slate-900">
-                    {getCourseNameForEnrollment(selectedSectionId)}
-                  </span>
-                </div>
-                <div className="flex justify-between pt-2 border-t border-slate-200 text-base">
-                  <span className="font-bold text-slate-900">{t.paid}</span>
-                  <span className="font-bold text-emerald-600">
-                    {showReceipt.amount.toFixed(2)} {t.sar}
-                  </span>
-                </div>
-                <div className="flex justify-between pt-8 text-xs text-slate-400">
-                  <span>{t.cashier}: _________________</span>
-                  <span>{t.studentSignature}: _________________</span>
-                </div>
-              </div>
-            </div>
-            <div className="border-t border-slate-200 p-4 flex gap-3 justify-end">
-              <button onClick={handlePrint} className="btn-primary flex items-center gap-2">
-                <Receipt size={16} />
-                <span>{t.print}</span>
-              </button>
-              <button onClick={() => setShowReceipt(null)} className="btn-secondary">{t.close}</button>
-            </div>
+      <Modal open={showReceipt !== null} onClose={() => setShowReceipt(null)} title={t.receiptTitle} size="lg">
+        <div className="border-t border-slate-200 pt-4 space-y-3 text-sm">
+          <div className="text-center pb-4 border-b border-slate-100">
+            <h4 className="text-base font-bold text-slate-900">{t.instituteName}</h4>
+            <p className="text-slate-500 mt-1">{t.receiptTitle}</p>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-slate-500">{t.receiptNumber}</span>
+            <span className="font-semibold text-slate-900 font-mono">{showReceipt?.receipt_number}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-slate-500">{t.date}</span>
+            <span className="text-slate-900">{showReceipt ? formatDate(showReceipt.date) : ""}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-slate-500">{t.student}</span>
+            <span className="font-medium text-slate-900">{selectedStudent?.full_name || ""}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-slate-500">{t.course}</span>
+            <span className="text-slate-900">
+              {getCourseNameForEnrollment(selectedSectionId)}
+            </span>
+          </div>
+          <div className="flex justify-between pt-2 border-t border-slate-200 text-base">
+            <span className="font-bold text-slate-900">{t.paid}</span>
+            <span className="font-bold text-emerald-600">
+              {showReceipt ? `${showReceipt.amount.toFixed(2)} ${t.sar}` : ""}
+            </span>
+          </div>
+          <div className="flex justify-between pt-8 text-xs text-slate-400">
+            <span>{t.cashier}: _________________</span>
+            <span>{t.studentSignature}: _________________</span>
           </div>
         </div>
-      )}
+        <div className="border-t border-slate-200 flex gap-3 justify-end pt-4">
+          <button onClick={handlePrint} className="btn-primary flex items-center gap-2">
+            <Receipt size={16} />
+            <span>{t.print}</span>
+          </button>
+          <button onClick={() => setShowReceipt(null)} className="btn-secondary">{t.close}</button>
+        </div>
+      </Modal>
     </div>
   );
 }

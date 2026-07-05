@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import joinedload
 from sqlalchemy import func
+from sqlalchemy.orm import selectinload
 from app.modules.academic.models import Course, CourseSection, Student, Enrollment
 from app.modules.lms.models import (
     Payment, Expense, TeacherWallet, DailyClosure,
@@ -91,31 +92,29 @@ async def get_teacher_dashboard(db: AsyncSession, employee_id: uuid.UUID) -> dic
 
     payments_result = await db.execute(
         select(Payment)
+        .options(
+            joinedload(Payment.enrollment).joinedload(Enrollment.student),
+            joinedload(Payment.enrollment).joinedload(Enrollment.section).joinedload(CourseSection.course),
+        )
         .join(Enrollment, Payment.enrollment_id == Enrollment.id)
         .join(CourseSection, Enrollment.section_id == CourseSection.id)
         .where(CourseSection.teacher_id == employee_id)
         .order_by(Payment.date.desc())
         .limit(5)
     )
-    payments = payments_result.scalars().all()
+    payments = payments_result.unique().scalars().all()
 
-    recent_payments = []
-    for p in payments:
-        enrollment_result = await db.execute(
-            select(Enrollment).options(
-                joinedload(Enrollment.student),
-                joinedload(Enrollment.section).joinedload(CourseSection.course),
-            ).where(Enrollment.id == p.enrollment_id)
-        )
-        enrollment = enrollment_result.scalar_one_or_none()
-        recent_payments.append(RecentPayment(
+    recent_payments = [
+        RecentPayment(
             id=p.id,
-            student_name=enrollment.student.full_name if enrollment else "Unknown",
-            course_name=enrollment.section.course.name if enrollment and enrollment.section else "Unknown",
+            student_name=p.enrollment.student.full_name if p.enrollment and p.enrollment.student else "Unknown",
+            course_name=p.enrollment.section.course.name if p.enrollment and p.enrollment.section and p.enrollment.section.course else "Unknown",
             amount=p.amount,
             date=p.date,
             receipt_number=p.receipt_number,
-        ))
+        )
+        for p in payments
+    ]
 
     return {
         "sections_count": len(sections),
@@ -171,18 +170,17 @@ async def get_secretary_dashboard(db: AsyncSession) -> dict:
     today_transactions = []
 
     recent_pay_result = await db.execute(
-        select(Payment).where(Payment.date == today).order_by(Payment.date.desc()).limit(5)
+        select(Payment)
+        .options(joinedload(Payment.enrollment).joinedload(Enrollment.student))
+        .where(Payment.date == today)
+        .order_by(Payment.date.desc())
+        .limit(5)
     )
-    for p in recent_pay_result.scalars().all():
-        enrollment_result = await db.execute(
-            select(Enrollment).options(joinedload(Enrollment.student))
-            .where(Enrollment.id == p.enrollment_id)
-        )
-        enrollment = enrollment_result.scalar_one_or_none()
+    for p in recent_pay_result.unique().scalars().all():
         today_transactions.append(DailyTransaction(
             id=p.id,
             type="payment",
-            description=f"Payment - {enrollment.student.full_name if enrollment else 'Unknown'}",
+            description=f"Payment - {p.enrollment.student.full_name if p.enrollment and p.enrollment.student else 'Unknown'}",
             amount=p.amount,
             date=p.date,
             time="",

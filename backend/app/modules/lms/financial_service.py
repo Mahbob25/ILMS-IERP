@@ -479,14 +479,25 @@ async def get_revenue_overview(
     trend_start = period_start.replace(month=1, day=1)
     trend_result = await db.execute(
         text("""
-            SELECT
-                to_char(p.date, 'YYYY-MM') AS month,
-                COALESCE(SUM(p.amount), 0) AS revenue,
-                COALESCE(SUM(e.amount), 0) AS expenses
-            FROM payments p
-            LEFT JOIN expenses e ON to_char(e.date, 'YYYY-MM') = to_char(p.date, 'YYYY-MM')
-            WHERE p.date >= :start AND p.date <= :end
-            GROUP BY month
+            WITH monthly_revenue AS (
+                SELECT to_char(date, 'YYYY-MM') AS month,
+                       COALESCE(SUM(amount), 0) AS revenue
+                FROM payments
+                WHERE date >= :start AND date <= :end
+                GROUP BY month
+            ),
+            monthly_expenses AS (
+                SELECT to_char(date, 'YYYY-MM') AS month,
+                       COALESCE(SUM(amount), 0) AS expenses
+                FROM expenses
+                WHERE date >= :start AND date <= :end
+                GROUP BY month
+            )
+            SELECT COALESCE(r.month, e.month) AS month,
+                   COALESCE(r.revenue, 0) AS revenue,
+                   COALESCE(e.expenses, 0) AS expenses
+            FROM monthly_revenue r
+            FULL OUTER JOIN monthly_expenses e ON e.month = r.month
             ORDER BY month
         """),
         {"start": trend_start, "end": period_end}
@@ -547,15 +558,24 @@ async def get_revenue_overview(
     # daily breakdown
     daily_result = await db.execute(
         text("""
-            SELECT
-                p.date::text,
-                COALESCE(SUM(p.amount), 0) AS revenue,
-                COALESCE(SUM(e.amount), 0) AS expenses
-            FROM payments p
-            LEFT JOIN expenses e ON e.date = p.date
-            WHERE p.date >= :start AND p.date <= :end
-            GROUP BY p.date
-            ORDER BY p.date
+            WITH daily_revenue AS (
+                SELECT date, COALESCE(SUM(amount), 0) AS revenue
+                FROM payments
+                WHERE date >= :start AND date <= :end
+                GROUP BY date
+            ),
+            daily_expenses AS (
+                SELECT date, COALESCE(SUM(amount), 0) AS expenses
+                FROM expenses
+                WHERE date >= :start AND date <= :end
+                GROUP BY date
+            )
+            SELECT COALESCE(r.date::text, e.date::text) AS date,
+                   COALESCE(r.revenue, 0) AS revenue,
+                   COALESCE(e.expenses, 0) AS expenses
+            FROM daily_revenue r
+            FULL OUTER JOIN daily_expenses e ON e.date = r.date
+            ORDER BY date
         """),
         {"start": period_start, "end": period_end}
     )

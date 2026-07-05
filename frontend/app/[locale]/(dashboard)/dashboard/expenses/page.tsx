@@ -4,6 +4,8 @@ import React, { useState, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { apiClient } from "@/lib/api";
 import { useAuth } from "@/components/AuthContext";
+import Modal from "@/components/Modal";
+import Select from "@/components/ui/Select";
 import { Plus, Loader2, RefreshCw, Eye, X, Receipt } from "lucide-react";
 
 interface Expense {
@@ -298,16 +300,17 @@ export default function ExpensesPage() {
           <p className="text-sm text-slate-500 mt-1">{t.subtitle}</p>
         </div>
         <div className="flex items-center gap-2">
-          <select
+          <Select
             value={filterType}
-            onChange={(e) => setFilterType(e.target.value)}
-            className="input-field text-xs w-36"
-          >
-            <option value="">{t.all}</option>
-            <option value="general_expense">{t.generalExpense}</option>
-            <option value="teacher_withdrawal">{t.teacherWithdrawal}</option>
-            <option value="secretary_advance">{t.secretaryAdvance}</option>
-          </select>
+            onChange={setFilterType}
+            options={[
+              { value: "general_expense", label: t.generalExpense },
+              { value: "teacher_withdrawal", label: t.teacherWithdrawal },
+              { value: "secretary_advance", label: t.secretaryAdvance },
+            ]}
+            placeholder={t.all}
+            className="w-36"
+          />
           <button onClick={handleRefresh} disabled={refreshing} className="btn-icon" title={t.refresh}>
             <RefreshCw size={16} className={refreshing ? "animate-spin" : ""} />
           </button>
@@ -320,21 +323,20 @@ export default function ExpensesPage() {
         </div>
       </div>
 
-      {showForm && (
-        <div className="card p-5 space-y-4">
-          {message && (
-            <div className={`px-4 py-3 rounded-lg text-sm font-medium ${message.type === "success" ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-red-50 text-red-700 border border-red-200"}`}>
-              {message.text}
-            </div>
-          )}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <Modal open={showForm} onClose={() => { setShowForm(false); setSelectedRecipientEligible(null); }} title={t.add} size="xl">
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label className="block text-xs font-medium text-slate-700 mb-1">{t.selectType}</label>
-              <select value={form.type} onChange={(e) => handleTypeChange(e.target.value)} className="input-field">
-                <option value="general_expense">{t.generalExpense}</option>
-                <option value="teacher_withdrawal">{t.teacherWithdrawal}</option>
-                <option value="secretary_advance">{t.secretaryAdvance}</option>
-              </select>
+              <Select
+                value={form.type}
+                onChange={handleTypeChange}
+                options={[
+                  { value: "general_expense", label: t.generalExpense },
+                  { value: "teacher_withdrawal", label: t.teacherWithdrawal },
+                  { value: "secretary_advance", label: t.secretaryAdvance },
+                ]}
+              />
             </div>
             <div>
               <label className="block text-xs font-medium text-slate-700 mb-1">
@@ -345,18 +347,15 @@ export default function ExpensesPage() {
                 <input type="text" value={form.recipient_name} onChange={(e) => setForm({ ...form, recipient_name: e.target.value })} className="input-field" />
               ) : (
                 <div className="space-y-1">
-                  <select value={form.recipient_id} onChange={(e) => handleRecipientSelect(e.target.value)} className="input-field">
-                    <option value="">{t.selectRecipient}</option>
-                    {eligibleRecipients.map((r) => (
-                      <option key={r.id} value={r.id}>
-                        {r.full_name}
-                        {form.type === "secretary_advance" && ` (${r.available_limit.toFixed(2)} ${t.sar})`}
-                        {r.is_eligible
-                          ? ` ✓ ${t.eligible}`
-                          : ` ✗ ${t.notEligible}`}
-                      </option>
-                    ))}
-                  </select>
+                  <Select
+                    value={form.recipient_id}
+                    onChange={handleRecipientSelect}
+                    options={eligibleRecipients.map((r) => ({
+                      value: r.id,
+                      label: `${r.full_name}${form.type === "secretary_advance" ? ` (${r.available_limit.toFixed(2)} ${t.sar})` : ""} | ${r.is_eligible ? t.eligible : t.notEligible}`,
+                    }))}
+                    placeholder={t.selectRecipient}
+                  />
                   {selectedRecipientEligible === false && (
                     <p className="text-xs text-red-600 font-medium">
                       ⚠ {t.ineligibleRecipientWarning}
@@ -388,7 +387,7 @@ export default function ExpensesPage() {
             <button onClick={() => { setShowForm(false); setSelectedRecipientEligible(null); }} className="btn-secondary">{t.cancel}</button>
           </div>
         </div>
-      )}
+      </Modal>
 
       {expenses.length === 0 ? (
         <div className="card p-8 text-center text-sm text-slate-500">{t.empty}</div>
@@ -425,56 +424,46 @@ export default function ExpensesPage() {
         </div>
       )}
 
-      {showVoucher && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6 space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-bold text-slate-900">{t.voucherTitle}</h3>
-                <button onClick={() => setShowVoucher(null)} className="btn-icon"><X size={18} /></button>
-              </div>
-              <div className="border-t border-slate-200 pt-4 space-y-3 text-sm">
-                <div className="text-center pb-4 border-b border-slate-100">
-                  <h4 className="text-base font-bold text-slate-900">{t.instituteName}</h4>
-                  <p className="text-slate-500 mt-1">{t.voucherTitle}</p>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">{t.receiptNumber}</span>
-                  <span className="font-semibold text-slate-900">{showVoucher.receipt_number}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">{t.type}</span>
-                  <span>{typeBadge(showVoucher.type)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">{t.date}</span>
-                  <span className="text-slate-900">{formatDate(showVoucher.date)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">{t.recipient}</span>
-                  <span className="font-medium text-slate-900">{showVoucher.recipient_name}</span>
-                </div>
-                {showVoucher.description && (
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">{t.description}</span>
-                    <span className="text-slate-900">{showVoucher.description}</span>
-                  </div>
-                )}
-                <div className="flex justify-between pt-2 border-t border-slate-200 text-base">
-                  <span className="font-bold text-slate-900">{t.paid}</span>
-                  <span className="font-bold text-red-600">{showVoucher.amount.toFixed(2)} {t.sar}</span>
-                </div>
-              </div>
+      <Modal open={showVoucher !== null} onClose={() => setShowVoucher(null)} title={t.voucherTitle} size="lg">
+        <div className="border-t border-slate-200 pt-4 space-y-3 text-sm">
+          <div className="text-center pb-4 border-b border-slate-100">
+            <h4 className="text-base font-bold text-slate-900">{t.instituteName}</h4>
+            <p className="text-slate-500 mt-1">{t.voucherTitle}</p>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-slate-500">{t.receiptNumber}</span>
+            <span className="font-semibold text-slate-900">{showVoucher?.receipt_number}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-slate-500">{t.type}</span>
+            <span>{showVoucher ? typeBadge(showVoucher.type) : null}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-slate-500">{t.date}</span>
+            <span className="text-slate-900">{showVoucher ? formatDate(showVoucher.date) : ""}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-slate-500">{t.recipient}</span>
+            <span className="font-medium text-slate-900">{showVoucher?.recipient_name}</span>
+          </div>
+          {showVoucher?.description && (
+            <div className="flex justify-between">
+              <span className="text-slate-500">{t.description}</span>
+              <span className="text-slate-900">{showVoucher.description}</span>
             </div>
-            <div className="border-t border-slate-200 p-4 flex gap-3 justify-end">
-              <button onClick={handlePrint} className="btn-primary flex items-center gap-2">
-                <Receipt size={16} /><span>{t.print}</span>
-              </button>
-              <button onClick={() => setShowVoucher(null)} className="btn-secondary">{t.close}</button>
-            </div>
+          )}
+          <div className="flex justify-between pt-2 border-t border-slate-200 text-base">
+            <span className="font-bold text-slate-900">{t.paid}</span>
+            <span className="font-bold text-red-600">{showVoucher ? `${showVoucher.amount.toFixed(2)} ${t.sar}` : ""}</span>
           </div>
         </div>
-      )}
+        <div className="border-t border-slate-200 flex gap-3 justify-end pt-4">
+          <button onClick={handlePrint} className="btn-primary flex items-center gap-2">
+            <Receipt size={16} /><span>{t.print}</span>
+          </button>
+          <button onClick={() => setShowVoucher(null)} className="btn-secondary">{t.close}</button>
+        </div>
+      </Modal>
     </div>
   );
 }

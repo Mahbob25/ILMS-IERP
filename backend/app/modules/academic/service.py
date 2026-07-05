@@ -6,20 +6,27 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import joinedload, contains_eager
 from sqlalchemy import func, or_
-from sqlalchemy.exc import IntegrityError
 from app.modules.academic.models import Course, CourseSection, Student, Enrollment
 from app.modules.lms.models import Payment, TeacherWallet
 
 
 # --- Course CRUD ---
 async def create_course(db: AsyncSession, data: dict) -> Course:
+    if "code" in data and data["code"]:
+        existing = await db.execute(
+            select(Course).where(Course.code == data["code"], Course.deleted_at.is_(None))
+        )
+        if existing.scalar_one_or_none():
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Course code already exists")
     course = Course(**data)
     db.add(course)
     await db.flush()
     return course
 
 async def get_course(db: AsyncSession, course_id: uuid.UUID) -> Optional[Course]:
-    result = await db.execute(select(Course).where(Course.id == course_id))
+    result = await db.execute(
+        select(Course).where(Course.id == course_id, Course.deleted_at.is_(None))
+    )
     return result.scalar_one_or_none()
 
 async def list_courses(
@@ -30,8 +37,8 @@ async def list_courses(
     sort_by: str = "name",
     sort_order: str = "asc",
 ) -> dict:
-    query = select(Course)
-    count_query = select(func.count(Course.id))
+    query = select(Course).where(Course.deleted_at.is_(None))
+    count_query = select(func.count(Course.id)).where(Course.deleted_at.is_(None))
     if search:
         pattern = f"%{search}%"
         filter_clause = or_(Course.name.ilike(pattern), Course.code.ilike(pattern))
@@ -57,27 +64,27 @@ async def delete_course(db: AsyncSession, course_id: uuid.UUID) -> bool:
     course = await get_course(db, course_id)
     if not course:
         return False
-    try:
-        await db.delete(course)
-        await db.flush()
-        return True
-    except IntegrityError:
-        await db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot delete course: one or more sections have enrollments with payments"
-        )
+    course.deleted_at = datetime.now(timezone.utc)
+    await db.flush()
+    return True
 
 
 # --- CourseSection CRUD ---
 async def create_course_section(db: AsyncSession, data: dict) -> CourseSection:
+    course_id = data.get("course_id")
+    if course_id:
+        course = await get_course(db, course_id)
+        if not course:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
     section = CourseSection(**data)
     db.add(section)
     await db.flush()
     return section
 
 async def get_course_section(db: AsyncSession, section_id: uuid.UUID) -> Optional[CourseSection]:
-    result = await db.execute(select(CourseSection).where(CourseSection.id == section_id))
+    result = await db.execute(
+        select(CourseSection).where(CourseSection.id == section_id, CourseSection.deleted_at.is_(None))
+    )
     return result.scalar_one_or_none()
 
 async def list_course_sections(
@@ -90,8 +97,8 @@ async def list_course_sections(
     sort_by: str = "id",
     sort_order: str = "asc",
 ) -> dict:
-    query = select(CourseSection)
-    count_query = select(func.count(CourseSection.id))
+    query = select(CourseSection).where(CourseSection.deleted_at.is_(None))
+    count_query = select(func.count(CourseSection.id)).where(CourseSection.deleted_at.is_(None))
     if teacher_id:
         query = query.where(CourseSection.teacher_id == teacher_id)
         count_query = count_query.where(CourseSection.teacher_id == teacher_id)
@@ -122,16 +129,9 @@ async def delete_course_section(db: AsyncSession, section_id: uuid.UUID) -> bool
     section = await get_course_section(db, section_id)
     if not section:
         return False
-    try:
-        await db.delete(section)
-        await db.flush()
-        return True
-    except IntegrityError:
-        await db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot delete section with existing enrollments or payments"
-        )
+    section.deleted_at = datetime.now(timezone.utc)
+    await db.flush()
+    return True
 
 async def activate_section(db: AsyncSession, section_id: uuid.UUID, teacher_percentage: float) -> Optional[CourseSection]:
     section = await get_course_section(db, section_id)
@@ -186,13 +186,27 @@ async def complete_section(db: AsyncSession, section_id: uuid.UUID) -> Optional[
 
 # --- Student CRUD ---
 async def create_student(db: AsyncSession, data: dict) -> Student:
+    if "student_code" in data and data["student_code"]:
+        existing = await db.execute(
+            select(Student).where(Student.student_code == data["student_code"], Student.deleted_at.is_(None))
+        )
+        if existing.scalar_one_or_none():
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Student code already exists")
     student = Student(**data)
     db.add(student)
     await db.flush()
     return student
 
 async def get_student(db: AsyncSession, student_id: uuid.UUID) -> Optional[Student]:
-    result = await db.execute(select(Student).where(Student.id == student_id))
+    result = await db.execute(
+        select(Student).where(Student.id == student_id, Student.deleted_at.is_(None))
+    )
+    return result.scalar_one_or_none()
+
+async def find_student_by_code(db: AsyncSession, student_code: str) -> Optional[Student]:
+    result = await db.execute(
+        select(Student).where(Student.student_code == student_code, Student.deleted_at.is_(None))
+    )
     return result.scalar_one_or_none()
 
 async def list_students(
@@ -203,8 +217,8 @@ async def list_students(
     sort_by: str = "full_name",
     sort_order: str = "asc",
 ) -> dict:
-    query = select(Student)
-    count_query = select(func.count(Student.id))
+    query = select(Student).where(Student.deleted_at.is_(None))
+    count_query = select(func.count(Student.id)).where(Student.deleted_at.is_(None))
     if search:
         pattern = f"%{search}%"
         filter_clause = or_(Student.full_name.ilike(pattern), Student.student_code.ilike(pattern), Student.email.ilike(pattern))
@@ -230,14 +244,25 @@ async def delete_student(db: AsyncSession, student_id: uuid.UUID) -> bool:
     student = await get_student(db, student_id)
     if not student:
         return False
-    await db.delete(student)
+    student.deleted_at = datetime.now(timezone.utc)
     await db.flush()
     return True
 
 
 # --- Enrollment CRUD ---
-async def create_enrollment(db: AsyncSession, student_id: uuid.UUID, section_id: uuid.UUID,
-                            admin_discount: Optional[float] = None) -> Optional[Enrollment]:
+async def create_enrollment(db: AsyncSession, section_id: uuid.UUID,
+                            student_id: Optional[uuid.UUID] = None,
+                            admin_discount: Optional[float] = None,
+                            student_data: Optional[dict] = None) -> Optional[Enrollment]:
+    if not student_id and student_data:
+        existing = await find_student_by_code(db, student_data["student_code"])
+        if existing:
+            student_id = existing.id
+        else:
+            student = await create_student(db, student_data)
+            student_id = student.id
+    if not student_id:
+        return None
     section = await get_course_section(db, section_id)
     if not section:
         return None
@@ -255,7 +280,9 @@ async def create_enrollment(db: AsyncSession, student_id: uuid.UUID, section_id:
     return enrollment
 
 async def get_enrollment(db: AsyncSession, enrollment_id: uuid.UUID) -> Optional[Enrollment]:
-    result = await db.execute(select(Enrollment).where(Enrollment.id == enrollment_id))
+    result = await db.execute(
+        select(Enrollment).where(Enrollment.id == enrollment_id, Enrollment.deleted_at.is_(None))
+    )
     return result.scalar_one_or_none()
 
 async def list_enrollments(
@@ -268,8 +295,8 @@ async def list_enrollments(
     sort_by: str = "enrolled_at",
     sort_order: str = "desc",
 ) -> dict:
-    query = select(Enrollment)
-    count_query = select(func.count(Enrollment.id))
+    query = select(Enrollment).where(Enrollment.deleted_at.is_(None))
+    count_query = select(func.count(Enrollment.id)).where(Enrollment.deleted_at.is_(None))
     if section_id:
         query = query.where(Enrollment.section_id == section_id)
         count_query = count_query.where(Enrollment.section_id == section_id)
@@ -296,15 +323,8 @@ async def delete_enrollment(db: AsyncSession, enrollment_id: uuid.UUID) -> bool:
     if not enrollment:
         return False
     section = await get_course_section(db, enrollment.section_id)
-    try:
-        if section:
-            section.enrolled_count -= 1
-        await db.delete(enrollment)
-        await db.flush()
-        return True
-    except IntegrityError:
-        await db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot delete enrollment with existing payments"
-        )
+    if section:
+        section.enrolled_count -= 1
+    enrollment.deleted_at = datetime.now(timezone.utc)
+    await db.flush()
+    return True

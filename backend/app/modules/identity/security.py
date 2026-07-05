@@ -56,3 +56,7 @@ def create_refresh_token(data: Dict[str, Any], expires_delta: Optional[timedelta
 def decode_token(token: str) -> Dict[str, Any]:
     """Decode a JWT and return its payload. Raises PyJWT exceptions if invalid or expired."""
     return jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
+
+def decode_token_ignore_expiry(token: str) -> Dict[str, Any]:
+    """Decode a JWT ignoring expiration. Still verifies signature. Raises InvalidTokenError if malformed."""
+    return jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM], options={"verify_exp": False})

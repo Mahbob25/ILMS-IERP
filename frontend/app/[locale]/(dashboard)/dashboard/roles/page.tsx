@@ -39,7 +39,7 @@ const SYSTEM_ROLE_NAMES: Record<string, string> = {
 export default function RolesPage() {
   const params = useParams();
   const locale = (params?.locale as string) || "ar";
-  const { user } = useAuth();
+  const { user, permissions: authPermissions } = useAuth();
   const isRtl = locale === "ar";
 
   const [roles, setRoles] = useState<RoleInfo[]>([]);
@@ -64,7 +64,7 @@ export default function RolesPage() {
   }[locale === "en" ? "en" : "ar"];
 
   useEffect(() => {
-    if (!user?.is_superadmin) return;
+    if (!user?.is_superadmin && !authPermissions.includes("page_roles")) return;
     Promise.all([
       apiClient.get<Permission[]>("/permissions"),
       apiClient.get<RoleInfo[]>("/users/roles"),
@@ -127,7 +127,7 @@ export default function RolesPage() {
       });
   };
 
-  if (!user?.is_superadmin) {
+  if (!user?.is_superadmin && !authPermissions.includes("page_roles")) {
     return (
       <div className="max-w-6xl mx-auto text-center py-20">
         <AlertCircle className="mx-auto text-red-400 mb-4" size={48} />

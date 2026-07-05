@@ -6,11 +6,12 @@ import { apiClient } from "@/lib/api";
 import { useAuth } from "@/components/AuthContext";
 import RefreshButton from "@/components/RefreshButton";
 import ConfirmModal from "@/components/ConfirmModal";
+import Modal from "@/components/Modal";
+import Select from "@/components/ui/Select";
 import { Loader2, Plus, Pencil, Trash2, FileText } from "lucide-react";
 
-interface CourseSection { id: string; course_id: string; term_id: string; teacher_id: string; }
+interface CourseSection { id: string; course_id: string; teacher_id: string; }
 interface Course { id: string; name: string; code: string; }
-interface Term { id: string; name: string; }
 interface Student { id: string; student_code: string; full_name: string; }
 interface Enrollment { id: string; student_id: string; section_id: string; }
 interface Assignment { id: string; section_id: string; title: string; description: string | null; due_date: string | null; max_score: number; created_at: string; }
@@ -88,7 +89,6 @@ export default function GradebookPage() {
 
   const [sections, setSections] = useState<CourseSection[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
-  const [terms, setTerms] = useState<Term[]>([]);
   const [selectedSectionId, setSelectedSectionId] = useState("");
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
@@ -108,14 +108,12 @@ export default function GradebookPage() {
 
   const fetchData = useCallback(async () => {
     try {
-      const [sectRes, courseRes, termRes] = await Promise.all([
+      const [sectRes, courseRes] = await Promise.all([
         apiClient.get<{ items: CourseSection[]; total: number }>("/academic/course-sections?limit=1000"),
         apiClient.get<{ items: Course[]; total: number }>("/academic/courses?limit=1000"),
-        apiClient.get<Term[]>("/academic/terms"),
       ]);
       setSections(sectRes.data.items);
       setCourses(courseRes.data.items);
-      setTerms(termRes.data);
     } catch (e) { console.error(e); } finally { setLoading(false); }
   }, []);
 
@@ -224,12 +222,13 @@ export default function GradebookPage() {
       {/* Section Selector */}
       <div className="card p-5">
         <label className="block text-xs font-medium text-slate-700 mb-1">{t.selectSection}</label>
-        <select value={selectedSectionId} onChange={(e) => setSelectedSectionId(e.target.value)} className="input-field max-w-md">
-          <option value="">--</option>
-          {sections.map((sec) => (
-            <option key={sec.id} value={sec.id}>{getCourseName(sec.course_id)}</option>
-          ))}
-        </select>
+        <Select
+          value={selectedSectionId}
+          onChange={setSelectedSectionId}
+          options={sections.map((sec) => ({ value: sec.id, label: getCourseName(sec.course_id) }))}
+          placeholder="--"
+          className="max-w-md"
+        />
       </div>
 
       {!selectedSectionId && (
@@ -360,28 +359,24 @@ export default function GradebookPage() {
         </>
       )}
 
-      {/* Grade Modal */}
-      {gradeModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm">
-          <div className="bg-white rounded-xl border border-slate-200 shadow-xl p-6 w-full max-w-md mx-4 space-y-4" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-sm font-bold text-slate-900">{t.submitGrade}</h3>
-            <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">{t.grade}</label>
-              <input type="number" value={gradeModal.score} onChange={(e) => setGradeModal({ ...gradeModal, score: parseFloat(e.target.value) || 0 })}
-                className="input-field" step="0.5" min="0" />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">{t.feedback}</label>
-              <textarea value={gradeModal.feedback} onChange={(e) => setGradeModal({ ...gradeModal, feedback: e.target.value })}
-                className="input-field" rows={3} />
-            </div>
-            <div className="flex gap-2">
-              <button onClick={handleGrade} className="btn-primary">{t.save}</button>
-              <button onClick={() => setGradeModal(null)} className="btn-secondary">{t.cancel}</button>
-            </div>
+      <Modal open={gradeModal !== null} onClose={() => setGradeModal(null)} title={t.submitGrade} size="xl">
+        <div className="space-y-6">
+          <div>
+            <label className="block text-xs font-medium text-slate-700 mb-1">{t.grade}</label>
+            <input type="number" value={gradeModal?.score ?? ""} onChange={(e) => setGradeModal(gradeModal ? { ...gradeModal, score: parseFloat(e.target.value) || 0 } : null)}
+              className="input-field" step="0.5" min="0" />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-700 mb-1">{t.feedback}</label>
+            <textarea value={gradeModal?.feedback ?? ""} onChange={(e) => setGradeModal(gradeModal ? { ...gradeModal, feedback: e.target.value } : null)}
+              className="input-field" rows={3} />
+          </div>
+          <div className="flex gap-2">
+            <button onClick={handleGrade} className="btn-primary">{t.save}</button>
+            <button onClick={() => setGradeModal(null)} className="btn-secondary">{t.cancel}</button>
           </div>
         </div>
-      )}
+      </Modal>
 
       <ConfirmModal
         open={deleteTarget !== null}

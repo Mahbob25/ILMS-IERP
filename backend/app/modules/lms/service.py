@@ -1,5 +1,5 @@
 import uuid
-from datetime import date
+from datetime import date, datetime, timezone
 from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
@@ -48,11 +48,13 @@ async def create_assignment(db: AsyncSession, data: dict) -> Assignment:
     return assignment
 
 async def get_assignment(db: AsyncSession, assignment_id: uuid.UUID) -> Optional[Assignment]:
-    result = await db.execute(select(Assignment).where(Assignment.id == assignment_id))
+    result = await db.execute(
+        select(Assignment).where(Assignment.id == assignment_id, Assignment.deleted_at.is_(None))
+    )
     return result.scalar_one_or_none()
 
 async def list_assignments(db: AsyncSession, section_id: Optional[uuid.UUID] = None) -> list[Assignment]:
-    query = select(Assignment).order_by(Assignment.created_at.desc())
+    query = select(Assignment).where(Assignment.deleted_at.is_(None)).order_by(Assignment.created_at.desc())
     if section_id:
         query = query.where(Assignment.section_id == section_id)
     result = await db.execute(query)
@@ -71,7 +73,7 @@ async def delete_assignment(db: AsyncSession, assignment_id: uuid.UUID) -> bool:
     assignment = await get_assignment(db, assignment_id)
     if not assignment:
         return False
-    await db.delete(assignment)
+    assignment.deleted_at = datetime.now(timezone.utc)
     await db.flush()
     return True
 

@@ -2,7 +2,7 @@ import uuid
 import enum
 from datetime import date, datetime, timezone
 from typing import Optional, Dict, Any, TYPE_CHECKING
-from sqlalchemy import String, Boolean, DateTime, Date, Float, Text, ForeignKey, text, Enum as SAEnum
+from sqlalchemy import String, Boolean, DateTime, Date, Float, Text, ForeignKey, text, Enum as SAEnum, Integer, Numeric
 from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
@@ -54,23 +54,23 @@ class Employee(Base):
         nullable=False
     )
     phone_number: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
-    salary: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    salary: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
     hire_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     contract_end_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     address: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
     created_at: Mapped[datetime] = mapped_column(
-        DateTime,
+        DateTime(timezone=True),
         nullable=False,
-        default=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+        default=lambda: datetime.now(timezone.utc),
         server_default=text("timezone('utc'::text, now())")
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime,
+        DateTime(timezone=True),
         nullable=False,
-        default=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+        default=lambda: datetime.now(timezone.utc),
         server_default=text("timezone('utc'::text, now())"),
-        onupdate=lambda: datetime.now(timezone.utc).replace(tzinfo=None)
+        onupdate=lambda: datetime.now(timezone.utc)
     )
 
     user: Mapped[Optional["User"]] = relationship(back_populates="employee", uselist=False)
@@ -93,16 +93,20 @@ class User(Base):
     role_id: Mapped[uuid.UUID] = mapped_column(
         PG_UUID(as_uuid=True),
         ForeignKey("roles.id", ondelete="RESTRICT"),
-        nullable=False
+        nullable=False,
+        index=True
     )
     employee_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         PG_UUID(as_uuid=True),
         ForeignKey("employees.id", ondelete="SET NULL"),
-        nullable=True
+        nullable=True,
+        index=True
     )
     locale_pref: Mapped[str] = mapped_column(String(10), default="ar", server_default="ar")
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
     is_superadmin: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    failed_login_attempts: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    locked_until: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True, default=None)
 
     role: Mapped[Role] = relationship(back_populates="users")
     employee: Mapped[Optional[Employee]] = relationship(back_populates="user", uselist=False)
@@ -126,10 +130,11 @@ class RefreshToken(Base):
     user_id: Mapped[uuid.UUID] = mapped_column(
         PG_UUID(as_uuid=True),
         ForeignKey("users.id", ondelete="CASCADE"),
-        nullable=False
+        nullable=False,
+        index=True
     )
     token_hash: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
-    expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
     revoked: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
 
     user: Mapped[User] = relationship(back_populates="refresh_tokens")
@@ -147,15 +152,16 @@ class AuditLog(Base):
     user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         PG_UUID(as_uuid=True),
         ForeignKey("users.id", ondelete="SET NULL"),
-        nullable=True
+        nullable=True,
+        index=True
     )
     action: Mapped[str] = mapped_column(String(255), nullable=False)
     payload: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSONB, nullable=True)
     ip_address: Mapped[Optional[str]] = mapped_column(String(45), nullable=True)
     timestamp: Mapped[datetime] = mapped_column(
-        DateTime,
+        DateTime(timezone=True),
         nullable=False,
-        default=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+        default=lambda: datetime.now(timezone.utc),
         server_default=text("timezone('utc'::text, now())")
     )
 
