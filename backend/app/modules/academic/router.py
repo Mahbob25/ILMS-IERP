@@ -10,9 +10,12 @@ from app.modules.academic.schemas import (
     CourseSectionCreate, CourseSectionUpdate, CourseSectionResponse, SectionActivate,
     StudentCreate, StudentUpdate, StudentResponse,
     EnrollmentCreate, EnrollmentCreateWithStudent, EnrollmentResponse,
+    FinalGradeCreate, FinalGradeBulkCreate, FinalGradeResponse,
+    CertificateResponse,
     PaginatedResponse,
 )
 from app.modules.academic import service as academic_service
+from app.modules.academic import certificate_service
 
 academic_router = APIRouter(prefix="/academic", tags=["academic"])
 
@@ -134,13 +137,203 @@ async def complete_section(
     current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager"])),
     db: AsyncSession = Depends(get_db)
 ):
-    section = await academic_service.complete_section(db, section_id)
+    section = await academic_service.complete_section(db, section_id, user_id=current_user.id)
     if not section:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Cannot complete: section not in active status"
         )
     return section
+
+
+# --- Certificates ---
+@academic_router.get("/certificates", response_model=PaginatedResponse[CertificateResponse])
+async def list_certificates(
+    student_id: Optional[uuid.UUID] = Query(None),
+    section_id: Optional[uuid.UUID] = Query(None),
+    search: Optional[str] = Query(None),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=10000),
+    sort_by: str = Query("issued_at"),
+    sort_order: str = Query("desc"),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    teacher_id = None
+    if current_user.role.name == "teacher":
+        teacher_id = current_user.employee_id
+    result = await certificate_service.list_certificates(
+        db, student_id=student_id, section_id=section_id, search=search,
+        skip=skip, limit=limit, sort_by=sort_by, sort_order=sort_order,
+        teacher_id=teacher_id
+    )
+    items = []
+    for cert in result["items"]:
+        section = cert.section
+        duration_text = _section_duration_text(section)
+        total_hours = _section_total_hours(section)
+        cert_dict = {
+            "id": cert.id,
+            "student_id": cert.student_id,
+            "section_id": cert.section_id,
+            "certificate_number": cert.certificate_number,
+            "course_name": cert.course_name,
+            "student_name": cert.student_name,
+            "issued_at": cert.issued_at,
+            "final_score": float(cert.final_score) if cert.final_score is not None else None,
+            "grade_label": cert.grade_label,
+            "student_id_no": cert.student_id_no,
+            "student_code": cert.extra_data.get("student_code") if cert.extra_data else None,
+            "course_code": cert.extra_data.get("course_code") if cert.extra_data else None,
+            "duration_text": duration_text,
+            "total_hours": total_hours,
+        }
+        items.append(cert_dict)
+    return {"items": items, "total": result["total"]}
+
+
+def _section_duration_text(section) -> str:
+    if section.start_date and section.end_date:
+        return f"{section.start_date.strftime('%Y-%m-%d')} – {section.end_date.strftime('%Y-%m-%d')}"
+    return ""
+
+
+def _section_total_hours(section) -> str:
+    if section.class_duration_minutes:
+        return f"{section.class_duration_minutes / 60:.1f}h"
+    return ""
+
+
+@academic_router.get("/certificates/{cert_id}", response_model=CertificateResponse)
+async def get_certificate(
+    cert_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    cert = await certificate_service.get_certificate(db, cert_id)
+    if not cert:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Certificate not found")
+    section = cert.section
+    return {
+        "id": cert.id,
+        "student_id": cert.student_id,
+        "section_id": cert.section_id,
+        "certificate_number": cert.certificate_number,
+        "course_name": cert.course_name,
+        "student_name": cert.student_name,
+        "issued_at": cert.issued_at,
+        "final_score": float(cert.final_score) if cert.final_score is not None else None,
+        "grade_label": cert.grade_label,
+        "student_id_no": cert.student_id_no,
+        "student_code": cert.extra_data.get("student_code") if cert.extra_data else None,
+        "course_code": cert.extra_data.get("course_code") if cert.extra_data else None,
+        "duration_text": _section_duration_text(section),
+        "total_hours": _section_total_hours(section),
+    }
+
+
+@academic_router.get("/certificates/{cert_id}/preview")
+async def preview_certificate(
+    cert_id: uuid.UUID,
+    locale: str = Query("ar"),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    html = await certificate_service.get_certificate_html_content(db, cert_id, locale=locale)
+    if not html:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Certificate not found")
+    from fastapi.responses import HTMLResponse
+    return HTMLResponse(content=html)
+
+
+@academic_router.get("/students/{student_id}/certificates", response_model=PaginatedResponse[CertificateResponse])
+async def list_student_certificates(
+    student_id: uuid.UUID,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=10000),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    result = await certificate_service.list_certificates(
+        db, student_id=student_id, skip=skip, limit=limit
+    )
+    items = []
+    for cert in result["items"]:
+        section = cert.section
+        cert_dict = {
+            "id": cert.id,
+            "student_id": cert.student_id,
+            "section_id": cert.section_id,
+            "certificate_number": cert.certificate_number,
+            "course_name": cert.course_name,
+            "student_name": cert.student_name,
+            "issued_at": cert.issued_at,
+            "final_score": float(cert.final_score) if cert.final_score is not None else None,
+            "grade_label": cert.grade_label,
+            "student_id_no": cert.student_id_no,
+            "student_code": cert.extra_data.get("student_code") if cert.extra_data else None,
+            "course_code": cert.extra_data.get("course_code") if cert.extra_data else None,
+            "duration_text": _section_duration_text(section),
+            "total_hours": _section_total_hours(section),
+        }
+        items.append(cert_dict)
+    return {"items": items, "total": result["total"]}
+
+
+@academic_router.delete("/certificates/{cert_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_certificate(
+    cert_id: uuid.UUID,
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager"])),
+    db: AsyncSession = Depends(get_db)
+):
+    deleted = await certificate_service.delete_certificate(db, cert_id)
+    if not deleted:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Certificate not found")
+
+
+# --- Final Grades ---
+@academic_router.put("/sections/{section_id}/final-grades", response_model=list[FinalGradeResponse])
+async def set_section_final_grades(
+    section_id: uuid.UUID,
+    data: FinalGradeBulkCreate,
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary", "teacher"])),
+    db: AsyncSession = Depends(get_db)
+):
+    if current_user.role.name == "teacher":
+        section = await academic_service.get_course_section(db, section_id)
+        if not section or section.teacher_id != current_user.employee_id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied to this section")
+
+    grades_data = [g.model_dump() for g in data.grades]
+    results = await academic_service.set_final_grades_bulk(
+        db, section_id=section_id, grades=grades_data, graded_by=current_user.id
+    )
+    return [
+        {
+            "id": r.id,
+            "student_id": r.student_id,
+            "section_id": r.section_id,
+            "final_score": r.final_score,
+            "graded_by": r.graded_by,
+            "graded_at": r.graded_at,
+            "notes": r.notes,
+        }
+        for r in results
+    ]
+
+
+@academic_router.get("/sections/{section_id}/final-grades", response_model=list[FinalGradeResponse])
+async def list_section_final_grades(
+    section_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    if current_user.role.name == "teacher":
+        section = await academic_service.get_course_section(db, section_id)
+        if not section or section.teacher_id != current_user.employee_id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied to this section")
+
+    return await academic_service.list_final_grades(db, section_id=section_id)
 
 
 # --- Students ---

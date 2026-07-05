@@ -7,7 +7,8 @@ import { useAuth } from "@/components/AuthContext";
 import RefreshButton from "@/components/RefreshButton";
 import Modal from "@/components/Modal";
 import Select from "@/components/ui/Select";
-import { Loader2, ArrowLeft, Wallet, DollarSign, Plus, X } from "lucide-react";
+import { Loader2, ArrowLeft, Wallet, DollarSign, Plus, X, Award, Eye, FileDown } from "lucide-react";
+import CertificatePreview from "@/components/CertificatePreview";
 
 interface Student {
   id: string;
@@ -88,6 +89,15 @@ export default function StudentDetailPage() {
       enrollSuccess: "تم التسجيل بنجاح",
       enrollError: "فشل التسجيل",
       cancel: "إلغاء",
+      certificates: "الشهادات",
+      noCertificates: "لا توجد شهادات",
+      certificateNumber: "رقم الشهادة",
+      issueDate: "تاريخ الإصدار",
+      finalScore: "الدرجة النهائية",
+      grade: "التقدير",
+      preview: "عرض",
+      download: "تحميل PDF",
+      actions: "الإجراءات",
     },
     en: {
       title: "Student",
@@ -118,6 +128,15 @@ export default function StudentDetailPage() {
       enrollSuccess: "Enrolled successfully",
       enrollError: "Enrollment failed",
       cancel: "Cancel",
+      certificates: "Certificates",
+      noCertificates: "No certificates",
+      certificateNumber: "Certificate No.",
+      issueDate: "Issue Date",
+      finalScore: "Final Score",
+      grade: "Grade",
+      preview: "Preview",
+      download: "Download PDF",
+      actions: "Actions",
     },
   }[locale === "en" ? "en" : "ar"];
 
@@ -129,6 +148,8 @@ export default function StudentDetailPage() {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [summaries, setSummaries] = useState<Record<string, PaymentSummary>>({});
   const [loading, setLoading] = useState(true);
+  const [certificates, setCertificates] = useState<any[]>([]);
+  const [previewCertId, setPreviewCertId] = useState<string | null>(null);
   const [showQuickEnroll, setShowQuickEnroll] = useState(false);
   const [quickEnrollSectionId, setQuickEnrollSectionId] = useState("");
   const [quickEnrollDiscount, setQuickEnrollDiscount] = useState("");
@@ -137,12 +158,13 @@ export default function StudentDetailPage() {
   const fetchStudent = useCallback(async () => {
     if (!studentId) return;
     try {
-      const [studRes, enrollRes, sectRes, courseRes, payRes] = await Promise.all([
+      const [studRes, enrollRes, sectRes, courseRes, payRes, certRes] = await Promise.all([
         apiClient.get<{ items: Student[]; total: number }>("/academic/students?limit=1000"),
         apiClient.get<{ items: Enrollment[]; total: number }>(`/academic/enrollments?student_id=${studentId}&limit=1000`),
         apiClient.get<{ items: CourseSection[]; total: number }>("/academic/course-sections?limit=1000"),
         apiClient.get<{ items: Course[]; total: number }>("/academic/courses?limit=1000"),
         apiClient.get<Payment[]>(`/lms/payments?student_id=${studentId}`),
+        apiClient.get<{ items: any[]; total: number }>(`/academic/students/${studentId}/certificates?limit=100`),
       ]);
 
       const found = studRes.data.items.find((s) => s.id === studentId) || null;
@@ -152,6 +174,7 @@ export default function StudentDetailPage() {
       setSections(sectRes.data.items);
       setCourses(courseRes.data.items);
       setPayments(payRes.data);
+      setCertificates(certRes.data.items);
       setLoading(false);
 
       const summaryMap: Record<string, PaymentSummary> = {};
@@ -263,9 +286,10 @@ export default function StudentDetailPage() {
             <p className="text-sm text-slate-500 text-center py-4">{t.noEnrollments}</p>
           ) : (
             <div className="space-y-3">
-              {enrollments.map((enr) => {
+                {enrollments.map((enr) => {
                 const sectionInfo = getSectionCourse(enr.section_id);
                 const summary = summaries[enr.id];
+                const cert = certificates.find((c: any) => c.section_id === enr.section_id);
                 return (
                   <div key={enr.id} className="border border-slate-200 rounded-xl p-4 space-y-2">
                     <p className="font-medium text-slate-900 text-sm">{sectionInfo.name}</p>
@@ -276,6 +300,18 @@ export default function StudentDetailPage() {
                           {enr.agreed_price != null ? `${enr.agreed_price.toFixed(2)} ${t.sar}` : "—"}
                         </span>
                       </div>
+                      {cert && cert.final_score != null && (
+                        <div>
+                          <span className="text-slate-500">{t.finalScore}: </span>
+                          <span className="font-semibold text-slate-900">{cert.final_score}%</span>
+                        </div>
+                      )}
+                      {cert && cert.grade_label && (
+                        <div>
+                          <span className="text-slate-500">{t.grade}: </span>
+                          <span className="badge badge-success text-[10px]">{cert.grade_label}</span>
+                        </div>
+                      )}
                       <div>
                         <span className="text-slate-500">{t.adminDiscount}: </span>
                         <span className="font-semibold text-slate-900">
@@ -388,10 +424,98 @@ export default function StudentDetailPage() {
               {t.cancel}
             </button>
           </div>
-        </div>
+          </div>
       </Modal>
+      <div className="card p-5">
+          <h3 className="text-sm font-bold text-slate-900 mb-4 flex items-center gap-2">
+          <Award size={16} className="text-slate-400" />
+          {t.certificates}
+        </h3>
+        {certificates.length === 0 ? (
+          <p className="text-sm text-slate-500 text-center py-4">{t.noCertificates}</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="data-table text-xs">
+              <thead>
+                <tr>
+                  <th>{t.certificateNumber}</th>
+                  <th>{t.course}</th>
+                  <th className="hidden md:table-cell">{t.finalScore}</th>
+                  <th className="hidden md:table-cell">{t.grade}</th>
+                  <th>{t.issueDate}</th>
+                  <th>{t.actions}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {certificates.map((cert: any) => (
+                  <tr key={cert.id}>
+                    <td><span className="font-mono text-xs font-medium">{cert.certificate_number}</span></td>
+                    <td className="text-slate-700">{cert.course_name}</td>
+                    <td className="hidden md:table-cell text-slate-700 font-semibold">{cert.final_score != null ? `${cert.final_score}%` : "—"}</td>
+                    <td className="hidden md:table-cell">{cert.grade_label ? <span className="badge badge-success">{cert.grade_label}</span> : "—"}</td>
+                    <td className="text-slate-500">{new Date(cert.issued_at).toLocaleDateString(locale === "ar" ? "ar-SA" : "en-US", { year: "numeric", month: "short", day: "numeric" })}</td>
+                    <td>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => setPreviewCertId(cert.id)}
+                          className="btn-icon text-blue-600"
+                          title={t.preview}
+                        >
+                          <Eye size={14} />
+                        </button>
+                        <button
+                          onClick={async () => {
+                            try {
+                              const res = await apiClient.get(`/academic/certificates/${cert.id}/preview`, { responseType: "text" });
+                              const container = document.createElement("div");
+                              container.innerHTML = res.data;
+                              container.style.position = "fixed";
+                              container.style.top = "0";
+                              container.style.left = "0";
+                              container.style.width = "210mm";
+                              container.style.zIndex = "-1";
+                              container.style.opacity = "0";
+                              container.style.pointerEvents = "none";
+                              document.body.appendChild(container);
+
+                              await document.fonts.ready;
+                              await new Promise(r => setTimeout(r, 300));
+
+                              const html2pdf = (await import("html2pdf.js")).default;
+                              await html2pdf().set({
+                                margin: [10, 10, 10, 10],
+                                filename: `${cert.certificate_number}.pdf`,
+                                image: { type: "jpeg", quality: 0.98 },
+                                html2canvas: { scale: 2, useCORS: true },
+                                jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
+                              }).from(container).save();
+                              document.body.removeChild(container);
+                            } catch { /* */ }
+                          }}
+                          className="btn-icon text-emerald-600"
+                          title={t.download}
+                        >
+                          <FileDown size={14} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {previewCertId && (
+        <CertificatePreview
+          certId={previewCertId}
+          onClose={() => setPreviewCertId(null)}
+        />
+      )}
     </div>
   );
 }
+
 
 

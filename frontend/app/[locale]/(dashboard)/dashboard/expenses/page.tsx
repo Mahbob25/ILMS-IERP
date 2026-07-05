@@ -6,7 +6,8 @@ import { apiClient } from "@/lib/api";
 import { useAuth } from "@/components/AuthContext";
 import Modal from "@/components/Modal";
 import Select from "@/components/ui/Select";
-import { Plus, Loader2, RefreshCw, Eye, X, Receipt } from "lucide-react";
+import { Plus, Loader2, RefreshCw, Eye, X } from "lucide-react";
+import ReceiptModal, { ReceiptData } from "@/components/ReceiptModal";
 
 interface Expense {
   id: string;
@@ -242,6 +243,20 @@ export default function ExpensesPage() {
     );
   };
 
+  const expenseTypeMeta = (type: string) => {
+    const variantMap: Record<string, string> = {
+      general_expense: "general",
+      teacher_withdrawal: "teacher",
+      secretary_advance: "secretary",
+    };
+    const labelMap: Record<string, string> = {
+      general_expense: t.generalExpense,
+      teacher_withdrawal: t.teacherWithdrawal,
+      secretary_advance: t.secretaryAdvance,
+    };
+    return { variant: variantMap[type] || "general", label: labelMap[type] || type };
+  };
+
   const handleSave = async () => {
     if (!form.amount) return;
     if (form.type === "general_expense" && !form.recipient_name) return;
@@ -273,8 +288,6 @@ export default function ExpensesPage() {
       alert(msg);
     }
   };
-
-  const handlePrint = () => window.print();
 
   const formatDate = (d: string) => {
     try {
@@ -424,46 +437,22 @@ export default function ExpensesPage() {
         </div>
       )}
 
-      <Modal open={showVoucher !== null} onClose={() => setShowVoucher(null)} title={t.voucherTitle} size="lg">
-        <div className="border-t border-slate-200 pt-4 space-y-3 text-sm">
-          <div className="text-center pb-4 border-b border-slate-100">
-            <h4 className="text-base font-bold text-slate-900">{t.instituteName}</h4>
-            <p className="text-slate-500 mt-1">{t.voucherTitle}</p>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-slate-500">{t.receiptNumber}</span>
-            <span className="font-semibold text-slate-900">{showVoucher?.receipt_number}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-slate-500">{t.type}</span>
-            <span>{showVoucher ? typeBadge(showVoucher.type) : null}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-slate-500">{t.date}</span>
-            <span className="text-slate-900">{showVoucher ? formatDate(showVoucher.date) : ""}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-slate-500">{t.recipient}</span>
-            <span className="font-medium text-slate-900">{showVoucher?.recipient_name}</span>
-          </div>
-          {showVoucher?.description && (
-            <div className="flex justify-between">
-              <span className="text-slate-500">{t.description}</span>
-              <span className="text-slate-900">{showVoucher.description}</span>
-            </div>
-          )}
-          <div className="flex justify-between pt-2 border-t border-slate-200 text-base">
-            <span className="font-bold text-slate-900">{t.paid}</span>
-            <span className="font-bold text-red-600">{showVoucher ? `${showVoucher.amount.toFixed(2)} ${t.sar}` : ""}</span>
-          </div>
-        </div>
-        <div className="border-t border-slate-200 flex gap-3 justify-end pt-4">
-          <button onClick={handlePrint} className="btn-primary flex items-center gap-2">
-            <Receipt size={16} /><span>{t.print}</span>
-          </button>
-          <button onClick={() => setShowVoucher(null)} className="btn-secondary">{t.close}</button>
-        </div>
-      </Modal>
+      <ReceiptModal
+        open={showVoucher !== null}
+        onClose={() => setShowVoucher(null)}
+        data={showVoucher ? {
+          type: "expense",
+          receipt_number: showVoucher.receipt_number,
+          date: showVoucher.date,
+          amount: showVoucher.amount,
+          recipient_name: showVoucher.recipient_name,
+          expense_type_label: expenseTypeMeta(showVoucher.type).label,
+          expense_type_variant: expenseTypeMeta(showVoucher.type).variant as "general" | "teacher" | "secretary",
+        } : null}
+        locale={locale}
+        isRtl={isRtl}
+        instituteName={t.instituteName}
+      />
     </div>
   );
 }

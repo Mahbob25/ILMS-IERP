@@ -5,18 +5,21 @@ import { useParams } from "next/navigation";
 import { apiClient } from "@/lib/api";
 import { useAuth } from "@/components/AuthContext";
 import RefreshButton from "@/components/RefreshButton";
-import ConfirmModal from "@/components/ConfirmModal";
-import Modal from "@/components/Modal";
 import Select from "@/components/ui/Select";
-import { Loader2, Plus, Pencil, Trash2, FileText } from "lucide-react";
+import { Loader2, Save } from "lucide-react";
 
 interface CourseSection { id: string; course_id: string; teacher_id: string; }
 interface Course { id: string; name: string; code: string; }
 interface Student { id: string; student_code: string; full_name: string; }
 interface Enrollment { id: string; student_id: string; section_id: string; }
-interface Assignment { id: string; section_id: string; title: string; description: string | null; due_date: string | null; max_score: number; created_at: string; }
-interface Submission { id: string; assignment_id: string; student_id: string; submitted_at: string; file_path: string | null; status: string; grade?: Grade | null; }
-interface Grade { id: string; submission_id: string; score: number; feedback: string | null; graded_by: string; graded_at: string; }
+
+interface FinalGrade {
+  id: string;
+  student_id: string;
+  student_name: string;
+  final_score: number;
+  notes: string | null;
+}
 
 export default function GradebookPage() {
   const params = useParams();
@@ -27,84 +30,47 @@ export default function GradebookPage() {
   const t = {
     ar: {
       title: "سجل الدرجات",
-      subtitle: "إدارة الواجبات وتقييم الطلاب",
+      subtitle: "إدخال الدرجات النهائية للطلاب",
       selectSection: "اختر الشعبة",
-      assignments: "الواجبات",
-      addAssignment: "إضافة واجب",
-      editAssignment: "تعديل واجب",
-      deleteAssignment: "حذف",
-      titleLabel: "العنوان",
-      description: "الوصف",
-      maxScore: "الدرجة القصوى",
-      dueDate: "تاريخ التسليم",
-      save: "حفظ",
-      cancel: "إلغاء",
-      students: "الطلاب",
-      submission: "التسليم",
-      grade: "الدرجة",
-      feedback: "ملاحظات",
-      submitGrade: "تقييم",
       noSection: "اختر شعبة لعرض سجل الدرجات",
-      noAssignments: "لا توجد واجبات لهذه الشعبة",
       noStudents: "لا يوجد طلاب مسجلين",
       loading: "جاري التحميل...",
-      yes: "نعم",
-      confirmTitle: "تأكيد الحذف",
-      confirmDelete: "هل أنت متأكد من حذف هذا الواجب؟",
-      no: "لا",
-      notSubmitted: "لم يسلم",
-      graded: "مقيم",
+      studentName: "اسم الطالب",
+      studentCode: "رمز الطالب",
+      finalScore: "الدرجة النهائية",
+      notes: "ملاحظات",
+      saveAll: "حفظ الكل",
+      saved: "تم الحفظ بنجاح",
+      saveError: "فشل الحفظ",
+      saving: "جاري الحفظ...",
     },
     en: {
       title: "Gradebook",
-      subtitle: "Manage assignments and grade students",
+      subtitle: "Enter final student grades",
       selectSection: "Select Section",
-      assignments: "Assignments",
-      addAssignment: "Add Assignment",
-      editAssignment: "Edit Assignment",
-      deleteAssignment: "Delete",
-      titleLabel: "Title",
-      description: "Description",
-      maxScore: "Max Score",
-      dueDate: "Due Date",
-      save: "Save",
-      cancel: "Cancel",
-      students: "Students",
-      submission: "Submission",
-      grade: "Grade",
-      feedback: "Feedback",
-      submitGrade: "Grade",
       noSection: "Select a section to view gradebook",
-      noAssignments: "No assignments for this section",
       noStudents: "No students enrolled",
       loading: "Loading...",
-      yes: "Yes",
-      confirmTitle: "Confirm Deletion",
-      confirmDelete: "Are you sure you want to delete this assignment?",
-      no: "No",
-      notSubmitted: "Not submitted",
-      graded: "Graded",
+      studentName: "Student Name",
+      studentCode: "Student Code",
+      finalScore: "Final Score",
+      notes: "Notes",
+      saveAll: "Save All",
+      saved: "Saved successfully",
+      saveError: "Save failed",
+      saving: "Saving...",
     },
   }[locale === "en" ? "en" : "ar"];
 
   const [sections, setSections] = useState<CourseSection[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
   const [selectedSectionId, setSelectedSectionId] = useState("");
-  const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
-  const [enrollments, setEnrollment] = useState<Enrollment[]>([]);
-  const [selectedAssignmentId, setSelectedAssignmentId] = useState("");
-  const [submissions, setSubmissions] = useState<Submission[]>([]);
+  const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
+  const [grades, setGrades] = useState<Record<string, { score: string; notes: string }>>({});
   const [loading, setLoading] = useState(true);
-
-  // Assignment form
-  const [showAssignmentForm, setShowAssignmentForm] = useState(false);
-  const [editingAssignment, setEditingAssignment] = useState<string | null>(null);
-  const [assignmentForm, setAssignmentForm] = useState({ title: "", description: "", max_score: 100, due_date: "" });
-  const [deleteTarget, setDeleteTarget] = useState<Assignment | null>(null);
-
-  // Grade modal
-  const [gradeModal, setGradeModal] = useState<{ submissionId: string; score: number; feedback: string } | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   const fetchData = useCallback(async () => {
     try {
@@ -114,7 +80,7 @@ export default function GradebookPage() {
       ]);
       setSections(sectRes.data.items);
       setCourses(courseRes.data.items);
-    } catch (e) { console.error(e); } finally { setLoading(false); }
+    } catch { /* */ } finally { setLoading(false); }
   }, []);
 
   useEffect(() => { fetchData(); }, [fetchData]);
@@ -125,12 +91,13 @@ export default function GradebookPage() {
     if (!selectedSectionId) return;
     (async () => {
       try {
-        const [assignRes, enrRes] = await Promise.all([
-          apiClient.get<Assignment[]>(`/lms/assignments?section_id=${selectedSectionId}`),
-          apiClient.get<{ items: Enrollment[]; total: number }>(`/academic/enrollments?section_id=${selectedSectionId}&limit=1000`),
+        const [enrRes, gradeRes] = await Promise.all([
+          apiClient.get<{ items: Enrollment[]; total: number }>(
+            `/academic/enrollments?section_id=${selectedSectionId}&limit=1000`
+          ),
+          apiClient.get<FinalGrade[]>(`/academic/sections/${selectedSectionId}/final-grades`).catch(() => [] as FinalGrade[]),
         ]);
-        setAssignments(assignRes.data);
-        setEnrollment(enrRes.data.items);
+        setEnrollments(enrRes.data.items);
 
         const studentIds = enrRes.data.items.map((e) => e.student_id);
         if (studentIds.length > 0) {
@@ -139,69 +106,72 @@ export default function GradebookPage() {
         } else {
           setStudents([]);
         }
-      } catch (e) { console.error(e); }
+
+        const gradeMap: Record<string, { score: string; notes: string }> = {};
+        const gradesData = Array.isArray(gradeRes) ? gradeRes : [];
+        for (const g of gradesData) {
+          gradeMap[g.student_id] = {
+            score: String(g.final_score),
+            notes: g.notes || "",
+          };
+        }
+        setGrades(gradeMap);
+      } catch { /* */ }
     })();
   }, [selectedSectionId]);
 
-  useEffect(() => {
-    if (!selectedAssignmentId) { setSubmissions([]); return; }
-    (async () => {
-      try {
-        const res = await apiClient.get<Submission[]>(`/lms/assignments/${selectedAssignmentId}/submissions`);
-        setSubmissions(res.data);
-      } catch (e) { console.error(e); }
-    })();
-  }, [selectedAssignmentId]);
+  const handleScoreChange = (studentId: string, value: string) => {
+    const num = parseFloat(value);
+    if (value !== "" && (isNaN(num) || num < 0)) return;
+    if (num > 100) return;
+    setGrades((prev) => ({
+      ...prev,
+      [studentId]: { ...prev[studentId], score: value },
+    }));
+  };
 
-  const handleSaveAssignment = async () => {
-    try {
-      const payload: Record<string, unknown> = {
-        section_id: selectedSectionId,
-        title: assignmentForm.title,
-        max_score: assignmentForm.max_score,
-      };
-      if (assignmentForm.description) payload.description = assignmentForm.description;
-      if (assignmentForm.due_date) payload.due_date = new Date(assignmentForm.due_date).toISOString();
+  const handleNotesChange = (studentId: string, value: string) => {
+    setGrades((prev) => ({
+      ...prev,
+      [studentId]: { ...prev[studentId], notes: value },
+    }));
+  };
 
-      if (editingAssignment) {
-        await apiClient.put(`/lms/assignments/${editingAssignment}`, payload);
-      } else {
-        await apiClient.post("/lms/assignments", payload);
+  const handleSaveAll = async () => {
+    if (!selectedSectionId) return;
+    const sectionStudents = enrollments.filter((e) => e.section_id === selectedSectionId);
+    const gradesPayload: { student_id: string; final_score: number; notes?: string }[] = [];
+    for (const enr of sectionStudents) {
+      const g = grades[enr.student_id];
+      if (g && g.score !== "") {
+        gradesPayload.push({
+          student_id: enr.student_id,
+          final_score: parseFloat(g.score),
+          notes: g.notes || undefined,
+        });
       }
-      setShowAssignmentForm(false);
-      setEditingAssignment(null);
-      setAssignmentForm({ title: "", description: "", max_score: 100, due_date: "" });
+    }
+    if (gradesPayload.length === 0) return;
 
-      const res = await apiClient.get<Assignment[]>(`/lms/assignments?section_id=${selectedSectionId}`);
-      setAssignments(res.data);
-    } catch (e) { console.error(e); }
-  };
-
-  const handleDeleteAssignment = async (id: string) => {
+    setSaving(true);
+    setMessage(null);
     try {
-      await apiClient.delete(`/lms/assignments/${id}`);
-      setDeleteTarget(null);
-      const res = await apiClient.get<Assignment[]>(`/lms/assignments?section_id=${selectedSectionId}`);
-      setAssignments(res.data);
-      if (selectedAssignmentId === id) setSelectedAssignmentId("");
-    } catch (e) { setDeleteTarget(null); console.error(e); }
-  };
-
-  const handleGrade = async () => {
-    if (!gradeModal) return;
-    try {
-      await apiClient.post(`/lms/submissions/${gradeModal.submissionId}/grade`, {
-        score: gradeModal.score,
-        feedback: gradeModal.feedback || null,
+      await apiClient.put(`/academic/sections/${selectedSectionId}/final-grades`, {
+        grades: gradesPayload,
       });
-      setGradeModal(null);
-      const res = await apiClient.get<Submission[]>(`/lms/assignments/${selectedAssignmentId}/submissions`);
-      setSubmissions(res.data);
-    } catch (e) { console.error(e); }
+      setMessage({ type: "success", text: t.saved });
+    } catch {
+      setMessage({ type: "error", text: t.saveError });
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const getSubmissionForStudent = (studentId: string) => submissions.find((s) => s.student_id === studentId);
   const getStudentName = (id: string) => students.find((s) => s.id === id)?.full_name || id;
+  const getStudentCode = (id: string) => students.find((s) => s.id === id)?.student_code || "";
+  const sectionStudents = selectedSectionId
+    ? enrollments.filter((e) => e.section_id === selectedSectionId)
+    : [];
 
   if (loading) {
     return <div className="flex items-center justify-center h-48"><Loader2 className="animate-spin text-slate-400" size={24} /></div>;
@@ -219,7 +189,6 @@ export default function GradebookPage() {
         </div>
       </div>
 
-      {/* Section Selector */}
       <div className="card p-5">
         <label className="block text-xs font-medium text-slate-700 mb-1">{t.selectSection}</label>
         <Select
@@ -236,158 +205,79 @@ export default function GradebookPage() {
       )}
 
       {selectedSectionId && (
-        <>
-          {/* Assignments List */}
-          <div className="card p-5">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-bold text-slate-900">{t.assignments}</h3>
-              <button onClick={() => { setAssignmentForm({ title: "", description: "", max_score: 100, due_date: "" }); setEditingAssignment(null); setShowAssignmentForm(true); }}
-                className="btn-primary flex items-center gap-2 text-xs">
-                <Plus size={14} /><span>{t.addAssignment}</span>
-              </button>
-            </div>
-
-            {showAssignmentForm && (
-              <div className="mb-4 p-4 border border-slate-200 rounded-xl bg-slate-50 space-y-3">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-medium text-slate-700 mb-1">{t.titleLabel}</label>
-                    <input type="text" value={assignmentForm.title} onChange={(e) => setAssignmentForm({ ...assignmentForm, title: e.target.value })} className="input-field" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-700 mb-1">{t.maxScore}</label>
-                    <input type="number" value={assignmentForm.max_score} onChange={(e) => setAssignmentForm({ ...assignmentForm, max_score: parseInt(e.target.value) || 0 })} className="input-field" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-700 mb-1">{t.dueDate}</label>
-                    <input type="datetime-local" value={assignmentForm.due_date} onChange={(e) => setAssignmentForm({ ...assignmentForm, due_date: e.target.value })} className="input-field" />
-                  </div>
-                  <div className="md:col-span-2">
-                    <label className="block text-xs font-medium text-slate-700 mb-1">{t.description}</label>
-                    <textarea value={assignmentForm.description} onChange={(e) => setAssignmentForm({ ...assignmentForm, description: e.target.value })} className="input-field" rows={2} />
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <button onClick={handleSaveAssignment} className="btn-primary">{t.save}</button>
-                  <button onClick={() => setShowAssignmentForm(false)} className="btn-secondary">{t.cancel}</button>
-                </div>
-              </div>
-            )}
-
-            {assignments.length === 0 ? (
-              <p className="text-sm text-slate-500 py-4 text-center">{t.noAssignments}</p>
-            ) : (
-              <div className="flex flex-wrap gap-2">
-                {assignments.map((a) => (
-                  <button
-                    key={a.id}
-                    onClick={() => setSelectedAssignmentId(a.id)}
-                    className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium border transition-all ${
-                      selectedAssignmentId === a.id
-                        ? "bg-brand-50 border-brand-300 text-brand-700"
-                        : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
-                    }`}
-                  >
-                    <FileText size={14} />
-                    <span>{a.title}</span>
-                    <span className="text-slate-400">({a.max_score})</span>
-                    {user?.is_superadmin && (
-                      <>
-                        <button onClick={(e) => { e.stopPropagation(); setAssignmentForm({ title: a.title, description: a.description || "", max_score: a.max_score, due_date: a.due_date ? new Date(a.due_date).toISOString().slice(0, 16) : "" }); setEditingAssignment(a.id); setShowAssignmentForm(true); }}
-                          className="p-1 text-slate-400 hover:text-slate-600"><Pencil size={12} /></button>
-                        <button onClick={(e) => { e.stopPropagation(); setDeleteTarget(a); }}
-                          className="p-1 text-red-400 hover:text-red-600"><Trash2 size={12} /></button>
-                      </>
-                    )}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Grade Table */}
-          {selectedAssignmentId && (
-            <div className="card overflow-hidden">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>{t.students}</th>
-                    <th>{t.submission}</th>
-                    <th>{t.grade}</th>
-                    <th>{t.feedback}</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {students.length === 0 && (
-                    <tr><td colSpan={5} className="text-center text-sm text-slate-500 py-8">{t.noStudents}</td></tr>
-                  )}
-                  {students.map((student) => {
-                    const sub = getSubmissionForStudent(student.id);
-                    const hasGrade = sub?.grade;
-                    return (
-                      <tr key={student.id}>
-                        <td className="font-medium text-slate-900">{student.full_name}</td>
-                        <td>
-                          {sub ? (
-                            <span className="badge badge-success">{t.graded}</span>
-                          ) : (
-                            <span className="badge badge-muted">{t.notSubmitted}</span>
-                          )}
-                        </td>
-                        <td className="text-slate-700 font-semibold">
-                          {hasGrade ? `${sub!.grade!.score}` : "—"}
-                        </td>
-                        <td className="text-slate-500 text-xs max-w-[200px] truncate">
-                          {hasGrade ? sub!.grade!.feedback || "—" : "—"}
-                        </td>
-                        <td>
-                          {sub && (
-                            <button onClick={() => setGradeModal({ submissionId: sub.id, score: sub.grade?.score || 0, feedback: sub.grade?.feedback || "" })}
-                              className="btn-primary text-xs px-3 py-1.5">
-                              {t.submitGrade}
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+        <div className="card overflow-hidden">
+          {message && (
+            <div className={`mx-4 mt-4 px-4 py-3 rounded-lg text-sm font-medium ${
+              message.type === "success"
+                ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                : "bg-red-50 text-red-700 border border-red-200"
+            }`}>
+              {message.text}
+              <button onClick={() => setMessage(null)} className="float-end">&times;</button>
             </div>
           )}
-        </>
-      )}
-
-      <Modal open={gradeModal !== null} onClose={() => setGradeModal(null)} title={t.submitGrade} size="xl">
-        <div className="space-y-6">
-          <div>
-            <label className="block text-xs font-medium text-slate-700 mb-1">{t.grade}</label>
-            <input type="number" value={gradeModal?.score ?? ""} onChange={(e) => setGradeModal(gradeModal ? { ...gradeModal, score: parseFloat(e.target.value) || 0 } : null)}
-              className="input-field" step="0.5" min="0" />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-slate-700 mb-1">{t.feedback}</label>
-            <textarea value={gradeModal?.feedback ?? ""} onChange={(e) => setGradeModal(gradeModal ? { ...gradeModal, feedback: e.target.value } : null)}
-              className="input-field" rows={3} />
-          </div>
-          <div className="flex gap-2">
-            <button onClick={handleGrade} className="btn-primary">{t.save}</button>
-            <button onClick={() => setGradeModal(null)} className="btn-secondary">{t.cancel}</button>
-          </div>
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th className="w-8">#</th>
+                <th>{t.studentName}</th>
+                <th className="hidden md:table-cell">{t.studentCode}</th>
+                <th className="w-32">{t.finalScore} (0-100)</th>
+                <th className="w-48 hidden md:table-cell">{t.notes}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sectionStudents.length === 0 && (
+                <tr><td colSpan={5} className="text-center text-sm text-slate-500 py-8">{t.noStudents}</td></tr>
+              )}
+              {sectionStudents.map((enr, idx) => (
+                <tr key={enr.student_id}>
+                  <td className="text-slate-400 text-xs">{idx + 1}</td>
+                  <td className="font-medium text-slate-900">{getStudentName(enr.student_id)}</td>
+                  <td className="hidden md:table-cell text-slate-500 text-xs">{getStudentCode(enr.student_id)}</td>
+                  <td>
+                    <input
+                      type="number"
+                      value={grades[enr.student_id]?.score ?? ""}
+                      onChange={(e) => handleScoreChange(enr.student_id, e.target.value)}
+                      className="input-field w-24 text-center"
+                      min={0}
+                      max={100}
+                      step={0.5}
+                      placeholder="0"
+                    />
+                  </td>
+                  <td className="hidden md:table-cell">
+                    <input
+                      type="text"
+                      value={grades[enr.student_id]?.notes ?? ""}
+                      onChange={(e) => handleNotesChange(enr.student_id, e.target.value)}
+                      className="input-field w-full"
+                      placeholder="—"
+                    />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {sectionStudents.length > 0 && (
+            <div className="flex justify-end px-4 py-3 border-t border-slate-200">
+              <button
+                onClick={handleSaveAll}
+                disabled={saving}
+                className="btn-primary flex items-center gap-2"
+              >
+                {saving ? (
+                  <Loader2 className="animate-spin" size={16} />
+                ) : (
+                  <Save size={16} />
+                )}
+                <span>{saving ? t.saving : t.saveAll}</span>
+              </button>
+            </div>
+          )}
         </div>
-      </Modal>
-
-      <ConfirmModal
-        open={deleteTarget !== null}
-        title={t.confirmTitle}
-        message={deleteTarget ? `${t.confirmDelete} (${deleteTarget.title})` : ""}
-        confirmLabel={t.yes}
-        cancelLabel={t.no}
-        isRtl={isRtl}
-        onConfirm={() => deleteTarget && handleDeleteAssignment(deleteTarget.id)}
-        onCancel={() => setDeleteTarget(null)}
-      />
+      )}
     </div>
   );
 }

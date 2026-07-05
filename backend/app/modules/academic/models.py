@@ -2,12 +2,83 @@ import uuid
 from datetime import date, datetime, time
 from typing import Optional, TYPE_CHECKING
 from sqlalchemy import String, Integer, Float, Date, DateTime, Time, ForeignKey, Text, Enum as SAEnum, UniqueConstraint, CheckConstraint, Numeric
-from sqlalchemy.dialects.postgresql import UUID as PG_UUID
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID, JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
 
 if TYPE_CHECKING:
     from app.modules.identity.models import Employee
+
+    from app.modules.lms.models import Payment
+
+
+class FinalGrade(Base):
+    __tablename__ = "final_grades"
+    __table_args__ = (
+        UniqueConstraint("section_id", "student_id", name="uq_final_grades_section_student"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4,
+        server_default="gen_random_uuid()"
+    )
+    section_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("course_sections.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    student_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("students.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    final_score: Mapped[float] = mapped_column(Numeric(5, 2), nullable=False)
+    graded_by: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
+    )
+    graded_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False,
+        server_default="timezone('utc'::text, now())"
+    )
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    section: Mapped["CourseSection"] = relationship(back_populates="final_grades")
+    student: Mapped["Student"] = relationship()
+    graded_by_user: Mapped["User"] = relationship()
+
+
+class Certificate(Base):
+    __tablename__ = "certificates"
+    __table_args__ = (
+        UniqueConstraint("student_id", "section_id", name="uq_certificates_student_section"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4,
+        server_default="gen_random_uuid()"
+    )
+    student_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("students.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    section_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("course_sections.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    enrollment_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("enrollments.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    certificate_number: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True)
+    course_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    student_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    issued_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False,
+        server_default="timezone('utc'::text, now())"
+    )
+    final_score: Mapped[Optional[float]] = mapped_column(Numeric(5, 2), nullable=True)
+    grade_label: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    student_id_no: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    extra_data: Mapped[Optional[dict]] = mapped_column("extra_data", JSONB, nullable=True)
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    student: Mapped["Student"] = relationship(back_populates="certificates")
+    section: Mapped["CourseSection"] = relationship(back_populates="certificates")
+    enrollment: Mapped["Enrollment"] = relationship(back_populates="certificates")
+
 
 
 class Course(Base):
@@ -61,6 +132,8 @@ class CourseSection(Base):
     enrollments: Mapped[list["Enrollment"]] = relationship(back_populates="section", cascade="all, delete-orphan")
     attendance_sessions: Mapped[list["AttendanceSession"]] = relationship(back_populates="section", cascade="all, delete-orphan")
     assignments: Mapped[list["Assignment"]] = relationship(back_populates="section", cascade="all, delete-orphan")
+    certificates: Mapped[list["Certificate"]] = relationship(back_populates="section", cascade="all, delete-orphan")
+    final_grades: Mapped[list["FinalGrade"]] = relationship(back_populates="section", cascade="all, delete-orphan")
 
 
 class Student(Base):
@@ -76,6 +149,7 @@ class Student(Base):
     deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     enrollments: Mapped[list["Enrollment"]] = relationship(back_populates="student")
+    certificates: Mapped[list["Certificate"]] = relationship(back_populates="student", cascade="all, delete-orphan")
 
 
 class Enrollment(Base):
@@ -105,3 +179,4 @@ class Enrollment(Base):
     student: Mapped[Student] = relationship(back_populates="enrollments")
     section: Mapped[CourseSection] = relationship(back_populates="enrollments")
     payments: Mapped[list["Payment"]] = relationship(back_populates="enrollment")
+    certificates: Mapped[list["Certificate"]] = relationship(back_populates="enrollment", cascade="all, delete-orphan")

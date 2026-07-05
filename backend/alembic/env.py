@@ -13,7 +13,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 from app.core.config import settings
 from app.db.base import Base, naming_convention
 from app.modules.identity.models import Role, User, RefreshToken, AuditLog, Employee, Permission, RolePermission
-from app.modules.academic.models import Course, CourseSection, Student, Enrollment
+from app.modules.academic.models import Course, CourseSection, Student, Enrollment, Certificate, FinalGrade
 from app.modules.lms.models import AttendanceSession, AttendanceRecord, Assignment, Submission, Grade, Payment, Expense, TeacherWallet, DailyClosure
 
 # this is the Alembic Config object, which provides

@@ -1,7 +1,7 @@
 import uuid
 from datetime import date, datetime, time
 from typing import Generic, Optional, TypeVar
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 T = TypeVar("T")
 
@@ -75,7 +75,6 @@ class CourseSectionResponse(BaseModel):
     class_duration_minutes: Optional[int] = None
     classroom: Optional[str] = None
     price: Optional[float] = None
-
     class Config:
         from_attributes = True
 
@@ -125,6 +124,58 @@ class EnrollmentResponse(BaseModel):
     enrolled_at: datetime
     agreed_price: Optional[float] = None
     admin_discount: Optional[float] = None
+
+    class Config:
+        from_attributes = True
+
+
+# --- Final Grade ---
+class FinalGradeCreate(BaseModel):
+    student_id: uuid.UUID
+    final_score: float = Field(ge=0, le=100)
+    notes: Optional[str] = None
+
+    @field_validator("final_score")
+    @classmethod
+    def validate_score(cls, v: float) -> float:
+        if v < 0 or v > 100:
+            raise ValueError("Final score must be between 0 and 100")
+        return round(v, 2)
+
+class FinalGradeBulkCreate(BaseModel):
+    grades: list[FinalGradeCreate]
+
+class FinalGradeResponse(BaseModel):
+    id: uuid.UUID
+    student_id: uuid.UUID
+    section_id: uuid.UUID
+    final_score: float
+    graded_by: uuid.UUID
+    graded_at: datetime
+    notes: Optional[str] = None
+    student_name: Optional[str] = None
+    student_code: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+# --- Certificate ---
+class CertificateResponse(BaseModel):
+    id: uuid.UUID
+    student_id: uuid.UUID
+    section_id: uuid.UUID
+    certificate_number: str
+    course_name: str
+    student_name: str
+    issued_at: datetime
+    final_score: Optional[float] = None
+    grade_label: Optional[str] = None
+    student_id_no: Optional[str] = None
+    student_code: Optional[str] = None
+    course_code: Optional[str] = None
+    duration_text: Optional[str] = None
+    total_hours: Optional[str] = None
 
     class Config:
         from_attributes = True

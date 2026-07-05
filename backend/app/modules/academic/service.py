@@ -6,9 +6,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import joinedload
 from sqlalchemy import func, or_
-from app.modules.academic.models import Course, CourseSection, Student, Enrollment
+from app.modules.academic.models import Course, CourseSection, Student, Enrollment, FinalGrade
+from app.modules.academic.certificate_service import create_certificate
 from app.modules.lms.models import Payment, TeacherWallet
-from app.modules.identity.models import Employee, CompensationType
+from app.modules.identity.models import Employee, CompensationType, User
 
 
 # --- Course CRUD ---
@@ -213,13 +214,28 @@ async def activate_section(db: AsyncSession, section_id: uuid.UUID, teacher_perc
     await db.flush()
     return section
 
-async def complete_section(db: AsyncSession, section_id: uuid.UUID) -> Optional[CourseSection]:
+async def complete_section(db: AsyncSession, section_id: uuid.UUID, user_id: Optional[uuid.UUID] = None) -> Optional[CourseSection]:
     section = await get_course_section(db, section_id)
     if not section:
         return None
     if section.status != "active":
         return None
     section.status = "completed"
+
+    enrollments_result = await db.execute(
+        select(Enrollment)
+        .where(Enrollment.section_id == section_id, Enrollment.deleted_at.is_(None))
+        .options(
+            joinedload(Enrollment.student),
+            joinedload(Enrollment.section).joinedload(CourseSection.course)
+        )
+    )
+    for enrollment in enrollments_result.scalars().all():
+        try:
+            await create_certificate(db, enrollment, user_id=user_id)
+        except Exception:
+            continue
+
     await db.flush()
     return section
 
@@ -368,3 +384,91 @@ async def delete_enrollment(db: AsyncSession, enrollment_id: uuid.UUID) -> bool:
     enrollment.deleted_at = datetime.now(timezone.utc)
     await db.flush()
     return True
+
+
+# --- Final Grade CRUD ---
+async def set_final_grade(
+    db: AsyncSession,
+    section_id: uuid.UUID,
+    student_id: uuid.UUID,
+    final_score: float,
+    graded_by: uuid.UUID,
+    notes: Optional[str] = None,
+) -> FinalGrade:
+    result = await db.execute(
+        select(FinalGrade).where(
+            FinalGrade.section_id == section_id,
+            FinalGrade.student_id == student_id,
+        )
+    )
+    existing = result.scalar_one_or_none()
+    if existing:
+        existing.final_score = final_score
+        existing.graded_by = graded_by
+        existing.graded_at = datetime.now(timezone.utc)
+        existing.notes = notes
+    else:
+        existing = FinalGrade(
+            section_id=section_id,
+            student_id=student_id,
+            final_score=final_score,
+            graded_by=graded_by,
+            notes=notes,
+        )
+        db.add(existing)
+    await db.flush()
+    return existing
+
+async def set_final_grades_bulk(
+    db: AsyncSession,
+    section_id: uuid.UUID,
+    grades: list[dict],
+    graded_by: uuid.UUID,
+) -> list[FinalGrade]:
+    results = []
+    for g in grades:
+        fg = await set_final_grade(
+            db, section_id=section_id, student_id=g["student_id"],
+            final_score=g["final_score"], graded_by=graded_by, notes=g.get("notes")
+        )
+        results.append(fg)
+    return results
+
+async def list_final_grades(
+    db: AsyncSession,
+    section_id: uuid.UUID,
+) -> list[dict]:
+    query = (
+        select(FinalGrade, Student.full_name, Student.student_code)
+        .join(Student, FinalGrade.student_id == Student.id)
+        .where(FinalGrade.section_id == section_id)
+        .order_by(Student.full_name)
+    )
+    result = await db.execute(query)
+    rows = []
+    for fg, student_name, student_code in result.all():
+        rows.append({
+            "id": fg.id,
+            "student_id": fg.student_id,
+            "section_id": fg.section_id,
+            "final_score": fg.final_score,
+            "graded_by": fg.graded_by,
+            "graded_at": fg.graded_at,
+            "notes": fg.notes,
+            "student_name": student_name,
+            "student_code": student_code,
+        })
+    return rows
+
+async def get_student_final_grade(
+    db: AsyncSession,
+    section_id: uuid.UUID,
+    student_id: uuid.UUID,
+) -> Optional[FinalGrade]:
+    result = await db.execute(
+        select(FinalGrade).where(
+            FinalGrade.section_id == section_id,
+            FinalGrade.student_id == student_id,
+        )
+    )
+    return result.scalar_one_or_none()

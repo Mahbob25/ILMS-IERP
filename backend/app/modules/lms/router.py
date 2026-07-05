@@ -1,7 +1,7 @@
 import uuid
 from datetime import date
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.session import get_db
 from app.modules.identity.models import User
@@ -10,8 +10,6 @@ from app.modules.academic.service import get_course_section
 from app.modules.lms.schemas import (
     AttendanceSessionCreate, AttendanceSessionResponse,
     AttendanceRecordResponse, AttendanceSubmit,
-    AssignmentCreate, AssignmentUpdate, AssignmentResponse,
-    SubmissionResponse, GradeCreate, GradeResponse,
     PaymentCreate, PaymentResponse,
     TeacherWalletResponse,
     ExpenseCreate, ExpenseResponse, EligibleRecipientResponse,
@@ -20,7 +18,6 @@ from app.modules.lms.schemas import (
 )
 from app.modules.lms import service as lms_service
 from app.modules.lms import financial_service
-from app.core.storage import save_upload
 
 lms_router = APIRouter(prefix="/lms", tags=["lms"])
 
@@ -79,107 +76,11 @@ async def submit_attendance(
     return await lms_service.set_attendance_records(db, session_id, records_data)
 
 
-# --- Assignments ---
-@lms_router.get("/assignments", response_model=list[AssignmentResponse])
-async def list_assignments(
-    section_id: Optional[uuid.UUID] = None,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
-):
-    return await lms_service.list_assignments(db, section_id=section_id)
-
-@lms_router.post("/assignments", response_model=AssignmentResponse, status_code=status.HTTP_201_CREATED)
-async def create_assignment(
-    data: AssignmentCreate,
-    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary", "teacher"])),
-    db: AsyncSession = Depends(get_db)
-):
-    section = await get_course_section(db, data.section_id)
-    if not section:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Section not found")
-    if current_user.role.name == "teacher" and section.teacher_id != current_user.employee_id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not your section")
-    return await lms_service.create_assignment(db, data.model_dump())
-
-@lms_router.put("/assignments/{assignment_id}", response_model=AssignmentResponse)
-async def update_assignment(
-    assignment_id: uuid.UUID,
-    data: AssignmentUpdate,
-    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary", "teacher"])),
-    db: AsyncSession = Depends(get_db)
-):
-    cleaned = {k: v for k, v in data.model_dump().items() if v is not None}
-    assignment = await lms_service.update_assignment(db, assignment_id, cleaned)
-    if not assignment:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assignment not found")
-    return assignment
-
-@lms_router.delete("/assignments/{assignment_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_assignment(
-    assignment_id: uuid.UUID,
-    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager"])),
-    db: AsyncSession = Depends(get_db)
-):
-    deleted = await lms_service.delete_assignment(db, assignment_id)
-    if not deleted:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assignment not found")
-
-
-# --- Submissions ---
-@lms_router.get("/assignments/{assignment_id}/submissions", response_model=list[SubmissionResponse])
-async def list_submissions(
-    assignment_id: uuid.UUID,
-    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary", "teacher"])),
-    db: AsyncSession = Depends(get_db)
-):
-    return await lms_service.list_submissions(db, assignment_id)
-
-@lms_router.post("/assignments/{assignment_id}/submissions", response_model=SubmissionResponse, status_code=status.HTTP_201_CREATED)
-async def submit_assignment(
-    assignment_id: uuid.UUID,
-    student_id: str = Form(...),
-    file: Optional[UploadFile] = File(None),
-    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary", "teacher"])),
-    db: AsyncSession = Depends(get_db)
-):
-    assignment = await lms_service.get_assignment(db, assignment_id)
-    if not assignment:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assignment not found")
-    file_path = None
-    if file:
-        file_path = await save_upload(file, subdir="submissions")
-    submission = await lms_service.create_submission(db, assignment_id, uuid.UUID(student_id), file_path)
-    if not submission:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Submission already exists")
-    return submission
-
-
-# --- Grades ---
-@lms_router.post("/submissions/{submission_id}/grade", response_model=GradeResponse, status_code=status.HTTP_201_CREATED)
-async def grade_submission(
-    submission_id: uuid.UUID,
-    data: GradeCreate,
-    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary", "teacher"])),
-    db: AsyncSession = Depends(get_db)
-):
-    grade = await lms_service.create_or_update_grade(db, submission_id, data.score, data.feedback, current_user.id)
-    if grade is None:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid submission or score exceeds max")
-    return grade
-
-@lms_router.get("/assignments/{assignment_id}/grades", response_model=list[GradeResponse])
-async def list_grades(
-    assignment_id: uuid.UUID,
-    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary", "teacher"])),
-    db: AsyncSession = Depends(get_db)
-):
-    return await lms_service.list_grades_for_assignment(db, assignment_id)
-
-
 # --- Payments ---
 @lms_router.post("/payments", response_model=PaymentResponse, status_code=status.HTTP_201_CREATED)
 async def create_payment(
     data: PaymentCreate,
+    locale: str = "ar",
     current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])),
     db: AsyncSession = Depends(get_db)
 ):
@@ -188,6 +89,7 @@ async def create_payment(
         db, data.enrollment_id, data.amount, payment_date,
         payment_method=data.payment_method,
         transaction_number=data.transaction_number,
+        locale=locale,
     )
     if not payment:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Enrollment not found")
@@ -222,6 +124,19 @@ async def get_payment(
     if not payment:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Payment not found")
     return payment
+
+
+@lms_router.get("/payments/{payment_id}/preview")
+async def preview_receipt(
+    payment_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    html = await financial_service.get_receipt_html_content(db, payment_id)
+    if not html:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Receipt not found")
+    from fastapi.responses import HTMLResponse
+    return HTMLResponse(content=html)
 
 
 # --- Revenue Overview ---
@@ -274,6 +189,7 @@ async def list_eligible_recipients(
 @lms_router.post("/expenses", response_model=ExpenseResponse, status_code=status.HTTP_201_CREATED)
 async def create_expense(
     data: ExpenseCreate,
+    locale: str = "ar",
     current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])),
     db: AsyncSession = Depends(get_db)
 ):
@@ -285,6 +201,7 @@ async def create_expense(
             db, amount=data.amount, recipient_name=data.recipient_name,
             recipient_id=data.recipient_id,
             expense_type=data.type, description=data.description, expense_date=expense_date,
+            locale=locale,
         )
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
@@ -313,6 +230,19 @@ async def get_expense(
     if not expense:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Expense not found")
     return expense
+
+
+@lms_router.get("/expenses/{expense_id}/preview")
+async def preview_voucher(
+    expense_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    html = await financial_service.get_voucher_html_content(db, expense_id)
+    if not html:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Voucher not found")
+    from fastapi.responses import HTMLResponse
+    return HTMLResponse(content=html)
 
 
 # --- Daily Closures ---

@@ -4,9 +4,9 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useParams } from "next/navigation";
 import { apiClient } from "@/lib/api";
 import { useAuth } from "@/components/AuthContext";
-import Modal from "@/components/Modal";
-import { Search, Loader2, RefreshCw, Receipt, X, Plus, Check } from "lucide-react";
+import { Search, Loader2, RefreshCw, X, Plus, Check } from "lucide-react";
 import RefreshButton from "@/components/RefreshButton";
+import ReceiptModal, { ReceiptData } from "@/components/ReceiptModal";
 
 interface Student {
   id: string;
@@ -169,7 +169,8 @@ export default function POSPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [loadingEnrollments, setLoadingEnrollments] = useState(false);
   const [error, setError] = useState("");
-  const [showReceipt, setShowReceipt] = useState<PaymentResult | null>(null);
+  const [showReceipt, setShowReceipt] = useState(false);
+  const [receiptData, setReceiptData] = useState<ReceiptData | null>(null);
 
   const fetchStudents = useCallback(async () => {
     try {
@@ -243,6 +244,7 @@ export default function POSPage() {
   };
 
   const handleClear = () => {
+    setShowReceipt(false);
     setSelectedStudent(null);
     setStudentQuery("");
     setShowDropdown(false);
@@ -292,9 +294,24 @@ export default function POSPage() {
         payload.transaction_number = transactionNumber;
       }
       const res = await apiClient.post<PaymentResult>("/lms/payments", payload);
+      const rd: ReceiptData = {
+        type: "payment",
+        receipt_number: res.data.receipt_number,
+        date: res.data.date,
+        amount: res.data.amount,
+        student_name: selectedStudent?.full_name || "",
+        course_name: getCourseNameForEnrollment(selectedSectionId),
+        payment_method: paymentMethod,
+        transaction_number: transactionNumber,
+        agreed_price: summary?.agreed_price ?? null,
+        admin_discount: summary?.admin_discount ?? null,
+        total_paid: summary?.total_paid ?? null,
+        balance_remaining: summary?.balance_remaining ?? null,
+      };
+      setReceiptData(rd);
       setResult(res.data);
       if (printReceipt) {
-        setShowReceipt(res.data);
+        setShowReceipt(true);
       }
     } catch (e: unknown) {
       const err = e as { response?: { data?: { detail?: string } } };
@@ -318,10 +335,6 @@ export default function POSPage() {
       await fetchEnrollments(selectedStudent.id);
     }
     setRefreshing(false);
-  };
-
-  const handlePrint = () => {
-    window.print();
   };
 
   const formatDate = (d: string) => {
@@ -363,7 +376,7 @@ export default function POSPage() {
         <RefreshButton onRefresh={handleRefresh} tooltip={isRtl ? "تحديث" : "Refresh"} />
       </div>
 
-      {result && !showReceipt && (
+      {result && receiptData && (
         <div className="card p-4 border-emerald-200 bg-emerald-50 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Check size={20} className="text-emerald-600" />
@@ -375,8 +388,7 @@ export default function POSPage() {
             </div>
           </div>
           <div className="flex gap-2">
-            <button onClick={() => setShowReceipt(result)} className="btn-primary text-xs flex items-center gap-1">
-              <Receipt size={14} />
+            <button onClick={() => setShowReceipt(true)} className="btn-primary text-xs flex items-center gap-1">
               <span>{t.receiptPreview}</span>
             </button>
             <button onClick={handleClear} className="btn-secondary text-xs">{t.newPayment}</button>
@@ -644,49 +656,14 @@ export default function POSPage() {
         <span>{isRtl ? "للحذف" : "to clear"}</span>
       </div>
 
-      <Modal open={showReceipt !== null} onClose={() => setShowReceipt(null)} title={t.receiptTitle} size="lg">
-        <div className="border-t border-slate-200 pt-4 space-y-3 text-sm">
-          <div className="text-center pb-4 border-b border-slate-100">
-            <h4 className="text-base font-bold text-slate-900">{t.instituteName}</h4>
-            <p className="text-slate-500 mt-1">{t.receiptTitle}</p>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-slate-500">{t.receiptNumber}</span>
-            <span className="font-semibold text-slate-900 font-mono">{showReceipt?.receipt_number}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-slate-500">{t.date}</span>
-            <span className="text-slate-900">{showReceipt ? formatDate(showReceipt.date) : ""}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-slate-500">{t.student}</span>
-            <span className="font-medium text-slate-900">{selectedStudent?.full_name || ""}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-slate-500">{t.course}</span>
-            <span className="text-slate-900">
-              {getCourseNameForEnrollment(selectedSectionId)}
-            </span>
-          </div>
-          <div className="flex justify-between pt-2 border-t border-slate-200 text-base">
-            <span className="font-bold text-slate-900">{t.paid}</span>
-            <span className="font-bold text-emerald-600">
-              {showReceipt ? `${showReceipt.amount.toFixed(2)} ${t.sar}` : ""}
-            </span>
-          </div>
-          <div className="flex justify-between pt-8 text-xs text-slate-400">
-            <span>{t.cashier}: _________________</span>
-            <span>{t.studentSignature}: _________________</span>
-          </div>
-        </div>
-        <div className="border-t border-slate-200 flex gap-3 justify-end pt-4">
-          <button onClick={handlePrint} className="btn-primary flex items-center gap-2">
-            <Receipt size={16} />
-            <span>{t.print}</span>
-          </button>
-          <button onClick={() => setShowReceipt(null)} className="btn-secondary">{t.close}</button>
-        </div>
-      </Modal>
+      <ReceiptModal
+        open={showReceipt}
+        onClose={() => setShowReceipt(false)}
+        data={receiptData}
+        locale={locale}
+        isRtl={isRtl}
+        instituteName={t.instituteName}
+      />
     </div>
   );
 }

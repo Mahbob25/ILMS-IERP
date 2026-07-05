@@ -78,4 +78,77 @@ test.describe('Academic: Section Lifecycle', () => {
     const response = await request.delete(`${BASE_URL}/academic/course-sections/${fakeId}`, { headers })
     expect(response.status()).toBe(404)
   })
+
+  test('should auto-generate certificates on section completion', async ({ request }) => {
+    const ts = Date.now().toString(36)
+    const courseCode = `CERT${ts}`
+    const courseRes = await request.post(`${BASE_URL}/academic/courses`, {
+      headers,
+      data: { name: `Cert Test Course ${ts}`, code: courseCode, credits: 2 },
+    })
+    expect(courseRes.status()).toBe(201)
+    const course = await courseRes.json()
+
+    const teachersRes = await request.get(`${BASE_URL}/users/teachers`, { headers })
+    const teachers = await teachersRes.json()
+    if (teachers.length === 0) {
+      test.skip(true, 'No teachers found')
+      return
+    }
+
+    const sectionRes = await request.post(`${BASE_URL}/academic/course-sections`, {
+      headers,
+      data: {
+        course_id: course.id,
+        teacher_id: teachers[0].id,
+        capacity: 30,
+        min_students_required: 1,
+        price: 500,
+      },
+    })
+    expect(sectionRes.status()).toBe(201)
+    const section = await sectionRes.json()
+
+    const studentCode = `STU${ts}`
+    const studentRes = await request.post(`${BASE_URL}/academic/students`, {
+      headers,
+      data: { student_code: studentCode, full_name: `Cert Student ${ts}` },
+    })
+    expect(studentRes.status()).toBe(201)
+    const student = await studentRes.json()
+
+    const enrollRes = await request.post(`${BASE_URL}/academic/enrollments`, {
+      headers,
+      data: { student_id: student.id, section_id: section.id },
+    })
+    expect(enrollRes.status()).toBe(201)
+
+    const activateRes = await request.post(`${BASE_URL}/academic/course-sections/${section.id}/activate`, {
+      headers,
+      data: { teacher_percentage: 50 },
+    })
+    expect(activateRes.status()).toBe(200)
+    const activeSection = await activateRes.json()
+    expect(activeSection.status).toBe('active')
+
+    const completeRes = await request.post(`${BASE_URL}/academic/course-sections/${section.id}/complete`, {
+      headers,
+    })
+    expect(completeRes.status()).toBe(200)
+    const completedSection = await completeRes.json()
+    expect(completedSection.status).toBe('completed')
+
+    const certsRes = await request.get(`${BASE_URL}/academic/certificates?student_id=${student.id}`, { headers })
+    expect(certsRes.status()).toBe(200)
+    const certsBody = await certsRes.json()
+    expect(certsBody.total).toBeGreaterThanOrEqual(1)
+    expect(certsBody.items.length).toBeGreaterThanOrEqual(1)
+
+    const cert = certsBody.items[0]
+    expect(cert.student_name).toBe(`Cert Student ${ts}`)
+    expect(cert.course_name).toBe(`Cert Test Course ${ts}`)
+    expect(cert.certificate_number).toMatch(/^CERT-\d{4}-\d{6}$/)
+    expect(cert.student_id).toBe(student.id)
+    expect(cert.section_id).toBe(section.id)
+  })
 })

@@ -6,7 +6,8 @@ import { apiClient } from "@/lib/api";
 import { useAuth } from "@/components/AuthContext";
 import Modal from "@/components/Modal";
 import Select from "@/components/ui/Select";
-import { Plus, Loader2, RefreshCw, Receipt, X, Eye } from "lucide-react";
+import { Plus, Loader2, RefreshCw, Eye } from "lucide-react";
+import ReceiptModal, { ReceiptData } from "@/components/ReceiptModal";
 
 interface Payment {
   id: string;
@@ -133,6 +134,7 @@ export default function PaymentsPage() {
   const [formError, setFormError] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [showReceipt, setShowReceipt] = useState<Payment | null>(null);
+  const [receiptSummary, setReceiptSummary] = useState<PaymentSummary | null>(null);
   const [form, setForm] = useState<{
     enrollment_id: string;
     amount: string;
@@ -237,6 +239,7 @@ export default function PaymentsPage() {
       setShowForm(false);
       setFormError("");
       setShowReceipt(res.data);
+      setReceiptSummary(summary);
       fetchPayments();
     } catch (e: unknown) {
       const err = e as { response?: { data?: { detail?: string } } };
@@ -249,10 +252,6 @@ export default function PaymentsPage() {
         setFormError(detail || t.paymentFailed);
       }
     }
-  };
-
-  const handlePrint = () => {
-    window.print();
   };
 
   const formatDate = (d: string) => {
@@ -439,7 +438,7 @@ export default function PaymentsPage() {
                     <td className="font-semibold text-slate-900">{payment.amount.toFixed(2)} {t.sar}</td>
                     <td className="text-slate-500">{formatDate(payment.date)}</td>
                     <td>
-                      <button onClick={() => setShowReceipt(payment)} className="btn-icon" title={t.receiptPreview}>
+                      <button onClick={() => { setShowReceipt(payment); setReceiptSummary(null); }} className="btn-icon" title={t.receiptPreview}>
                         <Eye size={15} />
                       </button>
                     </td>
@@ -451,51 +450,27 @@ export default function PaymentsPage() {
         </div>
       )}
 
-      <Modal open={showReceipt !== null} onClose={() => setShowReceipt(null)} title={t.receiptTitle} size="lg">
-        <div className="border-t border-slate-200 pt-4 space-y-3 text-sm">
-          <div className="text-center pb-4 border-b border-slate-100">
-            <h4 className="text-base font-bold text-slate-900">{t.instituteName}</h4>
-            <p className="text-slate-500 mt-1">{t.receiptTitle}</p>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-slate-500">{t.receiptNumber}</span>
-            <span className="font-semibold text-slate-900">{showReceipt?.receipt_number}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-slate-500">{t.date}</span>
-            <span className="text-slate-900">{showReceipt ? formatDate(showReceipt.date) : ""}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-slate-500">{t.student}</span>
-            <span className="font-medium text-slate-900">
-              {showReceipt ? (resolveEnrollment(showReceipt.enrollment_id)?.student?.full_name || showReceipt.enrollment_id.slice(0, 8)) : ""}
-            </span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-slate-500">{t.course}</span>
-            <span className="text-slate-900">
-              {showReceipt ? (resolveEnrollment(showReceipt.enrollment_id)?.course?.name || showReceipt.enrollment_id.slice(0, 8)) : ""}
-            </span>
-          </div>
-          <div className="flex justify-between pt-2 border-t border-slate-200 text-base">
-            <span className="font-bold text-slate-900">{t.paid}</span>
-            <span className="font-bold text-emerald-600">
-              {showReceipt ? `${showReceipt.amount.toFixed(2)} ${t.sar}` : ""}
-            </span>
-          </div>
-          <div className="flex justify-between pt-8 text-xs text-slate-400">
-            <span>{t.cashier}: _________________</span>
-            <span>{t.studentSignature}: _________________</span>
-          </div>
-        </div>
-        <div className="border-t border-slate-200 flex gap-3 justify-end pt-4">
-          <button onClick={handlePrint} className="btn-primary flex items-center gap-2">
-            <Receipt size={16} />
-            <span>{t.print}</span>
-          </button>
-          <button onClick={() => setShowReceipt(null)} className="btn-secondary">{t.close}</button>
-        </div>
-      </Modal>
+      <ReceiptModal
+        open={showReceipt !== null}
+        onClose={() => { setShowReceipt(null); setReceiptSummary(null); }}
+        data={showReceipt ? {
+          type: "payment",
+          receipt_number: showReceipt.receipt_number,
+          date: showReceipt.date,
+          amount: showReceipt.amount,
+          student_name: resolveEnrollment(showReceipt.enrollment_id)?.student?.full_name || showReceipt.enrollment_id.slice(0, 8),
+          course_name: resolveEnrollment(showReceipt.enrollment_id)?.course?.name || showReceipt.enrollment_id.slice(0, 8),
+          payment_method: showReceipt.payment_method,
+          transaction_number: showReceipt.transaction_number,
+          agreed_price: receiptSummary?.agreed_price ?? null,
+          admin_discount: receiptSummary?.admin_discount ?? null,
+          total_paid: receiptSummary?.total_paid ?? null,
+          balance_remaining: receiptSummary?.balance_remaining ?? null,
+        } : null}
+        locale={locale}
+        isRtl={isRtl}
+        instituteName={t.instituteName}
+      />
     </div>
   );
 }
