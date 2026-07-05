@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import joinedload
 from sqlalchemy import func
-from app.modules.identity.models import User, Role, Employee, EmployeeType, Permission, RolePermission, AuditLog
+from app.modules.identity.models import User, Role, Employee, EmployeeType, CompensationType, Permission, RolePermission, AuditLog
 from app.modules.lms.models import TeacherWallet, AttendanceSession, Assignment, Grade, Submission
 from app.modules.academic.models import CourseSection, Course
 from app.modules.identity.schemas import SectionInfo, RecentActivity
@@ -213,6 +213,8 @@ async def list_employees(
             "employee_type": emp.employee_type.value if hasattr(emp.employee_type, 'value') else emp.employee_type,
             "phone_number": emp.phone_number,
             "salary": emp.salary,
+            "compensation_type": emp.compensation_type.value if hasattr(emp.compensation_type, 'value') else emp.compensation_type,
+            "default_percentage": float(emp.default_percentage) if emp.default_percentage is not None else None,
             "hire_date": str(emp.hire_date) if emp.hire_date else None,
             "contract_end_date": str(emp.contract_end_date) if emp.contract_end_date else None,
             "address": emp.address,
@@ -257,6 +259,8 @@ async def get_employee_detail(db: AsyncSession, employee_id: uuid.UUID) -> Optio
         "employee_type": emp.employee_type.value if hasattr(emp.employee_type, 'value') else emp.employee_type,
         "phone_number": emp.phone_number,
         "salary": emp.salary,
+        "compensation_type": emp.compensation_type.value if hasattr(emp.compensation_type, 'value') else emp.compensation_type,
+        "default_percentage": float(emp.default_percentage) if emp.default_percentage is not None else None,
         "hire_date": str(emp.hire_date) if emp.hire_date else None,
         "contract_end_date": str(emp.contract_end_date) if emp.contract_end_date else None,
         "address": emp.address,
@@ -271,11 +275,27 @@ async def create_employee(db: AsyncSession, data: dict) -> Employee:
     except ValueError:
         raise ValueError(f"Invalid employee type: {data['employee_type']}")
 
+    comp_type_str = data.get("compensation_type", "salary")
+    try:
+        comp_type = CompensationType(comp_type_str)
+    except ValueError:
+        raise ValueError(f"Invalid compensation type: {comp_type_str}")
+
+    salary_value = data.get("salary")
+    if comp_type == CompensationType.PERCENTAGE:
+        salary_value = 0
+
+    default_pct = data.get("default_percentage")
+    if default_pct is not None and comp_type == CompensationType.SALARY:
+        default_pct = None
+
     employee = Employee(
         full_name=data["full_name"],
         employee_type=type_enum,
+        compensation_type=comp_type,
+        default_percentage=default_pct,
         phone_number=data.get("phone_number"),
-        salary=data.get("salary"),
+        salary=salary_value,
         hire_date=data.get("hire_date"),
         contract_end_date=data.get("contract_end_date"),
         address=data.get("address"),
@@ -295,6 +315,23 @@ async def update_employee(db: AsyncSession, employee: Employee, data: dict) -> E
             data["employee_type"] = EmployeeType(data["employee_type"])
         except ValueError:
             raise ValueError(f"Invalid employee type: {data['employee_type']}")
+
+    if "compensation_type" in data and data["compensation_type"]:
+        try:
+            data["compensation_type"] = CompensationType(data["compensation_type"])
+        except ValueError:
+            raise ValueError(f"Invalid compensation type: {data['compensation_type']}")
+
+    if "default_percentage" in data and data["default_percentage"] is not None:
+        comp_type = data.get("compensation_type", employee.compensation_type)
+        if comp_type == CompensationType.SALARY:
+            data["default_percentage"] = None
+
+    if "salary" in data:
+        comp_type = data.get("compensation_type", employee.compensation_type)
+        if comp_type == CompensationType.PERCENTAGE:
+            data["salary"] = 0
+
     for key, value in data.items():
         if value is not None:
             setattr(employee, key, value)

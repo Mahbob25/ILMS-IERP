@@ -98,6 +98,8 @@ class PaymentCreate(BaseModel):
     enrollment_id: uuid.UUID
     amount: float
     date: Optional[str] = None
+    payment_method: str = "cash"
+    transaction_number: Optional[str] = None
 
 class PaymentResponse(BaseModel):
     id: uuid.UUID
@@ -105,6 +107,8 @@ class PaymentResponse(BaseModel):
     amount: float
     date: date
     receipt_number: str
+    payment_method: str
+    transaction_number: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -156,9 +160,32 @@ class DailyClosureResponse(BaseModel):
     date: date
     status: str
     closed_by_manager_id: Optional[uuid.UUID] = None
+    total_payments_in: float = 0
+    total_expenses_out: float = 0
+    net_cash_flow: float = 0
 
     class Config:
         from_attributes = True
+
+class PaymentDetailItem(BaseModel):
+    id: uuid.UUID
+    amount: float
+    receipt_number: str
+    payment_method: str
+    transaction_number: Optional[str] = None
+    enrollment_id: uuid.UUID
+    student_id: uuid.UUID
+    student_name: str
+    course_name: str
+
+class ExpenseDetailItem(BaseModel):
+    id: uuid.UUID
+    amount: float
+    receipt_number: str
+    type: str
+    recipient_name: Optional[str] = None
+    description: Optional[str] = None
+    recipient_id: Optional[uuid.UUID] = None
 
 class DailyLedgerResponse(BaseModel):
     date: date
@@ -166,6 +193,11 @@ class DailyLedgerResponse(BaseModel):
     total_expenses_out: float
     net_cash_flow: float
     status: str
+    closed_by_manager_id: Optional[uuid.UUID] = None
+    payments: list[PaymentDetailItem]
+    expenses: list[ExpenseDetailItem]
+    prev_date: date
+    next_date: date
 
 
 # --- Revenue ---

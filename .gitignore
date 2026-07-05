@@ -47,6 +47,14 @@ alembic/versions/*.pyc
 Thumbs.db
 desktop.ini
 
-# --- Misc ---
+# --- Build / Output artifacts ---
+next_error.txt
+next_output.txt
+.npm-cache/
+
+# --- Cookie debug files ---
 cookie.txt
+cookies*.txt
+
+# --- Misc ---
 *.sqlite3

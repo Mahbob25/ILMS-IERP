@@ -185,7 +185,9 @@ async def create_payment(
 ):
     payment_date = date.fromisoformat(data.date) if data.date else None
     payment = await financial_service.create_payment(
-        db, data.enrollment_id, data.amount, payment_date
+        db, data.enrollment_id, data.amount, payment_date,
+        payment_method=data.payment_method,
+        transaction_number=data.transaction_number,
     )
     if not payment:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Enrollment not found")

@@ -15,6 +15,8 @@ interface EmployeeDetail {
   employee_type: string;
   phone_number: string | null;
   salary: number | null;
+  compensation_type: string;
+  default_percentage: number | null;
   hire_date: string | null;
   contract_end_date: string | null;
   address: string | null;
@@ -53,6 +55,8 @@ export default function EmployeeDetailPage() {
       hasAccess: "لديه صلاحية وصول", noAccess: "لا توجد صلاحية وصول",
       linkedUser: "حساب النظام المرتبط", email: "البريد الإلكتروني",
       role: "الدور", userStatus: "حالة الحساب",
+      compensationType: "نظام التعويض", defaultPct: "النسبة الافتراضية",
+      monthlySalary: "راتب شهري", percentage: "نسبة مئوية", hybrid: "نظام هجين",
     },
     en: {
       back: "Back to Employees", hrInfo: "Employee Information", type: "Employee Type",
@@ -62,6 +66,8 @@ export default function EmployeeDetailPage() {
       hasAccess: "Has System Access", noAccess: "No System Access",
       linkedUser: "Linked User Account", email: "Email",
       role: "Role", userStatus: "Account Status",
+      compensationType: "Compensation Type", defaultPct: "Default Percentage",
+      monthlySalary: "Monthly Salary", percentage: "Percentage", hybrid: "Hybrid",
     },
   }[locale === "en" ? "en" : "ar"];
 
@@ -141,8 +147,15 @@ export default function EmployeeDetailPage() {
             <span className="text-slate-900 font-medium">{data.phone_number || "—"}</span>
           </div>
           <div className="flex items-center gap-2 text-slate-600">
-            <DollarSign size={14} className="text-slate-400" />
-            <span className="text-slate-900 font-medium">{data.salary !== null ? `${data.salary.toFixed(2)}` : "—"}</span>
+            {data.compensation_type === "salary" && (
+              <><DollarSign size={14} className="text-slate-400" /><span className="text-slate-900 font-medium">{t.monthlySalary}{data.salary !== null ? ` (${data.salary.toFixed(2)})` : ""}</span></>
+            )}
+            {data.compensation_type === "percentage" && (
+              <><DollarSign size={14} className="text-slate-400" /><span className="text-slate-900 font-medium">{t.percentage}{data.default_percentage ? ` (${data.default_percentage}%)` : ""}</span></>
+            )}
+            {data.compensation_type === "hybrid" && (
+              <><DollarSign size={14} className="text-slate-400" /><span className="text-slate-900 font-medium">{t.hybrid}{data.salary !== null ? ` (${data.salary.toFixed(2)})` : ""}</span></>
+            )}
           </div>
           <div className="flex items-center gap-2 text-slate-600">
             <Calendar size={14} className="text-slate-400" />

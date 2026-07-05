@@ -47,6 +47,8 @@ class EmployeeResponse(BaseModel):
     employee_type: str
     phone_number: Optional[str] = None
     salary: Optional[float] = None
+    compensation_type: str = "salary"
+    default_percentage: Optional[float] = None
     hire_date: Optional[date] = None
     contract_end_date: Optional[date] = None
     address: Optional[str] = None
@@ -61,6 +63,8 @@ class EmployeeCreate(BaseModel):
     employee_type: str = Field(..., description="Must be a valid EmployeeType value")
     phone_number: Optional[str] = None
     salary: Optional[float] = None
+    compensation_type: str = "salary"
+    default_percentage: Optional[float] = None
     hire_date: Optional[date] = None
     contract_end_date: Optional[date] = None
     address: Optional[str] = None
@@ -70,6 +74,8 @@ class EmployeeUpdate(BaseModel):
     employee_type: Optional[str] = None
     phone_number: Optional[str] = None
     salary: Optional[float] = None
+    compensation_type: Optional[str] = None
+    default_percentage: Optional[float] = None
     hire_date: Optional[date] = None
     contract_end_date: Optional[date] = None
     address: Optional[str] = None
@@ -81,6 +87,8 @@ class EmployeeDetailResponse(BaseModel):
     employee_type: str
     phone_number: Optional[str] = None
     salary: Optional[float] = None
+    compensation_type: str = "salary"
+    default_percentage: Optional[float] = None
     hire_date: Optional[date] = None
     contract_end_date: Optional[date] = None
     address: Optional[str] = None

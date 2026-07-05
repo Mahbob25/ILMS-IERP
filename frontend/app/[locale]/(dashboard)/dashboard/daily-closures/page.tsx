@@ -1,28 +1,23 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { apiClient } from "@/lib/api";
 import { useAuth } from "@/components/AuthContext";
-import Modal from "@/components/Modal";
-import { Loader2, RefreshCw, Lock, Unlock, Eye, X } from "lucide-react";
+import { Loader2, RefreshCw, Lock, Unlock, Eye } from "lucide-react";
 
 interface DailyClosure {
   date: string;
   status: string;
   closed_by_manager_id: string | null;
-}
-
-interface DailyLedger {
-  date: string;
   total_payments_in: number;
   total_expenses_out: number;
   net_cash_flow: number;
-  status: string;
 }
 
 export default function DailyClosuresPage() {
   const params = useParams();
+  const router = useRouter();
   const { user } = useAuth();
   const locale = (params?.locale as string) || "ar";
   const isRtl = locale === "ar";
@@ -53,6 +48,15 @@ export default function DailyClosuresPage() {
       sar: "ريال",
       filterDateFrom: "من تاريخ",
       filterDateTo: "إلى تاريخ",
+      receiptNumber: "رقم الإيصال",
+      cash: "نقداً",
+      online: "تحويل بنكي",
+      transactionNumber: "رقم العملية",
+      paymentMethod: "طريقة الدفع",
+      amount: "المبلغ",
+      cashPayments: "المدفوعات النقدية",
+      onlinePayments: "المدفوعات البنكية",
+      ledgerError: "فشل تحميل كشف الحساب",
     },
     en: {
       title: "Daily Closures",
@@ -79,15 +83,22 @@ export default function DailyClosuresPage() {
       sar: "SAR",
       filterDateFrom: "From Date",
       filterDateTo: "To Date",
+      receiptNumber: "Receipt No.",
+      cash: "Cash",
+      online: "Bank Transfer",
+      transactionNumber: "Transaction No.",
+      paymentMethod: "Method",
+      amount: "Amount",
+      cashPayments: "Cash Payments",
+      onlinePayments: "Bank Transfer Payments",
+      ledgerError: "Failed to load ledger",
     },
   }[locale === "en" ? "en" : "ar"];
 
   const [closures, setClosures] = useState<DailyClosure[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [showLedger, setShowLedger] = useState<DailyLedger | null>(null);
   const [closeConfirm, setCloseConfirm] = useState<string | null>(null);
-  const [ledgerLoading, setLedgerLoading] = useState(false);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
 
@@ -149,17 +160,6 @@ export default function DailyClosuresPage() {
     } catch (e) {
       console.error(e);
     }
-  };
-
-  const handleShowLedger = async (date: string) => {
-    setLedgerLoading(true);
-    try {
-      const res = await apiClient.get<DailyLedger>(`/lms/daily-closures/${date}/ledger`);
-      setShowLedger(res.data);
-    } catch (e) {
-      console.error(e);
-    }
-    setLedgerLoading(false);
   };
 
   const statusBadge = (status: string) => {
@@ -232,17 +232,16 @@ export default function DailyClosuresPage() {
                 <tr key={closure.date}>
                   <td className="font-medium text-slate-900">{formatDate(closure.date)}</td>
                   <td>{statusBadge(closure.status)}</td>
-                  <td colSpan={3}>
-                    <button
-                      onClick={() => handleShowLedger(closure.date)}
-                      className="btn-icon text-indigo-600"
-                      title={t.ledger}
-                    >
-                      <Eye size={15} />
-                    </button>
+                  <td className="font-semibold text-emerald-600">{closure.total_payments_in.toFixed(2)} {t.sar}</td>
+                  <td className="font-semibold text-red-600">{closure.total_expenses_out.toFixed(2)} {t.sar}</td>
+                  <td className={`font-semibold ${closure.net_cash_flow >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+                    {closure.net_cash_flow.toFixed(2)} {t.sar}
                   </td>
                   <td>
                     <div className="flex items-center gap-1">
+                      <button onClick={() => router.push(`/${locale}/dashboard/daily-closures/${closure.date}`)} className="btn-icon text-indigo-600" title={t.ledger}>
+                        <Eye size={15} />
+                      </button>
                       {canClose && closure.status !== "closed" && (
                         <>
                           {closeConfirm === closure.date ? (
@@ -276,35 +275,6 @@ export default function DailyClosuresPage() {
         </div>
       )}
 
-      <Modal open={showLedger !== null} onClose={() => setShowLedger(null)} title={t.ledger}>
-        <div className="border-t border-slate-200 pt-4 space-y-3 text-sm">
-          <div className="flex justify-between">
-            <span className="text-slate-500">{t.date}</span>
-            <span className="font-medium text-slate-900">{showLedger ? formatDate(showLedger.date) : ""}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-slate-500">{t.status}</span>
-            <span>{showLedger ? statusBadge(showLedger.status) : null}</span>
-          </div>
-          <div className="flex justify-between pt-2 border-t border-slate-100">
-            <span className="text-slate-600">{t.paymentsIn}</span>
-            <span className="font-semibold text-emerald-600">{showLedger ? `${showLedger.total_payments_in.toFixed(2)} ${t.sar}` : ""}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-slate-600">{t.expensesOut}</span>
-            <span className="font-semibold text-red-600">{showLedger ? `${showLedger.total_expenses_out.toFixed(2)} ${t.sar}` : ""}</span>
-          </div>
-          <div className="flex justify-between pt-2 border-t border-slate-200 text-base">
-            <span className="font-bold text-slate-900">{t.netCash}</span>
-            <span className={`font-bold ${showLedger && showLedger.net_cash_flow >= 0 ? "text-emerald-600" : "text-red-600"}`}>
-              {showLedger ? `${showLedger.net_cash_flow.toFixed(2)} ${t.sar}` : ""}
-            </span>
-          </div>
-        </div>
-        <div className="border-t border-slate-200 flex justify-end pt-4">
-          <button onClick={() => setShowLedger(null)} className="btn-secondary">{t.close}</button>
-        </div>
-      </Modal>
     </div>
   );
 }

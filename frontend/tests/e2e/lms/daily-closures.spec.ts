@@ -32,6 +32,8 @@ test.describe('LMS: Daily Closures', () => {
     expect(ledger).toHaveProperty('date')
     expect(ledger).toHaveProperty('total_payments_in')
     expect(ledger).toHaveProperty('total_expenses_out')
+    expect(ledger).toHaveProperty('payments')
+    expect(Array.isArray(ledger.payments)).toBe(true)
   })
 
   test('should reject closing day without auth', async ({ request }) => {

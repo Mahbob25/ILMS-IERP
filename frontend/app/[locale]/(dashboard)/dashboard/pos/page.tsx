@@ -95,6 +95,11 @@ export default function POSPage() {
       positiveAmount: "يجب أن يكون المبلغ أكبر من صفر",
       exceedsBalance: "المبلغ يتجاوز الرصيد المتبقي",
       paymentFailed: "فشل تسجيل الدفعة",
+      cash: "نقداً",
+      online: "تحويل بنكي",
+      paymentMethod: "طريقة الدفع",
+      transactionNumber: "رقم العملية",
+      enterTransactionNumber: "أدخل رقم العملية",
     },
     en: {
       title: "Point of Sale",
@@ -133,6 +138,11 @@ export default function POSPage() {
       positiveAmount: "Amount must be positive",
       exceedsBalance: "Amount exceeds remaining balance",
       paymentFailed: "Payment failed",
+      cash: "Cash",
+      online: "Bank Transfer",
+      paymentMethod: "Payment Method",
+      transactionNumber: "Transaction Number",
+      enterTransactionNumber: "Enter transaction number",
     },
   }[locale === "en" ? "en" : "ar"];
 
@@ -150,6 +160,8 @@ export default function POSPage() {
   const [selectedSectionId, setSelectedSectionId] = useState("");
   const [selectedEnrollmentId, setSelectedEnrollmentId] = useState("");
   const [amount, setAmount] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState("cash");
+  const [transactionNumber, setTransactionNumber] = useState("");
   const [printReceipt, setPrintReceipt] = useState(true);
   const [summary, setSummary] = useState<PaymentSummary | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -237,6 +249,8 @@ export default function POSPage() {
     setSelectedSectionId("");
     setSelectedEnrollmentId("");
     setAmount("");
+    setPaymentMethod("cash");
+    setTransactionNumber("");
     setSummary(null);
     setResult(null);
     setError("");
@@ -272,7 +286,11 @@ export default function POSPage() {
       const payload: Record<string, unknown> = {
         enrollment_id: selectedEnrollmentId,
         amount: parsedAmount,
+        payment_method: paymentMethod,
       };
+      if (paymentMethod === "online") {
+        payload.transaction_number = transactionNumber;
+      }
       const res = await apiClient.post<PaymentResult>("/lms/payments", payload);
       setResult(res.data);
       if (printReceipt) {
@@ -533,6 +551,47 @@ export default function POSPage() {
               />
               <span className="absolute start-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">{t.sar}</span>
             </div>
+          </div>
+        )}
+
+        {/* Payment Method */}
+        {selectedSectionId && (
+          <div>
+            <label className="block text-xs font-medium text-slate-700 mb-1.5">{t.paymentMethod}</label>
+            <div className="flex gap-2">
+              <button
+                onClick={() => { setPaymentMethod("cash"); setTransactionNumber(""); }}
+                className={`flex-1 py-2 px-4 text-sm font-medium rounded-lg border transition-colors ${
+                  paymentMethod === "cash"
+                    ? "border-emerald-400 bg-emerald-50 text-emerald-700"
+                    : "border-slate-200 text-slate-600 hover:border-slate-300"
+                }`}
+              >
+                {t.cash}
+              </button>
+              <button
+                onClick={() => setPaymentMethod("online")}
+                className={`flex-1 py-2 px-4 text-sm font-medium rounded-lg border transition-colors ${
+                  paymentMethod === "online"
+                    ? "border-emerald-400 bg-emerald-50 text-emerald-700"
+                    : "border-slate-200 text-slate-600 hover:border-slate-300"
+                }`}
+              >
+                {t.online}
+              </button>
+            </div>
+            {paymentMethod === "online" && (
+              <div className="mt-4">
+                <input
+                  type="text"
+                  value={transactionNumber}
+                  onChange={(e) => setTransactionNumber(e.target.value)}
+                  placeholder={t.enterTransactionNumber}
+                  className="input-field"
+                  required
+                />
+              </div>
+            )}
           </div>
         )}
 

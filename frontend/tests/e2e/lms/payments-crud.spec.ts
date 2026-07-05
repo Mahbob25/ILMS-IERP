@@ -21,6 +21,11 @@ test.describe('LMS: Payment Operations', () => {
     expect(payment).toHaveProperty('id')
     expect(payment).toHaveProperty('amount')
     expect(payment).toHaveProperty('receipt_number')
+    expect(payment).toHaveProperty('payment_method')
+    expect(['cash', 'online']).toContain(payment.payment_method)
+    if (payment.payment_method === 'online') {
+      expect(payment).toHaveProperty('transaction_number')
+    }
   })
 
   test('should return 404 for non-existent payment', async ({ request }) => {

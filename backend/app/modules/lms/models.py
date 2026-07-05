@@ -145,6 +145,8 @@ class Payment(Base):
     amount: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
     date: Mapped[date] = mapped_column(Date, nullable=False)
     receipt_number: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True)
+    payment_method: Mapped[str] = mapped_column(SAEnum('cash', 'online', name='paymentmethod'), nullable=False, default="cash", server_default="cash")
+    transaction_number: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
 
     enrollment: Mapped["Enrollment"] = relationship(back_populates="payments")
 

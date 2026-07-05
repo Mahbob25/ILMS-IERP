@@ -149,7 +149,8 @@ export default function SectionsPage() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState({ course_id: "", teacher_id: "", capacity: 30, min_students_required: 0, start_date: "", end_date: "", class_time: "", class_duration_minutes: 0, classroom: "", price: "" });
+  const [form, setForm] = useState({ course_id: "", teacher_id: "", capacity: 30, min_students_required: 0, start_date: "", end_date: "", class_time: "", class_duration_minutes: 0, classroom: "", price: "", teacher_percentage: "" });
+  const [teacherCompMap, setTeacherCompMap] = useState<Record<string, { compensation_type: string; default_percentage: number | null }>>({});
   const [deleteTarget, setDeleteTarget] = useState<CourseSection | null>(null);
   const [activatePct, setActivatePct] = useState<Record<string, string>>({});
   const [showRegister, setShowRegister] = useState<string | null>(null);
@@ -168,7 +169,14 @@ export default function SectionsPage() {
       apiClient.get<{ items: Student[]; total: number }>("/academic/students?limit=1000").catch(() => null),
     ]);
     if (coursesRes) setCourses(coursesRes.data.items);
-    if (teachersRes) setTeachers(teachersRes.data);
+    if (teachersRes) {
+      setTeachers(teachersRes.data);
+      const compMap: Record<string, { compensation_type: string; default_percentage: number | null }> = {};
+      teachersRes.data.forEach((t: any) => {
+        compMap[t.id] = { compensation_type: t.compensation_type || "salary", default_percentage: t.default_percentage ?? null };
+      });
+      setTeacherCompMap(compMap);
+    }
     if (studentsRes) setStudents(studentsRes.data.items);
   }, []);
 
@@ -239,7 +247,7 @@ export default function SectionsPage() {
   };
 
   const openCreate = () => {
-    setForm({ course_id: "", teacher_id: "", capacity: 30, min_students_required: 0, start_date: "", end_date: "", class_time: "", class_duration_minutes: 0, classroom: "", price: "" });
+    setForm({ course_id: "", teacher_id: "", capacity: 30, min_students_required: 0, start_date: "", end_date: "", class_time: "", class_duration_minutes: 0, classroom: "", price: "", teacher_percentage: "" });
     setEditingId(null);
     setShowForm(true);
     setMessage(null);
@@ -257,6 +265,7 @@ export default function SectionsPage() {
       class_duration_minutes: section.class_duration_minutes || 0,
       classroom: section.classroom || "",
       price: section.price != null ? section.price.toString() : "",
+      teacher_percentage: section.teacher_percentage?.toString() || "",
     });
     setEditingId(section.id);
     setShowForm(true);
@@ -276,6 +285,7 @@ export default function SectionsPage() {
       if (form.class_duration_minutes > 0) payload.class_duration_minutes = form.class_duration_minutes;
       if (form.classroom) payload.classroom = form.classroom;
       if (form.price) payload.price = parseFloat(form.price);
+      if (form.teacher_percentage) payload.teacher_percentage = parseFloat(form.teacher_percentage);
       if (editingId) {
         const cleaned: Record<string, unknown> = {};
         Object.entries(payload).forEach(([k, v]) => { if (v !== "" && v !== null) cleaned[k] = v; });
@@ -309,16 +319,30 @@ export default function SectionsPage() {
   };
 
   const handleActivate = async (sectionId: string) => {
-    const pct = parseFloat(activatePct[sectionId] || "0");
-    if (!pct || pct <= 0 || pct > 100) return;
-    try {
-      await apiClient.post(`/academic/course-sections/${sectionId}/activate`, { teacher_percentage: pct });
-      setActivatePct(prev => ({ ...prev, [sectionId]: "" }));
-      setMessage({ type: "success", text: t.activated });
-      fetchSections(search, statusFilter, page);
-    } catch (e: unknown) {
-      const err = e as { response?: { data?: { detail?: string } } };
-      setMessage({ type: "error", text: err?.response?.data?.detail || "Activation failed" });
+    const section = sections.find(s => s.id === sectionId);
+    if (!section) return;
+    const compType = teacherCompMap[section.teacher_id]?.compensation_type || "salary";
+    if (compType !== "salary") {
+      const pct = parseFloat(activatePct[sectionId] || "0");
+      if (!pct || pct <= 0 || pct > 100) return;
+      try {
+        await apiClient.post(`/academic/course-sections/${sectionId}/activate`, { teacher_percentage: pct });
+        setActivatePct(prev => ({ ...prev, [sectionId]: "" }));
+        setMessage({ type: "success", text: t.activated });
+        fetchSections(search, statusFilter, page);
+      } catch (e: unknown) {
+        const err = e as { response?: { data?: { detail?: string } } };
+        setMessage({ type: "error", text: err?.response?.data?.detail || "Activation failed" });
+      }
+    } else {
+      try {
+        await apiClient.post(`/academic/course-sections/${sectionId}/activate`, {});
+        setMessage({ type: "success", text: t.activated });
+        fetchSections(search, statusFilter, page);
+      } catch (e: unknown) {
+        const err = e as { response?: { data?: { detail?: string } } };
+        setMessage({ type: "error", text: err?.response?.data?.detail || "Activation failed" });
+      }
     }
   };
 
@@ -436,11 +460,25 @@ export default function SectionsPage() {
               <label className="block text-xs font-medium text-slate-700 mb-1">{t.teacher}</label>
               <Select
                 value={form.teacher_id}
-                onChange={(value) => setForm({ ...form, teacher_id: value })}
+                onChange={(value) => {
+                  const comp = teacherCompMap[value];
+                  const defaultPct = comp?.default_percentage?.toString() || "";
+                  setForm({ ...form, teacher_id: value, teacher_percentage: defaultPct });
+                }}
                 options={teachers.map((u) => ({ value: u.id, label: u.full_name }))}
                 placeholder="--"
               />
             </div>
+            {form.teacher_id && teacherCompMap[form.teacher_id]?.compensation_type !== "salary" && (
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1">
+                  {t.teacherPctLabel}
+                  {teacherCompMap[form.teacher_id]?.compensation_type === "percentage" && <span className="text-red-500 ms-1">*</span>}
+                </label>
+                <input type="number" value={form.teacher_percentage} onChange={(e) => setForm({ ...form, teacher_percentage: e.target.value })}
+                  className="input-field" min={0} max={100} placeholder={teacherCompMap[form.teacher_id]?.compensation_type === "percentage" ? t.teacherPctLabel : "0"} />
+              </div>
+            )}
             <div>
               <label className="block text-xs font-medium text-slate-700 mb-1">{t.capacity}</label>
               <input type="number" value={form.capacity} onChange={(e) => setForm({ ...form, capacity: parseInt(e.target.value) || 0 })}
@@ -567,17 +605,19 @@ export default function SectionsPage() {
                           )}
                           {canActivate && section.status === "pending" && (
                             <div className="flex items-center gap-1">
-                              <input
-                                type="number"
-                                placeholder="%"
-                                value={activatePct[section.id] || ""}
-                                onChange={(e) => setActivatePct(prev => ({ ...prev, [section.id]: e.target.value }))}
-                                className="w-14 text-xs px-1 py-1 border border-slate-200 rounded"
-                                min={1} max={100}
-                              />
+                              {teacherCompMap[section.teacher_id]?.compensation_type !== "salary" && (
+                                <input
+                                  type="number"
+                                  placeholder="%"
+                                  value={activatePct[section.id] || ""}
+                                  onChange={(e) => setActivatePct(prev => ({ ...prev, [section.id]: e.target.value }))}
+                                  className="w-14 text-xs px-1 py-1 border border-slate-200 rounded"
+                                  min={0} max={100}
+                                />
+                              )}
                               <button
                                 onClick={() => handleActivate(section.id)}
-                                disabled={!quotaMet || !activatePct[section.id]}
+                                disabled={!quotaMet || (teacherCompMap[section.teacher_id]?.compensation_type !== "salary" && !activatePct[section.id])}
                                 className={`btn-icon ${quotaMet ? "text-emerald-600" : "text-slate-300"}`}
                                 title={t.activate}
                               >

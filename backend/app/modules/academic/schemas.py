@@ -46,6 +46,7 @@ class CourseSectionCreate(BaseModel):
     class_duration_minutes: Optional[int] = None
     classroom: Optional[str] = None
     price: Optional[float] = None
+    teacher_percentage: Optional[float] = None
 
 class CourseSectionUpdate(BaseModel):
     teacher_id: Optional[uuid.UUID] = None
@@ -57,6 +58,7 @@ class CourseSectionUpdate(BaseModel):
     class_duration_minutes: Optional[int] = None
     classroom: Optional[str] = None
     price: Optional[float] = None
+    teacher_percentage: Optional[float] = None
 
 class CourseSectionResponse(BaseModel):
     id: uuid.UUID
@@ -78,7 +80,7 @@ class CourseSectionResponse(BaseModel):
         from_attributes = True
 
 class SectionActivate(BaseModel):
-    teacher_percentage: float
+    teacher_percentage: Optional[float] = None
 
 
 # --- Student ---

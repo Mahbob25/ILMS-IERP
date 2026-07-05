@@ -4,10 +4,11 @@ from typing import Optional
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy.orm import joinedload, contains_eager
+from sqlalchemy.orm import joinedload
 from sqlalchemy import func, or_
 from app.modules.academic.models import Course, CourseSection, Student, Enrollment
 from app.modules.lms.models import Payment, TeacherWallet
+from app.modules.identity.models import Employee, CompensationType
 
 
 # --- Course CRUD ---
@@ -70,12 +71,39 @@ async def delete_course(db: AsyncSession, course_id: uuid.UUID) -> bool:
 
 
 # --- CourseSection CRUD ---
+async def _validate_teacher_percentage(db: AsyncSession, teacher_id: uuid.UUID, teacher_percentage: Optional[float]):
+    teacher_result = await db.execute(
+        select(Employee).where(Employee.id == teacher_id)
+    )
+    teacher = teacher_result.scalar_one_or_none()
+    if not teacher:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Teacher not found")
+
+    comp_type = teacher.compensation_type
+    if comp_type == CompensationType.SALARY and teacher_percentage is not None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot set teacher percentage for a salary-based teacher"
+        )
+    if comp_type == CompensationType.PERCENTAGE and teacher_percentage is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Teacher percentage is required for percentage-based teachers"
+        )
+
+
 async def create_course_section(db: AsyncSession, data: dict) -> CourseSection:
     course_id = data.get("course_id")
     if course_id:
         course = await get_course(db, course_id)
         if not course:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
+
+    teacher_id = data.get("teacher_id")
+    teacher_pct = data.get("teacher_percentage")
+    if teacher_id:
+        await _validate_teacher_percentage(db, teacher_id, teacher_pct)
+
     section = CourseSection(**data)
     db.add(section)
     await db.flush()
@@ -120,8 +148,15 @@ async def update_course_section(db: AsyncSession, section_id: uuid.UUID, data: d
     section = await get_course_section(db, section_id)
     if not section:
         return None
+
+    if "teacher_percentage" in data or "teacher_id" in data:
+        teacher_id = data.get("teacher_id", section.teacher_id)
+        teacher_pct = data.get("teacher_percentage", section.teacher_percentage)
+        await _validate_teacher_percentage(db, teacher_id, teacher_pct)
+
     for key, value in data.items():
-        setattr(section, key, value)
+        if value is not None:
+            setattr(section, key, value)
     await db.flush()
     return section
 
@@ -133,7 +168,7 @@ async def delete_course_section(db: AsyncSession, section_id: uuid.UUID) -> bool
     await db.flush()
     return True
 
-async def activate_section(db: AsyncSession, section_id: uuid.UUID, teacher_percentage: float) -> Optional[CourseSection]:
+async def activate_section(db: AsyncSession, section_id: uuid.UUID, teacher_percentage: Optional[float] = None) -> Optional[CourseSection]:
     section = await get_course_section(db, section_id)
     if not section:
         return None
@@ -142,33 +177,38 @@ async def activate_section(db: AsyncSession, section_id: uuid.UUID, teacher_perc
     min_req = section.min_students_required or 1
     if section.enrolled_count < min_req:
         return None
+
+    await _validate_teacher_percentage(db, section.teacher_id, teacher_percentage)
+
     section.status = "active"
-    section.teacher_percentage = teacher_percentage
+    if teacher_percentage is not None:
+        section.teacher_percentage = teacher_percentage
 
     # Retroactively credit teacher wallet for existing payments
-    payments_result = await db.execute(
-        select(Payment)
-        .join(Enrollment, Payment.enrollment_id == Enrollment.id)
-        .where(Enrollment.section_id == section_id)
-    )
-    payments = payments_result.scalars().all()
-    if payments:
-        total_share = sum(p.amount * teacher_percentage / 100.0 for p in payments)
-        if total_share > 0:
-            wallet_result = await db.execute(
-                select(TeacherWallet).where(TeacherWallet.teacher_id == section.teacher_id)
-            )
-            wallet = wallet_result.scalar_one_or_none()
-            if wallet:
-                wallet.balance += total_share
-                wallet.last_updated = datetime.now(timezone.utc).replace(tzinfo=None)
-            else:
-                wallet = TeacherWallet(
-                    teacher_id=section.teacher_id,
-                    balance=total_share,
-                    last_updated=datetime.now(timezone.utc).replace(tzinfo=None),
+    if teacher_percentage:
+        payments_result = await db.execute(
+            select(Payment)
+            .join(Enrollment, Payment.enrollment_id == Enrollment.id)
+            .where(Enrollment.section_id == section_id)
+        )
+        payments = payments_result.scalars().all()
+        if payments:
+            total_share = sum(p.amount * teacher_percentage / 100.0 for p in payments)
+            if total_share > 0:
+                wallet_result = await db.execute(
+                    select(TeacherWallet).where(TeacherWallet.teacher_id == section.teacher_id)
                 )
-                db.add(wallet)
+                wallet = wallet_result.scalar_one_or_none()
+                if wallet:
+                    wallet.balance += total_share
+                    wallet.last_updated = datetime.now(timezone.utc).replace(tzinfo=None)
+                else:
+                    wallet = TeacherWallet(
+                        teacher_id=section.teacher_id,
+                        balance=total_share,
+                        last_updated=datetime.now(timezone.utc).replace(tzinfo=None),
+                    )
+                    db.add(wallet)
 
     await db.flush()
     return section

@@ -24,6 +24,12 @@ class EmployeeType(str, enum.Enum):
     OTHER = "other"
 
 
+class CompensationType(str, enum.Enum):
+    SALARY = "salary"
+    PERCENTAGE = "percentage"
+    HYBRID = "hybrid"
+
+
 class Role(Base):
     __tablename__ = "roles"
 
@@ -55,6 +61,13 @@ class Employee(Base):
     )
     phone_number: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     salary: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
+    compensation_type: Mapped[CompensationType] = mapped_column(
+        SAEnum(CompensationType, name="compensationtype", create_constraint=True, values_callable=lambda obj: [e.value for e in obj]),
+        nullable=False,
+        default=CompensationType.SALARY,
+        server_default=text("'salary'")
+    )
+    default_percentage: Mapped[Optional[float]] = mapped_column(Numeric(5, 2), nullable=True)
     hire_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     contract_end_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     address: Mapped[Optional[str]] = mapped_column(Text, nullable=True)

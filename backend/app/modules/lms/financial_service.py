@@ -8,8 +8,8 @@ from sqlalchemy import func, update, text, or_
 from sqlalchemy.orm import joinedload
 
 from app.modules.lms.models import Payment, TeacherWallet, Expense, DailyClosure
-from app.modules.academic.models import Course, CourseSection, Enrollment
-from app.modules.identity.models import Employee, EmployeeType
+from app.modules.academic.models import Course, CourseSection, Enrollment, Student
+from app.modules.identity.models import Employee, EmployeeType, CompensationType
 
 
 async def get_next_receipt_number(db: AsyncSession, payment_date: date) -> str:
@@ -31,6 +31,8 @@ async def create_payment(
     enrollment_id: uuid.UUID,
     amount: float,
     payment_date: Optional[date] = None,
+    payment_method: str = "cash",
+    transaction_number: Optional[str] = None,
 ) -> Optional[Payment]:
     if payment_date is None:
         payment_date = date.today()
@@ -39,6 +41,12 @@ async def create_payment(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Payment amount must be positive"
+        )
+
+    if payment_method == "online" and not transaction_number:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Transaction number is required for online payments"
         )
 
     enrollment_result = await db.execute(
@@ -73,6 +81,8 @@ async def create_payment(
         amount=amount,
         date=payment_date,
         receipt_number=receipt_number,
+        payment_method=payment_method,
+        transaction_number=transaction_number if payment_method == "online" else None,
     )
     db.add(payment)
 
@@ -80,6 +90,14 @@ async def create_payment(
     teacher_pct = section.teacher_percentage or 0
 
     teacher_share = amount * teacher_pct / 100.0
+
+    if teacher_share > 0:
+        teacher_emp_result = await db.execute(
+            select(Employee).where(Employee.id == section.teacher_id)
+        )
+        teacher_emp = teacher_emp_result.scalar_one_or_none()
+        if teacher_emp and teacher_emp.compensation_type == CompensationType.SALARY:
+            teacher_share = 0
 
     if teacher_share > 0:
         teacher_id = section.teacher_id
@@ -382,14 +400,57 @@ async def list_closures(
     db: AsyncSession,
     date_from: Optional[date] = None,
     date_to: Optional[date] = None,
-) -> list[DailyClosure]:
-    query = select(DailyClosure).order_by(DailyClosure.date.desc())
+) -> list[dict]:
+    payments_dates = select(Payment.date.distinct().label("date")).subquery()
+    expenses_dates = select(Expense.date.distinct().label("date")).subquery()
+    union_query = select(payments_dates.c.date).union(
+        select(expenses_dates.c.date),
+        select(DailyClosure.date),
+    ).subquery()
+
+    query = select(
+        union_query.c.date,
+        func.coalesce(
+            select(func.sum(Payment.amount))
+            .where(Payment.date == union_query.c.date)
+            .correlate(union_query)
+            .scalar_subquery(), 0
+        ).label("total_payments_in"),
+        func.coalesce(
+            select(func.sum(Expense.amount))
+            .where(Expense.date == union_query.c.date)
+            .correlate(union_query)
+            .scalar_subquery(), 0
+        ).label("total_expenses_out"),
+        select(DailyClosure.status)
+        .where(DailyClosure.date == union_query.c.date)
+        .correlate(union_query)
+        .scalar_subquery().label("status"),
+        select(DailyClosure.closed_by_manager_id)
+        .where(DailyClosure.date == union_query.c.date)
+        .correlate(union_query)
+        .scalar_subquery().label("closed_by_manager_id"),
+    ).order_by(union_query.c.date.desc())
+
     if date_from:
-        query = query.where(DailyClosure.date >= date_from)
+        query = query.where(union_query.c.date >= date_from)
     if date_to:
-        query = query.where(DailyClosure.date <= date_to)
+        query = query.where(union_query.c.date <= date_to)
+
     result = await db.execute(query)
-    return result.scalars().all()
+    rows = result.fetchall()
+
+    return [
+        {
+            "date": row.date,
+            "status": row.status or "pending",
+            "closed_by_manager_id": row.closed_by_manager_id,
+            "total_payments_in": float(row.total_payments_in or 0),
+            "total_expenses_out": float(row.total_expenses_out or 0),
+            "net_cash_flow": float((row.total_payments_in or 0) - (row.total_expenses_out or 0)),
+        }
+        for row in rows
+    ]
 
 
 async def get_daily_ledger(db: AsyncSession, ledger_date: date) -> dict:
@@ -405,6 +466,69 @@ async def get_daily_ledger(db: AsyncSession, ledger_date: date) -> dict:
     )
     total_expenses_out = expenses_out_result.scalar() or 0.0
 
+    payments_detail_result = await db.execute(
+        select(
+            Payment.id,
+            Payment.amount,
+            Payment.receipt_number,
+            Payment.payment_method,
+            Payment.transaction_number,
+            Payment.enrollment_id,
+            Enrollment.student_id,
+            Student.full_name,
+            Course.name,
+        )
+        .join(Enrollment, Payment.enrollment_id == Enrollment.id)
+        .join(Student, Enrollment.student_id == Student.id)
+        .join(CourseSection, Enrollment.section_id == CourseSection.id)
+        .join(Course, CourseSection.course_id == Course.id)
+        .where(Payment.date == ledger_date)
+        .order_by(Payment.receipt_number)
+    )
+    payments_detail = [
+        {
+            "id": row[0],
+            "amount": float(row[1]),
+            "receipt_number": row[2],
+            "payment_method": row[3] if isinstance(row[3], str) else row[3].value if hasattr(row[3], 'value') else str(row[3]),
+            "transaction_number": row[4],
+            "enrollment_id": row[5],
+            "student_id": row[6],
+            "student_name": row[7],
+            "course_name": row[8],
+        }
+        for row in payments_detail_result.fetchall()
+    ]
+
+    expenses_detail_result = await db.execute(
+        select(
+            Expense.id,
+            Expense.amount,
+            Expense.receipt_number,
+            Expense.type,
+            Expense.recipient_name,
+            Expense.description,
+            Expense.recipient_id,
+        )
+        .where(Expense.date == ledger_date)
+        .order_by(Expense.receipt_number)
+    )
+    expenses_detail = [
+        {
+            "id": row[0],
+            "amount": float(row[1]),
+            "receipt_number": row[2],
+            "type": row[3],
+            "recipient_name": row[4],
+            "description": row[5],
+            "recipient_id": row[6],
+        }
+        for row in expenses_detail_result.fetchall()
+    ]
+
+    prev_date = ledger_date - timedelta(days=1)
+    next_date = ledger_date + timedelta(days=1)
+
     closure_result = await db.execute(select(DailyClosure).where(DailyClosure.date == ledger_date))
     closure = closure_result.scalar_one_or_none()
 
@@ -414,6 +538,11 @@ async def get_daily_ledger(db: AsyncSession, ledger_date: date) -> dict:
         "total_expenses_out": total_expenses_out,
         "net_cash_flow": total_payments_in - total_expenses_out,
         "status": closure.status if closure else "pending",
+        "closed_by_manager_id": closure.closed_by_manager_id if closure else None,
+        "payments": payments_detail,
+        "expenses": expenses_detail,
+        "prev_date": prev_date,
+        "next_date": next_date,
     }
 
 

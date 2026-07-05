@@ -14,6 +14,8 @@ interface Payment {
   amount: number;
   date: string;
   receipt_number: string;
+  payment_method: string;
+  transaction_number: string | null;
 }
 
 interface Student { id: string; student_code: string; full_name: string; }
@@ -70,6 +72,11 @@ export default function PaymentsPage() {
       positiveAmount: "يجب أن يكون المبلغ أكبر من صفر",
       exceedsBalance: "المبلغ يتجاوز الرصيد المتبقي",
       paymentFailed: "فشل تسجيل الدفعة",
+      cash: "نقداً",
+      online: "تحويل بنكي",
+      paymentMethod: "طريقة الدفع",
+      transactionNumber: "رقم العملية",
+      enterTransactionNumber: "أدخل رقم العملية",
       sar: "ريال",
     },
     en: {
@@ -106,6 +113,11 @@ export default function PaymentsPage() {
       positiveAmount: "Amount must be positive",
       exceedsBalance: "Amount exceeds remaining balance",
       paymentFailed: "Payment failed",
+      cash: "Cash",
+      online: "Bank Transfer",
+      paymentMethod: "Payment Method",
+      transactionNumber: "Transaction Number",
+      enterTransactionNumber: "Enter transaction number",
       sar: "SAR",
     },
   }[locale === "en" ? "en" : "ar"];
@@ -125,7 +137,9 @@ export default function PaymentsPage() {
     enrollment_id: string;
     amount: string;
     date: string;
-  }>({ enrollment_id: "", amount: "", date: new Date().toISOString().split("T")[0] });
+    payment_method: string;
+    transaction_number: string;
+  }>({ enrollment_id: "", amount: "", date: new Date().toISOString().split("T")[0], payment_method: "cash", transaction_number: "" });
 
   const canCreate = user?.is_superadmin || user?.role?.name === "manager" || user?.role?.name === "secretary";
 
@@ -171,7 +185,7 @@ export default function PaymentsPage() {
 
   const openCreate = async () => {
     await fetchLookups();
-    setForm({ enrollment_id: "", amount: "", date: new Date().toISOString().split("T")[0] });
+    setForm({ enrollment_id: "", amount: "", date: new Date().toISOString().split("T")[0], payment_method: "cash", transaction_number: "" });
     setSummary(null);
     setFormError("");
     setShowForm(true);
@@ -213,8 +227,12 @@ export default function PaymentsPage() {
       const payload: Record<string, unknown> = {
         enrollment_id: form.enrollment_id,
         amount: parsedAmount,
+        payment_method: form.payment_method,
       };
       if (form.date) payload.date = form.date;
+      if (form.payment_method === "online") {
+        payload.transaction_number = form.transaction_number;
+      }
       const res = await apiClient.post("/lms/payments", payload);
       setShowForm(false);
       setFormError("");
@@ -334,6 +352,41 @@ export default function PaymentsPage() {
                 onChange={(e) => setForm({ ...form, date: e.target.value })}
                 className="input-field" />
             </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-700 mb-1">{t.paymentMethod}</label>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setForm({ ...form, payment_method: "cash", transaction_number: "" })}
+                  className={`flex-1 py-2 px-3 text-sm font-medium rounded-lg border transition-colors ${
+                    form.payment_method === "cash"
+                      ? "border-emerald-400 bg-emerald-50 text-emerald-700"
+                      : "border-slate-200 text-slate-600 hover:border-slate-300"
+                  }`}
+                >
+                  {t.cash}
+                </button>
+                <button
+                  onClick={() => setForm({ ...form, payment_method: "online" })}
+                  className={`flex-1 py-2 px-3 text-sm font-medium rounded-lg border transition-colors ${
+                    form.payment_method === "online"
+                      ? "border-emerald-400 bg-emerald-50 text-emerald-700"
+                      : "border-slate-200 text-slate-600 hover:border-slate-300"
+                  }`}
+                >
+                  {t.online}
+                </button>
+              </div>
+              {form.payment_method === "online" && (
+                <input
+                  type="text"
+                  value={form.transaction_number}
+                  onChange={(e) => setForm({ ...form, transaction_number: e.target.value })}
+                  placeholder={t.enterTransactionNumber}
+                  className="input-field mt-2"
+                  required
+                />
+              )}
+            </div>
           </div>
           {formError && (
             <div className="text-sm text-red-600 bg-red-50 p-3 rounded-lg">{formError}</div>
@@ -355,6 +408,7 @@ export default function PaymentsPage() {
                 <th>{t.receiptNumber}</th>
                 <th>{t.student}</th>
                 <th>{t.course}</th>
+                <th>{t.paymentMethod}</th>
                 <th>{t.amount}</th>
                 <th>{t.date}</th>
                 <th>{t.actions}</th>
@@ -370,6 +424,18 @@ export default function PaymentsPage() {
                     <td><span className="badge badge-success">{payment.receipt_number}</span></td>
                     <td className="font-medium text-slate-900">{studentName}</td>
                     <td className="text-slate-600">{courseName}</td>
+                    <td>
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${
+                        payment.payment_method === "online"
+                          ? "bg-blue-50 text-blue-600 border-blue-200"
+                          : "bg-slate-50 text-slate-600 border-slate-200"
+                      }`}>
+                        {payment.payment_method === "online" ? t.online : t.cash}
+                      </span>
+                      {payment.transaction_number && (
+                        <div className="text-xs text-slate-400 mt-0.5 font-mono">{payment.transaction_number}</div>
+                      )}
+                    </td>
                     <td className="font-semibold text-slate-900">{payment.amount.toFixed(2)} {t.sar}</td>
                     <td className="text-slate-500">{formatDate(payment.date)}</td>
                     <td>

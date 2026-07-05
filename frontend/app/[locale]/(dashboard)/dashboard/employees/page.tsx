@@ -19,6 +19,8 @@ interface Employee {
   employee_type: string;
   phone_number: string | null;
   salary: number | null;
+  compensation_type: string;
+  default_percentage: number | null;
   hire_date: string | null;
   contract_end_date: string | null;
   address: string | null;
@@ -74,6 +76,12 @@ export default function EmployeesPage() {
       email: "البريد الإلكتروني", password: "كلمة المرور", role: "الدور",
       userCreated: "تم إنشاء حساب المستخدم بنجاح",
       passwordHint: "8 أحرف على الأقل: حرف كبير، حرف صغير، رقم، رمز خاص",
+      compensationType: "نظام التعويض",
+      monthlySalary: "راتب شهري",
+      percentage: "نسبة مئوية",
+      hybrid: "نظام هجين",
+      defaultPct: "النسبة الافتراضية (%)",
+      compensationSalary: "الراتب",
     },
     en: {
       title: "Employee Management", subtitle: "Manage employee records (HR data)",
@@ -93,6 +101,12 @@ export default function EmployeesPage() {
       email: "Email", password: "Password", role: "Role",
       userCreated: "User account created successfully",
       passwordHint: "Min 8 chars: uppercase, lowercase, digit, special character",
+      compensationType: "Compensation Type",
+      monthlySalary: "Monthly Salary",
+      percentage: "Percentage",
+      hybrid: "Hybrid",
+      defaultPct: "Default Percentage (%)",
+      compensationSalary: "Salary",
     },
   }[locale === "en" ? "en" : "ar"];
 
@@ -107,6 +121,7 @@ export default function EmployeesPage() {
     full_name: "", employee_type: "teacher",
     phone_number: "", salary: "", hire_date: "",
     contract_end_date: "", address: "",
+    compensation_type: "salary", default_percentage: "",
   });
   const [deleteTarget, setDeleteTarget] = useState<Employee | null>(null);
   const [grantTarget, setGrantTarget] = useState<Employee | null>(null);
@@ -150,7 +165,7 @@ export default function EmployeesPage() {
   );
 
   const openCreate = () => {
-    setForm({ full_name: "", employee_type: "teacher", phone_number: "", salary: "", hire_date: "", contract_end_date: "", address: "" });
+    setForm({ full_name: "", employee_type: "teacher", phone_number: "", salary: "", hire_date: "", contract_end_date: "", address: "", compensation_type: "salary", default_percentage: "" });
     setEditingId(null);
     setShowForm(true);
   };
@@ -164,6 +179,8 @@ export default function EmployeesPage() {
       hire_date: emp.hire_date || "",
       contract_end_date: emp.contract_end_date || "",
       address: emp.address || "",
+      compensation_type: emp.compensation_type || "salary",
+      default_percentage: emp.default_percentage?.toString() || "",
     });
     setEditingId(emp.id);
     setShowForm(true);
@@ -174,9 +191,11 @@ export default function EmployeesPage() {
       const payload: Record<string, any> = {
         full_name: form.full_name,
         employee_type: form.employee_type,
+        compensation_type: form.compensation_type,
       };
       if (form.phone_number) payload.phone_number = form.phone_number;
-      if (form.salary) payload.salary = parseFloat(form.salary);
+      if (form.salary && form.compensation_type !== "percentage") payload.salary = parseFloat(form.salary);
+      if (form.default_percentage) payload.default_percentage = parseFloat(form.default_percentage);
       if (form.hire_date) payload.hire_date = form.hire_date;
       if (form.contract_end_date) payload.contract_end_date = form.contract_end_date;
       if (form.address) payload.address = form.address;
@@ -325,10 +344,36 @@ export default function EmployeesPage() {
               <label className="block text-xs font-medium text-slate-700 mb-1">{t.phone}</label>
               <input type="text" value={form.phone_number} onChange={(e) => setForm({ ...form, phone_number: e.target.value })} className="input-field" />
             </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">{t.salary}</label>
-              <input type="number" value={form.salary} onChange={(e) => setForm({ ...form, salary: e.target.value })} className="input-field" />
+            <div className="md:col-span-3">
+              <label className="block text-xs font-medium text-slate-700 mb-1">{t.compensationType}</label>
+              <div className="flex gap-3">
+                {(["salary", "percentage", "hybrid"] as const).map((type) => (
+                  <label key={type} className={`flex items-center gap-2 px-4 py-2 rounded-lg border cursor-pointer transition-all text-sm ${form.compensation_type === type ? "bg-brand-50 text-brand-600 border-brand-200" : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"}`}>
+                    <input
+                      type="radio" name="compensation_type" value={type}
+                      checked={form.compensation_type === type}
+                      onChange={() => {
+                        setForm({ ...form, compensation_type: type, salary: type === "percentage" ? "0" : form.salary, default_percentage: type === "salary" ? "" : form.default_percentage });
+                      }}
+                      className="sr-only"
+                    />
+                    {type === "salary" ? t.monthlySalary : type === "percentage" ? t.percentage : t.hybrid}
+                  </label>
+                ))}
+              </div>
             </div>
+            {(form.compensation_type === "salary" || form.compensation_type === "hybrid") && (
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1">{t.compensationSalary}</label>
+                <input type="number" value={form.salary} onChange={(e) => setForm({ ...form, salary: e.target.value })} className="input-field" />
+              </div>
+            )}
+            {(form.compensation_type === "percentage" || form.compensation_type === "hybrid") && (
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1">{t.defaultPct}</label>
+                <input type="number" value={form.default_percentage} onChange={(e) => setForm({ ...form, default_percentage: e.target.value })} className="input-field" min={0} max={100} />
+              </div>
+            )}
             <div>
               <label className="block text-xs font-medium text-slate-700 mb-1">{t.hireDate}</label>
               <input type="date" value={form.hire_date} onChange={(e) => setForm({ ...form, hire_date: e.target.value })} className="input-field" />
@@ -359,7 +404,7 @@ export default function EmployeesPage() {
                 <th>{t.fullName}</th>
                 <th>{t.type}</th>
                 <th>{t.phone}</th>
-                <th>{t.salary}</th>
+                <th>{t.compensationType}</th>
                 <th>{t.access}</th>
                 <th>{t.status}</th>
                 {(canEdit) && <th>{t.actions}</th>}
@@ -383,7 +428,17 @@ export default function EmployeesPage() {
                     </span>
                   </td>
                   <td className="text-slate-600 text-sm">{emp.phone_number || "—"}</td>
-                  <td className="text-slate-700 font-medium">{emp.salary !== null ? emp.salary.toFixed(2) : "—"}</td>
+                  <td>
+                    {emp.compensation_type === "salary" && (
+                      <span className="badge bg-blue-50 text-blue-600 border-blue-100">{t.monthlySalary}{emp.salary !== null ? ` (${emp.salary.toFixed(2)})` : ""}</span>
+                    )}
+                    {emp.compensation_type === "percentage" && (
+                      <span className="badge bg-emerald-50 text-emerald-600 border-emerald-100">{t.percentage}{emp.default_percentage ? ` (${emp.default_percentage}%)` : ""}</span>
+                    )}
+                    {emp.compensation_type === "hybrid" && (
+                      <span className="badge bg-purple-50 text-purple-600 border-purple-100">{t.hybrid}{emp.salary !== null ? ` (${emp.salary.toFixed(2)})` : ""}</span>
+                    )}
+                  </td>
                   <td>
                     {emp.has_user_account ? (
                       <span className="badge bg-emerald-50 text-emerald-600 border-emerald-100 flex items-center gap-1 w-fit">
