@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Course Certificate - Al-Drasat Institute</title>
+    <style>
+        /* PDF and Print Setup (A4 Landscape) */
+        @page {
+            size: A4 landscape;
+            margin: 0;
+        }
+        
+        * {
+            box-sizing: border-box;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #f3f4f6; 
+        }
+
+        /* Certificate Container */
+        .certificate-frame {
+            width: 297mm;
+            height: 210mm;
+            background-color: #ffffff;
+            padding: 12mm;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1); 
+            position: relative;
+            overflow: hidden; /* Ensures watermark doesn't spill out */
+        }
+
+        /* Outer Border Design */
+        .certificate-border {
+            border: 4px double #000; 
+            height: 100%;
+            padding: 10mm;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        /* Background Watermark */
+        .watermark {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            opacity: 0.1; /* Light transparency for the watermark */
+            width: 450px;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* Header Section */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            z-index: 1;
+        }
+
+        .header-en {
+            width: 33%;
+            font-size: 15px;
+            text-align: left;
+            line-height: 1.6;
+            font-weight: bold;
+            font-family: 'Times New Roman', Times, serif; /* Headings Font */
+            color: #000;
+        }
+
+        .header-ar {
+            width: 33%;
+            font-size: 18px;
+            text-align: right;
+            direction: rtl;
+            line-height: 1.6;
+            font-weight: bold;
+            font-family: 'Times New Roman', Times, serif; /* Headings Font */
+            color: #000;
+        }
+
+        .header-center {
+            width: 33%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+        }
+
+        .bismillah {
+            font-family: 'Times New Roman', Times, serif; /* Headings Font */
+            font-size: 22px;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+
+        .logo {
+            width: 120px;
+            height: auto;
+            margin-top: 5px;
+        }
+
+        /* Title Section */
+        .cert-title {
+            text-align: center;
+            margin: 20px 0 30px 0;
+            z-index: 1;
+        }
+
+        .cert-title h2 {
+            margin: 0;
+            font-size: 38px;
+            color: #000; 
+            font-family: 'Times New Roman', Times, serif; /* Headings Font */
+        }
+
+        .cert-title h1 {
+            margin: 5px 0 0 0;
+            font-size: 28px;
+            color: #000; 
+            font-family: 'Times New Roman', Times, serif; /* Headings Font */
+        }
+
+        /* Main Body Content */
+        .content {
+            display: flex;
+            justify-content: space-between;
+            flex-grow: 1;
+            z-index: 1;
+            padding: 0 5mm;
+        }
+
+        .content-en {
+            width: 47%;
+            text-align: left;
+            font-size: 16px;
+            line-height: 2.4;
+            font-family: Arial, sans-serif; /* Body Font */
+            color: #000;
+        }
+
+        /* The Vertical Separator Line */
+        .divider {
+            width: 2px;
+            background-color: #000;
+            margin: 0 3%;
+        }
+
+        .content-ar {
+            width: 47%;
+            text-align: right;
+            direction: rtl;
+            font-size: 18px;
+            line-height: 2.4;
+            font-family: Arial, sans-serif; /* Body Font */
+            color: #000;
+        }
+
+        /* Dynamic Variable Fields */
+        .fill-in {
+            border-bottom: 1px dotted #000;
+            display: inline-block;
+            text-align: center;
+            color: #000;
+            font-weight: bold;
+            padding: 0 10px;
+            font-family: Arial, sans-serif; /* Matches Body Font */
+        }
+
+        /* Footer Section */
+        .footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            z-index: 1;
+            margin-top: auto;
+            padding-top: 20px;
+        }
+
+        .signature-block {
+            text-align: center;
+            font-size: 16px;
+            font-weight: bold;
+            font-family: 'Times New Roman', Times, serif; /* Headings Font */
+        }
+
+        .signature-line {
+            border-bottom: 1px solid #000;
+            width: 150px;
+            height: 40px;
+            margin: 10px auto;
+        }
+
+        .issue-block {
+            text-align: right;
+            direction: rtl;
+            font-size: 16px;
+            font-family: Arial, sans-serif; /* Body Font */
+            line-height: 1.8;
+        }
+
+        .footer-note {
+            text-align: center;
+            font-size: 14px;
+            font-family: 'Times New Roman', Times, serif; /* Headings Font */
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="certificate-frame">
+        <div class="certificate-border">
+            
+            <!-- Central Background Watermark -->
+            <img src="logo.jpeg" class="watermark" alt="">
+
+            <!-- Header: Ministries and Institute Details -->
+            <div class="header">
+                <div class="header-en">
+                    REPUBLIC OF YEMEN<br>
+                    Ministry of Technical Education<br>
+                    and Vocational Training<br>
+                    Office of Technical Education<br>
+                    and Vocational -Taiz Branch<br>
+                    Al-Drasat institute<br>
+                    For Languages and Computer Sciences
+                </div>
+                
+                <div class="header-center">
+                    <div class="bismillah">بسم الله الرحمن الرحيم</div>
+                    <img src="logo.jpeg" alt="LSI Logo" class="logo">
+                </div>
+                
+                <div class="header-ar">
+                    الجمهورية اليمنية<br>
+                    وزاره التعليم الفني والتدريب المهني<br>
+                    مكتب التعليم الفني والتدريب المهني - تعز<br>
+                    معهد الدراسات واللغات وعلوم الكمبيوتر
+                </div>
+            </div>
+
+            <!-- Certificate Title -->
+            <div class="cert-title">
+                <h2>شهادة دورة</h2>
+                <h1>Course Certificate</h1>
+            </div>
+
+            <!-- Main Bilingual Content -->
+            <div class="content">
+                <!-- English Side -->
+                <div class="content-en">
+                    The Studies Institute certifies that<br>
+                    Mr./Ms.: <span class="fill-in" style="min-width: 250px;">{{student_name_en}}</span><br>
+                    He/She has attended a course in: <span class="fill-in" style="min-width: 180px;">{{course_name_en}}</span><br>
+                    From: <span class="fill-in" style="min-width: 80px;">{{start_date}}</span> 
+                    To: <span class="fill-in" style="min-width: 80px;">{{end_date}}</span><br>
+                    He/She has passed the final exam with: <span class="fill-in" style="min-width: 100px;">{{grade_en}}</span>
+                </div>
+
+                <!-- Vertical Separator Line -->
+                <div class="divider"></div>
+
+                <!-- Arabic Side -->
+                <div class="content-ar">
+                    يشهد معهد الدراسات واللغات وعلوم الكمبيوتر<br>
+                    بأن الطالب/ـة: <span class="fill-in" style="min-width: 250px;">{{student_name_ar}}</span><br>
+                    التحق بدراسة دورة: <span class="fill-in" style="min-width: 180px;">{{course_name_ar}}</span><br>
+                    خلال الفترة من: <span class="fill-in" style="min-width: 80px;">{{start_date}}</span> 
+                    إلى: <span class="fill-in" style="min-width: 80px;">{{end_date}}</span><br>
+                    وقد اجتاز الامتحان النهائي بتقدير: <span class="fill-in" style="min-width: 100px;">{{grade_ar}}</span>
+                </div>
+            </div>
+
+            <!-- Footer: Signatures and Validation -->
+            <div class="footer">
+                <div class="signature-block">
+                    إدارة المعهد<br>
+                    Institute Management
+                    <div class="signature-line"></div>
+                </div>
+
+                <div class="footer-note">
+                    أي خدش أو تعديل يلغي هذه الشهادة<br>
+                    Any scratch or alteration invalidates this certificate
+                </div>
+
+                <div class="issue-block">
+                    صادرة برقم ( <span class="fill-in" style="min-width: 60px;">{{issue_number}}</span> )<br>
+                    وتاريخ <span class="fill-in" style="min-width: 80px;">{{issue_date}}</span> م
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+</body>
+</html>

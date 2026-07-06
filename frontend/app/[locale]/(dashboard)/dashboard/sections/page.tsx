@@ -1,14 +1,14 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { apiClient } from "@/lib/api";
 import { useAuth } from "@/components/AuthContext";
 import RefreshButton from "@/components/RefreshButton";
 import ConfirmModal from "@/components/ConfirmModal";
 import Modal from "@/components/Modal";
 import Select from "@/components/ui/Select";
-import { Plus, Pencil, Trash2, Loader2, Play, CheckCircle2, UserPlus } from "lucide-react";
+import { Plus, Pencil, Trash2, Loader2, Play, CheckCircle2, UserPlus, Eye } from "lucide-react";
 
 interface CourseSection {
   id: string;
@@ -33,6 +33,7 @@ interface Student { id: string; student_code: string; full_name: string; }
 
 export default function SectionsPage() {
   const params = useParams();
+  const router = useRouter();
   const { user } = useAuth();
   const locale = (params?.locale as string) || "ar";
   const isRtl = locale === "ar";
@@ -541,7 +542,7 @@ export default function SectionsPage() {
                 <th>{t.teacherPct}</th>
                 <th>{t.price}</th>
                 <th>{t.schedule}</th>
-                {(canEdit || canDelete) && <th>{t.actions}</th>}
+                <th>{t.actions}</th>
               </tr>
             </thead>
             <tbody>
@@ -590,19 +591,25 @@ export default function SectionsPage() {
                         </span>
                       ) : "—"}
                     </td>
-                    {(canEdit || canDelete) && (
-                      <td>
-                        <div className="flex items-center gap-1">
-                          {canEdit && section.status !== "completed" && (
-                            <button onClick={() => openEdit(section)} className="btn-icon" title={t.edit}>
-                              <Pencil size={14} />
-                            </button>
-                          )}
-                          {canDelete && (
-                            <button onClick={() => setDeleteTarget(section)} className="btn-icon text-red-500" title={t.delete}>
-                              <Trash2 size={14} />
-                            </button>
-                          )}
+                    <td>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => router.push(`/${locale}/dashboard/sections/${section.id}`)}
+                          className="btn-icon"
+                          title="View Details"
+                        >
+                          <Eye size={14} />
+                        </button>
+                        {canEdit && section.status !== "completed" && (
+                          <button onClick={() => openEdit(section)} className="btn-icon" title={t.edit}>
+                            <Pencil size={14} />
+                          </button>
+                        )}
+                        {canDelete && (
+                          <button onClick={() => setDeleteTarget(section)} className="btn-icon text-red-500" title={t.delete}>
+                            <Trash2 size={14} />
+                          </button>
+                        )}
                           {canActivate && section.status === "pending" && (
                             <div className="flex items-center gap-1">
                               {teacherCompMap[section.teacher_id]?.compensation_type !== "salary" && (
@@ -637,7 +644,6 @@ export default function SectionsPage() {
                           )}
                         </div>
                       </td>
-                    )}
                   </tr>
                 );
               })}

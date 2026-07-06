@@ -9,7 +9,7 @@ from app.modules.academic.schemas import (
     CourseCreate, CourseUpdate, CourseResponse,
     CourseSectionCreate, CourseSectionUpdate, CourseSectionResponse, SectionActivate,
     StudentCreate, StudentUpdate, StudentResponse,
-    EnrollmentCreate, EnrollmentCreateWithStudent, EnrollmentResponse,
+    EnrollmentCreate, EnrollmentCreateWithStudent, EnrollmentResponse, EnrollmentDetailResponse,
     FinalGradeCreate, FinalGradeBulkCreate, FinalGradeResponse,
     CertificateResponse,
     PaginatedResponse,
@@ -456,3 +456,18 @@ async def delete_enrollment(
     deleted = await academic_service.delete_enrollment(db, enrollment_id)
     if not deleted:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Enrollment not found")
+
+@academic_router.get("/sections/{section_id}/enrollments/detailed", response_model=list[EnrollmentDetailResponse])
+async def get_section_enrollments_detailed(
+    section_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    teacher_employee_id = None
+    if current_user.role.name == "teacher":
+        teacher_employee_id = current_user.employee_id
+    if teacher_employee_id:
+        section = await academic_service.get_course_section(db, section_id)
+        if not section or section.teacher_id != teacher_employee_id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied to this section")
+    return await academic_service.get_section_enrollments_detailed(db, section_id)

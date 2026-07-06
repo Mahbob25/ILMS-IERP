@@ -7,7 +7,7 @@ from sqlalchemy.future import select
 from sqlalchemy.orm import joinedload
 from sqlalchemy import func, or_
 from app.modules.academic.models import Course, CourseSection, Student, Enrollment, FinalGrade
-from app.modules.academic.certificate_service import create_certificate
+from app.modules.academic.certificate_service import create_certificate, get_grade_label
 from app.modules.lms.models import Payment, TeacherWallet
 from app.modules.identity.models import Employee, CompensationType, User
 
@@ -384,6 +384,69 @@ async def delete_enrollment(db: AsyncSession, enrollment_id: uuid.UUID) -> bool:
     enrollment.deleted_at = datetime.now(timezone.utc)
     await db.flush()
     return True
+
+async def get_section_enrollments_detailed(
+    db: AsyncSession, section_id: uuid.UUID
+) -> list[dict]:
+    result = await db.execute(
+        select(Enrollment)
+        .options(joinedload(Enrollment.student))
+        .where(Enrollment.section_id == section_id, Enrollment.deleted_at.is_(None))
+    )
+    enrollments = result.scalars().all()
+
+    if not enrollments:
+        return []
+
+    enrollment_ids = [e.id for e in enrollments]
+    student_ids = [e.student_id for e in enrollments]
+
+    total_paid_rows = await db.execute(
+        select(Payment.enrollment_id, func.coalesce(func.sum(Payment.amount), 0))
+        .where(Payment.enrollment_id.in_(enrollment_ids))
+        .group_by(Payment.enrollment_id)
+    )
+    total_paid_map = {row[0]: float(row[1]) for row in total_paid_rows.all()}
+
+    grade_rows = await db.execute(
+        select(FinalGrade)
+        .where(
+            FinalGrade.section_id == section_id,
+            FinalGrade.student_id.in_(student_ids),
+        )
+    )
+    grades = grade_rows.scalars().all()
+    grade_map = {g.student_id: g for g in grades}
+
+    results = []
+    for e in enrollments:
+        total_paid = total_paid_map.get(e.id, 0.0)
+        net_price = e.agreed_price
+        if e.agreed_price is not None and e.admin_discount is not None:
+            net_price = e.agreed_price - (e.agreed_price * e.admin_discount / 100.0)
+        balance = (net_price - total_paid) if net_price is not None else None
+
+        final_grade = grade_map.get(e.student_id)
+        final_score = float(final_grade.final_score) if final_grade else None
+        grade_label = get_grade_label(final_score) if final_score is not None else None
+
+        results.append({
+            "id": e.id,
+            "student_id": e.student_id,
+            "section_id": e.section_id,
+            "enrolled_at": e.enrolled_at,
+            "agreed_price": e.agreed_price,
+            "admin_discount": e.admin_discount,
+            "student_name": e.student.full_name,
+            "student_code": e.student.student_code,
+            "student_email": e.student.email,
+            "total_paid": total_paid,
+            "balance_remaining": balance,
+            "final_score": final_score,
+            "grade_label": grade_label,
+        })
+
+    return results
 
 
 # --- Final Grade CRUD ---

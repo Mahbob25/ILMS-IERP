@@ -128,6 +128,21 @@ class EnrollmentResponse(BaseModel):
     class Config:
         from_attributes = True
 
+class EnrollmentDetailResponse(BaseModel):
+    id: uuid.UUID
+    student_id: uuid.UUID
+    section_id: uuid.UUID
+    enrolled_at: datetime
+    agreed_price: Optional[float] = None
+    admin_discount: Optional[float] = None
+    student_name: str
+    student_code: str
+    student_email: Optional[str] = None
+    total_paid: float = 0
+    balance_remaining: Optional[float] = None
+    final_score: Optional[float] = None
+    grade_label: Optional[str] = None
+
 
 # --- Final Grade ---
 class FinalGradeCreate(BaseModel):
