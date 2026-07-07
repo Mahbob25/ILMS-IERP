@@ -8,7 +8,7 @@
     }
 }
 
-lims.institute.local {
+aldrasat.edu {
     tls internal               # Self-signed local certificate via Internal CA
     encode gzip
 

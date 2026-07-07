@@ -5,10 +5,10 @@ const BASE_URL = process.env.BASE_URL || 'http://localhost:8000/api/v1'
 const TOKEN_FILE = path.join(__dirname, '..', '.auth-tokens.json')
 
 const CREDENTIALS: Record<string, { email: string; password: string }> = {
-  superadmin: { email: 'superadmin@institute.dev', password: 'admin123' },
-  manager: { email: 'manager@institute.dev', password: 'manager123' },
-  secretary: { email: 'secretary@institute.dev', password: 'secretary123' },
-  teacher: { email: 'teacher@institute.dev', password: 'teacher123' },
+  superadmin: { email: 'superadmin@aldrasat.com', password: 'admin123' },
+  manager: { email: 'manager@aldrasat.com', password: 'manager123' },
+  secretary: { email: 'secretary@aldrasat.com', password: 'secretary123' },
+  teacher: { email: 'teacher@aldrasat.com', password: 'teacher123' },
 }
 
 const tokenCache: Record<string, { token: string; expiry: number }> = {}

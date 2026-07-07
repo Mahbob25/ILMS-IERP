@@ -18,6 +18,8 @@ interface Payment {
   receipt_number: string;
   payment_method: string;
   transaction_number: string | null;
+  created_by: string | null;
+  created_by_name: string;
 }
 
 interface Student { id: string; student_code: string; full_name: string; }
@@ -79,6 +81,7 @@ export default function PaymentsPage() {
       paymentMethod: "طريقة الدفع",
       transactionNumber: "رقم العملية",
       enterTransactionNumber: "أدخل رقم العملية",
+      createdBy: "تم بواسطة",
       sar: "ريال",
     },
     en: {
@@ -120,6 +123,7 @@ export default function PaymentsPage() {
       paymentMethod: "Payment Method",
       transactionNumber: "Transaction Number",
       enterTransactionNumber: "Enter transaction number",
+      createdBy: "Created By",
       sar: "YER",
     },
   }[locale === "en" ? "en" : "ar"];
@@ -406,6 +410,7 @@ export default function PaymentsPage() {
                 <th>{t.paymentMethod}</th>
                 <th>{t.amount}</th>
                 <th>{t.date}</th>
+                <th>{t.createdBy}</th>
                 <th>{t.actions}</th>
               </tr>
             </thead>
@@ -433,6 +438,7 @@ export default function PaymentsPage() {
                     </td>
                     <td className="font-semibold text-slate-900">{payment.amount.toFixed(2)} {t.sar}</td>
                     <td className="text-slate-500">{formatDate(payment.date)}</td>
+                    <td className="text-slate-600">{payment.created_by_name || "—"}</td>
                     <td>
                       <button onClick={() => { setShowReceipt(payment); setReceiptSummary(null); }} className="btn-icon" title={t.receiptPreview}>
                         <Eye size={15} />
@@ -467,6 +473,7 @@ export default function PaymentsPage() {
         locale={locale}
         isRtl={isRtl}
         instituteName={t.instituteName}
+        cashierName={user?.full_name || ""}
       />
     </div>
   );

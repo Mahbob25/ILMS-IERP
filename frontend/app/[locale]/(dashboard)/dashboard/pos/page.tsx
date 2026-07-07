@@ -666,6 +666,7 @@ export default function POSPage() {
         locale={locale}
         isRtl={isRtl}
         instituteName={t.instituteName}
+        cashierName={user?.full_name || ""}
       />
     </div>
   );

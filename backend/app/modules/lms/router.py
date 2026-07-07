@@ -89,7 +89,7 @@ async def create_payment(
     if await financial_service.is_date_closed(db, payment_date):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=get_error_detail("date_is_closed", locale))
     payment = await financial_service.create_payment(
-        db, data.enrollment_id, data.amount, payment_date,
+        db, data.enrollment_id, data.amount, current_user.id, payment_date,
         payment_method=data.payment_method,
         transaction_number=data.transaction_number,
         locale=locale,
@@ -202,7 +202,8 @@ async def create_expense(
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=get_error_detail("date_is_closed", locale))
     try:
         expense = await financial_service.create_expense(
-            db, amount=data.amount, recipient_name=data.recipient_name,
+            db, amount=data.amount, created_by=current_user.id,
+            recipient_name=data.recipient_name,
             recipient_id=data.recipient_id,
             expense_type=data.type, description=data.description, expense_date=expense_date,
             locale=locale,

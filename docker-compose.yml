@@ -60,7 +60,7 @@ services:
   #   container_name: lims_frontend
   #   restart: always
   #   environment:
-  #     NEXT_PUBLIC_API_URL: https://lims.institute.local/api/v1
+    #     NEXT_PUBLIC_API_URL: https://aldrasat.edu/api/v1
   #   depends_on:
   #     - backend
   #   networks:

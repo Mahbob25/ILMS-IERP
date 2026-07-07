@@ -73,7 +73,7 @@ def test_full_payment_flow():
     print('=' * 60)
     print()
 
-    client, token = login('superadmin@institute.dev', 'admin123')
+    client, token = login('superadmin@aldrasat.com', 'admin123')
     test('Login as superadmin', token is not None)
     if not token:
         client.close()
@@ -99,7 +99,7 @@ def test_full_payment_flow():
         with conn.cursor() as cur:
             cur.execute("SELECT id FROM roles WHERE name='teacher'")
             teacher_role_id = str(cur.fetchone()[0])
-            cur.execute("SELECT id FROM users WHERE email='teacher@institute.dev'")
+            cur.execute("SELECT id FROM users WHERE email='teacher@aldrasat.com'")
             row = cur.fetchone()
         conn.close()
 
@@ -227,7 +227,7 @@ def test_expense_flow():
     print('=' * 60)
     print()
 
-    client, token = login('superadmin@institute.dev', 'admin123')
+    client, token = login('superadmin@aldrasat.com', 'admin123')
     test('Login as superadmin', token is not None)
     if not token:
         client.close()
@@ -239,13 +239,13 @@ def test_expense_flow():
         import psycopg
         conn = psycopg.connect('postgresql://lims:lims_secure_pass@localhost:5440/lims')
         with conn.cursor() as cur:
-            cur.execute("SELECT id FROM users WHERE email='teacher@institute.dev'")
+            cur.execute("SELECT id FROM users WHERE email='teacher@aldrasat.com'")
             row = cur.fetchone()
         conn.close()
 
         teacher_id = str(row[0]) if row else None
         if not teacher_id:
-            test('Teacher user exists', False, 'teacher@institute.dev not found — run seed migration')
+            test('Teacher user exists', False, 'teacher@aldrasat.com not found — run seed migration')
             ac.close()
             client.close()
             return
@@ -302,7 +302,7 @@ def test_course_lifecycle():
     print('=' * 60)
     print()
 
-    client, token = login('superadmin@institute.dev', 'admin123')
+    client, token = login('superadmin@aldrasat.com', 'admin123')
     test('Login as superadmin', token is not None)
     if not token:
         client.close()
@@ -333,13 +333,13 @@ def test_course_lifecycle():
         import psycopg
         conn = psycopg.connect('postgresql://lims:lims_secure_pass@localhost:5440/lims')
         with conn.cursor() as cur:
-            cur.execute("SELECT id FROM users WHERE email='teacher@institute.dev'")
+            cur.execute("SELECT id FROM users WHERE email='teacher@aldrasat.com'")
             row = cur.fetchone()
         conn.close()
 
         teacher_id = str(row[0]) if row else None
         if not teacher_id:
-            test('Teacher available', False, 'teacher@institute.dev not found')
+            test('Teacher available', False, 'teacher@aldrasat.com not found')
             ac.close()
             client.close()
             return
@@ -380,7 +380,7 @@ def test_course_lifecycle():
             test('Teacher percentage is 50', r.json().get('teacher_percentage') == 50.0)
 
         # Late register: secretary enrolls with discount
-        sec_client, sec_token = login('secretary@institute.dev', 'secretary123')
+        sec_client, sec_token = login('secretary@aldrasat.com', 'secretary123')
         test('Login as secretary', sec_token is not None)
         if sec_token:
             sec_ac = authed_client(sec_token)
@@ -436,7 +436,7 @@ def test_daily_closure_state_machine():
     print('=' * 60)
     print()
 
-    client, token = login('superadmin@institute.dev', 'admin123')
+    client, token = login('superadmin@aldrasat.com', 'admin123')
     test('Login as superadmin', token is not None)
     if not token:
         client.close()
@@ -460,7 +460,7 @@ def test_daily_closure_state_machine():
         test('Double-close returns 409', r.status_code == 409, f'got {r.status_code}')
 
         # Request unlock as manager
-        mgr_client, mgr_token = login('manager@institute.dev', 'manager123')
+        mgr_client, mgr_token = login('manager@aldrasat.com', 'manager123')
         test('Login as manager', mgr_token is not None)
         if mgr_token:
             mgr_ac = authed_client(mgr_token)
@@ -506,7 +506,7 @@ def test_daily_closure_state_machine():
         test('List closures', r.status_code == 200, f'got {r.status_code}')
 
         # Teacher cannot close or approve
-        tch_client, tch_token = login('teacher@institute.dev', 'teacher123')
+        tch_client, tch_token = login('teacher@aldrasat.com', 'teacher123')
         test('Login as teacher', tch_token is not None)
         if tch_token:
             tch_ac = authed_client(tch_token)
@@ -536,10 +536,10 @@ def test_role_isolation():
     print()
 
     roles_to_test = [
-        ('superadmin@institute.dev', 'admin123', 'superadmin'),
-        ('manager@institute.dev', 'manager123', 'manager'),
-        ('secretary@institute.dev', 'secretary123', 'secretary'),
-        ('teacher@institute.dev', 'teacher123', 'teacher'),
+        ('superadmin@aldrasat.com', 'admin123', 'superadmin'),
+        ('manager@aldrasat.com', 'manager123', 'manager'),
+        ('secretary@aldrasat.com', 'secretary123', 'secretary'),
+        ('teacher@aldrasat.com', 'teacher123', 'teacher'),
     ]
 
     # Define endpoint access matrix: (method, path, body, allowed_roles)

@@ -148,7 +148,12 @@ class Payment(Base):
     payment_method: Mapped[str] = mapped_column(SAEnum('cash', 'online', name='paymentmethod'), nullable=False, default="cash", server_default="cash")
     transaction_number: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
 
+    created_by: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+
     enrollment: Mapped["Enrollment"] = relationship(back_populates="payments")
+    created_by_user: Mapped["User"] = relationship(foreign_keys=[created_by])
 
 
 class Expense(Base):
@@ -168,7 +173,12 @@ class Expense(Base):
     receipt_number: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True)
     type: Mapped[str] = mapped_column(SAEnum('general_expense', 'teacher_withdrawal', 'secretary_advance', name='expensetype'), nullable=False, default="general_expense", server_default="general_expense")
 
+    created_by: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+
     recipient_employee: Mapped[Optional["Employee"]] = relationship(back_populates="expenses")
+    created_by_user: Mapped["User"] = relationship(foreign_keys=[created_by])
 
 
 class TeacherWallet(Base):

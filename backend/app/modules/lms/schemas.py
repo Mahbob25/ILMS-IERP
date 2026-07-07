@@ -52,6 +52,8 @@ class PaymentResponse(BaseModel):
     receipt_number: str
     payment_method: str
     transaction_number: Optional[str] = None
+    created_by: Optional[uuid.UUID] = None
+    created_by_name: str = ""
 
     class Config:
         from_attributes = True
@@ -85,6 +87,8 @@ class ExpenseResponse(BaseModel):
     date: date
     receipt_number: str
     type: str
+    created_by: Optional[uuid.UUID] = None
+    created_by_name: str = ""
 
     class Config:
         from_attributes = True
@@ -120,6 +124,8 @@ class PaymentDetailItem(BaseModel):
     student_id: uuid.UUID
     student_name: str
     course_name: str
+    created_by: Optional[uuid.UUID] = None
+    created_by_name: str = ""
 
 class ExpenseDetailItem(BaseModel):
     id: uuid.UUID
@@ -129,6 +135,8 @@ class ExpenseDetailItem(BaseModel):
     recipient_name: Optional[str] = None
     description: Optional[str] = None
     recipient_id: Optional[uuid.UUID] = None
+    created_by: Optional[uuid.UUID] = None
+    created_by_name: str = ""
 
 class DailyLedgerResponse(BaseModel):
     date: date

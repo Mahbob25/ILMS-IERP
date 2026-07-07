@@ -3,7 +3,7 @@ import httpx
 
 base = 'http://localhost:8000'
 client = httpx.Client(base_url=base)
-r = client.post('/api/v1/auth/login', json={'email': 'superadmin@institute.dev', 'password': 'admin123'})
+r = client.post('/api/v1/auth/login', json={'email': 'superadmin@aldrasat.com', 'password': 'admin123'})
 print(f'Login: {r.status_code}')
 print(f'Set-Cookie headers: {r.headers.get_list("set-cookie")}')
 

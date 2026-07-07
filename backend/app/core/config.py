@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     ENVIRONMENT: str = "production"
-    CORS_ORIGINS: str = "https://lims.institute.local"
+    CORS_ORIGINS: str = "https://aldrasat.edu"
     TEMPLATES_DIR: str = ""
 
     @model_validator(mode="after")

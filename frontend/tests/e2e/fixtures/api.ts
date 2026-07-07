@@ -10,10 +10,10 @@ const BASE_URL = process.env.BASE_URL || 'http://localhost:8000/api/v1'
 const tokenCache: Record<string, { token: string; expiry: number }> = {}
 
 export const CREDENTIALS = {
-  superadmin: { email: 'superadmin@institute.dev', password: 'admin123' },
-  manager: { email: 'manager@institute.dev', password: 'manager123' },
-  secretary: { email: 'secretary@institute.dev', password: 'secretary123' },
-  teacher: { email: 'teacher@institute.dev', password: 'teacher123' },
+  superadmin: { email: 'superadmin@aldrasat.com', password: 'admin123' },
+  manager: { email: 'manager@aldrasat.com', password: 'manager123' },
+  secretary: { email: 'secretary@aldrasat.com', password: 'secretary123' },
+  teacher: { email: 'teacher@aldrasat.com', password: 'teacher123' },
 } as const
 
 export type Role = keyof typeof CREDENTIALS
@@ -70,10 +70,10 @@ async function loginAs(
 
 // Pre-authenticated credentials for tests
 export const TEST_USERS = {
-  superadmin: () => loginAs('superadmin@institute.dev', 'admin123'),
-  manager: () => loginAs('manager@institute.dev', 'manager123'),
-  secretary: () => loginAs('secretary@institute.dev', 'secretary123'),
-  teacher: () => loginAs('teacher@institute.dev', 'teacher123'),
+  superadmin: () => loginAs('superadmin@aldrasat.com', 'admin123'),
+  manager: () => loginAs('manager@aldrasat.com', 'manager123'),
+  secretary: () => loginAs('secretary@aldrasat.com', 'secretary123'),
+  teacher: () => loginAs('teacher@aldrasat.com', 'teacher123'),
 }
 
 export const API_BASE = BASE_URL

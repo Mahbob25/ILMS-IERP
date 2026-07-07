@@ -10,7 +10,7 @@ from sqlalchemy.orm import joinedload
 
 from app.modules.lms.models import Payment, TeacherWallet, Expense, DailyClosure
 from app.modules.academic.models import Course, CourseSection, Enrollment, Student
-from app.modules.identity.models import Employee, EmployeeType, CompensationType
+from app.modules.identity.models import Employee, EmployeeType, CompensationType, User
 from app.core.templates import template_engine
 from app.core.error_messages import get_error_detail
 
@@ -33,6 +33,7 @@ async def create_payment(
     db: AsyncSession,
     enrollment_id: uuid.UUID,
     amount: float,
+    created_by: uuid.UUID,
     payment_date: Optional[date] = None,
     payment_method: str = "cash",
     transaction_number: Optional[str] = None,
@@ -98,6 +99,7 @@ async def create_payment(
         receipt_number=receipt_number,
         payment_method=payment_method,
         transaction_number=transaction_number if payment_method == "online" else None,
+        created_by=created_by,
     )
     db.add(payment)
 
@@ -153,9 +155,26 @@ async def create_payment(
     return payment
 
 
-async def get_payment(db: AsyncSession, payment_id: uuid.UUID) -> Optional[Payment]:
-    result = await db.execute(select(Payment).where(Payment.id == payment_id))
-    return result.scalar_one_or_none()
+async def get_payment(db: AsyncSession, payment_id: uuid.UUID) -> Optional[dict]:
+    result = await db.execute(
+        select(Payment)
+        .options(joinedload(Payment.created_by_user).joinedload(User.employee))
+        .where(Payment.id == payment_id)
+    )
+    payment = result.scalar_one_or_none()
+    if not payment:
+        return None
+    return {
+        "id": payment.id,
+        "enrollment_id": payment.enrollment_id,
+        "amount": float(payment.amount),
+        "date": payment.date,
+        "receipt_number": payment.receipt_number,
+        "payment_method": payment.payment_method if isinstance(payment.payment_method, str) else payment.payment_method.value,
+        "transaction_number": payment.transaction_number,
+        "created_by": payment.created_by,
+        "created_by_name": (payment.created_by_user.full_name or "") if payment.created_by_user else "",
+    }
 
 
 async def list_payments(
@@ -164,8 +183,12 @@ async def list_payments(
     student_id: Optional[uuid.UUID] = None,
     date_from: Optional[date] = None,
     date_to: Optional[date] = None,
-) -> list[Payment]:
-    query = select(Payment).order_by(Payment.date.desc(), Payment.receipt_number.desc())
+) -> list[dict]:
+    query = (
+        select(Payment)
+        .options(joinedload(Payment.created_by_user).joinedload(User.employee))
+        .order_by(Payment.date.desc(), Payment.receipt_number.desc())
+    )
     if enrollment_id:
         query = query.where(Payment.enrollment_id == enrollment_id)
     if student_id:
@@ -175,7 +198,21 @@ async def list_payments(
     if date_to:
         query = query.where(Payment.date <= date_to)
     result = await db.execute(query)
-    return result.scalars().all()
+    payments = result.scalars().all()
+    return [
+        {
+            "id": p.id,
+            "enrollment_id": p.enrollment_id,
+            "amount": float(p.amount),
+            "date": p.date,
+            "receipt_number": p.receipt_number,
+            "payment_method": p.payment_method if isinstance(p.payment_method, str) else p.payment_method.value,
+            "transaction_number": p.transaction_number,
+            "created_by": p.created_by,
+            "created_by_name": (p.created_by_user.full_name or "") if p.created_by_user else "",
+        }
+        for p in payments
+    ]
 
 
 async def get_teacher_wallet(db: AsyncSession, teacher_id: uuid.UUID) -> Optional[TeacherWallet]:
@@ -185,16 +222,32 @@ async def get_teacher_wallet(db: AsyncSession, teacher_id: uuid.UUID) -> Optiona
     return result.scalar_one_or_none()
 
 
-async def get_teacher_withdrawals(db: AsyncSession, employee_id: uuid.UUID) -> list[Expense]:
+async def get_teacher_withdrawals(db: AsyncSession, employee_id: uuid.UUID) -> list[dict]:
     result = await db.execute(
         select(Expense)
+        .options(joinedload(Expense.created_by_user).joinedload(User.employee))
         .where(
             Expense.type == "teacher_withdrawal",
             Expense.recipient_id == employee_id,
         )
         .order_by(Expense.date.desc(), Expense.receipt_number.desc())
     )
-    return result.scalars().all()
+    expenses = result.scalars().all()
+    return [
+        {
+            "id": e.id,
+            "amount": float(e.amount),
+            "description": e.description,
+            "recipient_name": e.recipient_name,
+            "recipient_id": e.recipient_id,
+            "date": e.date,
+            "receipt_number": e.receipt_number,
+            "type": e.type,
+            "created_by": e.created_by,
+            "created_by_name": (e.created_by_user.full_name or "") if e.created_by_user else "",
+        }
+        for e in expenses
+    ]
 
 
 # ─────────────────────────────────────────────
@@ -282,6 +335,7 @@ async def get_next_voucher_number(db: AsyncSession, expense_date: date) -> str:
 async def create_expense(
     db: AsyncSession,
     amount: float,
+    created_by: uuid.UUID,
     recipient_name: Optional[str] = None,
     recipient_id: Optional[uuid.UUID] = None,
     expense_type: str = "general_expense",
@@ -347,6 +401,7 @@ async def create_expense(
         date=expense_date,
         receipt_number=receipt_number,
         type=expense_type,
+        created_by=created_by,
     )
     db.add(expense)
 
@@ -371,8 +426,12 @@ async def list_expenses(
     date_from: Optional[date] = None,
     date_to: Optional[date] = None,
     recipient_name: Optional[str] = None,
-) -> list[Expense]:
-    query = select(Expense).order_by(Expense.date.desc(), Expense.receipt_number.desc())
+) -> list[dict]:
+    query = (
+        select(Expense)
+        .options(joinedload(Expense.created_by_user).joinedload(User.employee))
+        .order_by(Expense.date.desc(), Expense.receipt_number.desc())
+    )
     if expense_type:
         query = query.where(Expense.type == expense_type)
     if date_from:
@@ -382,12 +441,45 @@ async def list_expenses(
     if recipient_name:
         query = query.where(Expense.recipient_name.ilike(f"%{recipient_name}%"))
     result = await db.execute(query)
-    return result.scalars().all()
+    expenses = result.scalars().all()
+    return [
+        {
+            "id": e.id,
+            "amount": float(e.amount),
+            "description": e.description,
+            "recipient_name": e.recipient_name,
+            "recipient_id": e.recipient_id,
+            "date": e.date,
+            "receipt_number": e.receipt_number,
+            "type": e.type,
+            "created_by": e.created_by,
+            "created_by_name": (e.created_by_user.full_name or "") if e.created_by_user else "",
+        }
+        for e in expenses
+    ]
 
 
-async def get_expense(db: AsyncSession, expense_id: uuid.UUID) -> Optional[Expense]:
-    result = await db.execute(select(Expense).where(Expense.id == expense_id))
-    return result.scalar_one_or_none()
+async def get_expense(db: AsyncSession, expense_id: uuid.UUID) -> Optional[dict]:
+    result = await db.execute(
+        select(Expense)
+        .options(joinedload(Expense.created_by_user).joinedload(User.employee))
+        .where(Expense.id == expense_id)
+    )
+    expense = result.scalar_one_or_none()
+    if not expense:
+        return None
+    return {
+        "id": expense.id,
+        "amount": float(expense.amount),
+        "description": expense.description,
+        "recipient_name": expense.recipient_name,
+        "recipient_id": expense.recipient_id,
+        "date": expense.date,
+        "receipt_number": expense.receipt_number,
+        "type": expense.type,
+        "created_by": expense.created_by,
+        "created_by_name": (expense.created_by_user.full_name or "") if expense.created_by_user else "",
+    }
 
 
 # ─────────────────────────────────────────────
@@ -510,14 +602,18 @@ async def get_daily_ledger(db: AsyncSession, ledger_date: date) -> dict:
             Payment.payment_method,
             Payment.transaction_number,
             Payment.enrollment_id,
+            Payment.created_by,
             Enrollment.student_id,
             Student.full_name,
             Course.name,
+            Employee.full_name,
         )
         .join(Enrollment, Payment.enrollment_id == Enrollment.id)
         .join(Student, Enrollment.student_id == Student.id)
         .join(CourseSection, Enrollment.section_id == CourseSection.id)
         .join(Course, CourseSection.course_id == Course.id)
+        .outerjoin(User, Payment.created_by == User.id)
+        .outerjoin(Employee, User.employee_id == Employee.id)
         .where(Payment.date == ledger_date)
         .order_by(Payment.receipt_number)
     )
@@ -529,9 +625,11 @@ async def get_daily_ledger(db: AsyncSession, ledger_date: date) -> dict:
             "payment_method": row[3] if isinstance(row[3], str) else row[3].value if hasattr(row[3], 'value') else str(row[3]),
             "transaction_number": row[4],
             "enrollment_id": row[5],
-            "student_id": row[6],
-            "student_name": row[7],
-            "course_name": row[8],
+            "created_by": row[6],
+            "student_id": row[7],
+            "student_name": row[8],
+            "course_name": row[9],
+            "created_by_name": row[10] or "",
         }
         for row in payments_detail_result.fetchall()
     ]
@@ -545,7 +643,11 @@ async def get_daily_ledger(db: AsyncSession, ledger_date: date) -> dict:
             Expense.recipient_name,
             Expense.description,
             Expense.recipient_id,
+            Expense.created_by,
+            Employee.full_name,
         )
+        .outerjoin(User, Expense.created_by == User.id)
+        .outerjoin(Employee, User.employee_id == Employee.id)
         .where(Expense.date == ledger_date)
         .order_by(Expense.receipt_number)
     )
@@ -558,6 +660,8 @@ async def get_daily_ledger(db: AsyncSession, ledger_date: date) -> dict:
             "recipient_name": row[4],
             "description": row[5],
             "recipient_id": row[6],
+            "created_by": row[7],
+            "created_by_name": row[8] or "",
         }
         for row in expenses_detail_result.fetchall()
     ]
@@ -923,6 +1027,7 @@ async def get_receipt_html_content(db: AsyncSession, payment_id: uuid.UUID, loca
             joinedload(Payment.enrollment)
             .joinedload(Enrollment.section)
             .joinedload(CourseSection.course),
+            joinedload(Payment.created_by_user).joinedload(User.employee),
         )
         .where(Payment.id == payment_id)
     )
@@ -948,6 +1053,8 @@ async def get_receipt_html_content(db: AsyncSession, payment_id: uuid.UUID, loca
         net_price = max(agreed_price, 1)
     balance_remaining = net_price - total_paid
 
+    cashier_name = (payment.created_by_user.full_name or "") if payment.created_by_user else ""
+
     return _generate_receipt_html(
         receipt_number=payment.receipt_number,
         date_str=payment.date.isoformat(),
@@ -961,14 +1068,21 @@ async def get_receipt_html_content(db: AsyncSession, payment_id: uuid.UUID, loca
         total_paid=total_paid,
         balance_remaining=balance_remaining,
         locale=locale,
+        cashier_name=cashier_name,
     )
 
 
 async def get_voucher_html_content(db: AsyncSession, expense_id: uuid.UUID, locale: str = "ar") -> Optional[str]:
-    result = await db.execute(select(Expense).where(Expense.id == expense_id))
+    result = await db.execute(
+        select(Expense)
+        .options(joinedload(Expense.created_by_user).joinedload(User.employee))
+        .where(Expense.id == expense_id)
+    )
     expense = result.scalar_one_or_none()
     if not expense:
         return None
+
+    cashier_name = (expense.created_by_user.full_name or "") if expense.created_by_user else ""
 
     return _generate_voucher_html(
         receipt_number=expense.receipt_number,
@@ -978,4 +1092,5 @@ async def get_voucher_html_content(db: AsyncSession, expense_id: uuid.UUID, loca
         recipient_name=expense.recipient_name,
         description=expense.description,
         locale=locale,
+        cashier_name=cashier_name,
     )

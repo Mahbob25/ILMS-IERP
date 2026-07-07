@@ -1,7 +1,7 @@
 import httpx
 
 c = httpx.Client(base_url='http://localhost:8000')
-r = c.post('/api/v1/auth/login', json={'email': 'superadmin@institute.dev', 'password': 'admin123'})
+r = c.post('/api/v1/auth/login', json={'email': 'superadmin@aldrasat.com', 'password': 'admin123'})
 token = c.cookies.get('access_token')
 h = {'Cookie': f'access_token={token}'}
 

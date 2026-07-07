@@ -19,6 +19,8 @@ interface Expense {
   date: string;
   receipt_number: string;
   type: string;
+  created_by: string | null;
+  created_by_name: string;
 }
 
 interface EligibleRecipient {
@@ -65,6 +67,7 @@ export default function ExpensesPage() {
       cashier: "أمين الصندوق",
       recipientSignature: "توقيع المستلم",
       paid: "مدفوع",
+      createdBy: "تم بواسطة",
       sar: "ريال",
       generalExpense: "مصروف عام",
       teacherWithdrawal: "سحب معلم",
@@ -112,6 +115,7 @@ export default function ExpensesPage() {
       cashier: "Cashier",
       recipientSignature: "Recipient Signature",
       paid: "Paid",
+      createdBy: "Created By",
       sar: "YER",
       generalExpense: "General Expense",
       teacherWithdrawal: "Teacher Withdrawal",
@@ -436,6 +440,7 @@ export default function ExpensesPage() {
                 <th>{t.recipient}</th>
                 <th>{t.amount}</th>
                 <th>{t.date}</th>
+                <th>{t.createdBy}</th>
                 <th>{t.actions}</th>
               </tr>
             </thead>
@@ -447,6 +452,7 @@ export default function ExpensesPage() {
                   <td className="font-medium text-slate-900">{exp.recipient_name}</td>
                   <td className="font-semibold text-slate-900">{exp.amount.toFixed(2)} {t.sar}</td>
                   <td className="text-slate-500">{formatDate(exp.date)}</td>
+                  <td className="text-slate-600">{exp.created_by_name || "—"}</td>
                   <td>
                     <button onClick={() => setShowVoucher(exp)} className="btn-icon" title={t.voucherPreview}>
                       <Eye size={15} />
@@ -475,6 +481,7 @@ export default function ExpensesPage() {
         locale={locale}
         isRtl={isRtl}
         instituteName={t.instituteName}
+        cashierName={user?.full_name || ""}
       />
     </div>
   );
