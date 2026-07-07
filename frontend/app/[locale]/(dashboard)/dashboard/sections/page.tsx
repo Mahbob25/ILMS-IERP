@@ -89,6 +89,10 @@ export default function SectionsPage() {
       classroom: "القاعة الدراسية",
       price: "السعر",
       schedule: "الجدول الزمني",
+      validationRequired: "يرجى ملء جميع الحقول المطلوبة",
+      validationSelectCourse: "يرجى اختيار المقرر",
+      validationSelectTeacher: "يرجى اختيار المدرس",
+      errorGeneric: "حدث خطأ أثناء حفظ الشعبة",
     },
     en: {
       title: "Course Sections",
@@ -140,6 +144,10 @@ export default function SectionsPage() {
       classroom: "Classroom",
       price: "Price",
       schedule: "Schedule",
+      validationRequired: "Please fill in all required fields",
+      validationSelectCourse: "Please select a course",
+      validationSelectTeacher: "Please select a teacher",
+      errorGeneric: "An error occurred while saving the section",
     },
   }[locale === "en" ? "en" : "ar"];
 
@@ -273,6 +281,14 @@ export default function SectionsPage() {
   };
 
   const handleSave = async () => {
+    if (!form.course_id) {
+      setMessage({ type: "error", text: t.validationSelectCourse });
+      return;
+    }
+    if (!form.teacher_id) {
+      setMessage({ type: "error", text: t.validationSelectTeacher });
+      return;
+    }
     try {
       const payload: Record<string, unknown> = {
         course_id: form.course_id,
@@ -297,8 +313,15 @@ export default function SectionsPage() {
       setShowForm(false);
       setEditingId(null);
       fetchSections(search, statusFilter, page);
-    } catch (e) {
-      console.error(e);
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { detail?: string | Array<{ loc: string[]; msg: string; type: string }> } } };
+      const detail = err?.response?.data?.detail;
+      if (Array.isArray(detail)) {
+        const msgs = detail.map((d) => d.msg).join("; ");
+        setMessage({ type: "error", text: msgs || t.errorGeneric });
+      } else {
+        setMessage({ type: "error", text: detail || t.errorGeneric });
+      }
     }
   };
 
@@ -434,17 +457,6 @@ export default function SectionsPage() {
         )}
       </div>
 
-      {message && (
-        <div className={`px-4 py-3 rounded-lg text-sm font-medium ${
-          message.type === "success"
-            ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-            : "bg-red-50 text-red-700 border border-red-200"
-        }`}>
-          {message.text}
-          <button onClick={() => setMessage(null)} className="ms-2 float-end">&times;</button>
-        </div>
-      )}
-
       <Modal open={showForm} onClose={() => setShowForm(false)} title={editingId ? t.edit : t.add} size="xl">
         <div className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -521,6 +533,16 @@ export default function SectionsPage() {
                 className="input-field" min={0} placeholder="0" />
             </div>
           </div>
+          {message && (
+            <div className={`px-4 py-3 rounded-lg text-sm font-medium ${
+              message.type === "success"
+                ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                : "bg-red-50 text-red-700 border border-red-200"
+            }`}>
+              {message.text}
+              <button onClick={() => setMessage(null)} className="ms-2 float-end">&times;</button>
+            </div>
+          )}
           <div className="flex gap-3 pt-2">
             <button onClick={handleSave} className="btn-primary">{t.save}</button>
             <button onClick={() => setShowForm(false)} className="btn-secondary">{t.cancel}</button>
