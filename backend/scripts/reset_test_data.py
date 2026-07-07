@@ -14,12 +14,17 @@ Dry-run mode (shows what would be deleted):
 
 import argparse
 import sys
+from pathlib import Path
 from dataclasses import dataclass, field
 from typing import Optional
 
+import os
+
 import psycopg
 
-sys.path.insert(0, ".")  # noqa: PTH022
+_BACKEND_DIR = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(_BACKEND_DIR))  # noqa: PTH022
+os.chdir(str(_BACKEND_DIR))
 
 from app.core.config import settings  # noqa: E402
 
@@ -155,6 +160,7 @@ def main() -> None:
         sys.exit(1)
 
     conn_str = settings.sync_database_url
+    conn_str = conn_str.replace("+psycopg", "")
     with psycopg.connect(conn_str) as conn:
         with conn.cursor() as cur:
             cur.execute("SELECT current_database()")

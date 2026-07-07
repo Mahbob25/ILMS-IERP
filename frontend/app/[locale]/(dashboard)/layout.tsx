@@ -53,6 +53,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       menu: {
         dashboard: "لوحة التحكم",
         employees: "الموظفين",
+        roles: "الأدوار",
         users: "المستخدمين",
         courses: "المقررات",
         sections: "الشعب الدراسية",
@@ -86,6 +87,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       menu: {
         dashboard: "Dashboard",
         employees: "Employees",
+        roles: "Roles",
         users: "User Management",
         courses: "Courses",
         sections: "Course Sections",
@@ -217,7 +219,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { name: t.menu.dashboard, href: `/${locale}/dashboard`, icon: Activity, permission: "page_dashboard" },
     { name: t.menu.users, href: `/${locale}/dashboard/users`, icon: Users, permission: "page_users" },
     { name: t.menu.employees, href: `/${locale}/dashboard/employees`, icon: Users, permission: "page_employees" },
-    { name: "Roles", href: `/${locale}/dashboard/roles`, icon: ShieldCheck, permission: "page_roles" },
+    { name: t.menu.roles, href: `/${locale}/dashboard/roles`, icon: ShieldCheck, permission: "page_roles" },
     { name: t.menu.courses, href: `/${locale}/dashboard/courses`, icon: BookOpen, permission: "page_courses" },
     { name: t.menu.sections, href: `/${locale}/dashboard/sections`, icon: BookMarked, permission: "page_sections" },
     { name: t.menu.certificates, href: `/${locale}/dashboard/certificates`, icon: Award, permission: "page_certificates" },
