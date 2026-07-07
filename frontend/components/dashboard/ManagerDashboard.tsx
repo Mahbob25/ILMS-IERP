@@ -42,6 +42,7 @@ export default function ManagerDashboard() {
   const router = useRouter();
   const params = useParams();
   const locale = (params?.locale as string) || "ar";
+  const currencySymbol = locale === "ar" ? "ريال" : "YER";
   const [data, setData] = useState<ManagerDashboardData | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -139,7 +140,7 @@ export default function ManagerDashboard() {
             <DollarSign size={24} />
           </div>
           <div className="flex-1">
-            <p className="text-2xl font-bold text-slate-900">{data.monthly_revenue.toFixed(2)}</p>
+            <p className="text-2xl font-bold text-slate-900">{data.monthly_revenue.toFixed(2)} {currencySymbol}</p>
             <p className="text-xs text-slate-500">{t.revenue}</p>
           </div>
           <span className="text-[10px] text-brand-500 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -151,7 +152,7 @@ export default function ManagerDashboard() {
             <Wallet size={24} />
           </div>
           <div>
-            <p className="text-2xl font-bold text-slate-900">{data.monthly_expenses.toFixed(2)}</p>
+            <p className="text-2xl font-bold text-slate-900">{data.monthly_expenses.toFixed(2)} {currencySymbol}</p>
             <p className="text-xs text-slate-500">{t.expenses}</p>
           </div>
         </div>

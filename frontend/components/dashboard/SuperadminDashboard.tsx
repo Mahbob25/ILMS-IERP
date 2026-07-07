@@ -39,6 +39,7 @@ interface SuperadminDashboardData {
 export default function SuperadminDashboard() {
   const params = useParams();
   const locale = (params?.locale as string) || "ar";
+  const currencySymbol = locale === "ar" ? "ريال" : "YER";
   const [data, setData] = useState<SuperadminDashboardData | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -193,7 +194,7 @@ export default function SuperadminDashboard() {
             <DollarSign size={20} />
           </div>
           <div>
-            <p className="text-xl font-bold text-slate-900">{data.monthly_revenue.toFixed(2)}</p>
+            <p className="text-xl font-bold text-slate-900">{data.monthly_revenue.toFixed(2)} {currencySymbol}</p>
             <p className="text-xs text-slate-500">{t.revenue}</p>
           </div>
         </div>
@@ -202,7 +203,7 @@ export default function SuperadminDashboard() {
             <Wallet size={20} />
           </div>
           <div>
-            <p className="text-xl font-bold text-slate-900">{data.monthly_expenses.toFixed(2)}</p>
+            <p className="text-xl font-bold text-slate-900">{data.monthly_expenses.toFixed(2)} {currencySymbol}</p>
             <p className="text-xs text-slate-500">{t.expenses}</p>
           </div>
         </div>

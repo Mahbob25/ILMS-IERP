@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -10,6 +11,7 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     ENVIRONMENT: str = "production"
     CORS_ORIGINS: str = "https://lims.institute.local"
+    TEMPLATES_DIR: str = ""
 
     @model_validator(mode="after")
     def validate_required_settings(self):
@@ -30,6 +32,12 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         extra="ignore"
     )
+
+    @property
+    def templates_dir(self) -> Path:
+        if self.TEMPLATES_DIR:
+            return Path(self.TEMPLATES_DIR)
+        return Path(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))) / "cert&recept"
 
     @property
     def sync_database_url(self) -> str:

@@ -117,7 +117,7 @@ export default function StudentDetailPage() {
       loading: "Loading...",
       noEnrollments: "No enrollments",
       noPayments: "No payments",
-      sar: "SAR",
+      sar: "YER",
       paid: "Paid",
       overpaid: "Overpaid",
       remaining: "Remaining",
@@ -411,11 +411,13 @@ export default function StudentDetailPage() {
               placeholder="—"
             />
           </div>
-          <div>
-            <label className="block text-xs font-medium text-slate-700 mb-1">{t.discount}</label>
-            <input type="number" value={quickEnrollDiscount} onChange={(e) => setQuickEnrollDiscount(e.target.value)}
-              className="input-field" min={0} />
-          </div>
+          {user?.role?.name !== "secretary" && (
+            <div>
+              <label className="block text-xs font-medium text-slate-700 mb-1">{t.discount}</label>
+              <input type="number" value={quickEnrollDiscount} onChange={(e) => setQuickEnrollDiscount(e.target.value)}
+                className="input-field" min={0} />
+            </div>
+          )}
           <div className="flex gap-3 pt-2">
             <button onClick={handleQuickEnroll} disabled={!quickEnrollSectionId} className="btn-primary flex-1">
               {t.enroll}

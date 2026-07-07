@@ -1,3 +1,4 @@
+from decimal import Decimal
 import uuid
 from datetime import date, datetime, timedelta, timezone
 from typing import Optional
@@ -10,7 +11,8 @@ from sqlalchemy.orm import joinedload
 from app.modules.lms.models import Payment, TeacherWallet, Expense, DailyClosure
 from app.modules.academic.models import Course, CourseSection, Enrollment, Student
 from app.modules.identity.models import Employee, EmployeeType, CompensationType
-from app.core.storage import ensure_upload_dir
+from app.core.templates import template_engine
+from app.core.error_messages import get_error_detail
 
 
 async def get_next_receipt_number(db: AsyncSession, payment_date: date) -> str:
@@ -39,11 +41,19 @@ async def create_payment(
     if payment_date is None:
         payment_date = date.today()
 
+    if await is_date_closed(db, payment_date):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=get_error_detail("date_is_closed", locale),
+        )
+
     if amount <= 0:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Payment amount must be positive"
         )
+
+    amount = Decimal(str(amount))
 
     if payment_method == "online" and not transaction_number:
         raise HTTPException(
@@ -65,15 +75,15 @@ async def create_payment(
         select(func.coalesce(func.sum(Payment.amount), 0))
         .where(Payment.enrollment_id == enrollment_id)
     )
-    total_paid_before = float(total_paid_result.scalar() or 0.0)
+    total_paid_before = Decimal(str(total_paid_result.scalar() or 0))
     agreed_price = enrollment.agreed_price or 0
     discount_pct = enrollment.admin_discount or 0
-    discount_amount = agreed_price * discount_pct / 100.0
+    discount_amount = agreed_price * discount_pct / 100
     net_price = agreed_price - discount_amount
     if net_price <= 0:
         net_price = max(agreed_price, 1)
     remaining = net_price - total_paid_before
-    if amount > remaining + 0.001:
+    if amount > remaining + Decimal('0.001'):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Payment amount {amount} exceeds remaining balance {max(0, remaining)}"
@@ -94,7 +104,7 @@ async def create_payment(
     section = enrollment.section
     teacher_pct = section.teacher_percentage or 0
 
-    teacher_share = amount * teacher_pct / 100.0
+    teacher_share = amount * teacher_pct / 100
 
     if teacher_share > 0:
         teacher_emp_result = await db.execute(
@@ -112,12 +122,12 @@ async def create_payment(
         wallet = wallet_result.scalar_one_or_none()
         if wallet:
             wallet.balance += teacher_share
-            wallet.last_updated = datetime.now(timezone.utc).replace(tzinfo=None)
+            wallet.last_updated = datetime.now(timezone.utc)
         else:
             wallet = TeacherWallet(
                 teacher_id=teacher_id,
                 balance=teacher_share,
-                last_updated=datetime.now(timezone.utc).replace(tzinfo=None),
+                last_updated=datetime.now(timezone.utc),
             )
             db.add(wallet)
 
@@ -131,35 +141,14 @@ async def create_payment(
         select(func.coalesce(func.sum(Payment.amount), 0))
         .where(Payment.enrollment_id == enrollment_id)
     )
-    total_paid = float(total_paid_result.scalar() or 0.0)
+    total_paid = Decimal(str(total_paid_result.scalar() or 0))
     agreed_price = enrollment.agreed_price or 0
     discount_pct = enrollment.admin_discount or 0
-    discount_amount = agreed_price * discount_pct / 100.0
+    discount_amount = agreed_price * discount_pct / 100
     net_price = agreed_price - discount_amount
     if net_price <= 0:
         net_price = max(agreed_price, 1)
     balance_remaining = net_price - total_paid
-
-    try:
-        receipt_html = _generate_receipt_html(
-            receipt_number=payment.receipt_number,
-            date_str=payment_date.isoformat(),
-            amount=amount,
-            student_name=student.full_name if student else "",
-            course_name=course.name if course else "",
-            payment_method=payment_method,
-            transaction_number=transaction_number,
-            agreed_price=agreed_price if agreed_price > 0 else None,
-            admin_discount=discount_amount if discount_amount > 0 else None,
-            total_paid=total_paid,
-            balance_remaining=balance_remaining,
-            locale=locale,
-        )
-        receipt_dir = ensure_upload_dir("receipts")
-        receipt_path = receipt_dir / f"{payment.id}.html"
-        receipt_path.write_text(receipt_html, encoding="utf-8")
-    except Exception:
-        pass
 
     return payment
 
@@ -302,6 +291,7 @@ async def create_expense(
 ) -> Expense:
     if expense_date is None:
         expense_date = date.today()
+    amount = Decimal(str(amount))
 
     # Validate and resolve recipient for teacher_withdrawal and secretary_advance
     if expense_type in ("teacher_withdrawal", "secretary_advance"):
@@ -368,25 +358,9 @@ async def create_expense(
         wallet = wallet_result.scalar_one_or_none()
         if wallet:
             wallet.balance -= amount
-            wallet.last_updated = datetime.now(timezone.utc).replace(tzinfo=None)
+            wallet.last_updated = datetime.now(timezone.utc)
 
     await db.flush()
-
-    try:
-        voucher_html = _generate_voucher_html(
-            receipt_number=expense.receipt_number,
-            date_str=expense_date.isoformat(),
-            amount=amount,
-            expense_type=expense_type,
-            recipient_name=recipient_name or "Unknown",
-            description=description,
-            locale=locale,
-        )
-        voucher_dir = ensure_upload_dir("vouchers")
-        voucher_path = voucher_dir / f"{expense.id}.html"
-        voucher_path.write_text(voucher_html, encoding="utf-8")
-    except Exception:
-        pass
 
     return expense
 
@@ -520,13 +494,13 @@ async def get_daily_ledger(db: AsyncSession, ledger_date: date) -> dict:
         select(func.coalesce(func.sum(Payment.amount), 0))
         .where(Payment.date == ledger_date)
     )
-    total_payments_in = payments_in_result.scalar() or 0.0
+    total_payments_in = float(payments_in_result.scalar() or 0)
 
     expenses_out_result = await db.execute(
         select(func.coalesce(func.sum(Expense.amount), 0))
         .where(Expense.date == ledger_date)
     )
-    total_expenses_out = expenses_out_result.scalar() or 0.0
+    total_expenses_out = float(expenses_out_result.scalar() or 0)
 
     payments_detail_result = await db.execute(
         select(
@@ -796,7 +770,9 @@ async def get_revenue_overview(
 async def is_date_closed(db: AsyncSession, check_date: date) -> bool:
     result = await db.execute(select(DailyClosure).where(DailyClosure.date == check_date))
     closure = result.scalar_one_or_none()
-    return closure is not None and closure.status == "closed"
+    if not closure:
+        return False
+    return closure.status in ("closed", "unlock_requested")
 
 
 async def get_student_payment_summary(
@@ -806,7 +782,7 @@ async def get_student_payment_summary(
         select(func.coalesce(func.sum(Payment.amount), 0))
         .where(Payment.enrollment_id == enrollment_id)
     )
-    total_paid = total_paid_result.scalar() or 0.0
+    total_paid = Decimal(str(total_paid_result.scalar() or 0))
 
     enrollment_result = await db.execute(
         select(Enrollment).where(Enrollment.id == enrollment_id)
@@ -815,7 +791,7 @@ async def get_student_payment_summary(
 
     agreed_price = enrollment.agreed_price if enrollment else None
     admin_discount = enrollment.admin_discount if enrollment else None
-    discount_amount = (agreed_price * admin_discount / 100.0) if (agreed_price is not None and admin_discount is not None) else None
+    discount_amount = (agreed_price * admin_discount / 100) if (agreed_price is not None and admin_discount is not None) else None
     net_price = (agreed_price - discount_amount) if (agreed_price is not None and discount_amount is not None) else agreed_price
     balance_remaining = (net_price - total_paid) if net_price is not None else None
 
@@ -829,466 +805,14 @@ async def get_student_payment_summary(
 
 
 # ─────────────────────────────────────────────
-# Receipt & Voucher HTML Templates
-# ─────────────────────────────────────────────
-
-RECEIPT_HTML_TEMPLATE = """<!DOCTYPE html>
-<html dir="{dir}">
-<head>
-<meta charset="utf-8">
-<style>
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap');
-
-  * {{ margin: 0; padding: 0; box-sizing: border-box; }}
-
-  body {{
-    font-family: {font_family};
-    background: #f8fafc;
-    display: flex;
-    justify-content: center;
-    padding: 40px 20px;
-    color: #1e293b;
-  }}
-
-  .receipt {{
-    width: 480px;
-    max-width: 100%;
-    background: #ffffff;
-    border-radius: 16px;
-    overflow: hidden;
-    box-shadow: 0 4px 24px rgba(0,0,0,0.08);
-  }}
-
-  .receipt-header {{
-    background: linear-gradient(135deg, #1E3A8A 0%, #312e81 100%);
-    padding: 28px 32px 20px;
-    text-align: center;
-  }}
-
-  .receipt-header h2 {{
-    color: #ffffff;
-    font-size: 18px;
-    font-weight: 700;
-    letter-spacing: 0.3px;
-  }}
-
-  .receipt-header p {{
-    color: rgba(255,255,255,0.8);
-    font-size: 12px;
-    margin-top: 4px;
-  }}
-
-  .receipt-badge {{
-    display: inline-block;
-    margin-top: 10px;
-    padding: 4px 14px;
-    border-radius: 20px;
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.5px;
-    background: rgba(255,255,255,0.15);
-    color: #ffffff;
-    border: 1px solid rgba(255,255,255,0.2);
-  }}
-
-  .accent-bar {{
-    height: 4px;
-    background: linear-gradient(90deg, #0D9488, #14b8a6);
-  }}
-
-  .receipt-body {{
-    padding: 20px 32px 24px;
-  }}
-
-  .receipt-row {{
-    display: flex;
-    justify-content: space-between;
-    padding: 6px 0;
-    font-size: 13px;
-  }}
-
-  .receipt-row .label {{
-    color: #64748b;
-  }}
-
-  .receipt-row .value {{
-    font-weight: 500;
-    color: #1e293b;
-  }}
-
-  .receipt-row .value-mono {{
-    font-family: 'Courier New', monospace;
-    font-weight: 600;
-  }}
-
-  .divider {{
-    border: none;
-    border-top: 1px dashed #e2e8f0;
-    margin: 10px 0;
-  }}
-
-  .divider-solid {{
-    border: none;
-    border-top: 1px solid #e2e8f0;
-    margin: 12px 0;
-  }}
-
-  .amount-section {{
-    margin: 12px 0;
-  }}
-
-  .amount-row {{
-    display: flex;
-    justify-content: space-between;
-    padding: 4px 0;
-    font-size: 13px;
-  }}
-
-  .amount-total {{
-    display: flex;
-    justify-content: space-between;
-    padding: 10px 0 4px;
-    font-size: 18px;
-    font-weight: 700;
-  }}
-
-  .amount-green {{
-    color: #059669;
-  }}
-
-  .amount-red {{
-    color: #dc2626;
-  }}
-
-  .signature-section {{
-    margin-top: 24px;
-    padding-top: 16px;
-    border-top: 1px solid #e2e8f0;
-    display: flex;
-    justify-content: space-between;
-    font-size: 11px;
-    color: #94a3b8;
-  }}
-
-  .expense-badge {{
-    display: inline-block;
-    padding: 2px 10px;
-    border-radius: 12px;
-    font-size: 11px;
-    font-weight: 500;
-    border: 1px solid;
-  }}
-
-  .badge-general {{
-    background: #f1f5f9;
-    color: #475569;
-    border-color: #cbd5e1;
-  }}
-
-  .badge-teacher {{
-    background: #fffbeb;
-    color: #d97706;
-    border-color: #fde68a;
-  }}
-
-  .badge-secretary {{
-    background: #faf5ff;
-    color: #9333ea;
-    border-color: #e9d5ff;
-  }}
-</style>
-</head>
-<body>
-  <div class="receipt">
-    <div class="receipt-header">
-      <h2>{institute_name}</h2>
-      <p>{receipt_title}</p>
-      <span class="receipt-badge">{receipt_number}</span>
-    </div>
-    <div class="accent-bar"></div>
-    <div class="receipt-body">
-      <div class="receipt-row">
-        <span class="label">{date_label}</span>
-        <span class="value">{date}</span>
-      </div>
-
-      <!-- payment section -->
-      {{payment_section}}
-
-      <!-- expense section -->
-      {{expense_section}}
-
-      <div class="amount-total">
-        <span>{paid_label}</span>
-        <span class="{amount_class}">{amount}</span>
-      </div>
-
-      <!-- balance section -->
-      {{balance_section}}
-
-      <div class="signature-section">
-        <span>{cashier_label}: {cashier_name}</span>
-        <span>{signature_label}</span>
-      </div>
-    </div>
-  </div>
-</body>
-</html>"""
-
-RECEIPT_PAYMENT_SECTION = """
-      <div class="receipt-row">
-        <span class="label">{student_label}</span>
-        <span class="value">{student_name}</span>
-      </div>
-      <div class="receipt-row">
-        <span class="label">{course_label}</span>
-        <span class="value">{course_name}</span>
-      </div>
-      <div class="receipt-row">
-        <span class="label">{method_label}</span>
-        <span class="value">{payment_method}</span>
-      </div>
-      {transaction_section}
-      {pricing_section}
-"""
-
-RECEIPT_PRICING_SECTION = """
-      <hr class="divider">
-      <div class="receipt-row">
-        <span class="label">{agreed_price_label}</span>
-        <span class="value">{agreed_price}</span>
-      </div>
-      {discount_section}
-      <hr class="divider-solid">
-"""
-
-RECEIPT_BALANCE_SECTION = """
-      <div class="receipt-row">
-        <span class="label">{balance_label}</span>
-        <span class="value {balance_class}">{balance}</span>
-      </div>
-"""
-
-VOUCHER_HTML_TEMPLATE = """<!DOCTYPE html>
-<html dir="{dir}">
-<head>
-<meta charset="utf-8">
-<style>
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap');
-
-  * {{ margin: 0; padding: 0; box-sizing: border-box; }}
-
-  body {{
-    font-family: {font_family};
-    background: #f8fafc;
-    display: flex;
-    justify-content: center;
-    padding: 40px 20px;
-    color: #1e293b;
-  }}
-
-  .receipt {{
-    width: 480px;
-    max-width: 100%;
-    background: #ffffff;
-    border-radius: 16px;
-    overflow: hidden;
-    box-shadow: 0 4px 24px rgba(0,0,0,0.08);
-  }}
-
-  .receipt-header {{
-    background: linear-gradient(135deg, #1E3A8A 0%, #312e81 100%);
-    padding: 28px 32px 20px;
-    text-align: center;
-  }}
-
-  .receipt-header h2 {{
-    color: #ffffff;
-    font-size: 18px;
-    font-weight: 700;
-    letter-spacing: 0.3px;
-  }}
-
-  .receipt-header p {{
-    color: rgba(255,255,255,0.8);
-    font-size: 12px;
-    margin-top: 4px;
-  }}
-
-  .receipt-badge {{
-    display: inline-block;
-    margin-top: 10px;
-    padding: 4px 14px;
-    border-radius: 20px;
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.5px;
-    background: rgba(255,255,255,0.15);
-    color: #ffffff;
-    border: 1px solid rgba(255,255,255,0.2);
-  }}
-
-  .accent-bar {{
-    height: 4px;
-    background: linear-gradient(90deg, #0D9488, #14b8a6);
-  }}
-
-  .receipt-body {{
-    padding: 20px 32px 24px;
-  }}
-
-  .receipt-row {{
-    display: flex;
-    justify-content: space-between;
-    padding: 6px 0;
-    font-size: 13px;
-  }}
-
-  .receipt-row .label {{
-    color: #64748b;
-  }}
-
-  .receipt-row .value {{
-    font-weight: 500;
-    color: #1e293b;
-  }}
-
-  .amount-total {{
-    display: flex;
-    justify-content: space-between;
-    padding: 10px 0 4px;
-    font-size: 18px;
-    font-weight: 700;
-  }}
-
-  .amount-red {{
-    color: #dc2626;
-  }}
-
-  .expense-badge {{
-    display: inline-block;
-    padding: 2px 10px;
-    border-radius: 12px;
-    font-size: 11px;
-    font-weight: 500;
-    border: 1px solid;
-  }}
-
-  .badge-general {{
-    background: #f1f5f9;
-    color: #475569;
-    border-color: #cbd5e1;
-  }}
-
-  .badge-teacher {{
-    background: #fffbeb;
-    color: #d97706;
-    border-color: #fde68a;
-  }}
-
-  .badge-secretary {{
-    background: #faf5ff;
-    color: #9333ea;
-    border-color: #e9d5ff;
-  }}
-
-  .divider {{
-    border: none;
-    border-top: 1px dashed #e2e8f0;
-    margin: 10px 0;
-  }}
-
-  .signature-section {{
-    margin-top: 24px;
-    padding-top: 16px;
-    border-top: 1px solid #e2e8f0;
-    display: flex;
-    justify-content: space-between;
-    font-size: 11px;
-    color: #94a3b8;
-  }}
-</style>
-</head>
-<body>
-  <div class="receipt">
-    <div class="receipt-header">
-      <h2>{institute_name}</h2>
-      <p>{voucher_title}</p>
-      <span class="receipt-badge">{receipt_number}</span>
-    </div>
-    <div class="accent-bar"></div>
-    <div class="receipt-body">
-      <div class="receipt-row">
-        <span class="label">{date_label}</span>
-        <span class="value">{date}</span>
-      </div>
-      <div class="receipt-row">
-        <span class="label">{type_label}</span>
-        <span class="value"><span class="expense-badge {badge_class}">{expense_type}</span></span>
-      </div>
-      <div class="receipt-row">
-        <span class="label">{recipient_label}</span>
-        <span class="value">{recipient_name}</span>
-      </div>
-      {description_section}
-      <hr class="divider">
-      <div class="amount-total">
-        <span>{paid_label}</span>
-        <span class="amount-red">{amount}</span>
-      </div>
-      <div class="signature-section">
-        <span>{cashier_label}: {cashier_name}</span>
-        <span>{signature_label}</span>
-      </div>
-    </div>
-  </div>
-</body>
-</html>"""
-
 RECEIPT_HTML_EN = {
-    "receipt_title": "Payment Receipt",
-    "voucher_title": "Payment Voucher",
-    "date_label": "Date",
-    "student_label": "Student",
-    "course_label": "Course",
-    "method_label": "Payment Method",
     "cash": "Cash",
     "online": "Bank Transfer",
-    "transaction_label": "Transaction No.",
-    "agreed_price_label": "Agreed Price",
-    "discount_label": "Discount",
-    "paid_label": "Paid",
-    "balance_label": "Balance",
-    "cashier_label": "Cashier",
-    "signature_label": "Student Signature: _______________",
-    "type_label": "Type",
-    "recipient_label": "Recipient",
-    "voucher_signature_label": "Recipient Signature: _______________",
-    "font_family": "'Inter', sans-serif",
-    "dir": "ltr",
 }
 
 RECEIPT_HTML_AR = {
-    "receipt_title": "إيصال دفع",
-    "voucher_title": "سند صرف",
-    "date_label": "التاريخ",
-    "student_label": "الطالب",
-    "course_label": "المقرر",
-    "method_label": "طريقة الدفع",
     "cash": "نقداً",
     "online": "تحويل بنكي",
-    "transaction_label": "رقم العملية",
-    "agreed_price_label": "السعر المتفق عليه",
-    "discount_label": "الخصم",
-    "paid_label": "مدفوع",
-    "balance_label": "المتبقي",
-    "cashier_label": "أمين الصندوق",
-    "signature_label": "توقيع الطالب: _______________",
-    "type_label": "النوع",
-    "recipient_label": "المستلم",
-    "voucher_signature_label": "توقيع المستلم: _______________",
-    "font_family": "'IBM Plex Sans Arabic', 'Inter', sans-serif",
-    "dir": "rtl",
 }
 
 EXPENSE_TYPE_LABELS_EN = {
@@ -1323,91 +847,41 @@ def _generate_receipt_html(
     total_paid: Optional[float] = None,
     balance_remaining: Optional[float] = None,
     locale: str = "ar",
-    institute_name: str = "Advanced Learning Institute",
+    institute_name: str = "Al-Drasat ERP",
     cashier_name: str = "",
-    currency: str = "SAR",
+    currency: str = "YER",
 ) -> str:
     labels = RECEIPT_HTML_AR if locale == "ar" else RECEIPT_HTML_EN
     method_label = labels["online"] if payment_method == "online" else labels["cash"]
     amount_str = f"{amount:.2f} {currency}"
 
-    transaction_section = ""
-    if transaction_number:
-        transaction_section = (
-            f'<div class="receipt-row">'
-            f'<span class="label">{labels["transaction_label"]}</span>'
-            f'<span class="value value-mono">{transaction_number}</span>'
-            f"</div>"
-        )
+    agreed_str = f"{agreed_price:.2f} {currency}" if agreed_price is not None else ""
+    discount_str = f"{admin_discount:.2f} {currency}" if admin_discount and admin_discount > 0 else ""
+    balance_str = f"{balance_remaining:.2f} {currency}" if balance_remaining is not None else ""
 
-    pricing_section = ""
-    if agreed_price is not None or (admin_discount is not None and admin_discount > 0):
-        agreed_str = f"{agreed_price:.2f} {currency}" if agreed_price is not None else "—"
-        discount_section = ""
-        if admin_discount is not None and admin_discount > 0:
-            discount_section = (
-                f'<div class="receipt-row">'
-                f'<span class="label">{labels["discount_label"]}</span>'
-                f'<span class="value" style="color:#dc2626">-{admin_discount:.2f} {currency}</span>'
-                f"</div>"
-            )
-        pricing_section = RECEIPT_PRICING_SECTION.format(
-            agreed_price_label=labels["agreed_price_label"],
-            agreed_price=agreed_str,
-            discount_section=discount_section,
-        )
+    if discount_str:
+        discount_en = f'Discount: <span class="fill-in" style="min-width:80px;">-{discount_str}</span><br>'
+        discount_ar = f'الخصم: <span class="fill-in" style="min-width:80px;">-{discount_str}</span><br>'
+    else:
+        discount_en = ""
+        discount_ar = ""
 
-    payment_section = RECEIPT_PAYMENT_SECTION.format(
-        student_label=labels["student_label"],
-        student_name=student_name,
-        course_label=labels["course_label"],
-        course_name=course_name,
-        method_label=labels["method_label"],
-        payment_method=method_label,
-        transaction_section=transaction_section,
-        pricing_section=pricing_section,
-    )
-
-    balance_section = ""
-    balance_class = "amount-green"
-    if balance_remaining is not None:
-        if balance_remaining > 0:
-            balance_class = "amount-green"
-        else:
-            balance_class = "amount-red"
-        balance_str = f"{balance_remaining:.2f} {currency}"
-        balance_section = RECEIPT_BALANCE_SECTION.format(
-            balance_label=labels["balance_label"],
-            balance=balance_str,
-            balance_class=balance_class,
-        )
-
-    html = RECEIPT_HTML_TEMPLATE.format(
-        dir=labels["dir"],
-        font_family=labels["font_family"],
-        institute_name=institute_name,
-        receipt_title=labels["receipt_title"],
-        receipt_number=receipt_number,
-        date_label=labels["date_label"],
-        date=date_str,
-        paid_label=labels["paid_label"],
-        amount_class="amount-green",
-        amount=amount_str,
-        cashier_label=labels["cashier_label"],
-        cashier_name=cashier_name,
-        signature_label=labels["signature_label"],
-    )
-
-    # Replace placeholders with sub-sections
-    html = html.replace(
-        "{payment_section}", payment_section
-    ).replace(
-        "{expense_section}", ""
-    ).replace(
-        "{balance_section}", balance_section
-    )
-
-    return html
+    variables = {
+        "receipt_title_ar": "إيصال دفع",
+        "receipt_title_en": "Payment Receipt",
+        "receipt_number": receipt_number,
+        "date": date_str,
+        "student_name": student_name,
+        "course_name": course_name,
+        "payment_method": method_label,
+        "agreed_price": agreed_str,
+        "discount_en": discount_en,
+        "discount_ar": discount_ar,
+        "paid_amount": amount_str,
+        "balance": balance_str,
+        "cashier_name": cashier_name,
+    }
+    return template_engine.render_receipt(variables)
 
 
 def _generate_voucher_html(
@@ -1418,60 +892,90 @@ def _generate_voucher_html(
     recipient_name: str = "",
     description: Optional[str] = None,
     locale: str = "ar",
-    institute_name: str = "Advanced Learning Institute",
+    institute_name: str = "Al-Drasat ERP",
     cashier_name: str = "",
-    currency: str = "SAR",
+    currency: str = "YER",
 ) -> str:
-    labels = RECEIPT_HTML_AR if locale == "ar" else RECEIPT_HTML_EN
     type_labels = EXPENSE_TYPE_LABELS_AR if locale == "ar" else EXPENSE_TYPE_LABELS_EN
-    badge_class = EXPENSE_TYPE_BADGE.get(expense_type, "badge-general")
     type_label = type_labels.get(expense_type, expense_type)
     amount_str = f"{amount:.2f} {currency}"
-    signature_label = labels.get("voucher_signature_label", labels["signature_label"])
 
-    description_section = ""
-    if description:
-        description_section = (
-            f'<div class="receipt-row">'
-            f'<span class="label">{description}</span>'
-            f"</div>"
+    variables = {
+        "voucher_title_ar": "سند صرف",
+        "voucher_title_en": "Payment Voucher",
+        "voucher_number": receipt_number,
+        "date": date_str,
+        "expense_type": type_label,
+        "recipient_name": recipient_name,
+        "description": description or "",
+        "amount": amount_str,
+        "cashier_name": cashier_name,
+    }
+    return template_engine.render_voucher(variables)
+
+
+async def get_receipt_html_content(db: AsyncSession, payment_id: uuid.UUID, locale: str = "ar") -> Optional[str]:
+    result = await db.execute(
+        select(Payment)
+        .options(
+            joinedload(Payment.enrollment)
+            .joinedload(Enrollment.student),
+            joinedload(Payment.enrollment)
+            .joinedload(Enrollment.section)
+            .joinedload(CourseSection.course),
         )
+        .where(Payment.id == payment_id)
+    )
+    payment = result.scalar_one_or_none()
+    if not payment:
+        return None
 
-    html = VOUCHER_HTML_TEMPLATE.format(
-        dir=labels["dir"],
-        font_family=labels["font_family"],
-        institute_name=institute_name,
-        voucher_title=labels["voucher_title"],
-        receipt_number=receipt_number,
-        date_label=labels["date_label"],
-        date=date_str,
-        type_label=labels["type_label"],
-        badge_class=badge_class,
-        expense_type=type_label,
-        recipient_label=labels["recipient_label"],
-        recipient_name=recipient_name,
-        description_section=description_section,
-        paid_label=labels["paid_label"],
-        amount=amount_str,
-        cashier_label=labels["cashier_label"],
-        cashier_name=cashier_name,
-        signature_label=signature_label,
+    enrollment = payment.enrollment
+    student = enrollment.student
+    section = enrollment.section
+    course = section.course
+
+    total_paid_result = await db.execute(
+        select(func.coalesce(func.sum(Payment.amount), 0))
+        .where(Payment.enrollment_id == enrollment.id)
+    )
+    total_paid = Decimal(str(total_paid_result.scalar() or 0))
+    agreed_price = enrollment.agreed_price or 0
+    discount_pct = enrollment.admin_discount or 0
+    discount_amount = agreed_price * discount_pct / 100
+    net_price = agreed_price - discount_amount
+    if net_price <= 0:
+        net_price = max(agreed_price, 1)
+    balance_remaining = net_price - total_paid
+
+    return _generate_receipt_html(
+        receipt_number=payment.receipt_number,
+        date_str=payment.date.isoformat(),
+        amount=payment.amount,
+        student_name=student.full_name if student else "",
+        course_name=course.name if course else "",
+        payment_method=payment.payment_method,
+        transaction_number=payment.transaction_number,
+        agreed_price=agreed_price if agreed_price > 0 else None,
+        admin_discount=discount_amount if discount_amount > 0 else None,
+        total_paid=total_paid,
+        balance_remaining=balance_remaining,
+        locale=locale,
     )
 
-    return html
 
+async def get_voucher_html_content(db: AsyncSession, expense_id: uuid.UUID, locale: str = "ar") -> Optional[str]:
+    result = await db.execute(select(Expense).where(Expense.id == expense_id))
+    expense = result.scalar_one_or_none()
+    if not expense:
+        return None
 
-async def get_receipt_html_content(db: AsyncSession, payment_id: uuid.UUID) -> Optional[str]:
-    from app.core.storage import UPLOAD_DIR
-    html_file = UPLOAD_DIR / "receipts" / f"{payment_id}.html"
-    if html_file.exists():
-        return html_file.read_text(encoding="utf-8")
-    return None
-
-
-async def get_voucher_html_content(db: AsyncSession, expense_id: uuid.UUID) -> Optional[str]:
-    from app.core.storage import UPLOAD_DIR
-    html_file = UPLOAD_DIR / "vouchers" / f"{expense_id}.html"
-    if html_file.exists():
-        return html_file.read_text(encoding="utf-8")
-    return None
+    return _generate_voucher_html(
+        receipt_number=expense.receipt_number,
+        date_str=expense.date.isoformat(),
+        amount=expense.amount,
+        expense_type=expense.type,
+        recipient_name=expense.recipient_name,
+        description=expense.description,
+        locale=locale,
+    )

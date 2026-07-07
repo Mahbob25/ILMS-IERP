@@ -152,7 +152,7 @@ export default function CertificatesPage() {
       container.style.position = "fixed";
       container.style.top = "0";
       container.style.left = "0";
-      container.style.width = "210mm";
+      container.style.width = "297mm";
       container.style.zIndex = "-1";
       container.style.opacity = "0";
       container.style.pointerEvents = "none";
@@ -164,11 +164,11 @@ export default function CertificatesPage() {
       const html2pdf = (await import("html2pdf.js")).default;
       await html2pdf()
         .set({
-          margin: [10, 10, 10, 10],
+          margin: 0,
           filename: `${cert.certificate_number}.pdf`,
           image: { type: "jpeg", quality: 0.98 },
-          html2canvas: { scale: 2, useCORS: true },
-          jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
+          html2canvas: { scale: 2, useCORS: true, width: 297, height: 210 },
+          jsPDF: { unit: "mm", format: "a4", orientation: "landscape" },
         })
         .from(container)
         .save();

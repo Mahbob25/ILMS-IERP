@@ -38,6 +38,7 @@ export default function SecretaryDashboard() {
   const params = useParams();
   const router = useRouter();
   const locale = (params?.locale as string) || "ar";
+  const currencySymbol = locale === "ar" ? "ريال" : "YER";
   const [data, setData] = useState<SecretaryDashboardData | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -133,7 +134,7 @@ export default function SecretaryDashboard() {
             <DollarSign size={24} />
           </div>
           <div>
-            <p className="text-2xl font-bold text-slate-900">{data.today_payments_total.toFixed(2)}</p>
+            <p className="text-2xl font-bold text-slate-900">{data.today_payments_total.toFixed(2)} {currencySymbol}</p>
             <p className="text-xs text-slate-500">{t.payments} ({data.today_payments_count})</p>
           </div>
         </div>
@@ -142,7 +143,7 @@ export default function SecretaryDashboard() {
             <Wallet size={24} />
           </div>
           <div>
-            <p className="text-2xl font-bold text-slate-900">{data.today_expenses_total.toFixed(2)}</p>
+            <p className="text-2xl font-bold text-slate-900">{data.today_expenses_total.toFixed(2)} {currencySymbol}</p>
             <p className="text-xs text-slate-500">{t.expenses} ({data.today_expenses_count})</p>
           </div>
         </div>
@@ -223,7 +224,7 @@ export default function SecretaryDashboard() {
                   <span className={`text-sm font-semibold ${
                     tx.amount >= 0 ? "text-emerald-600" : "text-red-600"
                   }`}>
-                    {tx.amount >= 0 ? "+" : ""}{tx.amount.toFixed(2)}
+                    {tx.amount >= 0 ? "+" : ""}{tx.amount.toFixed(2)} {currencySymbol}
                   </span>
                 </div>
               ))}

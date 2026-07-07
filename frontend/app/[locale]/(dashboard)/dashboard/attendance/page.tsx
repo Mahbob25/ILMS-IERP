@@ -7,6 +7,7 @@ import { useAuth } from "@/components/AuthContext";
 import RefreshButton from "@/components/RefreshButton";
 import Select from "@/components/ui/Select";
 import { Loader2, Check, X, Clock, AlertCircle } from "lucide-react";
+import { getLocalDateString } from "@/lib/dates";
 
 interface CourseSection { id: string; course_id: string; teacher_id: string; }
 interface Course { id: string; name: string; code: string; }
@@ -71,7 +72,7 @@ export default function AttendancePage() {
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [selectedSectionId, setSelectedSectionId] = useState("");
-  const [sessionDate, setSessionDate] = useState(new Date().toISOString().split("T")[0]);
+  const [sessionDate, setSessionDate] = useState(getLocalDateString());
   const [currentSession, setCurrentSession] = useState<AttendanceSession | null>(null);
   const [records, setRecords] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);

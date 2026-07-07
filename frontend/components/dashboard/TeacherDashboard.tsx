@@ -49,6 +49,7 @@ interface TeacherDashboardData {
 export default function TeacherDashboard() {
   const params = useParams();
   const locale = (params?.locale as string) || "ar";
+  const currencySymbol = locale === "ar" ? "ريال" : "YER";
   const [data, setData] = useState<TeacherDashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -155,7 +156,7 @@ export default function TeacherDashboard() {
             <Wallet size={24} />
           </div>
           <div>
-            <p className="text-2xl font-bold text-slate-900">{data.wallet_balance.toFixed(2)}</p>
+            <p className="text-2xl font-bold text-slate-900">{data.wallet_balance.toFixed(2)} {currencySymbol}</p>
             <p className="text-xs text-slate-500">{t.wallet}</p>
           </div>
         </div>
@@ -223,7 +224,7 @@ export default function TeacherDashboard() {
                 <tr key={p.id}>
                   <td className="font-medium text-slate-900">{p.student_name}</td>
                   <td className="text-slate-600">{p.course_name}</td>
-                  <td className="font-semibold text-emerald-600">{p.amount.toFixed(2)}</td>
+                  <td className="font-semibold text-emerald-600">{p.amount.toFixed(2)} {currencySymbol}</td>
                   <td className="text-slate-500 text-xs font-mono">{p.receipt_number}</td>
                 </tr>
               ))}

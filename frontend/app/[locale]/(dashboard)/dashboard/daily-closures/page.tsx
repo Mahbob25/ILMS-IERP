@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { apiClient } from "@/lib/api";
 import { useAuth } from "@/components/AuthContext";
 import { Loader2, RefreshCw, Lock, Unlock, Eye } from "lucide-react";
+import { formatDisplayDate } from "@/lib/dates";
 
 interface DailyClosure {
   date: string;
@@ -80,7 +81,7 @@ export default function DailyClosuresPage() {
       closeConfirm: "Are you sure you want to close this day?",
       yes: "Yes",
       no: "No",
-      sar: "SAR",
+      sar: "YER",
       filterDateFrom: "From Date",
       filterDateTo: "To Date",
       receiptNumber: "Receipt No.",
@@ -180,13 +181,7 @@ export default function DailyClosuresPage() {
     );
   };
 
-  const formatDate = (d: string) => {
-    try {
-      return new Date(d + "T00:00:00").toLocaleDateString(locale === "ar" ? "ar-SA" : "en-US", {
-        year: "numeric", month: "short", day: "numeric",
-      });
-    } catch { return d; }
-  };
+  const formatDate = (d: string) => formatDisplayDate(d, locale);
 
   if (loading) {
     return (

@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { apiClient } from "@/lib/api";
 import { useAuth } from "@/components/AuthContext";
 import { Loader2, ChevronLeft, ChevronRight, Lock, ArrowLeft } from "lucide-react";
+import { formatDisplayDate } from "@/lib/dates";
 
 interface PaymentDetail {
   id: string;
@@ -125,7 +126,7 @@ export default function DailyLedgerPage() {
       prevDay: "Previous Day",
       nextDay: "Next Day",
       loading: "Loading...",
-      sar: "SAR",
+      sar: "YER",
       yes: "Yes",
       no: "No",
       error: "Failed to load ledger",
@@ -194,13 +195,7 @@ export default function DailyLedgerPage() {
     );
   };
 
-  const formatDate = (d: string) => {
-    try {
-      return new Date(d + "T00:00:00").toLocaleDateString(locale === "ar" ? "ar-SA" : "en-US", {
-        year: "numeric", month: "short", day: "numeric",
-      });
-    } catch { return d; }
-  };
+  const formatDate = (d: string) => formatDisplayDate(d, locale);
 
   const handleClose = async () => {
     if (!ledger) return;

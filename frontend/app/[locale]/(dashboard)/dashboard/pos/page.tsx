@@ -82,7 +82,7 @@ export default function POSPage() {
       date: "التاريخ",
       student: "الطالب",
       receiptTitle: "إيصال دفع",
-      instituteName: "معهد التعليم المتطور",
+      instituteName: "Al-Drasat ERP",
       signature: "التوقيع",
       cashier: "أمين الصندوق",
       studentSignature: "توقيع الطالب",
@@ -119,13 +119,13 @@ export default function POSPage() {
       newPayment: "New Payment",
       course: "Course",
       agreedPrice: "Agreed Price",
-      sar: "SAR",
+      sar: "YER",
       receiptPreview: "Receipt Preview",
       paid: "Paid",
       date: "Date",
       student: "Student",
       receiptTitle: "Payment Receipt",
-      instituteName: "Advanced Learning Institute",
+      instituteName: "Al-Drasat ERP",
       signature: "Signature",
       cashier: "Cashier",
       studentSignature: "Student Signature",
@@ -294,7 +294,10 @@ export default function POSPage() {
         payload.transaction_number = transactionNumber;
       }
       const res = await apiClient.post<PaymentResult>("/lms/payments", payload);
+      const updatedSummaryRes = await apiClient.get<PaymentSummary>(`/lms/payments/summary/${selectedEnrollmentId}`);
+      const updatedSummary = updatedSummaryRes.data;
       const rd: ReceiptData = {
+        id: res.data.id,
         type: "payment",
         receipt_number: res.data.receipt_number,
         date: res.data.date,
@@ -303,10 +306,10 @@ export default function POSPage() {
         course_name: getCourseNameForEnrollment(selectedSectionId),
         payment_method: paymentMethod,
         transaction_number: transactionNumber,
-        agreed_price: summary?.agreed_price ?? null,
-        admin_discount: summary?.admin_discount ?? null,
-        total_paid: summary?.total_paid ?? null,
-        balance_remaining: summary?.balance_remaining ?? null,
+        agreed_price: updatedSummary?.agreed_price ?? null,
+        admin_discount: updatedSummary?.admin_discount ?? null,
+        total_paid: updatedSummary?.total_paid ?? null,
+        balance_remaining: updatedSummary?.balance_remaining ?? null,
       };
       setReceiptData(rd);
       setResult(res.data);

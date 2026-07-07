@@ -12,7 +12,7 @@ test.describe('Login Page UI', () => {
     await loginPage.goto('ar')
 
     await loginPage.expectFormVisible()
-    await expect(page.locator('h1')).toContainText('نظام إدارة المعهد')
+    await expect(page.locator('h1')).toContainText('Al-Drasat ERP')
     await expect(page.locator('button[type="submit"]')).toContainText('تسجيل الدخول')
   })
 
@@ -21,7 +21,7 @@ test.describe('Login Page UI', () => {
     await loginPage.goto('en')
 
     await loginPage.expectFormVisible()
-    await expect(page.locator('h1')).toContainText('Learning Institution Management System')
+    await expect(page.locator('h1')).toContainText('Al-Drasat ERP')
     await expect(page.locator('button[type="submit"]')).toContainText('Sign In')
   })
 
@@ -29,14 +29,14 @@ test.describe('Login Page UI', () => {
     const loginPage = new LoginPage(page)
     await loginPage.goto('ar')
 
-    await expect(loginPage.title).toContainText('نظام إدارة المعهد')
+    await expect(loginPage.title).toContainText('Al-Drasat ERP')
 
     await loginPage.toggleLanguage()
-    await expect(loginPage.title).toContainText('Learning Institution Management System')
+    await expect(loginPage.title).toContainText('Al-Drasat ERP')
     await expect(page).toHaveURL(/\/en\/login/)
 
     await loginPage.toggleLanguage()
-    await expect(loginPage.title).toContainText('نظام إدارة المعهد')
+    await expect(loginPage.title).toContainText('Al-Drasat ERP')
     await expect(page).toHaveURL(/\/ar\/login/)
   })
 

@@ -8,6 +8,7 @@ import Modal from "@/components/Modal";
 import Select from "@/components/ui/Select";
 import { Plus, Loader2, RefreshCw, Eye } from "lucide-react";
 import ReceiptModal, { ReceiptData } from "@/components/ReceiptModal";
+import { getLocalDateString, formatDisplayDate } from "@/lib/dates";
 
 interface Payment {
   id: string;
@@ -62,7 +63,7 @@ export default function PaymentsPage() {
       print: "طباعة",
       close: "إغلاق",
       receiptTitle: "إيصال دفع",
-      instituteName: "معهد التعليم المتطور",
+      instituteName: "Al-Drasat ERP",
       signature: "التوقيع",
       cashier: "أمين الصندوق",
       studentSignature: "توقيع الطالب",
@@ -103,7 +104,7 @@ export default function PaymentsPage() {
       print: "Print",
       close: "Close",
       receiptTitle: "Payment Receipt",
-      instituteName: "Advanced Learning Institute",
+      instituteName: "Al-Drasat ERP",
       signature: "Signature",
       cashier: "Cashier",
       studentSignature: "Student Signature",
@@ -119,7 +120,7 @@ export default function PaymentsPage() {
       paymentMethod: "Payment Method",
       transactionNumber: "Transaction Number",
       enterTransactionNumber: "Enter transaction number",
-      sar: "SAR",
+      sar: "YER",
     },
   }[locale === "en" ? "en" : "ar"];
 
@@ -141,7 +142,7 @@ export default function PaymentsPage() {
     date: string;
     payment_method: string;
     transaction_number: string;
-  }>({ enrollment_id: "", amount: "", date: new Date().toISOString().split("T")[0], payment_method: "cash", transaction_number: "" });
+  }>({ enrollment_id: "", amount: "", date: getLocalDateString(), payment_method: "cash", transaction_number: "" });
 
   const canCreate = user?.is_superadmin || user?.role?.name === "manager" || user?.role?.name === "secretary";
 
@@ -187,7 +188,7 @@ export default function PaymentsPage() {
 
   const openCreate = async () => {
     await fetchLookups();
-    setForm({ enrollment_id: "", amount: "", date: new Date().toISOString().split("T")[0], payment_method: "cash", transaction_number: "" });
+    setForm({ enrollment_id: "", amount: "", date: getLocalDateString(), payment_method: "cash", transaction_number: "" });
     setSummary(null);
     setFormError("");
     setShowForm(true);
@@ -238,8 +239,9 @@ export default function PaymentsPage() {
       const res = await apiClient.post("/lms/payments", payload);
       setShowForm(false);
       setFormError("");
+      const updatedSummary = await apiClient.get<PaymentSummary>(`/lms/payments/summary/${form.enrollment_id}`);
       setShowReceipt(res.data);
-      setReceiptSummary(summary);
+      setReceiptSummary(updatedSummary.data);
       fetchPayments();
     } catch (e: unknown) {
       const err = e as { response?: { data?: { detail?: string } } };
@@ -254,13 +256,7 @@ export default function PaymentsPage() {
     }
   };
 
-  const formatDate = (d: string) => {
-    try {
-      return new Date(d + "T00:00:00").toLocaleDateString(locale === "ar" ? "ar-SA" : "en-US", {
-        year: "numeric", month: "short", day: "numeric",
-      });
-    } catch { return d; }
-  };
+  const formatDate = (d: string) => formatDisplayDate(d, locale);
 
   if (loading) {
     return (
@@ -318,8 +314,18 @@ export default function PaymentsPage() {
             </div>
             <div>
               <label className="block text-xs font-medium text-slate-700 mb-1">{t.enterAmount}</label>
+              <input type="number" step="0.01" min="0" max={summary?.balance_remaining ?? ""} value={form.amount}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (summary?.balance_remaining != null && parseFloat(val) > summary.balance_remaining) {
+                    setForm({ ...form, amount: summary.balance_remaining.toString() });
+                  } else {
+                    setForm({ ...form, amount: val });
+                  }
+                }}
+                className="input-field" placeholder="0.00" />
               {summary && (
-                <div className="text-xs text-slate-600 space-y-0.5 mb-2 p-2 bg-slate-50 rounded-lg">
+                <div className="text-xs text-slate-600 space-y-0.5 mt-2 p-2 bg-slate-50 rounded-lg">
                   <div className="flex justify-between">
                     <span>{t.netPrice}:</span>
                     <span className="font-medium">{summary.net_price?.toFixed(2)} {t.sar}</span>
@@ -334,16 +340,6 @@ export default function PaymentsPage() {
                   </div>
                 </div>
               )}
-              <input type="number" step="0.01" min="0" max={summary?.balance_remaining ?? ""} value={form.amount}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  if (summary?.balance_remaining != null && parseFloat(val) > summary.balance_remaining) {
-                    setForm({ ...form, amount: summary.balance_remaining.toString() });
-                  } else {
-                    setForm({ ...form, amount: val });
-                  }
-                }}
-                className="input-field" placeholder="0.00" />
             </div>
             <div>
               <label className="block text-xs font-medium text-slate-700 mb-1">{t.paymentDate}</label>
@@ -454,6 +450,7 @@ export default function PaymentsPage() {
         open={showReceipt !== null}
         onClose={() => { setShowReceipt(null); setReceiptSummary(null); }}
         data={showReceipt ? {
+          id: showReceipt.id,
           type: "payment",
           receipt_number: showReceipt.receipt_number,
           date: showReceipt.date,

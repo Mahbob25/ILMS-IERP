@@ -2,8 +2,8 @@ import "@/app/globals.css";
 import { AuthProvider } from "@/components/AuthContext";
 
 export const metadata = {
-  title: "نظام إدارة المعهد | LIMS Portal",
-  description: "نظام إدارة المعهد التعليمي الشامل مع معالجة المناهج بالذكاء الاصطناعي",
+  title: "Al-Drasat ERP",
+  description: "نظام إدارة معهد الدراسات واللغات وعلوم الكمبيوتر - Al-Drasat ERP",
 };
 
 export default function RootLayout({

@@ -117,7 +117,7 @@ export default function RevenuePage() {
       to: "To",
       apply: "Apply",
       noData: "No data available",
-      sar: "SAR",
+      sar: "YER",
       course: "Course",
       teacher: "Teacher",
       amount: "Amount",
@@ -289,7 +289,7 @@ export default function RevenuePage() {
               </div>
               <div>
                 <p className="text-2xl font-bold text-slate-900">
-                  {data.total_revenue.toFixed(2)}
+                  {data.total_revenue.toFixed(2)} {t.sar}
                 </p>
                 <p className="text-xs text-slate-500">{t.totalRevenue}</p>
                 <p className="text-[10px] text-slate-400">{data.transaction_count} {t.transactionCount}</p>
@@ -301,7 +301,7 @@ export default function RevenuePage() {
               </div>
               <div>
                 <p className="text-2xl font-bold text-slate-900">
-                  {data.total_expenses.toFixed(2)}
+                  {data.total_expenses.toFixed(2)} {t.sar}
                 </p>
                 <p className="text-xs text-slate-500">{t.totalExpenses}</p>
               </div>
@@ -314,7 +314,7 @@ export default function RevenuePage() {
               </div>
               <div>
                 <p className="text-2xl font-bold text-slate-900">
-                  {data.net_revenue.toFixed(2)}
+                  {data.net_revenue.toFixed(2)} {t.sar}
                 </p>
                 <p className="text-xs text-slate-500">{t.netRevenue}</p>
               </div>
@@ -325,7 +325,7 @@ export default function RevenuePage() {
               </div>
               <div>
                 <p className="text-2xl font-bold text-slate-900">
-                  {data.avg_per_student.toFixed(2)}
+                  {data.avg_per_student.toFixed(2)} {t.sar}
                 </p>
                 <p className="text-xs text-slate-500">{t.avgPerStudent}</p>
                 <p className={`text-[10px] ${data.comparison.change_pct >= 0 ? "text-emerald-500" : "text-red-500"}`}>

@@ -18,6 +18,7 @@ from app.modules.lms.schemas import (
 )
 from app.modules.lms import service as lms_service
 from app.modules.lms import financial_service
+from app.core.error_messages import get_error_detail
 
 lms_router = APIRouter(prefix="/lms", tags=["lms"])
 
@@ -84,7 +85,9 @@ async def create_payment(
     current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])),
     db: AsyncSession = Depends(get_db)
 ):
-    payment_date = date.fromisoformat(data.date) if data.date else None
+    payment_date = date.fromisoformat(data.date) if data.date else date.today()
+    if await financial_service.is_date_closed(db, payment_date):
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=get_error_detail("date_is_closed", locale))
     payment = await financial_service.create_payment(
         db, data.enrollment_id, data.amount, payment_date,
         payment_method=data.payment_method,
@@ -129,10 +132,11 @@ async def get_payment(
 @lms_router.get("/payments/{payment_id}/preview")
 async def preview_receipt(
     payment_id: uuid.UUID,
+    locale: str = "ar",
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    html = await financial_service.get_receipt_html_content(db, payment_id)
+    html = await financial_service.get_receipt_html_content(db, payment_id, locale)
     if not html:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Receipt not found")
     from fastapi.responses import HTMLResponse
@@ -193,9 +197,9 @@ async def create_expense(
     current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])),
     db: AsyncSession = Depends(get_db)
 ):
-    expense_date = date.fromisoformat(data.date) if data.date else None
-    if expense_date and await financial_service.is_date_closed(db, expense_date):
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Date is closed")
+    expense_date = date.fromisoformat(data.date) if data.date else date.today()
+    if await financial_service.is_date_closed(db, expense_date):
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=get_error_detail("date_is_closed", locale))
     try:
         expense = await financial_service.create_expense(
             db, amount=data.amount, recipient_name=data.recipient_name,
@@ -235,10 +239,11 @@ async def get_expense(
 @lms_router.get("/expenses/{expense_id}/preview")
 async def preview_voucher(
     expense_id: uuid.UUID,
+    locale: str = "ar",
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    html = await financial_service.get_voucher_html_content(db, expense_id)
+    html = await financial_service.get_voucher_html_content(db, expense_id, locale)
     if not html:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Voucher not found")
     from fastapi.responses import HTMLResponse
@@ -249,36 +254,39 @@ async def preview_voucher(
 @lms_router.post("/daily-closures/{closure_date}/close", response_model=DailyClosureResponse)
 async def close_day(
     closure_date: date,
+    locale: str = "ar",
     current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager"])),
     db: AsyncSession = Depends(get_db)
 ):
     closure = await financial_service.close_day(db, closure_date, current_user.id)
     if not closure:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Date already closed")
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=get_error_detail("date_already_closed", locale))
     return closure
 
 
 @lms_router.post("/daily-closures/{closure_date}/unlock-request", response_model=DailyClosureResponse)
 async def request_unlock(
     closure_date: date,
+    locale: str = "ar",
     current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])),
     db: AsyncSession = Depends(get_db)
 ):
     closure = await financial_service.request_unlock(db, closure_date)
     if not closure:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Date is not closed or already unlocked")
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=get_error_detail("date_not_closed_or_already_unlocked", locale))
     return closure
 
 
 @lms_router.post("/daily-closures/{closure_date}/approve-unlock", response_model=DailyClosureResponse)
 async def approve_unlock(
     closure_date: date,
+    locale: str = "ar",
     current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager"])),
     db: AsyncSession = Depends(get_db)
 ):
     closure = await financial_service.approve_unlock(db, closure_date)
     if not closure:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="No unlock request pending for this date")
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=get_error_detail("no_unlock_request_pending", locale))
     return closure
 
 

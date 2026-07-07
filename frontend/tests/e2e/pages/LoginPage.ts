@@ -60,6 +60,6 @@ export class LoginPage {
 
   async expectRedirectToDashboard(locale: string = 'ar'): Promise<void> {
     await this.page.waitForURL(`/${locale}/dashboard`)
-    await expect(this.page.locator('text=LIMS Core Portal')).toBeVisible({ timeout: 10000 })
+    await expect(this.page.locator('text=Al-Drasat ERP')).toBeVisible({ timeout: 10000 })
   }
 }

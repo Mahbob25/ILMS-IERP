@@ -412,6 +412,8 @@ async def create_enrollment(
     current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])),
     db: AsyncSession = Depends(get_db)
 ):
+    if data.admin_discount is not None and current_user.role.name not in ("superadmin", "manager"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only managers can set discounts")
     enrollment = await academic_service.create_enrollment(
         db, section_id=data.section_id, student_id=data.student_id,
         admin_discount=data.admin_discount
@@ -429,6 +431,8 @@ async def create_enrollment_with_student(
     current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])),
     db: AsyncSession = Depends(get_db)
 ):
+    if data.admin_discount is not None and current_user.role.name not in ("superadmin", "manager"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only managers can set discounts")
     student_data = None
     if not data.student_id and data.student_code and data.full_name:
         student_data = {

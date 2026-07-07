@@ -57,6 +57,8 @@ async def get_teachers_with_stats(db: AsyncSession) -> list[dict]:
             "sections_count": sections_count,
             "wallet_balance": float(wallet_obj.balance) if wallet_obj else 0.0,
             "wallet_last_updated": wallet_obj.last_updated.isoformat() if wallet_obj and wallet_obj.last_updated else None,
+            "compensation_type": t.compensation_type.value,
+            "default_percentage": float(t.default_percentage) if t.default_percentage else None,
         })
     return result
 

@@ -24,7 +24,7 @@ export class DashboardPage {
     this.logoutButton = page.locator('button:has(svg.lucide-log-out)')
     this.mobileMenuButton = page.locator('button:has(svg.lucide-menu)').first()
     this.langToggle = page.locator('button:has(svg.lucide-globe)')
-    this.brandHeader = page.locator('text=LIMS Core Portal').first()
+    this.brandHeader = page.locator('text=Al-Drasat ERP').first()
   }
 
   async goto(locale: string = 'ar'): Promise<void> {

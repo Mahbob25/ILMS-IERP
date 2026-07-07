@@ -182,6 +182,8 @@ class TeacherResponse(BaseModel):
     sections_count: int = 0
     wallet_balance: float = 0.0
     wallet_last_updated: Optional[str] = None
+    compensation_type: str = "salary"
+    default_percentage: Optional[float] = None
 
     class Config:
         from_attributes = True

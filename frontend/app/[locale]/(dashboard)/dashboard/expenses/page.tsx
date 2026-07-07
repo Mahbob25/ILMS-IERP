@@ -8,6 +8,7 @@ import Modal from "@/components/Modal";
 import Select from "@/components/ui/Select";
 import { Plus, Loader2, RefreshCw, Eye, X } from "lucide-react";
 import ReceiptModal, { ReceiptData } from "@/components/ReceiptModal";
+import { getLocalDateString, formatDisplayDate } from "@/lib/dates";
 
 interface Expense {
   id: string;
@@ -59,7 +60,7 @@ export default function ExpensesPage() {
       print: "طباعة",
       close: "إغلاق",
       voucherTitle: "سند صرف",
-      instituteName: "معهد التعليم المتطور",
+      instituteName: "Al-Drasat ERP",
       signature: "التوقيع",
       cashier: "أمين الصندوق",
       recipientSignature: "توقيع المستلم",
@@ -79,6 +80,8 @@ export default function ExpensesPage() {
       ineligibleRecipientWarning: "لا يمكن السحب: الرصيد غير كافٍ",
       amountExceedsBalance: "المبلغ يتجاوز الرصيد المتاح",
       recipientNotEligible: "المستلم غير مؤهل للسحب",
+      dateIsClosed: "التاريخ مقفل - لا يمكن إجراء عمليات على هذا التاريخ",
+      expenseError: "حدث خطأ أثناء تسجيل المصروف",
     },
     en: {
       title: "Expenses",
@@ -104,12 +107,12 @@ export default function ExpensesPage() {
       print: "Print",
       close: "Close",
       voucherTitle: "Payment Voucher",
-      instituteName: "Advanced Learning Institute",
+      instituteName: "Al-Drasat ERP",
       signature: "Signature",
       cashier: "Cashier",
       recipientSignature: "Recipient Signature",
       paid: "Paid",
-      sar: "SAR",
+      sar: "YER",
       generalExpense: "General Expense",
       teacherWithdrawal: "Teacher Withdrawal",
       secretaryAdvance: "Secretary Advance",
@@ -124,6 +127,8 @@ export default function ExpensesPage() {
       ineligibleRecipientWarning: "Cannot deduct: insufficient balance",
       amountExceedsBalance: "Amount exceeds available balance",
       recipientNotEligible: "Recipient is not eligible for withdrawal",
+      dateIsClosed: "Date is closed - cannot perform operations on this date",
+      expenseError: "Error creating expense",
     },
   }[locale === "en" ? "en" : "ar"];
 
@@ -137,13 +142,15 @@ export default function ExpensesPage() {
   const [availableLimit, setAvailableLimit] = useState<number | null>(null);
   const [selectedRecipientEligible, setSelectedRecipientEligible] = useState<boolean | null>(null);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [formError, setFormError] = useState("");
+  const [closedDates, setClosedDates] = useState<Set<string>>(new Set());
   const [form, setForm] = useState({
     amount: "",
     recipient_name: "",
     recipient_id: "",
     description: "",
     type: "general_expense",
-    date: new Date().toISOString().split("T")[0],
+    date: getLocalDateString(),
   });
 
   const canCreate = user?.is_superadmin || user?.role?.name === "manager" || user?.role?.name === "secretary";
@@ -183,9 +190,20 @@ export default function ExpensesPage() {
     }
   }, []);
 
+  const fetchClosedDates = useCallback(async () => {
+    try {
+      const res = await apiClient.get<{ date: string; status: string }[]>("/lms/daily-closures");
+      const closed = new Set(res.data.filter((c) => c.status === "closed").map((c) => c.date));
+      setClosedDates(closed);
+    } catch (e) {
+      console.error(e);
+    }
+  }, []);
+
   useEffect(() => {
     if (showForm) {
       fetchEligibleRecipients(form.type);
+      fetchClosedDates();
       setForm((prev) => ({ ...prev, recipient_id: "", recipient_name: "" }));
       setAvailableLimit(null);
       setSelectedRecipientEligible(null);
@@ -284,18 +302,16 @@ export default function ExpensesPage() {
       setShowVoucher(res.data);
       fetchExpenses();
     } catch (e: any) {
-      const msg = e?.response?.data?.detail || "Error creating expense";
-      alert(msg);
+      const detail = e?.response?.data?.detail || "";
+      if (detail.includes("مقفل") || detail.toLowerCase().includes("closed")) {
+        setFormError(t.dateIsClosed);
+      } else {
+        setFormError(detail || t.expenseError);
+      }
     }
   };
 
-  const formatDate = (d: string) => {
-    try {
-      return new Date(d + "T00:00:00").toLocaleDateString(locale === "ar" ? "ar-SA" : "en-US", {
-        year: "numeric", month: "short", day: "numeric",
-      });
-    } catch { return d; }
-  };
+  const formatDate = (d: string) => formatDisplayDate(d, locale);
 
   if (loading) {
     return (
@@ -336,7 +352,7 @@ export default function ExpensesPage() {
         </div>
       </div>
 
-      <Modal open={showForm} onClose={() => { setShowForm(false); setSelectedRecipientEligible(null); }} title={t.add} size="xl">
+      <Modal open={showForm} onClose={() => { setShowForm(false); setFormError(""); setSelectedRecipientEligible(null); }} title={t.add} size="xl">
         <div className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
@@ -389,15 +405,21 @@ export default function ExpensesPage() {
             <div>
               <label className="block text-xs font-medium text-slate-700 mb-1">{t.date}</label>
               <input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} className="input-field" />
+              {closedDates.has(form.date) && (
+                <p className="text-xs text-red-600 font-medium mt-1">⚠ {t.dateIsClosed}</p>
+              )}
             </div>
             <div className="md:col-span-2">
               <label className="block text-xs font-medium text-slate-700 mb-1">{t.enterDescription}</label>
               <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="input-field" rows={2} />
             </div>
           </div>
+          {formError && (
+            <div className="text-sm text-red-600 bg-red-50 p-3 rounded-lg">{formError}</div>
+          )}
           <div className="flex gap-3 pt-2">
             <button onClick={handleSave} className="btn-primary">{t.save}</button>
-            <button onClick={() => { setShowForm(false); setSelectedRecipientEligible(null); }} className="btn-secondary">{t.cancel}</button>
+            <button onClick={() => { setShowForm(false); setFormError(""); setSelectedRecipientEligible(null); }} className="btn-secondary">{t.cancel}</button>
           </div>
         </div>
       </Modal>
@@ -441,6 +463,7 @@ export default function ExpensesPage() {
         open={showVoucher !== null}
         onClose={() => setShowVoucher(null)}
         data={showVoucher ? {
+          id: showVoucher.id,
           type: "expense",
           receipt_number: showVoucher.receipt_number,
           date: showVoucher.date,

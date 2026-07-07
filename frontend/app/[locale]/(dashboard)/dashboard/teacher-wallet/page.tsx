@@ -9,6 +9,7 @@ import {
   Loader2, RefreshCw, Wallet, ChevronDown, ChevronUp,
   DollarSign, Users, X, Plus,
 } from "lucide-react";
+import { getLocalDateString, formatDisplayDate, formatDisplayDateTime } from "@/lib/dates";
 
 // ─── Shared Types ───────────────────────────────────────────────────────────
 
@@ -39,29 +40,8 @@ interface TeacherWithWallet {
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
-function formatDate(d: string, locale: string) {
-  try {
-    return new Date(d + "T00:00:00").toLocaleDateString(
-      locale === "ar" ? "ar-SA" : "en-US",
-      { year: "numeric", month: "short", day: "numeric" }
-    );
-  } catch {
-    return d;
-  }
-}
-
-function formatDateTime(iso: string | null, locale: string) {
-  if (!iso) return "—";
-  try {
-    const dt = new Date(iso);
-    return dt.toLocaleDateString(
-      locale === "ar" ? "ar-SA" : "en-US",
-      { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }
-    );
-  } catch {
-    return iso;
-  }
-}
+const formatDate = formatDisplayDate;
+const formatDateTime = formatDisplayDateTime;
 
 // ─── Teacher View (unchanged from original) ─────────────────────────────────
 
@@ -97,7 +77,7 @@ function TeacherWalletView({ locale, employeeId }: { locale: string; employeeId:
       description: "Description",
       history: "Withdrawal History",
       emptyHistory: "No withdrawals yet",
-      sar: "SAR",
+      sar: "YER",
       receiptNumber: "Voucher No.",
       date: "Date",
     },
@@ -271,7 +251,7 @@ function AdminWalletOverview({ locale }: { locale: string }) {
       actions: "Actions",
       noTeachers: "No teachers yet",
       withdraw: "Withdraw",
-      sar: "SAR",
+      sar: "YER",
       history: "Withdrawal History",
       emptyHistory: "No withdrawals",
       receiptNumber: "Voucher No.",
@@ -300,7 +280,7 @@ function AdminWalletOverview({ locale }: { locale: string }) {
   const [modalTeacher, setModalTeacher] = useState<TeacherWithWallet | null>(null);
   const [modalAmount, setModalAmount] = useState("");
   const [modalDesc, setModalDesc] = useState("");
-  const [modalDate, setModalDate] = useState(new Date().toISOString().split("T")[0]);
+  const [modalDate, setModalDate] = useState(getLocalDateString());
   const [modalError, setModalError] = useState("");
   const [modalSubmitting, setModalSubmitting] = useState(false);
   const [modalSuccess, setModalSuccess] = useState(false);
@@ -351,7 +331,7 @@ function AdminWalletOverview({ locale }: { locale: string }) {
     setModalTeacher(teacher);
     setModalAmount("");
     setModalDesc("");
-    setModalDate(new Date().toISOString().split("T")[0]);
+    setModalDate(getLocalDateString());
     setModalError("");
     setModalSuccess(false);
     setModalPreviewBalance(null);
@@ -361,7 +341,7 @@ function AdminWalletOverview({ locale }: { locale: string }) {
     setModalTeacher(null);
     setModalAmount("");
     setModalDesc("");
-    setModalDate(new Date().toISOString().split("T")[0]);
+    setModalDate(getLocalDateString());
     setModalError("");
     setModalSuccess(false);
     setModalPreviewBalance(null);

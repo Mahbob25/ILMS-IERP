@@ -130,7 +130,7 @@ async def login(
     db_refresh_token = RefreshToken(
         user_id=user.id,
         token_hash=hashed_refresh,
-        expires_at=(datetime.now(timezone.utc) + timedelta(days=7)).replace(tzinfo=None)
+        expires_at=(datetime.now(timezone.utc) + timedelta(days=7))
     )
     db.add(db_refresh_token)
 
@@ -183,7 +183,7 @@ async def refresh_token(
     result = await db.execute(query)
     db_refresh = result.scalar_one_or_none()
 
-    if not db_refresh or db_refresh.expires_at.replace(tzinfo=timezone.utc) < datetime.now(timezone.utc):
+    if not db_refresh or db_refresh.expires_at < datetime.now(timezone.utc):
         _clear_auth_cookies(response)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -208,7 +208,7 @@ async def refresh_token(
     new_db_refresh = RefreshToken(
         user_id=user.id,
         token_hash=new_hashed_refresh,
-        expires_at=(datetime.now(timezone.utc) + timedelta(days=7)).replace(tzinfo=None)
+        expires_at=(datetime.now(timezone.utc) + timedelta(days=7))
     )
     db.add(new_db_refresh)
 
@@ -388,7 +388,7 @@ async def create_role(
 
 @users_router.get("/teachers", response_model=List[TeacherResponse])
 async def list_teachers(
-    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager"])),
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])),
     db: AsyncSession = Depends(get_db)
 ):
     return await identity_service.get_teachers_with_stats(db)

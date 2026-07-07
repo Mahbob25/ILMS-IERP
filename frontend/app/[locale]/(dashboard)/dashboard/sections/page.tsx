@@ -145,7 +145,7 @@ export default function SectionsPage() {
 
   const [sections, setSections] = useState<CourseSection[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
-  const [teachers, setTeachers] = useState<Employee[]>([]);
+  const [teachers, setTeachers] = useState<any[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -166,7 +166,7 @@ export default function SectionsPage() {
   const fetchLookups = useCallback(async () => {
     const [coursesRes, teachersRes, studentsRes] = await Promise.all([
       apiClient.get<{ items: Course[]; total: number }>("/academic/courses?limit=1000").catch(() => null),
-      apiClient.get<Employee[]>("/employees?employee_type=teacher").catch(() => null),
+      apiClient.get<any[]>("/users/teachers").catch(() => null),
       apiClient.get<{ items: Student[]; total: number }>("/academic/students?limit=1000").catch(() => null),
     ]);
     if (coursesRes) setCourses(coursesRes.data.items);
@@ -678,12 +678,14 @@ export default function SectionsPage() {
               placeholder="—"
             />
           </div>
-          <div>
-            <label className="block text-xs font-medium text-slate-700 mb-1">Discount</label>
-            <input type="number" value={registerForm.admin_discount}
-              onChange={(e) => setRegisterForm(prev => ({ ...prev, admin_discount: e.target.value }))}
-              className="input-field" min={0} placeholder="0" />
-          </div>
+          {user?.role?.name !== "secretary" && (
+            <div>
+              <label className="block text-xs font-medium text-slate-700 mb-1">Discount</label>
+              <input type="number" value={registerForm.admin_discount}
+                onChange={(e) => setRegisterForm(prev => ({ ...prev, admin_discount: e.target.value }))}
+                className="input-field" min={0} placeholder="0" />
+            </div>
+          )}
           {(() => {
             const sec = sections.find(s => s.id === showRegister);
             return sec?.price != null ? (

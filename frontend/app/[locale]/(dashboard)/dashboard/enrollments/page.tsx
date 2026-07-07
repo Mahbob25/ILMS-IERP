@@ -390,11 +390,13 @@ export default function EnrollmentsPage() {
                 placeholder="—"
               />
             </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">{t.discount}</label>
-              <input type="number" value={form.admin_discount} onChange={(e) => setForm({ ...form, admin_discount: e.target.value })}
-                className="input-field" min={0} />
-            </div>
+            {user?.role?.name !== "secretary" && (
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1">{t.discount}</label>
+                <input type="number" value={form.admin_discount} onChange={(e) => setForm({ ...form, admin_discount: e.target.value })}
+                  className="input-field" min={0} />
+              </div>
+            )}
           </div>
           <div className="flex gap-3 pt-2">
             <button onClick={handleSave} className="btn-primary">{t.save}</button>

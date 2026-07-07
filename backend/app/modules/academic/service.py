@@ -1,3 +1,4 @@
+from decimal import Decimal
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
@@ -194,7 +195,7 @@ async def activate_section(db: AsyncSession, section_id: uuid.UUID, teacher_perc
         )
         payments = payments_result.scalars().all()
         if payments:
-            total_share = sum(p.amount * teacher_percentage / 100.0 for p in payments)
+            total_share = sum(p.amount * teacher_percentage / 100 for p in payments)
             if total_share > 0:
                 wallet_result = await db.execute(
                     select(TeacherWallet).where(TeacherWallet.teacher_id == section.teacher_id)
@@ -202,12 +203,12 @@ async def activate_section(db: AsyncSession, section_id: uuid.UUID, teacher_perc
                 wallet = wallet_result.scalar_one_or_none()
                 if wallet:
                     wallet.balance += total_share
-                    wallet.last_updated = datetime.now(timezone.utc).replace(tzinfo=None)
+                    wallet.last_updated = datetime.now(timezone.utc)
                 else:
                     wallet = TeacherWallet(
                         teacher_id=section.teacher_id,
                         balance=total_share,
-                        last_updated=datetime.now(timezone.utc).replace(tzinfo=None),
+                        last_updated=datetime.now(timezone.utc),
                     )
                     db.add(wallet)
 
@@ -406,7 +407,7 @@ async def get_section_enrollments_detailed(
         .where(Payment.enrollment_id.in_(enrollment_ids))
         .group_by(Payment.enrollment_id)
     )
-    total_paid_map = {row[0]: float(row[1]) for row in total_paid_rows.all()}
+    total_paid_map = {row[0]: Decimal(str(row[1])) for row in total_paid_rows.all()}
 
     grade_rows = await db.execute(
         select(FinalGrade)
@@ -420,10 +421,10 @@ async def get_section_enrollments_detailed(
 
     results = []
     for e in enrollments:
-        total_paid = total_paid_map.get(e.id, 0.0)
+        total_paid = total_paid_map.get(e.id, Decimal('0'))
         net_price = e.agreed_price
         if e.agreed_price is not None and e.admin_discount is not None:
-            net_price = e.agreed_price - (e.agreed_price * e.admin_discount / 100.0)
+            net_price = e.agreed_price - (e.agreed_price * e.admin_discount / 100)
         balance = (net_price - total_paid) if net_price is not None else None
 
         final_grade = grade_map.get(e.student_id)

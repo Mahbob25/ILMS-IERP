@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { apiClient } from "@/lib/api";
 import { useAuth } from "@/components/AuthContext";
@@ -79,6 +79,11 @@ export default function SectionStudentsPage() {
       active: "نشط",
       completed: "مكتمل",
       notFound: "الشعبة غير موجودة",
+      financialSummary: "الملخص المالي",
+      sectionFullAmount: "إجمالي المبلغ المستحق",
+      totalPaidSummary: "إجمالي المدفوع",
+      remaining: "المتبقي",
+      of: "من",
     },
     en: {
       title: "Section Students",
@@ -102,18 +107,23 @@ export default function SectionStudentsPage() {
       grade: "Grade",
       loading: "Loading...",
       empty: "No students enrolled in this section",
-      sar: "SAR",
+      sar: "YER",
       pending: "Pending",
       active: "Active",
       completed: "Completed",
       notFound: "Section not found",
+      financialSummary: "Financial Summary",
+      sectionFullAmount: "Total Amount Due",
+      totalPaidSummary: "Total Paid",
+      remaining: "Remaining",
+      of: "of",
     },
   }[locale === "en" ? "en" : "ar"];
 
   const [section, setSection] = useState<SectionInfo | null>(null);
   const [students, setStudents] = useState<SectionEnrollmentDetail[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
-  const [teachers, setTeachers] = useState<Employee[]>([]);
+  const [teachers, setTeachers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
 
@@ -130,7 +140,7 @@ export default function SectionStudentsPage() {
           `/academic/sections/${sectionId}/enrollments/detailed`
         ).catch(() => null),
         apiClient.get<{ items: Course[]; total: number }>("/academic/courses?limit=1000").catch(() => null),
-        apiClient.get<Employee[]>("/employees?employee_type=teacher").catch(() => null),
+        apiClient.get<any[]>("/users/teachers").catch(() => null),
       ]);
 
       if (courseRes) setCourses(courseRes.data.items);
@@ -164,6 +174,17 @@ export default function SectionStudentsPage() {
       });
     } catch { return d; }
   };
+
+  const financialSummary = useMemo(() => {
+    const fullAmount = students.reduce((sum, s) => {
+      const price = s.agreed_price ?? section?.price ?? 0;
+      return sum + price;
+    }, 0);
+    const totalPaid = students.reduce((sum, s) => sum + (s.total_paid || 0), 0);
+    const remaining = fullAmount - totalPaid;
+    const percentage = fullAmount > 0 ? (totalPaid / fullAmount) * 100 : 0;
+    return { fullAmount, totalPaid, remaining, percentage };
+  }, [students, section]);
 
   const getCourseName = (courseId: string) => courses.find((c) => c.id === courseId)?.name || courseId;
   const getTeacherName = (teacherId: string) => teachers.find((u) => u.id === teacherId)?.full_name || teacherId;
@@ -255,6 +276,59 @@ export default function SectionStudentsPage() {
               </span>
             </div>
           )}
+        </div>
+      )}
+
+      {students.length > 0 && (
+        <div className="card p-4">
+          <h3 className="text-sm font-bold text-slate-900 mb-3">{t.financialSummary}</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+            <div className="bg-slate-50 rounded-lg p-3">
+              <p className="text-xs text-slate-500 mb-1">{t.sectionFullAmount}</p>
+              <p className="text-lg font-bold text-slate-900">
+                {financialSummary.fullAmount.toFixed(2)} {t.sar}
+              </p>
+            </div>
+            <div className="bg-emerald-50 rounded-lg p-3">
+              <p className="text-xs text-emerald-600 mb-1">{t.totalPaidSummary}</p>
+              <p className="text-lg font-bold text-emerald-700">
+                {financialSummary.totalPaid.toFixed(2)} {t.sar}
+              </p>
+            </div>
+            <div className="bg-amber-50 rounded-lg p-3">
+              <p className="text-xs text-amber-600 mb-1">{t.remaining}</p>
+              <p className={`text-lg font-bold ${
+                financialSummary.remaining > 0 ? "text-amber-700" : "text-emerald-700"
+              }`}>
+                {financialSummary.remaining.toFixed(2)} {t.sar}
+              </p>
+            </div>
+          </div>
+          <div>
+            <div className="flex items-center justify-between text-xs text-slate-500 mb-1">
+              <span>{financialSummary.totalPaid.toFixed(2)} {t.sar}</span>
+              <span>{financialSummary.fullAmount.toFixed(2)} {t.sar}</span>
+            </div>
+            <div className="w-full bg-slate-200 rounded-full h-2.5 overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all duration-500 ${
+                  financialSummary.percentage >= 100
+                    ? "bg-emerald-500"
+                    : financialSummary.percentage > 0
+                    ? "bg-amber-500"
+                    : "bg-slate-300"
+                }`}
+                style={{
+                  [isRtl ? "marginRight" : "marginLeft"]: 0,
+                  width: `${Math.min(financialSummary.percentage, 100)}%`,
+                  marginInlineStart: 0,
+                }}
+              />
+            </div>
+            <p className="text-xs text-slate-400 mt-1">
+              {financialSummary.percentage.toFixed(1)}% {t.of} {financialSummary.fullAmount.toFixed(2)} {t.sar}
+            </p>
+          </div>
         </div>
       )}
 

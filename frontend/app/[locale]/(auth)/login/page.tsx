@@ -19,11 +19,11 @@ export default function LoginPage() {
   // Simple translations dictionary for login page
   const t = {
     ar: {
-      title: "نظام إدارة المعهد",
-      subtitle: "سجل الدخول للمتابعة إلى بوابة LIMS",
+      title: "Al-Drasat ERP",
+      subtitle: "سجل الدخول للمتابعة إلى Al-Drasat ERP",
       email: "البريد الإلكتروني",
       password: "كلمة المرور",
-      emailPlaceholder: "name@institute.dev",
+      emailPlaceholder: "name@aldrasat.com",
       passwordPlaceholder: "••••••••",
       submitBtn: "تسجيل الدخول",
       loading: "جاري التحقق...",
@@ -33,11 +33,11 @@ export default function LoginPage() {
       validationError: "يرجى ملء جميع الحقول المطلوبة."
     },
     en: {
-      title: "Learning Institution Management System",
-      subtitle: "Sign in to access your LIMS portal",
+      title: "Al-Drasat ERP",
+      subtitle: "Sign in to access your ERP portal",
       email: "Email Address",
       password: "Password",
-      emailPlaceholder: "name@institute.dev",
+      emailPlaceholder: "name@aldrasat.com",
       passwordPlaceholder: "••••••••",
       submitBtn: "Sign In",
       loading: "Authenticating...",

@@ -2,10 +2,12 @@
 
 import React, { useEffect, useCallback, useRef } from "react";
 import { X, Printer, FileDown } from "lucide-react";
-import html2canvas from "html2canvas";
-import jsPDF from "jspdf";
+import { formatDisplayDate } from "@/lib/dates";
+import { apiClient } from "@/lib/api";
+import { generatePdfFromHtml } from "@/lib/generatePdfFromHtml";
 
 export interface ReceiptData {
+  id?: string;
   type: "payment" | "expense";
   receipt_number: string;
   date: string;
@@ -46,9 +48,9 @@ export default function ReceiptModal({
   data,
   locale,
   isRtl,
-  instituteName = "Advanced Learning Institute",
+  instituteName = "Al-Drasat ERP",
   cashierName = "",
-  currency = "SAR",
+  currency = "ريال",
 }: ReceiptModalProps) {
   const receiptRef = useRef<HTMLDivElement>(null);
 
@@ -98,162 +100,68 @@ export default function ReceiptModal({
     };
   }, [open, handleKeyDown]);
 
-  const formatDate = (d: string) => {
-    try {
-      return new Date(d + "T00:00:00").toLocaleDateString(isAr ? "ar-SA" : "en-US", {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-      });
-    } catch {
-      return d;
-    }
-  };
+  const formatDate = (d: string) => formatDisplayDate(d, isAr ? "ar" : "en");
 
   const formatCurrency = (val: number) => {
     return `${val.toFixed(2)} ${currency}`;
   };
 
-  const handlePrint = () => {
-    const printWindow = window.open("", "_blank");
-    if (!printWindow) return;
+  const handlePrint = async () => {
+    if (!data?.id) return;
 
-    const content = receiptRef.current?.innerHTML || "";
+    try {
+      const endpoint =
+        data.type === "payment"
+          ? `/lms/payments/${data.id}/preview?locale=${locale}`
+          : `/lms/expenses/${data.id}/preview?locale=${locale}`;
 
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html dir="${isRtl ? "rtl" : "ltr"}">
-      <head>
-        <title>${data?.receipt_number || "Receipt"}</title>
-        <link rel="preconnect" href="https://fonts.googleapis.com">
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
-        <style>
-          * { margin: 0; padding: 0; box-sizing: border-box; }
-          body {
-            font-family: ${isAr ? "'IBM Plex Sans Arabic', 'Inter', sans-serif" : "'Inter', sans-serif"};
-            background: #f8fafc;
-            display: flex;
-            justify-content: center;
-            padding: 40px 20px;
-            color: #1e293b;
-          }
-          .receipt-print {
-            width: 100%;
-            max-width: 480px;
-            background: #ffffff;
-            border-radius: 16px;
-            overflow: hidden;
-            box-shadow: 0 4px 24px rgba(0,0,0,0.08);
-          }
-          .receipt-header {
-            background: linear-gradient(135deg, #1E3A8A 0%, #312e81 100%);
-            padding: 28px 32px 20px;
-            text-align: center;
-          }
-          .receipt-header h2 {
-            color: #ffffff;
-            font-size: 18px;
-            font-weight: 700;
-            letter-spacing: 0.3px;
-          }
-          .receipt-header p {
-            color: rgba(255,255,255,0.8);
-            font-size: 12px;
-            margin-top: 4px;
-          }
-          .receipt-badge {
-            display: inline-block;
-            margin-top: 10px;
-            padding: 4px 14px;
-            border-radius: 20px;
-            font-size: 11px;
-            font-weight: 600;
-            letter-spacing: 0.5px;
-            background: rgba(255,255,255,0.15);
-            color: #ffffff;
-            border: 1px solid rgba(255,255,255,0.2);
-          }
-          .accent-bar {
-            height: 4px;
-            background: linear-gradient(90deg, #0D9488, #14b8a6);
-          }
-          .receipt-body { padding: 20px 32px 24px; }
-          .receipt-row {
-            display: flex;
-            justify-content: space-between;
-            padding: 6px 0;
-            font-size: 13px;
-          }
-          .receipt-row .label { color: #64748b; }
-          .receipt-row .value { font-weight: 500; color: #1e293b; }
-          .receipt-row .value-mono { font-family: 'Courier New', monospace; font-weight: 600; }
-          .divider { border: none; border-top: 1px dashed #e2e8f0; margin: 10px 0; }
-          .divider-solid { border: none; border-top: 1px solid #e2e8f0; margin: 12px 0; }
-          .amount-section { margin: 12px 0; }
-          .amount-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 13px; }
-          .amount-total {
-            display: flex; justify-content: space-between; padding: 10px 0 4px;
-            font-size: 18px; font-weight: 700;
-          }
-          .amount-green { color: #059669; }
-          .amount-red { color: #dc2626; }
-          .signature-section {
-            margin-top: 24px; padding-top: 16px;
-            border-top: 1px solid #e2e8f0;
-            display: flex; justify-content: space-between;
-            font-size: 11px; color: #94a3b8;
-          }
-          .signature-section span { flex: 1; }
-          .expense-badge {
-            display: inline-block;
-            padding: 2px 10px;
-            border-radius: 12px;
-            font-size: 11px;
-            font-weight: 500;
-            border: 1px solid;
-          }
-          @media print {
-            body { background: white; padding: 0; }
-            .receipt-print { box-shadow: none; max-width: 100%; border-radius: 0; }
-            .no-print { display: none !important; }
-          }
-        </style>
-      </head>
-      <body>
-        <div class="receipt-print">${content}</div>
-        <script>window.print();window.close();</script>
-      </body>
-      </html>
-    `);
+      const res = await apiClient.get(endpoint, { responseType: "text" });
+      const htmlContent = res.data as string;
 
-    printWindow.document.close();
+      const printWindow = window.open("", "_blank");
+      if (!printWindow) return;
+
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>${data.receipt_number}</title>
+          <base href="${window.location.origin}/">
+        </head>
+        <body>
+          ${htmlContent}
+          <script>window.print();window.close();<\/script>
+        </body>
+        </html>
+      `);
+
+      printWindow.document.close();
+    } catch (err) {
+      console.error("Print failed:", err);
+    }
   };
 
   const handleDownloadPdf = async () => {
-    if (!receiptRef.current || !data) return;
-
-    const originalOverflow = document.body.style.overflow;
-    document.body.style.overflow = "visible";
+    if (!data?.id) return;
 
     try {
-      const canvas = await html2canvas(receiptRef.current, {
-        scale: 2,
-        backgroundColor: "#ffffff",
-        logging: false,
-        useCORS: true,
+      const endpoint =
+        data.type === "payment"
+          ? `/lms/payments/${data.id}/preview?locale=${locale}`
+          : `/lms/expenses/${data.id}/preview?locale=${locale}`;
+
+      const res = await apiClient.get(endpoint, { responseType: "text" });
+      const htmlContent = res.data as string;
+
+      await generatePdfFromHtml(htmlContent, {
+        filename: `${data.receipt_number}.pdf`,
+        width: 210,
+        height: 148,
+        orientation: "l",
+        format: "a5",
       });
-
-      const imgData = canvas.toDataURL("image/png");
-      const pdf = new jsPDF("p", "mm", "a4");
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-
-      pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
-      pdf.save(`${data.receipt_number}.pdf`);
     } catch (err) {
       console.error("PDF generation failed:", err);
-    } finally {
-      document.body.style.overflow = originalOverflow;
     }
   };
 

@@ -249,7 +249,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           {/* Brand Header */}
           <div className="h-16 flex items-center px-6 border-b border-slate-200">
             <span className="text-lg font-bold tracking-tight text-slate-900">
-              LIMS Core Portal
+              Al-Drasat ERP
             </span>
           </div>
 
@@ -347,7 +347,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           } transition-transform duration-300`}>
             {/* Close button */}
             <div className="h-16 flex items-center justify-between px-6 border-b border-slate-200">
-              <span className="text-lg font-bold tracking-tight text-slate-900">LIMS Core Portal</span>
+              <span className="text-lg font-bold tracking-tight text-slate-900">Al-Drasat ERP</span>
               <button onClick={() => setSidebarOpen(false)} className="text-slate-500 hover:text-slate-900">
                 <X size={20} />
               </button>
