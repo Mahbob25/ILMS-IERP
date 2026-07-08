@@ -37,7 +37,7 @@ class CourseResponse(BaseModel):
 # --- Course Section ---
 class CourseSectionCreate(BaseModel):
     course_id: uuid.UUID
-    teacher_id: uuid.UUID
+    teacher_id: Optional[uuid.UUID] = None
     capacity: int = 30
     min_students_required: Optional[int] = None
     start_date: Optional[date] = None
@@ -63,7 +63,7 @@ class CourseSectionUpdate(BaseModel):
 class CourseSectionResponse(BaseModel):
     id: uuid.UUID
     course_id: uuid.UUID
-    teacher_id: uuid.UUID
+    teacher_id: Optional[uuid.UUID] = None
     capacity: int
     enrolled_count: int
     status: str = "pending"
@@ -159,6 +159,11 @@ class FinalGradeCreate(BaseModel):
 
 class FinalGradeBulkCreate(BaseModel):
     grades: list[FinalGradeCreate]
+
+class StudentGradeSummary(BaseModel):
+    section_id: uuid.UUID
+    final_score: float
+    grade_label: str
 
 class FinalGradeResponse(BaseModel):
     id: uuid.UUID

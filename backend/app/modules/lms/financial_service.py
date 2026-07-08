@@ -5,12 +5,16 @@ from typing import Optional
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import func, update, text, or_
+from sqlalchemy import func, text
 from sqlalchemy.orm import joinedload
 
-from app.modules.lms.models import Payment, TeacherWallet, Expense, DailyClosure
+from app.modules.lms.models import (
+    Payment, TeacherWallet, Expense, DailyClosure,
+    LedgerEntryType, CompensationModel,
+)
+from app.modules.lms.ledger_service import record as ledger_record, get_or_create_wallet
 from app.modules.academic.models import Course, CourseSection, Enrollment, Student
-from app.modules.identity.models import Employee, EmployeeType, CompensationType, User
+from app.modules.identity.models import Employee, EmployeeType, User
 from app.core.templates import template_engine
 from app.core.error_messages import get_error_detail
 
@@ -64,7 +68,12 @@ async def create_payment(
 
     enrollment_result = await db.execute(
         select(Enrollment)
-        .options(joinedload(Enrollment.section).joinedload(CourseSection.course))
+        .options(
+            joinedload(Enrollment.section)
+            .joinedload(CourseSection.course),
+            joinedload(Enrollment.section)
+            .joinedload(CourseSection.contract),
+        )
         .options(joinedload(Enrollment.student))
         .where(Enrollment.id == enrollment_id)
     )
@@ -104,53 +113,39 @@ async def create_payment(
     db.add(payment)
 
     section = enrollment.section
-    teacher_pct = section.teacher_percentage or 0
 
-    teacher_share = amount * teacher_pct / 100
+    teacher_share = Decimal("0")
+    holdback = Decimal("0.20")
+    contract = section.contract
 
-    if teacher_share > 0:
-        teacher_emp_result = await db.execute(
-            select(Employee).where(Employee.id == section.teacher_id)
+    if contract and contract.compensation_model == CompensationModel.PERCENTAGE:
+        pct = Decimal(str(contract.percentage or 0))
+        holdback = Decimal(str(contract.holdback_rate))
+        teacher_share = amount * pct / 100
+        teacher_pct = float(pct)
+    elif section.teacher_percentage:
+        teacher_pct = section.teacher_percentage
+        teacher_share = amount * Decimal(str(teacher_pct)) / 100
+
+    if teacher_share > 0 and section.teacher_id:
+        wallet = await get_or_create_wallet(db, section.teacher_id)
+        available = teacher_share * (Decimal("1") - holdback)
+        frozen = teacher_share * holdback
+        await ledger_record(
+            db=db,
+            wallet_id=wallet.id,
+            contract_id=contract.id if contract else None,
+            entry_type=LedgerEntryType.PAYMENT_SHARE,
+            total_amount=teacher_share,
+            available_delta=available,
+            frozen_delta=frozen,
+            reference_type="payment",
+            reference_id=payment.id,
+            narrative=f"Payment share: {teacher_share} ({teacher_pct}%)",
+            created_by=created_by,
         )
-        teacher_emp = teacher_emp_result.scalar_one_or_none()
-        if teacher_emp and teacher_emp.compensation_type == CompensationType.SALARY:
-            teacher_share = 0
-
-    if teacher_share > 0:
-        teacher_id = section.teacher_id
-        wallet_result = await db.execute(
-            select(TeacherWallet).where(TeacherWallet.teacher_id == teacher_id)
-        )
-        wallet = wallet_result.scalar_one_or_none()
-        if wallet:
-            wallet.balance += teacher_share
-            wallet.last_updated = datetime.now(timezone.utc)
-        else:
-            wallet = TeacherWallet(
-                teacher_id=teacher_id,
-                balance=teacher_share,
-                last_updated=datetime.now(timezone.utc),
-            )
-            db.add(wallet)
 
     await db.flush()
-
-    student = enrollment.student
-    section = enrollment.section
-    course = section.course
-
-    total_paid_result = await db.execute(
-        select(func.coalesce(func.sum(Payment.amount), 0))
-        .where(Payment.enrollment_id == enrollment_id)
-    )
-    total_paid = Decimal(str(total_paid_result.scalar() or 0))
-    agreed_price = enrollment.agreed_price or 0
-    discount_pct = enrollment.admin_discount or 0
-    discount_amount = agreed_price * discount_pct / 100
-    net_price = agreed_price - discount_amount
-    if net_price <= 0:
-        net_price = max(agreed_price, 1)
-    balance_remaining = net_price - total_paid
 
     return payment
 
@@ -260,7 +255,7 @@ async def get_eligible_recipients(db: AsyncSession, recipient_type: str) -> list
     if recipient_type == "teacher_withdrawal":
         employees_result = await db.execute(
             select(Employee)
-            .where(Employee.employee_type == EmployeeType.TEACHER, Employee.is_active == True)
+            .where(Employee.employee_type == EmployeeType.TEACHER, Employee.is_active)
         )
         teachers = employees_result.scalars().all()
 
@@ -271,19 +266,21 @@ async def get_eligible_recipients(db: AsyncSession, recipient_type: str) -> list
             )
             wallet = wallet_result.scalar_one_or_none()
             balance = wallet.balance if wallet else 0
+            frozen = wallet.frozen_balance if wallet else 0
+            available = balance - frozen
             result.append({
                 "id": str(emp.id),
                 "full_name": emp.full_name,
                 "role": "teacher",
-                "available_limit": balance,
-                "is_eligible": balance > 0,
+                "available_limit": available,
+                "is_eligible": available > 0,
             })
         return result
 
     elif recipient_type == "secretary_advance":
         employees_result = await db.execute(
             select(Employee)
-            .where(Employee.employee_type == EmployeeType.SECRETARY, Employee.is_active == True)
+            .where(Employee.employee_type == EmployeeType.SECRETARY, Employee.is_active)
         )
         secretaries = employees_result.scalars().all()
 
@@ -303,7 +300,7 @@ async def get_eligible_recipients(db: AsyncSession, recipient_type: str) -> list
 
         result = []
         for emp in secretaries:
-            stipend = emp.salary or 0
+            stipend = emp.default_salary or 0
             total_advances = advances_map.get(emp.id, 0)
             remaining = stipend - total_advances
             result.append({
@@ -370,11 +367,12 @@ async def create_expense(
                 select(TeacherWallet).where(TeacherWallet.teacher_id == employee.id)
             )
             wallet = wallet_result.scalar_one_or_none()
-            if not wallet or wallet.balance < amount:
+            available_balance = (wallet.balance - wallet.frozen_balance) if wallet else 0
+            if not wallet or available_balance < amount:
                 raise ValueError("Insufficient wallet balance")
 
         elif expense_type == "secretary_advance":
-            stipend = employee.salary or 0
+            stipend = employee.default_salary or 0
             month_start = expense_date.replace(day=1)
             total_result = await db.execute(
                 select(func.coalesce(func.sum(Expense.amount), 0))
@@ -405,15 +403,22 @@ async def create_expense(
     )
     db.add(expense)
 
-    # Auto-deduct wallet for teacher withdrawal
+    # Record withdrawal via ledger for teacher withdrawal
     if expense_type == "teacher_withdrawal" and recipient_id:
-        wallet_result = await db.execute(
-            select(TeacherWallet).where(TeacherWallet.teacher_id == recipient_id)
+        wallet = await get_or_create_wallet(db, recipient_id)
+        await ledger_record(
+            db=db,
+            wallet_id=wallet.id,
+            contract_id=None,
+            entry_type=LedgerEntryType.WITHDRAWAL,
+            total_amount=amount,
+            available_delta=-amount,
+            frozen_delta=Decimal("0"),
+            reference_type="expense",
+            reference_id=expense.id,
+            narrative=f"Teacher withdrawal: {receipt_number}",
+            created_by=created_by,
         )
-        wallet = wallet_result.scalar_one_or_none()
-        if wallet:
-            wallet.balance -= amount
-            wallet.last_updated = datetime.now(timezone.utc)
 
     await db.flush()
 

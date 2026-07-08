@@ -46,8 +46,7 @@ class EmployeeResponse(BaseModel):
     full_name: str
     employee_type: str
     phone_number: Optional[str] = None
-    salary: Optional[float] = None
-    compensation_type: str = "salary"
+    default_salary: Optional[float] = None
     default_percentage: Optional[float] = None
     hire_date: Optional[date] = None
     contract_end_date: Optional[date] = None
@@ -62,8 +61,7 @@ class EmployeeCreate(BaseModel):
     full_name: str
     employee_type: str = Field(..., description="Must be a valid EmployeeType value")
     phone_number: Optional[str] = None
-    salary: Optional[float] = None
-    compensation_type: str = "salary"
+    default_salary: Optional[float] = None
     default_percentage: Optional[float] = None
     hire_date: Optional[date] = None
     contract_end_date: Optional[date] = None
@@ -73,8 +71,7 @@ class EmployeeUpdate(BaseModel):
     full_name: Optional[str] = None
     employee_type: Optional[str] = None
     phone_number: Optional[str] = None
-    salary: Optional[float] = None
-    compensation_type: Optional[str] = None
+    default_salary: Optional[float] = None
     default_percentage: Optional[float] = None
     hire_date: Optional[date] = None
     contract_end_date: Optional[date] = None
@@ -86,8 +83,7 @@ class EmployeeDetailResponse(BaseModel):
     full_name: str
     employee_type: str
     phone_number: Optional[str] = None
-    salary: Optional[float] = None
-    compensation_type: str = "salary"
+    default_salary: Optional[float] = None
     default_percentage: Optional[float] = None
     hire_date: Optional[date] = None
     contract_end_date: Optional[date] = None
@@ -182,7 +178,7 @@ class TeacherResponse(BaseModel):
     sections_count: int = 0
     wallet_balance: float = 0.0
     wallet_last_updated: Optional[str] = None
-    compensation_type: str = "salary"
+    default_salary: Optional[float] = None
     default_percentage: Optional[float] = None
 
     class Config:
@@ -194,6 +190,8 @@ class TeacherDetailResponse(BaseModel):
     email: Optional[EmailStr] = None
     is_active: bool
     wallet_balance: float
+    default_salary: Optional[float] = None
+    default_percentage: Optional[float] = None
     sections: list[SectionInfo]
     recent_activity: list[RecentActivity]
 

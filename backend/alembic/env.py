@@ -14,7 +14,7 @@ from app.core.config import settings
 from app.db.base import Base, naming_convention
 from app.modules.identity.models import Role, User, RefreshToken, AuditLog, Employee, Permission, RolePermission
 from app.modules.academic.models import Course, CourseSection, Student, Enrollment, Certificate, FinalGrade
-from app.modules.lms.models import AttendanceSession, AttendanceRecord, Assignment, Submission, Grade, Payment, Expense, TeacherWallet, DailyClosure
+from app.modules.lms.models import AttendanceSession, AttendanceRecord, Assignment, Submission, Grade, Payment, Expense, TeacherWallet, DailyClosure, SectionContract, LedgerEntry, CompensationAmendmentRequest
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

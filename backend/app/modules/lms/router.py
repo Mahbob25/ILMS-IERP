@@ -1,23 +1,37 @@
+from decimal import Decimal
 import uuid
 from datetime import date
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+from sqlalchemy.orm import joinedload
 from app.db.session import get_db
 from app.modules.identity.models import User
 from app.modules.identity.dependencies import get_current_user, RoleChecker
 from app.modules.academic.service import get_course_section
+from app.modules.academic.models import CourseSection as CourseSectionModel
+from app.modules.lms.models import (
+    SectionContract, CompensationAmendmentRequest, AmendmentStatus,
+    CompensationModel, TeacherWallet, ContractStatus,
+)
 from app.modules.lms.schemas import (
     AttendanceSessionCreate, AttendanceSessionResponse,
-    AttendanceRecordResponse, AttendanceSubmit,
+    AttendanceRecordResponse, AttendanceSubmit, StudentAttendanceSummary,
     PaymentCreate, PaymentResponse,
     TeacherWalletResponse,
     ExpenseCreate, ExpenseResponse, EligibleRecipientResponse,
     DailyClosureResponse, DailyLedgerResponse,
     RevenueOverviewResponse,
+    SectionContractResponse, ContractAssignRequest,
+    AmendmentCreateRequest, AmendmentResponse,
+    AmendmentApproveRequest, AmendmentRejectRequest, AmendmentPendingItem,
+    WalletDetailResponse,
 )
 from app.modules.lms import service as lms_service
 from app.modules.lms import financial_service
+from app.modules.lms import ledger_service as lms_ledger
+from app.modules.lms import compensation_service
 from app.core.error_messages import get_error_detail
 
 lms_router = APIRouter(prefix="/lms", tags=["lms"])
@@ -33,6 +47,8 @@ async def create_attendance_session(
     section = await get_course_section(db, data.section_id)
     if not section:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Section not found")
+    if section.status != "active":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot create attendance for a section that is not active")
     if current_user.role.name == "teacher" and section.teacher_id != current_user.employee_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not your section")
     return await lms_service.create_attendance_session(db, data.section_id, data.date, current_user.id)
@@ -75,6 +91,15 @@ async def submit_attendance(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not your session")
     records_data = [r.model_dump() for r in data.records]
     return await lms_service.set_attendance_records(db, session_id, records_data)
+
+
+@lms_router.get("/attendance/students/{student_id}/summary", response_model=list[StudentAttendanceSummary])
+async def get_student_attendance_summary(
+    student_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    return await lms_service.get_student_attendance_summary(db, student_id)
 
 
 # --- Payments ---
@@ -308,3 +333,350 @@ async def get_daily_ledger(
     db: AsyncSession = Depends(get_db)
 ):
     return await financial_service.get_daily_ledger(db, closure_date)
+
+
+# --- Section Contracts ---
+@lms_router.get("/sections/{section_id}/contract", response_model=SectionContractResponse)
+async def get_section_contract(
+    section_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    result = await db.execute(
+        select(SectionContract)
+        .options(
+            joinedload(SectionContract.section).joinedload(CourseSectionModel.course)
+        )
+        .where(SectionContract.section_id == section_id)
+    )
+    contract = result.scalar_one_or_none()
+    if not contract:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Contract not found")
+    section_data = None
+    if contract.section:
+        section_data = {
+            "id": contract.section.id,
+            "name": str(contract.section.id),
+            "course_name": "",
+        }
+    return SectionContractResponse(
+        id=contract.id,
+        section_id=contract.section_id,
+        teacher_id=contract.teacher_id,
+        compensation_model=contract.compensation_model.value if contract.compensation_model else None,
+        fixed_amount=float(contract.fixed_amount) if contract.fixed_amount else None,
+        percentage=float(contract.percentage) if contract.percentage else None,
+        holdback_rate=float(contract.holdback_rate),
+        status=contract.status.value,
+        created_at=contract.created_at,
+        updated_at=contract.updated_at,
+        section=section_data,
+    )
+
+
+@lms_router.put("/sections/{section_id}/contract/assign", response_model=SectionContractResponse)
+async def assign_section_contract(
+    section_id: uuid.UUID,
+    data: ContractAssignRequest,
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager"])),
+    db: AsyncSession = Depends(get_db)
+):
+    section = await get_course_section(db, section_id)
+    if not section:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Section not found")
+    comp_model = data.compensation_model.lower()
+    if comp_model not in ("fixed", "percentage"):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="compensation_model must be 'fixed' or 'percentage'")
+
+    model_enum = CompensationModel.FIXED if comp_model == "fixed" else CompensationModel.PERCENTAGE
+    try:
+        contract = await lms_ledger.assign_contract(
+            db=db,
+            section_id=section_id,
+            teacher_id=data.teacher_id,
+            compensation_model=model_enum,
+            fixed_amount=Decimal(str(data.fixed_amount)) if data.fixed_amount is not None else None,
+            percentage=Decimal(str(data.percentage)) if data.percentage is not None else None,
+            holdback_rate=Decimal(str(data.holdback_rate)) if data.holdback_rate is not None else None,
+        )
+        await db.refresh(contract, ["section"])
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+    section_data = None
+    if contract.section:
+        section_data = {
+            "id": contract.section.id,
+            "name": str(contract.section.id),
+            "course_name": "",
+        }
+    return SectionContractResponse(
+        id=contract.id,
+        section_id=contract.section_id,
+        teacher_id=contract.teacher_id,
+        compensation_model=contract.compensation_model.value if contract.compensation_model else None,
+        fixed_amount=float(contract.fixed_amount) if contract.fixed_amount else None,
+        percentage=float(contract.percentage) if contract.percentage else None,
+        holdback_rate=float(contract.holdback_rate),
+        status=contract.status.value,
+        created_at=contract.created_at,
+        updated_at=contract.updated_at,
+        section=section_data,
+    )
+
+
+@lms_router.post("/sections/{section_id}/contract/activate", response_model=SectionContractResponse)
+async def activate_section_contract(
+    section_id: uuid.UUID,
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])),
+    db: AsyncSession = Depends(get_db)
+):
+    result = await db.execute(
+        select(SectionContract).where(SectionContract.section_id == section_id)
+    )
+    contract = result.scalar_one_or_none()
+    if not contract:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Contract not found")
+    try:
+        contract = await lms_ledger.activate_contract(db, contract.id, current_user.id)
+        await db.refresh(contract, ["section"])
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    section_data = None
+    if contract.section:
+        section_data = {
+            "id": contract.section.id,
+            "name": str(contract.section.id),
+            "course_name": "",
+        }
+    return SectionContractResponse(
+        id=contract.id,
+        section_id=contract.section_id,
+        teacher_id=contract.teacher_id,
+        compensation_model=contract.compensation_model.value if contract.compensation_model else None,
+        fixed_amount=float(contract.fixed_amount) if contract.fixed_amount else None,
+        percentage=float(contract.percentage) if contract.percentage else None,
+        holdback_rate=float(contract.holdback_rate),
+        status=contract.status.value,
+        created_at=contract.created_at,
+        updated_at=contract.updated_at,
+        section=section_data,
+    )
+
+
+@lms_router.post("/sections/{section_id}/contract/complete", response_model=SectionContractResponse)
+async def complete_section_contract(
+    section_id: uuid.UUID,
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])),
+    db: AsyncSession = Depends(get_db)
+):
+    result = await db.execute(
+        select(SectionContract).where(SectionContract.section_id == section_id)
+    )
+    contract = result.scalar_one_or_none()
+    if not contract:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Contract not found")
+    try:
+        if contract.status == ContractStatus.ACTIVE:
+            contract = await lms_ledger.finalize_grades_for_section(db, contract.section_id)
+        contract = await lms_ledger.settle_contract(db, contract.id, current_user.id)
+        await db.refresh(contract, ["section"])
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    section_data = None
+    if contract.section:
+        section_data = {
+            "id": contract.section.id,
+            "name": str(contract.section.id),
+            "course_name": "",
+        }
+    return SectionContractResponse(
+        id=contract.id,
+        section_id=contract.section_id,
+        teacher_id=contract.teacher_id,
+        compensation_model=contract.compensation_model.value if contract.compensation_model else None,
+        fixed_amount=float(contract.fixed_amount) if contract.fixed_amount else None,
+        percentage=float(contract.percentage) if contract.percentage else None,
+        holdback_rate=float(contract.holdback_rate),
+        status=contract.status.value,
+        created_at=contract.created_at,
+        updated_at=contract.updated_at,
+        section=section_data,
+    )
+
+
+# --- Compensation Amendments ---
+@lms_router.post("/sections/{section_id}/contract/amend", response_model=AmendmentResponse)
+async def create_amendment(
+    section_id: uuid.UUID,
+    data: AmendmentCreateRequest,
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "teacher"])),
+    db: AsyncSession = Depends(get_db)
+):
+    result = await db.execute(
+        select(SectionContract).where(SectionContract.section_id == section_id)
+    )
+    contract = result.scalar_one_or_none()
+    if not contract:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Contract not found")
+    if current_user.role.name == "teacher" and contract.teacher_id != current_user.employee_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not your contract")
+
+    if contract.compensation_model and contract.compensation_model.value == "fixed":
+        requested_fixed = Decimal(str(data.requested_amount))
+        requested_pct = None
+    elif contract.compensation_model and contract.compensation_model.value == "percentage":
+        requested_fixed = None
+        requested_pct = Decimal(str(data.requested_amount))
+    else:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Contract has no compensation model")
+    try:
+        amendment = await compensation_service.create_amendment(
+            db=db,
+            contract_id=contract.id,
+            requested_fixed_amount=requested_fixed,
+            requested_percentage=requested_pct,
+            reason=data.reason,
+            requested_by=current_user.employee_id,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    return AmendmentResponse(
+        id=amendment.id,
+        contract_id=amendment.contract_id,
+        previous_fixed_amount=float(amendment.previous_fixed_amount) if amendment.previous_fixed_amount else None,
+        requested_fixed_amount=float(amendment.requested_fixed_amount) if amendment.requested_fixed_amount else None,
+        previous_percentage=float(amendment.previous_percentage) if amendment.previous_percentage else None,
+        requested_percentage=float(amendment.requested_percentage) if amendment.requested_percentage else None,
+        reason=amendment.reason,
+        requested_by=amendment.requested_by,
+        requested_at=amendment.requested_at,
+        status=amendment.status.value,
+        reviewed_by=amendment.reviewed_by,
+        reviewed_at=amendment.reviewed_at,
+        review_notes=amendment.review_notes,
+    )
+
+
+@lms_router.get("/amendments/pending", response_model=list[AmendmentPendingItem])
+async def list_pending_amendments(
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager"])),
+    db: AsyncSession = Depends(get_db)
+):
+    result = await db.execute(
+        select(CompensationAmendmentRequest)
+        .options(
+            joinedload(CompensationAmendmentRequest.contract)
+            .joinedload(SectionContract.section)
+            .joinedload(CourseSectionModel.course),
+            joinedload(CompensationAmendmentRequest.requestor),
+        )
+        .where(CompensationAmendmentRequest.status == AmendmentStatus.PENDING)
+        .order_by(CompensationAmendmentRequest.requested_at)
+    )
+    amendments = result.scalars().all()
+    items = []
+    for am in amendments:
+        contract = am.contract
+        section = contract.section if contract else None
+        course = section.course if section else None
+        requestor = am.requestor
+        teacher_name = requestor.full_name if requestor else ""
+        comp_model = contract.compensation_model.value if contract and contract.compensation_model else None
+        if comp_model == "fixed":
+            current_amount = float(contract.fixed_amount) if contract and contract.fixed_amount else None
+            requested_amount = float(am.requested_fixed_amount) if am.requested_fixed_amount else None
+        else:
+            current_amount = float(contract.percentage) if contract and contract.percentage else None
+            requested_amount = float(am.requested_percentage) if am.requested_percentage else None
+        items.append(AmendmentPendingItem(
+            id=am.id,
+            contract_id=am.contract_id,
+            section_name=str(section.id) if section else "",
+            course_name=course.name if course else "",
+            teacher_name=teacher_name,
+            compensation_model=comp_model,
+            current_amount=current_amount,
+            requested_amount=requested_amount,
+            reason=am.reason,
+            requested_by_name=teacher_name,
+            requested_at=am.requested_at,
+        ))
+    return items
+
+
+@lms_router.put("/amendments/{amendment_id}/approve", response_model=AmendmentResponse)
+async def approve_amendment(
+    amendment_id: uuid.UUID,
+    data: AmendmentApproveRequest = AmendmentApproveRequest(),
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager"])),
+    db: AsyncSession = Depends(get_db)
+):
+    try:
+        amendment = await compensation_service.approve_amendment(db, amendment_id, current_user.employee_id)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    return AmendmentResponse(
+        id=amendment.id,
+        contract_id=amendment.contract_id,
+        previous_fixed_amount=float(amendment.previous_fixed_amount) if amendment.previous_fixed_amount else None,
+        requested_fixed_amount=float(amendment.requested_fixed_amount) if amendment.requested_fixed_amount else None,
+        previous_percentage=float(amendment.previous_percentage) if amendment.previous_percentage else None,
+        requested_percentage=float(amendment.requested_percentage) if amendment.requested_percentage else None,
+        reason=amendment.reason,
+        requested_by=amendment.requested_by,
+        requested_at=amendment.requested_at,
+        status=amendment.status.value,
+        reviewed_by=amendment.reviewed_by,
+        reviewed_at=amendment.reviewed_at,
+        review_notes=data.review_notes or amendment.review_notes,
+    )
+
+
+@lms_router.put("/amendments/{amendment_id}/reject", response_model=AmendmentResponse)
+async def reject_amendment(
+    amendment_id: uuid.UUID,
+    data: AmendmentRejectRequest = AmendmentRejectRequest(),
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager"])),
+    db: AsyncSession = Depends(get_db)
+):
+    try:
+        amendment = await compensation_service.reject_amendment(
+            db, amendment_id, current_user.employee_id, review_notes=data.review_notes
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    return AmendmentResponse(
+        id=amendment.id,
+        contract_id=amendment.contract_id,
+        previous_fixed_amount=float(amendment.previous_fixed_amount) if amendment.previous_fixed_amount else None,
+        requested_fixed_amount=float(amendment.requested_fixed_amount) if amendment.requested_fixed_amount else None,
+        previous_percentage=float(amendment.previous_percentage) if amendment.previous_percentage else None,
+        requested_percentage=float(amendment.requested_percentage) if amendment.requested_percentage else None,
+        reason=amendment.reason,
+        requested_by=amendment.requested_by,
+        requested_at=amendment.requested_at,
+        status=amendment.status.value,
+        reviewed_by=amendment.reviewed_by,
+        reviewed_at=amendment.reviewed_at,
+        review_notes=amendment.review_notes,
+    )
+
+
+# --- Wallet Detail ---
+@lms_router.get("/teacher-wallets/{teacher_id}/detail", response_model=WalletDetailResponse)
+async def get_wallet_detail(
+    teacher_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    if current_user.role and current_user.role.name == "teacher" and current_user.employee_id != teacher_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cannot view other teachers' wallet")
+    wallet_result = await db.execute(
+        select(TeacherWallet).where(TeacherWallet.teacher_id == teacher_id)
+    )
+    wallet = wallet_result.scalar_one_or_none()
+    if not wallet:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Teacher wallet not found")
+    summary = await lms_ledger.get_wallet_summary(db, wallet.id)
+    return summary

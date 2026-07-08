@@ -40,3 +40,56 @@ async def set_attendance_records(db: AsyncSession, session_id: uuid.UUID, record
     return created
 
 
+# --- Student Attendance Summary ---
+async def get_student_attendance_summary(db: AsyncSession, student_id: uuid.UUID) -> list[dict]:
+    from sqlalchemy import func, select as sa_select
+
+    result = await db.execute(
+        sa_select(
+            AttendanceRecord.session_id,
+            AttendanceSession.section_id,
+            AttendanceRecord.status,
+            func.count(AttendanceRecord.id).label("cnt"),
+        )
+        .join(AttendanceSession, AttendanceRecord.session_id == AttendanceSession.id)
+        .where(AttendanceRecord.student_id == student_id)
+        .group_by(AttendanceRecord.session_id, AttendanceSession.section_id, AttendanceRecord.status)
+    )
+    rows = result.all()
+
+    section_map: dict[uuid.UUID, dict[str, int]] = {}
+    for session_id, section_id, status, cnt in rows:
+        if section_id not in section_map:
+            section_map[section_id] = {"total_sessions": 0, "present_count": 0, "absent_count": 0, "late_count": 0, "excused_count": 0}
+        section_map[section_id]["total_sessions"] += cnt
+        key = f"{status}_count"
+        if key in section_map[section_id]:
+            section_map[section_id][key] += cnt
+
+    # Count distinct session dates per section for total session count
+    session_count_result = await db.execute(
+        sa_select(
+            AttendanceSession.section_id,
+            func.count(AttendanceSession.id).label("session_cnt"),
+        )
+        .join(AttendanceRecord, AttendanceRecord.session_id == AttendanceSession.id)
+        .where(AttendanceRecord.student_id == student_id)
+        .group_by(AttendanceSession.section_id)
+    )
+    for section_id, session_cnt in session_count_result.all():
+        if section_id in section_map:
+            section_map[section_id]["total_sessions"] = session_cnt
+
+    return [
+        {
+            "section_id": section_id,
+            "total_sessions": data["total_sessions"],
+            "present_count": data["present_count"],
+            "absent_count": data["absent_count"],
+            "late_count": data["late_count"],
+            "excused_count": data["excused_count"],
+        }
+        for section_id, data in section_map.items()
+    ]
+
+

@@ -9,7 +9,7 @@ from app.db.base import Base
 if TYPE_CHECKING:
     from app.modules.identity.models import Employee
 
-    from app.modules.lms.models import Payment
+    from app.modules.lms.models import Payment, SectionContract
 
 
 class FinalGrade(Base):
@@ -111,8 +111,8 @@ class CourseSection(Base):
     course_id: Mapped[uuid.UUID] = mapped_column(
         PG_UUID(as_uuid=True), ForeignKey("courses.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    teacher_id: Mapped[uuid.UUID] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("employees.id", ondelete="RESTRICT"), nullable=False, index=True
+    teacher_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("employees.id", ondelete="RESTRICT"), nullable=True, index=True
     )
     capacity: Mapped[int] = mapped_column(Integer, default=30, server_default="30")
     enrolled_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
@@ -128,7 +128,8 @@ class CourseSection(Base):
     deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     course: Mapped[Course] = relationship(back_populates="sections")
-    teacher_employee: Mapped["Employee"] = relationship(back_populates="sections")
+    teacher_employee: Mapped[Optional["Employee"]] = relationship(back_populates="sections")
+    contract: Mapped[Optional["SectionContract"]] = relationship(back_populates="section", uselist=False)
     enrollments: Mapped[list["Enrollment"]] = relationship(back_populates="section", cascade="all, delete-orphan")
     attendance_sessions: Mapped[list["AttendanceSession"]] = relationship(back_populates="section", cascade="all, delete-orphan")
     assignments: Mapped[list["Assignment"]] = relationship(back_populates="section", cascade="all, delete-orphan")

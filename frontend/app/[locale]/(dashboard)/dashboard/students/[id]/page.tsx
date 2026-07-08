@@ -7,7 +7,7 @@ import { useAuth } from "@/components/AuthContext";
 import RefreshButton from "@/components/RefreshButton";
 import Modal from "@/components/Modal";
 import Select from "@/components/ui/Select";
-import { Loader2, ArrowLeft, Wallet, DollarSign, Plus, X, Award, Eye, FileDown } from "lucide-react";
+import { Loader2, ArrowLeft, Wallet, DollarSign, Plus, X, Award, Eye, FileDown, Check, Clock, AlertCircle } from "lucide-react";
 import CertificatePreview from "@/components/CertificatePreview";
 
 interface Student {
@@ -49,6 +49,21 @@ interface PaymentSummary {
   total_paid: number;
   agreed_price: number | null;
   balance_remaining: number | null;
+}
+
+interface GradeSummary {
+  section_id: string;
+  final_score: number;
+  grade_label: string;
+}
+
+interface AttendanceSummary {
+  section_id: string;
+  total_sessions: number;
+  present_count: number;
+  absent_count: number;
+  late_count: number;
+  excused_count: number;
 }
 
 export default function StudentDetailPage() {
@@ -98,6 +113,12 @@ export default function StudentDetailPage() {
       preview: "عرض",
       download: "تحميل PDF",
       actions: "الإجراءات",
+      attendance: "الحضور",
+      present: "حاضر",
+      absent: "غائب",
+      late: "متأخر",
+      excused: "معذور",
+      sessions: "جلسة",
     },
     en: {
       title: "Student",
@@ -137,6 +158,12 @@ export default function StudentDetailPage() {
       preview: "Preview",
       download: "Download PDF",
       actions: "Actions",
+      attendance: "Attendance",
+      present: "Present",
+      absent: "Absent",
+      late: "Late",
+      excused: "Excused",
+      sessions: "sessions",
     },
   }[locale === "en" ? "en" : "ar"];
 
@@ -149,6 +176,8 @@ export default function StudentDetailPage() {
   const [summaries, setSummaries] = useState<Record<string, PaymentSummary>>({});
   const [loading, setLoading] = useState(true);
   const [certificates, setCertificates] = useState<any[]>([]);
+  const [attendanceSummary, setAttendanceSummary] = useState<AttendanceSummary[]>([]);
+  const [gradeSummaries, setGradeSummaries] = useState<GradeSummary[]>([]);
   const [previewCertId, setPreviewCertId] = useState<string | null>(null);
   const [showQuickEnroll, setShowQuickEnroll] = useState(false);
   const [quickEnrollSectionId, setQuickEnrollSectionId] = useState("");
@@ -158,13 +187,15 @@ export default function StudentDetailPage() {
   const fetchStudent = useCallback(async () => {
     if (!studentId) return;
     try {
-      const [studRes, enrollRes, sectRes, courseRes, payRes, certRes] = await Promise.all([
+      const [studRes, enrollRes, sectRes, courseRes, payRes, certRes, attRes, gradeRes] = await Promise.all([
         apiClient.get<{ items: Student[]; total: number }>("/academic/students?limit=1000"),
         apiClient.get<{ items: Enrollment[]; total: number }>(`/academic/enrollments?student_id=${studentId}&limit=1000`),
         apiClient.get<{ items: CourseSection[]; total: number }>("/academic/course-sections?limit=1000"),
         apiClient.get<{ items: Course[]; total: number }>("/academic/courses?limit=1000"),
         apiClient.get<Payment[]>(`/lms/payments?student_id=${studentId}`),
         apiClient.get<{ items: any[]; total: number }>(`/academic/students/${studentId}/certificates?limit=100`),
+        apiClient.get<AttendanceSummary[]>(`/lms/attendance/students/${studentId}/summary`).then(r => r.data).catch(() => [] as AttendanceSummary[]),
+        apiClient.get<GradeSummary[]>(`/academic/students/${studentId}/final-grades`).then(r => r.data).catch(() => [] as GradeSummary[]),
       ]);
 
       const found = studRes.data.items.find((s) => s.id === studentId) || null;
@@ -175,6 +206,8 @@ export default function StudentDetailPage() {
       setCourses(courseRes.data.items);
       setPayments(payRes.data);
       setCertificates(certRes.data.items);
+      setAttendanceSummary(attRes);
+      setGradeSummaries(gradeRes);
       setLoading(false);
 
       const summaryMap: Record<string, PaymentSummary> = {};
@@ -223,6 +256,16 @@ export default function StudentDetailPage() {
     if (!sect) return { name: sectionId, courseId: "" };
     const course = courses.find((c) => c.id === sect.course_id);
     return { name: course ? course.name : sectionId, courseId: sect.course_id };
+  };
+
+  const attendanceIcon = (status: string) => {
+    switch (status) {
+      case "present": return <Check size={12} className="text-emerald-500" />;
+      case "absent": return <X size={12} className="text-red-500" />;
+      case "late": return <Clock size={12} className="text-amber-500" />;
+      case "excused": return <AlertCircle size={12} className="text-blue-500" />;
+      default: return null;
+    }
   };
 
   const formatDate = (d: string) => {
@@ -290,28 +333,18 @@ export default function StudentDetailPage() {
                 const sectionInfo = getSectionCourse(enr.section_id);
                 const summary = summaries[enr.id];
                 const cert = certificates.find((c: any) => c.section_id === enr.section_id);
+                const grade = gradeSummaries.find((g) => g.section_id === enr.section_id);
+                const att = attendanceSummary.find((a) => a.section_id === enr.section_id);
                 return (
-                  <div key={enr.id} className="border border-slate-200 rounded-xl p-4 space-y-2">
+                  <div key={enr.id} className="border border-slate-200 rounded-xl p-4 space-y-3">
                     <p className="font-medium text-slate-900 text-sm">{sectionInfo.name}</p>
-                    <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
                       <div>
                         <span className="text-slate-500">{t.agreedPrice}: </span>
                         <span className="font-semibold text-slate-900">
                           {enr.agreed_price != null ? `${enr.agreed_price.toFixed(2)} ${t.sar}` : "—"}
                         </span>
                       </div>
-                      {cert && cert.final_score != null && (
-                        <div>
-                          <span className="text-slate-500">{t.finalScore}: </span>
-                          <span className="font-semibold text-slate-900">{cert.final_score}%</span>
-                        </div>
-                      )}
-                      {cert && cert.grade_label && (
-                        <div>
-                          <span className="text-slate-500">{t.grade}: </span>
-                          <span className="badge badge-success text-[10px]">{cert.grade_label}</span>
-                        </div>
-                      )}
                       <div>
                         <span className="text-slate-500">{t.adminDiscount}: </span>
                         <span className="font-semibold text-slate-900">
@@ -346,7 +379,39 @@ export default function StudentDetailPage() {
                           </div>
                         </>
                       )}
+                      {(grade ?? cert) && (grade ?? cert)!.final_score != null && (
+                        <div>
+                          <span className="text-slate-500">{t.finalScore}: </span>
+                          <span className="font-semibold text-slate-900">{(grade ?? cert)!.final_score}%</span>
+                        </div>
+                      )}
+                      {(grade ?? cert) && (grade ?? cert)!.grade_label && (
+                        <div>
+                          <span className="text-slate-500">{t.grade}: </span>
+                          <span className="badge badge-success text-[10px]">{(grade ?? cert)!.grade_label}</span>
+                        </div>
+                      )}
                     </div>
+                    {att && att.total_sessions > 0 && (
+                      <div className="flex items-center gap-3 text-xs pt-1 border-t border-slate-100">
+                        <span className="text-slate-500 font-medium">{t.attendance}:</span>
+                        <span className="flex items-center gap-1 text-emerald-700">
+                          {attendanceIcon("present")} {att.present_count}
+                        </span>
+                        <span className="flex items-center gap-1 text-red-600">
+                          {attendanceIcon("absent")} {att.absent_count}
+                        </span>
+                        <span className="flex items-center gap-1 text-amber-600">
+                          {attendanceIcon("late")} {att.late_count}
+                        </span>
+                        <span className="flex items-center gap-1 text-blue-600">
+                          {attendanceIcon("excused")} {att.excused_count}
+                        </span>
+                        <span className="text-slate-400">
+                          / {att.total_sessions} {t.sessions}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 );
               })}

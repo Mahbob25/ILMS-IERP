@@ -14,8 +14,7 @@ interface EmployeeDetail {
   full_name: string;
   employee_type: string;
   phone_number: string | null;
-  salary: number | null;
-  compensation_type: string;
+  default_salary: number | null;
   default_percentage: number | null;
   hire_date: string | null;
   contract_end_date: string | null;
@@ -56,7 +55,7 @@ export default function EmployeeDetailPage() {
       linkedUser: "حساب النظام المرتبط", email: "البريد الإلكتروني",
       role: "الدور", userStatus: "حالة الحساب",
       compensationType: "نظام التعويض", defaultPct: "النسبة الافتراضية",
-      monthlySalary: "راتب شهري", percentage: "نسبة مئوية", hybrid: "نظام هجين",
+      monthlySalary: "راتب", percentage: "نسبة مئوية", hybrid: "نظام هجين",
     },
     en: {
       back: "Back to Employees", hrInfo: "Employee Information", type: "Employee Type",
@@ -67,7 +66,7 @@ export default function EmployeeDetailPage() {
       linkedUser: "Linked User Account", email: "Email",
       role: "Role", userStatus: "Account Status",
       compensationType: "Compensation Type", defaultPct: "Default Percentage",
-      monthlySalary: "Monthly Salary", percentage: "Percentage", hybrid: "Hybrid",
+      monthlySalary: "Stipend", percentage: "Percentage", hybrid: "Hybrid",
     },
   }[locale === "en" ? "en" : "ar"];
 
@@ -147,15 +146,13 @@ export default function EmployeeDetailPage() {
             <span className="text-slate-900 font-medium">{data.phone_number || "—"}</span>
           </div>
           <div className="flex items-center gap-2 text-slate-600">
-            {data.compensation_type === "salary" && (
-              <><DollarSign size={14} className="text-slate-400" /><span className="text-slate-900 font-medium">{t.monthlySalary}{data.salary !== null ? ` (${data.salary.toFixed(2)})` : ""}</span></>
-            )}
-            {data.compensation_type === "percentage" && (
-              <><DollarSign size={14} className="text-slate-400" /><span className="text-slate-900 font-medium">{t.percentage}{data.default_percentage ? ` (${data.default_percentage}%)` : ""}</span></>
-            )}
-            {data.compensation_type === "hybrid" && (
-              <><DollarSign size={14} className="text-slate-400" /><span className="text-slate-900 font-medium">{t.hybrid}{data.salary !== null ? ` (${data.salary.toFixed(2)})` : ""}</span></>
-            )}
+            <DollarSign size={14} className="text-slate-400" />
+            <span className="text-slate-900 font-medium">
+              {data.default_salary !== null ? `${t.monthlySalary}: ${data.default_salary.toFixed(2)}` : ''}
+              {data.default_salary !== null && data.default_percentage !== null ? ' | ' : ''}
+              {data.default_percentage !== null ? `${t.defaultPct}: ${data.default_percentage}%` : ''}
+              {data.default_salary === null && data.default_percentage === null ? '\u2014' : ''}
+            </span>
           </div>
           <div className="flex items-center gap-2 text-slate-600">
             <Calendar size={14} className="text-slate-400" />

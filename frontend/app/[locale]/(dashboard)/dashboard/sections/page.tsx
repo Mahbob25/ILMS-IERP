@@ -92,6 +92,16 @@ export default function SectionsPage() {
       validationRequired: "يرجى ملء جميع الحقول المطلوبة",
       validationSelectCourse: "يرجى اختيار المقرر",
       validationSelectTeacher: "يرجى اختيار المدرس",
+      compModel: "نموذج التعويض",
+      comp: "التعويض",
+      fixedAmount: "المبلغ الثابت (ريال)",
+      requestIncrease: "طلب زيادة",
+      currentTerms: "الشروط الحالية",
+      newAmount: "المبلغ الجديد",
+      reason: "السبب",
+      reasonPlaceholder: "اشرح سبب الزيادة المطلوبة...",
+      requestSubmitted: "تم تقديم طلب الزيادة",
+      submit: "إرسال",
       errorGeneric: "حدث خطأ أثناء حفظ الشعبة",
     },
     en: {
@@ -147,6 +157,16 @@ export default function SectionsPage() {
       validationRequired: "Please fill in all required fields",
       validationSelectCourse: "Please select a course",
       validationSelectTeacher: "Please select a teacher",
+      compModel: "Compensation Model",
+      comp: "Comp",
+      fixedAmount: "Fixed Amount (SAR)",
+      requestIncrease: "Request Increase",
+      currentTerms: "Current Terms",
+      newAmount: "New Amount",
+      reason: "Reason",
+      reasonPlaceholder: "Explain why the increase is needed...",
+      requestSubmitted: "Increase request submitted",
+      submit: "Submit",
       errorGeneric: "An error occurred while saving the section",
     },
   }[locale === "en" ? "en" : "ar"];
@@ -157,11 +177,14 @@ export default function SectionsPage() {
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [showIncreaseModal, setShowIncreaseModal] = useState(false);
+  const [increaseReason, setIncreaseReason] = useState("");
+  const [increaseAmount, setIncreaseAmount] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState({ course_id: "", teacher_id: "", capacity: 30, min_students_required: 0, start_date: "", end_date: "", class_time: "", class_duration_minutes: 0, classroom: "", price: "", teacher_percentage: "" });
-  const [teacherCompMap, setTeacherCompMap] = useState<Record<string, { compensation_type: string; default_percentage: number | null }>>({});
+  const [form, setForm] = useState({ course_id: "", teacher_id: "", capacity: 30, min_students_required: 0, start_date: "", end_date: "", class_time: "", class_duration_minutes: 0, classroom: "", price: "", teacher_percentage: "", comp_model: "", teacher_salary: "" });
+  const [teacherDefaultMap, setTeacherDefaultMap] = useState<Record<string, { default_salary: number | null; default_percentage: number | null }>>({});
   const [deleteTarget, setDeleteTarget] = useState<CourseSection | null>(null);
-  const [activatePct, setActivatePct] = useState<Record<string, string>>({});
+
   const [showRegister, setShowRegister] = useState<string | null>(null);
   const [registerForm, setRegisterForm] = useState({ student_id: "", admin_discount: "" });
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -180,11 +203,11 @@ export default function SectionsPage() {
     if (coursesRes) setCourses(coursesRes.data.items);
     if (teachersRes) {
       setTeachers(teachersRes.data);
-      const compMap: Record<string, { compensation_type: string; default_percentage: number | null }> = {};
+      const defMap: Record<string, { default_salary: number | null; default_percentage: number | null }> = {};
       teachersRes.data.forEach((t: any) => {
-        compMap[t.id] = { compensation_type: t.compensation_type || "salary", default_percentage: t.default_percentage ?? null };
+        defMap[t.id] = { default_salary: t.default_salary ?? null, default_percentage: t.default_percentage ?? null };
       });
-      setTeacherCompMap(compMap);
+      setTeacherDefaultMap(defMap);
     }
     if (studentsRes) setStudents(studentsRes.data.items);
   }, []);
@@ -256,13 +279,15 @@ export default function SectionsPage() {
   };
 
   const openCreate = () => {
-    setForm({ course_id: "", teacher_id: "", capacity: 30, min_students_required: 0, start_date: "", end_date: "", class_time: "", class_duration_minutes: 0, classroom: "", price: "", teacher_percentage: "" });
+    setForm({ course_id: "", teacher_id: "", capacity: 30, min_students_required: 0, start_date: "", end_date: "", class_time: "", class_duration_minutes: 0, classroom: "", price: "", teacher_percentage: "", comp_model: "", teacher_salary: "" });
     setEditingId(null);
     setShowForm(true);
     setMessage(null);
   };
 
   const openEdit = (section: CourseSection) => {
+    setMessage(null);
+    const def = teacherDefaultMap[section.teacher_id];
     setForm({
       course_id: section.course_id,
       teacher_id: section.teacher_id,
@@ -275,6 +300,8 @@ export default function SectionsPage() {
       classroom: section.classroom || "",
       price: section.price != null ? section.price.toString() : "",
       teacher_percentage: section.teacher_percentage?.toString() || "",
+      comp_model: "",
+      teacher_salary: def?.default_salary?.toString() || "",
     });
     setEditingId(section.id);
     setShowForm(true);
@@ -285,14 +312,10 @@ export default function SectionsPage() {
       setMessage({ type: "error", text: t.validationSelectCourse });
       return;
     }
-    if (!form.teacher_id) {
-      setMessage({ type: "error", text: t.validationSelectTeacher });
-      return;
-    }
     try {
       const payload: Record<string, unknown> = {
         course_id: form.course_id,
-        teacher_id: form.teacher_id,
+        teacher_id: form.teacher_id || null,
         capacity: form.capacity,
       };
       if (form.min_students_required > 0) payload.min_students_required = form.min_students_required;
@@ -302,13 +325,26 @@ export default function SectionsPage() {
       if (form.class_duration_minutes > 0) payload.class_duration_minutes = form.class_duration_minutes;
       if (form.classroom) payload.classroom = form.classroom;
       if (form.price) payload.price = parseFloat(form.price);
-      if (form.teacher_percentage) payload.teacher_percentage = parseFloat(form.teacher_percentage);
+      let sectionId = editingId;
       if (editingId) {
         const cleaned: Record<string, unknown> = {};
         Object.entries(payload).forEach(([k, v]) => { if (v !== "" && v !== null) cleaned[k] = v; });
         await apiClient.put(`/academic/course-sections/${editingId}`, cleaned);
       } else {
-        await apiClient.post("/academic/course-sections", payload);
+        const res = await apiClient.post("/academic/course-sections", payload);
+        sectionId = res.data?.data?.id || res.data?.id;
+      }
+      if (form.teacher_id && form.comp_model && sectionId && user?.role?.name !== "secretary") {
+        const contractAssign: Record<string, unknown> = {
+          teacher_id: form.teacher_id,
+          compensation_model: form.comp_model,
+        };
+        if (form.comp_model === "fixed" && form.teacher_salary) {
+          contractAssign.fixed_amount = parseFloat(form.teacher_salary);
+        } else if (form.comp_model === "percentage" && form.teacher_percentage) {
+          contractAssign.percentage = parseFloat(form.teacher_percentage);
+        }
+        await apiClient.put(`/lms/sections/${sectionId}/contract/assign`, contractAssign);
       }
       setShowForm(false);
       setEditingId(null);
@@ -343,36 +379,19 @@ export default function SectionsPage() {
   };
 
   const handleActivate = async (sectionId: string) => {
-    const section = sections.find(s => s.id === sectionId);
-    if (!section) return;
-    const compType = teacherCompMap[section.teacher_id]?.compensation_type || "salary";
-    if (compType !== "salary") {
-      const pct = parseFloat(activatePct[sectionId] || "0");
-      if (!pct || pct <= 0 || pct > 100) return;
-      try {
-        await apiClient.post(`/academic/course-sections/${sectionId}/activate`, { teacher_percentage: pct });
-        setActivatePct(prev => ({ ...prev, [sectionId]: "" }));
-        setMessage({ type: "success", text: t.activated });
-        fetchSections(search, statusFilter, page);
-      } catch (e: unknown) {
-        const err = e as { response?: { data?: { detail?: string } } };
-        setMessage({ type: "error", text: err?.response?.data?.detail || "Activation failed" });
-      }
-    } else {
-      try {
-        await apiClient.post(`/academic/course-sections/${sectionId}/activate`, {});
-        setMessage({ type: "success", text: t.activated });
-        fetchSections(search, statusFilter, page);
-      } catch (e: unknown) {
-        const err = e as { response?: { data?: { detail?: string } } };
-        setMessage({ type: "error", text: err?.response?.data?.detail || "Activation failed" });
-      }
+    try {
+      await apiClient.post(`/lms/sections/${sectionId}/contract/activate`);
+      setMessage({ type: "success", text: t.activated });
+      fetchSections(search, statusFilter, page);
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { detail?: string } } };
+      setMessage({ type: "error", text: err?.response?.data?.detail || "Activation failed" });
     }
   };
 
   const handleComplete = async (sectionId: string) => {
     try {
-      await apiClient.post(`/academic/course-sections/${sectionId}/complete`);
+      await apiClient.post(`/lms/sections/${sectionId}/contract/complete`);
       setMessage({ type: "success", text: t.completedMsg });
       fetchSections(search, statusFilter, page);
     } catch (e: unknown) {
@@ -474,22 +493,55 @@ export default function SectionsPage() {
               <Select
                 value={form.teacher_id}
                 onChange={(value) => {
-                  const comp = teacherCompMap[value];
-                  const defaultPct = comp?.default_percentage?.toString() || "";
-                  setForm({ ...form, teacher_id: value, teacher_percentage: defaultPct });
+                  const def = teacherDefaultMap[value];
+                  const defaultPct = def?.default_percentage?.toString() || "";
+                  const defaultSal = def?.default_salary?.toString() || "";
+                  setForm({ ...form, teacher_id: value, teacher_percentage: defaultPct, teacher_salary: defaultSal });
                 }}
                 options={teachers.map((u) => ({ value: u.id, label: u.full_name }))}
                 placeholder="--"
               />
             </div>
-            {form.teacher_id && teacherCompMap[form.teacher_id]?.compensation_type !== "salary" && (
-              <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">
-                  {t.teacherPctLabel}
-                  {teacherCompMap[form.teacher_id]?.compensation_type === "percentage" && <span className="text-red-500 ms-1">*</span>}
-                </label>
-                <input type="number" value={form.teacher_percentage} onChange={(e) => setForm({ ...form, teacher_percentage: e.target.value })}
-                  className="input-field" min={0} max={100} placeholder={teacherCompMap[form.teacher_id]?.compensation_type === "percentage" ? t.teacherPctLabel : "0"} />
+            {form.teacher_id && (
+              <div className="col-span-2 bg-blue-50 p-3 rounded border border-blue-200">
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-700 mb-1">{t.compModel || "Compensation"}</label>
+                    <Select
+                      value={form.comp_model}
+                      onChange={(value) => setForm({ ...form, comp_model: value })}
+                      options={[
+                        { value: "fixed", label: "Fixed Amount" },
+                        { value: "percentage", label: "Percentage" },
+                      ]}
+                      placeholder="--"
+                    />
+                  </div>
+                  {form.comp_model === "fixed" && (
+                    <div>
+                      <label className="block text-xs font-medium text-slate-700 mb-1">{t.fixedAmount || "Fixed Amount (SAR)"}</label>
+                      <input type="number" value={form.teacher_salary}
+                        onChange={(e) => setForm({ ...form, teacher_salary: e.target.value })}
+                        className="input-field" min={0}
+                        readOnly={user?.role?.name === "secretary"} />
+                    </div>
+                  )}
+                  {form.comp_model === "percentage" && (
+                    <div>
+                      <label className="block text-xs font-medium text-slate-700 mb-1">{t.teacherPctLabel}</label>
+                      <input type="number" value={form.teacher_percentage}
+                        onChange={(e) => setForm({ ...form, teacher_percentage: e.target.value })}
+                        className="input-field" min={0} max={100}
+                        readOnly={user?.role?.name === "secretary"} />
+                    </div>
+                  )}
+                  <div className="flex items-end">
+                    <button type="button" onClick={() => setShowIncreaseModal(true)}
+                      className="px-3 py-1.5 text-xs font-medium text-amber-700 bg-amber-50 border border-amber-300 rounded hover:bg-amber-100">
+                      {t.requestIncrease || "Request Increase"}
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
             <div>
@@ -561,7 +613,7 @@ export default function SectionsPage() {
                 {user?.role?.name !== "teacher" && <th>{t.teacher}</th>}
                 <th>{t.status}</th>
                 <th>{t.quota}</th>
-                <th>{t.teacherPct}</th>
+                <th>{t.comp || "Comp"}</th>
                 <th>{t.price}</th>
                 <th>{t.schedule}</th>
                 <th>{t.actions}</th>
@@ -591,7 +643,7 @@ export default function SectionsPage() {
                       </div>
                     </td>
                     <td className="text-slate-600">
-                      {section.teacher_percentage != null ? `${section.teacher_percentage}%` : "—"}
+                      {section.teacher_id ? "Assigned" : "—"}
                     </td>
                     <td className="text-slate-600">
                       {section.price != null ? `${section.price}` : "—"}
@@ -633,26 +685,14 @@ export default function SectionsPage() {
                           </button>
                         )}
                           {canActivate && section.status === "pending" && (
-                            <div className="flex items-center gap-1">
-                              {teacherCompMap[section.teacher_id]?.compensation_type !== "salary" && (
-                                <input
-                                  type="number"
-                                  placeholder="%"
-                                  value={activatePct[section.id] || ""}
-                                  onChange={(e) => setActivatePct(prev => ({ ...prev, [section.id]: e.target.value }))}
-                                  className="w-14 text-xs px-1 py-1 border border-slate-200 rounded"
-                                  min={0} max={100}
-                                />
-                              )}
-                              <button
-                                onClick={() => handleActivate(section.id)}
-                                disabled={!quotaMet || (teacherCompMap[section.teacher_id]?.compensation_type !== "salary" && !activatePct[section.id])}
-                                className={`btn-icon ${quotaMet ? "text-emerald-600" : "text-slate-300"}`}
-                                title={t.activate}
-                              >
-                                <Play size={14} />
-                              </button>
-                            </div>
+                            <button
+                              onClick={() => handleActivate(section.id)}
+                              disabled={!quotaMet}
+                              className={`btn-icon ${quotaMet ? "text-emerald-600" : "text-slate-300"}`}
+                              title={t.activate}
+                            >
+                              <Play size={14} />
+                            </button>
                           )}
                           {canActivate && section.status === "active" && (
                             <button onClick={() => handleComplete(section.id)} className="btn-icon text-blue-600" title={t.complete}>
@@ -721,6 +761,56 @@ export default function SectionsPage() {
             <button onClick={handleRegister} className="btn-primary">{t.register}</button>
             <button onClick={() => { setShowRegister(null); }} className="btn-secondary">{t.cancel}</button>
           </div>
+        </div>
+      </Modal>
+
+      <Modal open={showIncreaseModal} onClose={() => setShowIncreaseModal(false)} title={t.requestIncrease || "Request Compensation Increase"} size="md">
+        <div className="space-y-6">
+          {form.teacher_id && (
+            <>
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1">{t.currentTerms || "Current Terms"}</label>
+                <div className="text-sm text-slate-600 bg-slate-50 p-2 rounded">
+                  {form.comp_model === "fixed"
+                    ? `Fixed: SAR ${form.teacher_salary || "—"}`
+                    : form.comp_model === "percentage"
+                      ? `Percentage: ${form.teacher_percentage || "—"}%`
+                      : "Not set"}
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1">{t.newAmount || "New Amount"}{" "}<span className="text-red-500">*</span></label>
+                <input type="number" value={increaseAmount}
+                  onChange={(e) => setIncreaseAmount(e.target.value)}
+                  className="input-field" min={0} placeholder="0" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1">{t.reason || "Reason"}{" "}<span className="text-red-500">*</span></label>
+                <textarea value={increaseReason}
+                  onChange={(e) => setIncreaseReason(e.target.value)}
+                  className="input-field" rows={3} placeholder={t.reasonPlaceholder || "Explain why the increase is needed..."} />
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button onClick={async () => {
+                  if (!increaseAmount || !increaseReason) return;
+                  try {
+                    const editingSection = sections.find(s => s.id === editingId);
+                    const sectionId = editingId || (editingSection?.id);
+                    await apiClient.post("/lms/sections/increase-request", {
+                      section_id: sectionId,
+                      amount: parseFloat(increaseAmount),
+                      reason: increaseReason,
+                    });
+                    setShowIncreaseModal(false);
+                    setIncreaseAmount("");
+                    setIncreaseReason("");
+                    setMessage({ type: "success", text: t.requestSubmitted || "Increase request submitted" });
+                  } catch { /* ignore */ }
+                }} className="btn-primary">{t.submit || "Submit"}</button>
+                <button onClick={() => setShowIncreaseModal(false)} className="btn-secondary">{t.cancel}</button>
+              </div>
+            </>
+          )}
         </div>
       </Modal>
 

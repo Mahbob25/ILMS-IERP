@@ -82,7 +82,7 @@ export default function AttendancePage() {
   const fetchData = useCallback(async () => {
     try {
       const [sectRes, courseRes] = await Promise.all([
-        apiClient.get<{ items: CourseSection[]; total: number }>("/academic/course-sections?limit=1000"),
+        apiClient.get<{ items: CourseSection[]; total: number }>("/academic/course-sections?limit=1000&status=active"),
         apiClient.get<{ items: Course[]; total: number }>("/academic/courses?limit=1000"),
       ]);
       setSections(sectRes.data.items);

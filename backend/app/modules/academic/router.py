@@ -10,7 +10,7 @@ from app.modules.academic.schemas import (
     CourseSectionCreate, CourseSectionUpdate, CourseSectionResponse, SectionActivate,
     StudentCreate, StudentUpdate, StudentResponse,
     EnrollmentCreate, EnrollmentCreateWithStudent, EnrollmentResponse, EnrollmentDetailResponse,
-    FinalGradeCreate, FinalGradeBulkCreate, FinalGradeResponse,
+    FinalGradeCreate, FinalGradeBulkCreate, FinalGradeResponse, StudentGradeSummary,
     CertificateResponse,
     PaginatedResponse,
 )
@@ -280,6 +280,15 @@ async def list_student_certificates(
     return {"items": items, "total": result["total"]}
 
 
+@academic_router.get("/students/{student_id}/final-grades", response_model=list[StudentGradeSummary])
+async def get_student_final_grades(
+    student_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    return await academic_service.get_student_final_grades(db, student_id)
+
+
 @academic_router.delete("/certificates/{cert_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_certificate(
     cert_id: uuid.UUID,
@@ -299,10 +308,18 @@ async def set_section_final_grades(
     current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary", "teacher"])),
     db: AsyncSession = Depends(get_db)
 ):
+    section = None
     if current_user.role.name == "teacher":
         section = await academic_service.get_course_section(db, section_id)
         if not section or section.teacher_id != current_user.employee_id:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied to this section")
+
+    if not section:
+        section = await academic_service.get_course_section(db, section_id)
+    if not section:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Section not found")
+    if section.status != "active":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot set grades for a section that is not active")
 
     grades_data = [g.model_dump() for g in data.grades]
     results = await academic_service.set_final_grades_bulk(

@@ -22,6 +22,20 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
+interface PendingAmendment {
+  id: string;
+  contract_id: string;
+  section_name: string;
+  course_name: string;
+  teacher_name: string;
+  compensation_model: string | null;
+  current_amount: number | null;
+  requested_amount: number | null;
+  reason: string;
+  requested_by_name: string;
+  requested_at: string;
+}
+
 interface UnlockRequest {
   date: string;
   requested_by: string | null;
@@ -44,14 +58,14 @@ export default function ManagerDashboard() {
   const locale = (params?.locale as string) || "ar";
   const currencySymbol = locale === "ar" ? "ريال" : "YER";
   const [data, setData] = useState<ManagerDashboardData | null>(null);
+  const [amendments, setAmendments] = useState<PendingAmendment[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    apiClient
-      .get<ManagerDashboardData>("/dashboard/manager")
-      .then((res) => setData(res.data))
-      .catch(() => {})
-      .finally(() => setLoading(false));
+    Promise.all([
+      apiClient.get<ManagerDashboardData>("/dashboard/manager").then((res) => setData(res.data)).catch(() => {}),
+      apiClient.get<PendingAmendment[]>("/lms/amendments/pending").then((res) => setAmendments(res.data)).catch(() => {}),
+    ]).finally(() => setLoading(false));
   }, []);
 
   const t = {
@@ -184,13 +198,59 @@ export default function ManagerDashboard() {
             <AlertCircle size={16} className="text-amber-500" />
             <span>{t.pendingApprovals}</span>
           </h3>
-          {data.pending_unlock_requests.length === 0 && data.pending_withdrawals_count === 0 ? (
+          {data.pending_unlock_requests.length === 0 && data.pending_withdrawals_count === 0 && amendments.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-10 text-slate-400">
               <CheckCircle size={40} className="mb-3 text-emerald-300" />
               <p className="text-sm">{t.noApprovals}</p>
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-3 max-h-80 overflow-y-auto">
+              {amendments.map((am) => (
+                <div key={am.id} className="py-2 px-3 rounded-lg bg-amber-50 border border-amber-100">
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="flex items-center gap-2">
+                      <DollarSign size={14} className="text-amber-500" />
+                      <span className="text-sm font-medium text-slate-900">
+                        {am.teacher_name} — {am.course_name}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={async () => {
+                          try {
+                            await apiClient.put(`/lms/amendments/${am.id}/approve`);
+                            setAmendments((prev) => prev.filter((a) => a.id !== am.id));
+                          } catch { /* ignore */ }
+                        }}
+                        className="p-1 rounded text-emerald-600 hover:bg-emerald-100"
+                        title="Approve"
+                      >
+                        <CheckCircle size={14} />
+                      </button>
+                      <button
+                        onClick={async () => {
+                          try {
+                            await apiClient.put(`/lms/amendments/${am.id}/reject`);
+                            setAmendments((prev) => prev.filter((a) => a.id !== am.id));
+                          } catch { /* ignore */ }
+                        }}
+                        className="p-1 rounded text-red-500 hover:bg-red-100"
+                        title="Reject"
+                      >
+                        <AlertCircle size={14} />
+                      </button>
+                    </div>
+                  </div>
+                  <div className="text-xs text-slate-500 ms-6">
+                    {am.compensation_model === "fixed"
+                      ? `SAR ${am.current_amount ?? "—"} → SAR ${am.requested_amount ?? "—"}`
+                      : `${am.current_amount ?? "—"}% → ${am.requested_amount ?? "—"}%`
+                    }
+                    <span className="mx-1">·</span>
+                    {am.reason}
+                  </div>
+                </div>
+              ))}
               {data.pending_unlock_requests.map((req) => (
                 <div key={req.date} className="flex items-center justify-between py-2 px-3 rounded-lg bg-amber-50 border border-amber-100">
                   <div className="flex items-center gap-2">

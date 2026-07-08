@@ -38,6 +38,10 @@ test.describe('LMS: Attendance', () => {
     expect(sectionRes.status()).toBe(201)
     const section = await sectionRes.json()
 
+    // Activate section
+    const activateRes = await request.post(`${BASE_URL}/academic/course-sections/${section.id}/activate`, { headers })
+    expect(activateRes.status()).toBe(200)
+
     // Create session
     const today = new Date().toISOString().split('T')[0]
     const response = await request.post(`${BASE_URL}/lms/attendance/sessions`, {

@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { apiClient } from "@/lib/api";
 import { useAuth } from "@/components/AuthContext";
 import RefreshButton from "@/components/RefreshButton";
-import { Loader2, ArrowLeft, Users } from "lucide-react";
+import { Loader2, ArrowLeft, Users, Play, CheckCircle2 } from "lucide-react";
 
 interface SectionEnrollmentDetail {
   id: string;
@@ -30,7 +30,6 @@ interface SectionInfo {
   capacity: number;
   enrolled_count: number;
   status: string;
-  teacher_percentage: number | null;
   min_students_required: number | null;
   start_date: string | null;
   end_date: string | null;
@@ -38,6 +37,18 @@ interface SectionInfo {
   class_duration_minutes: number | null;
   classroom: string | null;
   price: number | null;
+}
+
+interface ContractInfo {
+  id: string;
+  section_id: string;
+  teacher_id: string;
+  status: string;
+  fixed_amount: number | null;
+  percentage: number | null;
+  total_earned: number;
+  total_paid: number;
+  created_at: string;
 }
 
 interface Course { id: string; name: string; code: string; }
@@ -75,6 +86,7 @@ export default function SectionStudentsPage() {
       loading: "جاري التحميل...",
       empty: "لا يوجد طلاب مسجلون في هذه الشعبة",
       sar: "ريال",
+      gradesRequired: "يجب إكمال جميع الدرجات النهائية قبل إتمام الشعبة",
       pending: "قيد الانتظار",
       active: "نشط",
       completed: "مكتمل",
@@ -108,6 +120,7 @@ export default function SectionStudentsPage() {
       loading: "Loading...",
       empty: "No students enrolled in this section",
       sar: "YER",
+      gradesRequired: "Please fill final scores for all students before completing",
       pending: "Pending",
       active: "Active",
       completed: "Completed",
@@ -124,15 +137,20 @@ export default function SectionStudentsPage() {
   const [students, setStudents] = useState<SectionEnrollmentDetail[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
   const [teachers, setTeachers] = useState<any[]>([]);
+  const [contract, setContract] = useState<ContractInfo | null>(null);
+  const [activating, setActivating] = useState(false);
+  const [completing, setCompleting] = useState(false);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+
+  const canActivate = user?.is_superadmin || user?.role?.name === "manager" || user?.role?.name === "secretary";
 
   const fetchData = useCallback(async () => {
     if (!sectionId) return;
     setLoading(true);
     setNotFound(false);
     try {
-      const [sectRes, enrollRes, courseRes, teachersRes] = await Promise.all([
+      const [sectRes, enrollRes, courseRes, teachersRes, contractRes] = await Promise.all([
         apiClient.get<{ items: SectionInfo[]; total: number }>(
           `/academic/course-sections?limit=1000`
         ).catch(() => null),
@@ -141,11 +159,13 @@ export default function SectionStudentsPage() {
         ).catch(() => null),
         apiClient.get<{ items: Course[]; total: number }>("/academic/courses?limit=1000").catch(() => null),
         apiClient.get<any[]>("/users/teachers").catch(() => null),
+        apiClient.get<ContractInfo>(`/lms/sections/${sectionId}/contract`).catch(() => null),
       ]);
 
       if (courseRes) setCourses(courseRes.data.items);
       if (teachersRes) setTeachers(teachersRes.data);
       if (enrollRes) setStudents(enrollRes.data);
+      if (contractRes) setContract(contractRes.data);
 
       if (sectRes) {
         const found = sectRes.data.items.find(s => s.id === sectionId);
@@ -185,6 +205,10 @@ export default function SectionStudentsPage() {
     const percentage = fullAmount > 0 ? (totalPaid / fullAmount) * 100 : 0;
     return { fullAmount, totalPaid, remaining, percentage };
   }, [students, section]);
+
+  const allGradesFilled = useMemo(() => {
+    return students.length > 0 && students.every(s => s.final_score != null);
+  }, [students]);
 
   const getCourseName = (courseId: string) => courses.find((c) => c.id === courseId)?.name || courseId;
   const getTeacherName = (teacherId: string) => teachers.find((u) => u.id === teacherId)?.full_name || teacherId;
@@ -253,7 +277,75 @@ export default function SectionStudentsPage() {
             <span className="text-slate-500">{t.teacher}:</span>
             <span className="font-semibold text-slate-900">{getTeacherName(section.teacher_id)}</span>
           </div>
-          <div>{statusBadge(section.status)}</div>
+          <div className="flex items-center gap-2">
+            {statusBadge(section.status)}
+            {contract && (
+              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${
+                contract.status === "active" ? "bg-emerald-50 text-emerald-600 border-emerald-200" :
+                contract.status === "assigned" ? "bg-blue-50 text-blue-600 border-blue-200" :
+                contract.status === "grades_submitted" ? "bg-purple-50 text-purple-600 border-purple-200" :
+                contract.status === "settled" ? "bg-slate-100 text-slate-500 border-slate-200" :
+                "bg-slate-50 text-slate-400 border-slate-200"
+              }`}>
+                {contract.status === "assigned" ? "Assigned" :
+                 contract.status === "active" ? "Active" :
+                 contract.status === "grades_submitted" ? "Graded" :
+                 contract.status === "settled" ? "Settled" :
+                 contract.status === "cancelled" ? "Cancelled" : contract.status}
+              </span>
+            )}
+          </div>
+          {(section.status === "pending" || section.status === "active") && canActivate && (
+            <div className="flex items-center gap-2">
+              {section.status === "pending" && contract?.status === "assigned" && (
+                <button onClick={async () => {
+                  setActivating(true);
+                  try {
+                    await apiClient.post(`/lms/sections/${sectionId}/contract/activate`);
+                    const refetch = await apiClient.get<ContractInfo>(`/lms/sections/${sectionId}/contract`).catch(() => null);
+                    if (refetch) setContract(refetch.data);
+                    const sectRefetch = await apiClient.get<{ items: SectionInfo[]; total: number }>(
+                      `/academic/course-sections?limit=1000`
+                    ).catch(() => null);
+                    if (sectRefetch) {
+                      const found = sectRefetch.data.items.find(s => s.id === sectionId);
+                      if (found) setSection(found);
+                    }
+                  } catch (activateErr) {
+                    console.error("Activation failed:", activateErr);
+                  } finally { setActivating(false); }
+                }} disabled={activating} className="btn-primary px-3 py-1.5 text-xs flex items-center gap-1">
+                  <Play size={12} />{activating ? "..." : "Activate"}
+                </button>
+              )}
+              {section.status === "active" && contract?.status === "active" && (
+                <button
+                  onClick={async () => {
+                    setCompleting(true);
+                    try {
+                      await apiClient.post(`/lms/sections/${sectionId}/contract/complete`);
+                      const refetch = await apiClient.get<ContractInfo>(`/lms/sections/${sectionId}/contract`).catch(() => null);
+                      if (refetch) setContract(refetch.data);
+                      const sectRefetch = await apiClient.get<{ items: SectionInfo[]; total: number }>(
+                        `/academic/course-sections?limit=1000`
+                      ).catch(() => null);
+                      if (sectRefetch) {
+                        const found = sectRefetch.data.items.find(s => s.id === sectionId);
+                        if (found) setSection(found);
+                      }
+                    } catch (completeErr) {
+                      console.error("Completion failed:", completeErr);
+                    } finally { setCompleting(false); }
+                  }}
+                  disabled={completing || !allGradesFilled}
+                  title={!allGradesFilled ? t.gradesRequired : undefined}
+                  className="btn-primary px-3 py-1.5 text-xs flex items-center gap-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <CheckCircle2 size={12} />{completing ? "..." : "Complete"}
+                </button>
+              )}
+            </div>
+          )}
           <div className="flex items-center gap-2">
             <span className="text-slate-500">{t.capacity}:</span>
             <span className="font-semibold text-slate-900">{section.enrolled_count}/{section.capacity}</span>

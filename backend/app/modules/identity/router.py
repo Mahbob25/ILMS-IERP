@@ -388,7 +388,7 @@ async def create_role(
 
 @users_router.get("/teachers", response_model=List[TeacherResponse])
 async def list_teachers(
-    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])),
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary", "teacher"])),
     db: AsyncSession = Depends(get_db)
 ):
     return await identity_service.get_teachers_with_stats(db)

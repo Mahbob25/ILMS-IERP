@@ -1,7 +1,7 @@
 import uuid
 from datetime import date, datetime
 from typing import Optional
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel
 
 
 # --- Attendance ---
@@ -35,6 +35,14 @@ class AttendanceRecordResponse(BaseModel):
     class Config:
         from_attributes = True
 
+class StudentAttendanceSummary(BaseModel):
+    section_id: uuid.UUID
+    total_sessions: int
+    present_count: int
+    absent_count: int
+    late_count: int
+    excused_count: int
+
 
 # --- Payments ---
 class PaymentCreate(BaseModel):
@@ -63,6 +71,7 @@ class PaymentResponse(BaseModel):
 class TeacherWalletResponse(BaseModel):
     teacher_id: uuid.UUID
     balance: float
+    frozen_balance: float = 0
     last_updated: datetime
 
     class Config:
@@ -188,3 +197,107 @@ class RevenueOverviewResponse(BaseModel):
     by_course: list[CourseRevenueItem]
     by_teacher: list[TeacherRevenueItem]
     daily_breakdown: list[DailyRevenueItem]
+
+
+# --- Section Contract ---
+class ContractAssignRequest(BaseModel):
+    teacher_id: uuid.UUID
+    compensation_model: str  # "fixed" or "percentage"
+    fixed_amount: Optional[float] = None
+    percentage: Optional[float] = None
+    holdback_rate: Optional[float] = None
+
+
+class ContractSectionInfo(BaseModel):
+    id: uuid.UUID
+    name: str
+    course_name: str
+
+    class Config:
+        from_attributes = True
+
+
+class SectionContractResponse(BaseModel):
+    id: uuid.UUID
+    section_id: uuid.UUID
+    teacher_id: Optional[uuid.UUID] = None
+    compensation_model: Optional[str] = None
+    fixed_amount: Optional[float] = None
+    percentage: Optional[float] = None
+    holdback_rate: float = 0.20
+    status: str
+    created_at: datetime
+    updated_at: datetime
+    section: Optional[ContractSectionInfo] = None
+
+    class Config:
+        from_attributes = True
+
+
+# --- Amendment Requests ---
+class AmendmentCreateRequest(BaseModel):
+    requested_amount: float
+    reason: Optional[str] = None
+
+
+class AmendmentResponse(BaseModel):
+    id: uuid.UUID
+    contract_id: uuid.UUID
+    previous_fixed_amount: Optional[float] = None
+    requested_fixed_amount: Optional[float] = None
+    previous_percentage: Optional[float] = None
+    requested_percentage: Optional[float] = None
+    reason: Optional[str] = None
+    requested_by: uuid.UUID
+    requested_at: datetime
+    status: str
+    reviewed_by: Optional[uuid.UUID] = None
+    reviewed_at: Optional[datetime] = None
+    review_notes: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+class AmendmentApproveRequest(BaseModel):
+    review_notes: Optional[str] = None
+
+
+class AmendmentRejectRequest(BaseModel):
+    review_notes: Optional[str] = None
+
+
+class AmendmentPendingItem(BaseModel):
+    id: uuid.UUID
+    contract_id: uuid.UUID
+    section_name: str
+    course_name: str
+    teacher_name: str
+    compensation_model: Optional[str] = None
+    current_amount: Optional[float] = None
+    requested_amount: Optional[float] = None
+    reason: Optional[str] = None
+    requested_by_name: str
+    requested_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# --- Wallet Detail ---
+class WalletSectionDetail(BaseModel):
+    contract_id: str
+    section_name: Optional[str] = None
+    course_name: Optional[str] = None
+    model: Optional[str] = None
+    status: Optional[str] = None
+    credited: float = 0
+    frozen: float = 0
+    available: float = 0
+
+
+class WalletDetailResponse(BaseModel):
+    total_balance: float
+    total_frozen: float
+    total_available: float
+    sections: list[WalletSectionDetail]

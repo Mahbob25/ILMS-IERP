@@ -13,10 +13,22 @@ import { getLocalDateString, formatDisplayDate, formatDisplayDateTime } from "@/
 
 // ─── Shared Types ───────────────────────────────────────────────────────────
 
-interface TeacherWallet {
-  teacher_id: string;
-  balance: number;
-  last_updated: string;
+interface WalletDetail {
+  total_balance: number;
+  total_frozen: number;
+  total_available: number;
+  sections: WalletSection[];
+}
+
+interface WalletSection {
+  contract_id: string;
+  section_name: string;
+  course_name: string | null;
+  model: string | null;
+  status: string | null;
+  credited: number;
+  frozen: number;
+  available: number;
 }
 
 interface Expense {
@@ -53,6 +65,9 @@ function TeacherWalletView({ locale, employeeId }: { locale: string; employeeId:
       title: "محفظة المعلم",
       subtitle: "الرصيد الحالي وسجل السحوبات",
       currentBalance: "الرصيد الحالي",
+      availableBalance: "الرصيد المتاح",
+      frozenBalance: "الرصيد المجمد",
+      sectionBreakdown: "تفصيل الإيرادات حسب الشعبة",
       lastUpdated: "آخر تحديث",
       loading: "جاري التحميل...",
       refresh: "تحديث",
@@ -69,6 +84,9 @@ function TeacherWalletView({ locale, employeeId }: { locale: string; employeeId:
       title: "Teacher Wallet",
       subtitle: "Current balance and withdrawal history",
       currentBalance: "Current Balance",
+      availableBalance: "Available Balance",
+      frozenBalance: "Frozen Balance",
+      sectionBreakdown: "Revenue Breakdown by Section",
       lastUpdated: "Last Updated",
       loading: "Loading...",
       refresh: "Refresh",
@@ -83,7 +101,7 @@ function TeacherWalletView({ locale, employeeId }: { locale: string; employeeId:
     },
   }[locale === "en" ? "en" : "ar"];
 
-  const [wallet, setWallet] = useState<TeacherWallet | null>(null);
+  const [walletDetail, setWalletDetail] = useState<WalletDetail | null>(null);
   const [withdrawals, setWithdrawals] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -93,10 +111,10 @@ function TeacherWalletView({ locale, employeeId }: { locale: string; employeeId:
   const fetchWallet = useCallback(async () => {
     if (!teacherId) return;
     try {
-      const res = await apiClient.get<TeacherWallet>(`/lms/teacher-wallets/${teacherId}`);
-      if (res.status === 200) setWallet(res.data);
+      const res = await apiClient.get<WalletDetail>(`/lms/teacher-wallets/${teacherId}/detail`);
+      if (res.status === 200) setWalletDetail(res.data);
     } catch {
-      setWallet(null);
+      setWalletDetail(null);
     }
   }, [teacherId]);
 
@@ -146,24 +164,72 @@ function TeacherWalletView({ locale, employeeId }: { locale: string; employeeId:
         </div>
       </div>
 
-      {!wallet ? (
+      {!walletDetail ? (
         <div className="card p-8 text-center text-sm text-slate-500">{t.noWallet}</div>
       ) : (
         <>
           <div className="card p-6">
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-4 mb-4">
               <div className="w-14 h-14 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center">
                 <Wallet size={28} className="text-emerald-600" />
               </div>
               <div>
                 <p className="text-xs text-slate-500">{t.currentBalance}</p>
-                <p className="text-3xl font-bold text-slate-900">{wallet.balance.toFixed(2)} {t.sar}</p>
-                <p className="text-xs text-slate-400 mt-1">
-                  {t.lastUpdated}: {formatDate(wallet.last_updated.split("T")[0], locale)}
+                <p className="text-3xl font-bold text-slate-900">{walletDetail.total_balance.toFixed(2)} {t.sar}</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3 pt-3 border-t border-slate-100">
+              <div className="bg-emerald-50 rounded-lg p-3">
+                <p className="text-xs text-emerald-600">{t.availableBalance}</p>
+                <p className="text-lg font-bold text-emerald-700">
+                  {walletDetail.total_available.toFixed(2)} {t.sar}
+                </p>
+              </div>
+              <div className="bg-amber-50 rounded-lg p-3">
+                <p className="text-xs text-amber-600">{t.frozenBalance}</p>
+                <p className="text-lg font-bold text-amber-700">
+                  {walletDetail.total_frozen.toFixed(2)} {t.sar}
                 </p>
               </div>
             </div>
           </div>
+
+          {walletDetail.sections.length > 0 && (
+            <div className="card overflow-hidden">
+              <div className="px-4 py-3 border-b border-slate-200 flex items-center justify-between">
+                <h3 className="text-sm font-bold text-slate-900">{t.sectionBreakdown}</h3>
+              </div>
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Course</th>
+                    <th>Contract</th>
+                    <th>Model</th>
+                    <th>Credited</th>
+                    <th>Available</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {walletDetail.sections.map((sec) => (
+                    <tr key={sec.contract_id}>
+                      <td className="font-medium text-slate-900">{sec.course_name || sec.section_name}</td>
+                      <td>
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${
+                          sec.status === "active" ? "bg-emerald-50 text-emerald-600 border-emerald-200" :
+                          sec.status === "assigned" ? "bg-blue-50 text-blue-600 border-blue-200" :
+                          sec.status === "settled" ? "bg-slate-100 text-slate-500 border-slate-200" :
+                          "bg-slate-50 text-slate-400 border-slate-200"
+                        }`}>{sec.status}</span>
+                      </td>
+                      <td className="text-slate-600">{sec.model || "—"}</td>
+                      <td className="font-semibold text-emerald-600">{sec.credited.toFixed(2)} {t.sar}</td>
+                      <td className="font-semibold">{sec.available.toFixed(2)} {t.sar}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
           <div>
             <h3 className="text-sm font-bold text-slate-900 mb-3">{t.history}</h3>
             {withdrawals.length === 0 ? (

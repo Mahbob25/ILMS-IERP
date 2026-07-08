@@ -9,8 +9,12 @@ from sqlalchemy.orm import joinedload
 from sqlalchemy import func, or_
 from app.modules.academic.models import Course, CourseSection, Student, Enrollment, FinalGrade
 from app.modules.academic.certificate_service import create_certificate, get_grade_label
-from app.modules.lms.models import Payment, TeacherWallet
-from app.modules.identity.models import Employee, CompensationType, User
+from app.modules.lms.models import Payment, ContractStatus
+from app.modules.lms.ledger_service import (
+    activate_contract as ledger_activate_contract,
+    settle_contract as ledger_settle_contract,
+    finalize_grades_for_section as ledger_finalize_grades,
+)
 
 
 # --- Course CRUD ---
@@ -73,38 +77,12 @@ async def delete_course(db: AsyncSession, course_id: uuid.UUID) -> bool:
 
 
 # --- CourseSection CRUD ---
-async def _validate_teacher_percentage(db: AsyncSession, teacher_id: uuid.UUID, teacher_percentage: Optional[float]):
-    teacher_result = await db.execute(
-        select(Employee).where(Employee.id == teacher_id)
-    )
-    teacher = teacher_result.scalar_one_or_none()
-    if not teacher:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Teacher not found")
-
-    comp_type = teacher.compensation_type
-    if comp_type == CompensationType.SALARY and teacher_percentage is not None:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot set teacher percentage for a salary-based teacher"
-        )
-    if comp_type == CompensationType.PERCENTAGE and teacher_percentage is None:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Teacher percentage is required for percentage-based teachers"
-        )
-
-
 async def create_course_section(db: AsyncSession, data: dict) -> CourseSection:
     course_id = data.get("course_id")
     if course_id:
         course = await get_course(db, course_id)
         if not course:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
-
-    teacher_id = data.get("teacher_id")
-    teacher_pct = data.get("teacher_percentage")
-    if teacher_id:
-        await _validate_teacher_percentage(db, teacher_id, teacher_pct)
 
     section = CourseSection(**data)
     db.add(section)
@@ -151,11 +129,6 @@ async def update_course_section(db: AsyncSession, section_id: uuid.UUID, data: d
     if not section:
         return None
 
-    if "teacher_percentage" in data or "teacher_id" in data:
-        teacher_id = data.get("teacher_id", section.teacher_id)
-        teacher_pct = data.get("teacher_percentage", section.teacher_percentage)
-        await _validate_teacher_percentage(db, teacher_id, teacher_pct)
-
     for key, value in data.items():
         if value is not None:
             setattr(section, key, value)
@@ -170,7 +143,12 @@ async def delete_course_section(db: AsyncSession, section_id: uuid.UUID) -> bool
     await db.flush()
     return True
 
-async def activate_section(db: AsyncSession, section_id: uuid.UUID, teacher_percentage: Optional[float] = None) -> Optional[CourseSection]:
+async def activate_section(
+    db: AsyncSession,
+    section_id: uuid.UUID,
+    teacher_percentage: Optional[float] = None,
+    activated_by: Optional[uuid.UUID] = None,
+) -> Optional[CourseSection]:
     section = await get_course_section(db, section_id)
     if not section:
         return None
@@ -180,37 +158,12 @@ async def activate_section(db: AsyncSession, section_id: uuid.UUID, teacher_perc
     if section.enrolled_count < min_req:
         return None
 
-    await _validate_teacher_percentage(db, section.teacher_id, teacher_percentage)
-
     section.status = "active"
     if teacher_percentage is not None:
         section.teacher_percentage = teacher_percentage
 
-    # Retroactively credit teacher wallet for existing payments
-    if teacher_percentage:
-        payments_result = await db.execute(
-            select(Payment)
-            .join(Enrollment, Payment.enrollment_id == Enrollment.id)
-            .where(Enrollment.section_id == section_id)
-        )
-        payments = payments_result.scalars().all()
-        if payments:
-            total_share = sum(p.amount * teacher_percentage / 100 for p in payments)
-            if total_share > 0:
-                wallet_result = await db.execute(
-                    select(TeacherWallet).where(TeacherWallet.teacher_id == section.teacher_id)
-                )
-                wallet = wallet_result.scalar_one_or_none()
-                if wallet:
-                    wallet.balance += total_share
-                    wallet.last_updated = datetime.now(timezone.utc)
-                else:
-                    wallet = TeacherWallet(
-                        teacher_id=section.teacher_id,
-                        balance=total_share,
-                        last_updated=datetime.now(timezone.utc),
-                    )
-                    db.add(wallet)
+    if section.contract and section.contract.status == ContractStatus.ASSIGNED and activated_by:
+        await ledger_activate_contract(db, section.contract.id, activated_by=activated_by)
 
     await db.flush()
     return section
@@ -221,6 +174,10 @@ async def complete_section(db: AsyncSession, section_id: uuid.UUID, user_id: Opt
         return None
     if section.status != "active":
         return None
+
+    if section.contract and section.contract.status == ContractStatus.GRADES_SUBMITTED and user_id:
+        await ledger_settle_contract(db, section.contract.id, settled_by=user_id)
+
     section.status = "completed"
 
     enrollments_result = await db.execute(
@@ -496,6 +453,26 @@ async def set_final_grades_bulk(
             final_score=g["final_score"], graded_by=graded_by, notes=g.get("notes")
         )
         results.append(fg)
+
+    enrolled_count = await db.scalar(
+        select(func.count(Enrollment.id))
+        .where(
+            Enrollment.section_id == section_id,
+            Enrollment.deleted_at.is_(None),
+        )
+    ) or 0
+
+    graded_count = await db.scalar(
+        select(func.count(FinalGrade.id))
+        .where(FinalGrade.section_id == section_id)
+    ) or 0
+
+    if enrolled_count > 0 and graded_count >= enrolled_count:
+        try:
+            await ledger_finalize_grades(db, section_id=section_id)
+        except ValueError:
+            pass
+
     return results
 
 async def list_final_grades(
@@ -523,6 +500,20 @@ async def list_final_grades(
             "student_code": student_code,
         })
     return rows
+
+async def get_student_final_grades(db: AsyncSession, student_id: uuid.UUID) -> list[dict]:
+    result = await db.execute(
+        select(FinalGrade).where(FinalGrade.student_id == student_id)
+    )
+    grades = result.scalars().all()
+    return [
+        {
+            "section_id": g.section_id,
+            "final_score": float(g.final_score),
+            "grade_label": get_grade_label(float(g.final_score)),
+        }
+        for g in grades
+    ]
 
 async def get_student_final_grade(
     db: AsyncSession,

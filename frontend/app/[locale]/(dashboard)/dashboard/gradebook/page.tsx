@@ -8,7 +8,7 @@ import RefreshButton from "@/components/RefreshButton";
 import Select from "@/components/ui/Select";
 import { Loader2, Save } from "lucide-react";
 
-interface CourseSection { id: string; course_id: string; teacher_id: string; }
+interface CourseSection { id: string; course_id: string; teacher_id: string; status: string; }
 interface Course { id: string; name: string; code: string; }
 interface Student { id: string; student_code: string; full_name: string; }
 interface Enrollment { id: string; student_id: string; section_id: string; }
@@ -65,6 +65,7 @@ export default function GradebookPage() {
   const [sections, setSections] = useState<CourseSection[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
   const [selectedSectionId, setSelectedSectionId] = useState("");
+  const [selectedSection, setSelectedSection] = useState<CourseSection | null>(null);
   const [students, setStudents] = useState<Student[]>([]);
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
   const [grades, setGrades] = useState<Record<string, { score: string; notes: string }>>({});
@@ -86,6 +87,8 @@ export default function GradebookPage() {
   useEffect(() => { fetchData(); }, [fetchData]);
 
   const getCourseName = (id: string) => courses.find((c) => c.id === id)?.name || id;
+
+  const isCompleted = selectedSection?.status === "completed";
 
   useEffect(() => {
     if (!selectedSectionId) return;
@@ -193,7 +196,10 @@ export default function GradebookPage() {
         <label className="block text-xs font-medium text-slate-700 mb-1">{t.selectSection}</label>
         <Select
           value={selectedSectionId}
-          onChange={setSelectedSectionId}
+          onChange={(val) => {
+            setSelectedSectionId(val);
+            setSelectedSection(sections.find((s) => s.id === val) || null);
+          }}
           options={sections.map((sec) => ({ value: sec.id, label: getCourseName(sec.course_id) }))}
           placeholder="--"
           className="max-w-md"
@@ -240,7 +246,8 @@ export default function GradebookPage() {
                       type="number"
                       value={grades[enr.student_id]?.score ?? ""}
                       onChange={(e) => handleScoreChange(enr.student_id, e.target.value)}
-                      className="input-field w-24 text-center"
+                      readOnly={isCompleted}
+                      className={`input-field w-24 text-center ${isCompleted ? "bg-slate-100 cursor-not-allowed" : ""}`}
                       min={0}
                       max={100}
                       step={0.5}
@@ -252,7 +259,8 @@ export default function GradebookPage() {
                       type="text"
                       value={grades[enr.student_id]?.notes ?? ""}
                       onChange={(e) => handleNotesChange(enr.student_id, e.target.value)}
-                      className="input-field w-full"
+                      readOnly={isCompleted}
+                      className={`input-field w-full ${isCompleted ? "bg-slate-100 cursor-not-allowed" : ""}`}
                       placeholder="—"
                     />
                   </td>
@@ -260,7 +268,7 @@ export default function GradebookPage() {
               ))}
             </tbody>
           </table>
-          {sectionStudents.length > 0 && (
+          {sectionStudents.length > 0 && !isCompleted && (
             <div className="flex justify-end px-4 py-3 border-t border-slate-200">
               <button
                 onClick={handleSaveAll}

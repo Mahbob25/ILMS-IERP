@@ -2,14 +2,14 @@ import uuid
 import enum
 from datetime import date, datetime, timezone
 from typing import Optional, Dict, Any, TYPE_CHECKING
-from sqlalchemy import String, Boolean, DateTime, Date, Float, Text, ForeignKey, text, Enum as SAEnum, Integer, Numeric
+from sqlalchemy import String, Boolean, DateTime, Date, Text, ForeignKey, text, Enum as SAEnum, Integer, Numeric
 from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
 
 if TYPE_CHECKING:
     from app.modules.academic.models import CourseSection
-    from app.modules.lms.models import TeacherWallet, Expense
+    from app.modules.lms.models import TeacherWallet, Expense, SectionContract
 
 
 class EmployeeType(str, enum.Enum):
@@ -22,12 +22,6 @@ class EmployeeType(str, enum.Enum):
     ACCOUNTANT = "accountant"
     MAINTENANCE = "maintenance"
     OTHER = "other"
-
-
-class CompensationType(str, enum.Enum):
-    SALARY = "salary"
-    PERCENTAGE = "percentage"
-    HYBRID = "hybrid"
 
 
 class Role(Base):
@@ -60,13 +54,7 @@ class Employee(Base):
         nullable=False
     )
     phone_number: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
-    salary: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
-    compensation_type: Mapped[CompensationType] = mapped_column(
-        SAEnum(CompensationType, name="compensationtype", create_constraint=True, values_callable=lambda obj: [e.value for e in obj]),
-        nullable=False,
-        default=CompensationType.SALARY,
-        server_default=text("'salary'")
-    )
+    default_salary: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
     default_percentage: Mapped[Optional[float]] = mapped_column(Numeric(5, 2), nullable=True)
     hire_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     contract_end_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
@@ -90,6 +78,7 @@ class Employee(Base):
     sections: Mapped[list["CourseSection"]] = relationship(back_populates="teacher_employee")
     wallet: Mapped[Optional["TeacherWallet"]] = relationship(back_populates="teacher_employee", uselist=False)
     expenses: Mapped[list["Expense"]] = relationship(back_populates="recipient_employee")
+    contracts: Mapped[list["SectionContract"]] = relationship(back_populates="teacher_employee", foreign_keys="SectionContract.teacher_id")
 
 
 class User(Base):
