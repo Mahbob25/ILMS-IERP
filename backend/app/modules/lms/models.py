@@ -33,6 +33,8 @@ class LedgerEntryType(str, enum.Enum):
     AMENDMENT_ADJUSTMENT = "amendment_adjustment"
     REVERSAL = "reversal"
     WITHDRAWAL = "withdrawal"
+    DEACTIVATION_REVERSAL = "deactivation_reversal"
+    REFUND_DISBURSEMENT = "refund_disbursement"
 
 
 class AmendmentStatus(str, enum.Enum):
