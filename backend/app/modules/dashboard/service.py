@@ -1,5 +1,6 @@
 import uuid
 from datetime import date, datetime, timezone
+from app.core.timezone import get_today
 from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
@@ -45,7 +46,7 @@ async def get_teacher_dashboard(db: AsyncSession, employee_id: uuid.UUID) -> dic
     emp = emp_result.scalar_one_or_none()
     user_id = emp.user.id if emp and emp.user else None
 
-    today = date.today()
+    today = get_today()
     today_sessions = []
     if user_id:
         sessions_result = await db.execute(
@@ -128,7 +129,7 @@ async def get_teacher_dashboard(db: AsyncSession, employee_id: uuid.UUID) -> dic
 
 
 async def get_secretary_dashboard(db: AsyncSession) -> dict:
-    today = date.today()
+    today = get_today()
 
     payments_result = await db.execute(
         select(func.count(), func.coalesce(func.sum(Payment.amount), 0))
@@ -230,7 +231,7 @@ async def get_manager_dashboard(db: AsyncSession) -> dict:
     )
     total_teachers = teachers_result.scalar() or 0
 
-    first_of_month = date.today().replace(day=1)
+    first_of_month = get_today().replace(day=1)
 
     revenue_result = await db.execute(
         select(func.coalesce(func.sum(Payment.amount), 0))

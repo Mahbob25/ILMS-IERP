@@ -5,6 +5,7 @@ from app.core.config import settings
 # Create async database engine
 engine = create_async_engine(
     settings.DATABASE_URL,
+    connect_args={"server_settings": {"timezone": settings.TIMEZONE}},
     echo=False,
     future=True,
     pool_pre_ping=True,

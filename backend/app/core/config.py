@@ -12,6 +12,10 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "production"
     CORS_ORIGINS: str = "https://aldrasat.edu"
     TEMPLATES_DIR: str = ""
+    TIMEZONE: str = "Asia/Riyadh"
+    HTTP_PROXY: str = ""
+    HTTPS_PROXY: str = ""
+    NO_PROXY: str = "localhost,127.0.0.1,.aldrasat.edu"
 
     @model_validator(mode="after")
     def validate_required_settings(self):

@@ -1,6 +1,7 @@
 from decimal import Decimal
 import uuid
 from datetime import date, datetime, timedelta, timezone
+from app.core.timezone import get_today
 from typing import Optional
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -44,7 +45,7 @@ async def create_payment(
     locale: str = "ar",
 ) -> Optional[Payment]:
     if payment_date is None:
-        payment_date = date.today()
+        payment_date = get_today()
 
     if await is_date_closed(db, payment_date):
         raise HTTPException(
@@ -252,7 +253,7 @@ async def get_teacher_withdrawals(db: AsyncSession, employee_id: uuid.UUID) -> l
 # Expenses
 # ─────────────────────────────────────────────
 async def get_eligible_recipients(db: AsyncSession, recipient_type: str) -> list[dict]:
-    now = datetime.now(timezone.utc).date()
+    now = get_today()
     month_start = now.replace(day=1)
 
     if recipient_type == "teacher_withdrawal":
@@ -377,7 +378,7 @@ async def create_expense(
     locale: str = "ar",
 ) -> Expense:
     if expense_date is None:
-        expense_date = date.today()
+        expense_date = get_today()
     amount = Decimal(str(amount))
 
     # Validate and resolve recipient for teacher_withdrawal and secretary_advance
@@ -746,7 +747,7 @@ async def get_revenue_overview(
     end_date: Optional[date] = None,
 ) -> dict:
     if end_date is None:
-        end_date = date.today()
+        end_date = get_today()
     if start_date is None:
         start_date = end_date.replace(day=1)
 

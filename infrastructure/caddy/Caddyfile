@@ -13,9 +13,9 @@ aldrasat.edu {
     encode gzip
 
     # API proxy — point to host for local dev
-    reverse_proxy /api/v1/* host.docker.internal:8000
-    reverse_proxy /uploads/* host.docker.internal:8000
+    reverse_proxy /api/v1/* {env.BACKEND_URL}
+    reverse_proxy /uploads/* {env.BACKEND_URL}
 
     # Frontend fallback
-    reverse_proxy * host.docker.internal:3000
+    reverse_proxy * {env.FRONTEND_URL}
 }
