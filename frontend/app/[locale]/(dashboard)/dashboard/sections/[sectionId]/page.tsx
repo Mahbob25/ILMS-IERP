@@ -5,7 +5,21 @@ import { useParams, useRouter } from "next/navigation";
 import { apiClient } from "@/lib/api";
 import { useAuth } from "@/components/AuthContext";
 import RefreshButton from "@/components/RefreshButton";
-import { Loader2, ArrowLeft, Users, Play, CheckCircle2 } from "lucide-react";
+import {
+  Loader2,
+  ArrowLeft,
+  Users,
+  Play,
+  CheckCircle2,
+  AlertTriangle,
+  Clock,
+  XCircle,
+  Ban,
+} from "lucide-react";
+import SectionWarningBanner from "@/components/sections/SectionWarningBanner";
+import CancelSectionModal from "@/components/sections/CancelSectionModal";
+import DeactivateSectionModal from "@/components/sections/DeactivateSectionModal";
+import CompleteSectionModal from "@/components/sections/CompleteSectionModal";
 
 interface SectionEnrollmentDetail {
   id: string;
@@ -37,6 +51,10 @@ interface SectionInfo {
   class_duration_minutes: number | null;
   classroom: string | null;
   price: number | null;
+  flags?: Record<string, any>;
+  cancelled_at?: string | null;
+  cancelled_by?: string | null;
+  cancellation_reason?: string | null;
 }
 
 interface ContractInfo {
@@ -110,6 +128,22 @@ export default function SectionStudentsPage() {
       errMissingStartDate: "تاريخ البداية",
       errMissingClassTime: "وقت المحاضرة",
       errActivateMissingFields: "يرجى ملء جميع الحقول المطلوبة قبل التفعيل:",
+      ready_for_completion: "جاهز للإكمال",
+      cancelled: "ملغى",
+      cancelSection: "إلغاء الشعبة",
+      deactivateSection: "إلغاء التنشيط",
+      completeSection: "إكمال الشعبة",
+      overdueBanner: "مضت أيام على تاريخ النهاية",
+      approachingBanner: "يقترب موعد النهاية",
+      readyBanner: "جاهز للإكمال",
+      daysPast: "أيام مضت",
+      ungradedStudents: "طلاب بدون درجات",
+      unpaidStudents: "طلاب عليهم مدفوعات",
+      cancelSuccess: "تم إلغاء الشعبة بنجاح",
+      deactivateSuccess: "تم إلغاء التنشيط بنجاح",
+      completeSuccess: "تم إكمال الشعبة بنجاح",
+      missingGradesCount: (n: number, t: number) => `${n} من ${t} طالب مكتمل`,
+      outstandingPayments: (n: number, a: number) => `${n} طالب عليهم ${a.toFixed(2)}`,
     },
     en: {
       title: "Section Students",
@@ -158,6 +192,22 @@ export default function SectionStudentsPage() {
       errMissingStartDate: "Start Date",
       errMissingClassTime: "Class Time",
       errActivateMissingFields: "Please fill in all required fields before activating:",
+      ready_for_completion: "Ready for Completion",
+      cancelled: "Cancelled",
+      cancelSection: "Cancel Section",
+      deactivateSection: "Deactivate",
+      completeSection: "Complete Section",
+      overdueBanner: "days past end date",
+      approachingBanner: "Approaching end date",
+      readyBanner: "Ready for Completion",
+      daysPast: "days past",
+      ungradedStudents: "Ungraded Students",
+      unpaidStudents: "Unpaid Students",
+      cancelSuccess: "Section cancelled successfully",
+      deactivateSuccess: "Section deactivated successfully",
+      completeSuccess: "Section completed successfully",
+      missingGradesCount: (n: number, t: number) => `${n}/${t} students graded`,
+      outstandingPayments: (n: number, a: number) => `${n} students owe ${a.toFixed(2)}`,
     },
   }[locale === "en" ? "en" : "ar"];
 
@@ -171,6 +221,13 @@ export default function SectionStudentsPage() {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [showDeactivateModal, setShowDeactivateModal] = useState(false);
+  const [showCompleteOverride, setShowCompleteOverride] = useState(false);
+  const [overrideData, setOverrideData] = useState<{
+    ungraded: any[];
+    unpaid: any[];
+  }>({ ungraded: [], unpaid: [] });
 
   const canActivate = user?.is_superadmin || user?.role?.name === "manager" || user?.role?.name === "secretary";
 
@@ -247,14 +304,20 @@ export default function SectionStudentsPage() {
       pending: "bg-amber-50 text-amber-600 border-amber-200",
       active: "bg-emerald-50 text-emerald-600 border-emerald-200",
       completed: "bg-slate-100 text-slate-500 border-slate-200",
+      ready_for_completion: "bg-yellow-50 text-yellow-600 border-yellow-300",
+      cancelled: "bg-red-50 text-red-600 border-red-200",
     };
     const labels: Record<string, string> = {
       pending: t.pending,
       active: t.active,
       completed: t.completed,
+      ready_for_completion: t.ready_for_completion,
+      cancelled: t.cancelled,
     };
     return (
-      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${colors[status] || colors.pending}`}>
+      <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium border ${colors[status] || colors.pending}`}>
+        {status === "cancelled" && <Ban size={12} />}
+        {status === "ready_for_completion" && <AlertTriangle size={12} />}
         {labels[status] || status}
       </span>
     );
@@ -324,7 +387,7 @@ export default function SectionStudentsPage() {
               </span>
             )}
           </div>
-          {(section.status === "pending" || section.status === "active") && canActivate && (
+          {(section.status === "pending" || section.status === "active" || section.status === "ready_for_completion") && canActivate && (
             <div className="flex items-center gap-2">
               {section.status === "pending" && contract?.status === "assigned" && (
                 <button onClick={async () => {
@@ -388,16 +451,15 @@ export default function SectionStudentsPage() {
                   <Play size={12} />{activating ? "..." : "Activate"}
                 </button>
               )}
-              {section.status === "active" && contract?.status === "active" && (
+              {/* Complete button for active and ready_for_completion */}
+              {(section.status === "active" || section.status === "ready_for_completion") && (
                 <button
                   onClick={async () => {
                     setError(null);
                     setCompleting(true);
                     try {
-                      await apiClient.post(`/lms/sections/${sectionId}/contract/complete`);
+                      await apiClient.post(`/academic/course-sections/${sectionId}/complete`);
                       setError(null);
-                      const refetch = await apiClient.get<ContractInfo>(`/lms/sections/${sectionId}/contract`).catch(() => null);
-                      if (refetch) setContract(refetch.data);
                       const sectRefetch = await apiClient.get<{ items: SectionInfo[]; total: number }>(
                         `/academic/course-sections?limit=1000`
                       ).catch(() => null);
@@ -405,36 +467,43 @@ export default function SectionStudentsPage() {
                         const found = sectRefetch.data.items.find(s => s.id === sectionId);
                         if (found) setSection(found);
                       }
-                    } catch (completeErr) {
-                      const err = completeErr as { response?: { data?: { detail?: string } } };
-                      const detail = err?.response?.data?.detail;
-                      if (detail) {
-                        if (locale === "en") {
-                          setError(detail);
-                        } else {
-                          const patterns: [RegExp, (...m: string[]) => string][] = [
-                            [/^Cannot finalize grades: (\d+) of (\d+) students are missing final scores$/, (a, b) => `${t.errCannotFinalize}${a} من ${b} طالب يفتقدون للدرجات النهائية`],
-                            [/^Cannot settle a contract without a teacher$/, () => t.errNoTeacher],
-                            [/^Only ACTIVE contracts can be finalized, current: (.+)$/, (s) => `${t.errOnlyActive}، الحالة الحالية: ${s}`],
-                            [/^Only GRADES_SUBMITTED contracts can be settled, current: (.+)$/, (s) => `${t.errOnlyGraded}، الحالة الحالية: ${s}`],
-                          ];
-                          let translated: string | null = null;
-                          for (const [regex, fn] of patterns) {
-                            const m = detail.match(regex);
-                            if (m) { translated = fn(...m.slice(1)); break; }
-                          }
-                          setError(translated || detail);
-                        }
+                    } catch (completeErr: any) {
+                      const detail = completeErr?.response?.data?.detail || "";
+                      // If the error says grades are missing or payments outstanding, offer override
+                      if (detail.includes("missing") || detail.includes("grades") || detail.includes("payment") || detail.includes("unpaid")) {
+                        setOverrideData({
+                          ungraded: students.filter(s => s.final_score == null).map(s => ({ student_name: s.student_name, student_code: s.student_code })),
+                          unpaid: students.filter(s => (s.balance_remaining || 0) > 0).map(s => ({ student_name: s.student_name, student_code: s.student_code, amount: s.balance_remaining })),
+                        });
+                        setShowCompleteOverride(true);
                       } else {
-                        setError(t.completionFailed);
+                        setError(detail || t.completionFailed);
                       }
                     } finally { setCompleting(false); }
                   }}
-                  disabled={completing || !allGradesFilled}
-                  title={!allGradesFilled ? t.gradesRequired : undefined}
-                  className="btn-primary px-3 py-1.5 text-xs flex items-center gap-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={completing}
+                  className="btn-primary px-3 py-1.5 text-xs flex items-center gap-1 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <CheckCircle2 size={12} />{completing ? "..." : "Complete"}
+                  <CheckCircle2 size={12} />{completing ? "..." : t.completeSection || "Complete"}
+                </button>
+              )}
+              {/* Cancel Section button */}
+              {(user?.is_superadmin || user?.role?.name === "manager") &&
+                (section.status === "pending" || section.status === "active") && (
+                <button
+                  onClick={() => setShowCancelModal(true)}
+                  className="px-3 py-1.5 text-xs flex items-center gap-1 bg-red-50 text-red-600 border border-red-200 rounded-lg hover:bg-red-100 font-medium"
+                >
+                  <XCircle size={12} /> {t.cancelSection}
+                </button>
+              )}
+              {/* Deactivate button */}
+              {user?.is_superadmin && section.status === "active" && (
+                <button
+                  onClick={() => setShowDeactivateModal(true)}
+                  className="px-3 py-1.5 text-xs flex items-center gap-1 bg-amber-50 text-amber-600 border border-amber-200 rounded-lg hover:bg-amber-100 font-medium"
+                >
+                  <Ban size={12} /> {t.deactivateSection}
                 </button>
               )}
             </div>
@@ -462,6 +531,53 @@ export default function SectionStudentsPage() {
             </div>
           )}
         </div>
+      )}
+
+      {section && section.end_date && (() => {
+        const endDate = new Date(section.end_date + "T00:00:00");
+        const now = new Date();
+        const diffDays = Math.floor((now.getTime() - endDate.getTime()) / (1000 * 60 * 60 * 24));
+        if (section.status === "cancelled") return null;
+        if (diffDays > 0) {
+          return (
+            <SectionWarningBanner
+              type="overdue"
+              daysPastEnd={diffDays}
+              endDate={section.end_date}
+              missingGradeCount={students.filter(s => s.final_score == null).length}
+              totalStudentCount={students.length}
+              outstandingPaymentCount={students.filter(s => (s.balance_remaining || 0) > 0).length}
+              outstandingPaymentTotal={students.reduce((sum, s) => sum + (s.balance_remaining || 0), 0)}
+              isRtl={isRtl}
+              locale={locale}
+            />
+          );
+        }
+        if (diffDays >= -7) {
+          return (
+            <SectionWarningBanner
+              type="approaching"
+              endDate={section.end_date}
+              missingGradeCount={students.filter(s => s.final_score == null).length}
+              totalStudentCount={students.length}
+              outstandingPaymentCount={students.filter(s => (s.balance_remaining || 0) > 0).length}
+              outstandingPaymentTotal={students.reduce((sum, s) => sum + (s.balance_remaining || 0), 0)}
+              isRtl={isRtl}
+              locale={locale}
+            />
+          );
+        }
+        return null;
+      })()}
+
+      {section?.status === "ready_for_completion" && (
+        <SectionWarningBanner
+          type="ready"
+          missingGradeCount={students.filter(s => s.final_score != null).length}
+          totalStudentCount={students.length}
+          isRtl={isRtl}
+          locale={locale}
+        />
       )}
 
       {error && (
@@ -597,6 +713,48 @@ export default function SectionStudentsPage() {
           </div>
         )}
       </div>
+
+      <CancelSectionModal
+        open={showCancelModal}
+        onClose={() => setShowCancelModal(false)}
+        sectionId={sectionId}
+        sectionName={section ? getCourseName(section.course_id) : ""}
+        isRtl={isRtl}
+        locale={locale}
+        onSuccess={() => {
+          setError(null);
+          fetchData();
+        }}
+      />
+
+      <DeactivateSectionModal
+        open={showDeactivateModal}
+        onClose={() => setShowDeactivateModal(false)}
+        sectionId={sectionId}
+        sectionName={section ? getCourseName(section.course_id) : ""}
+        hasPayments={students.some(s => (s.total_paid || 0) > 0)}
+        isRtl={isRtl}
+        locale={locale}
+        onSuccess={() => {
+          setError(null);
+          fetchData();
+        }}
+      />
+
+      <CompleteSectionModal
+        open={showCompleteOverride}
+        onClose={() => setShowCompleteOverride(false)}
+        sectionId={sectionId}
+        sectionName={section ? getCourseName(section.course_id) : ""}
+        ungradedStudents={overrideData.ungraded}
+        unpaidStudents={overrideData.unpaid}
+        isRtl={isRtl}
+        locale={locale}
+        onSuccess={() => {
+          setError(null);
+          fetchData();
+        }}
+      />
     </div>
   );
 }

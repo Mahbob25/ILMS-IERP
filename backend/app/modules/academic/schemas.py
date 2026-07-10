@@ -91,6 +91,10 @@ class SectionActivate(BaseModel):
     teacher_percentage: Optional[float] = None
 
 
+class DeactivateRequest(BaseModel):
+    reason: str | None = None
+
+
 # --- Student ---
 class StudentCreate(BaseModel):
     student_code: str

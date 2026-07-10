@@ -1,26 +1,32 @@
 from decimal import Decimal
 import uuid
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Optional
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import joinedload
-from sqlalchemy import func, or_
+from sqlalchemy import exists, func, or_, and_
 from app.modules.academic.models import (
     Course,
     CourseSection,
     Student,
     Enrollment,
     FinalGrade,
+    SectionCompletionOverride,
+    SectionLifecycleConfig,
+    DailyJobsLog,
 )
 from app.modules.academic.certificate_service import create_certificate, get_grade_label
-from app.modules.lms.models import Payment, ContractStatus
+from app.modules.identity.models import User
+from app.modules.lms.models import Payment, ContractStatus, SectionContract
 from app.modules.lms.ledger_service import (
     activate_contract as ledger_activate_contract,
     settle_contract as ledger_settle_contract,
     finalize_grades_for_section as ledger_finalize_grades,
+    deactivate_contract as ledger_deactivate_contract,
 )
+from app.core.timezone import get_today
 
 
 # --- Course CRUD ---
@@ -228,7 +234,8 @@ async def activate_section(
 
 
 async def complete_section(
-    db: AsyncSession, section_id: uuid.UUID, user_id: Optional[uuid.UUID] = None
+    db: AsyncSession, section_id: uuid.UUID, current_user: User,
+    force: bool = False, force_reason: str | None = None
 ) -> Optional[CourseSection]:
     section = await get_course_section(db, section_id)
     if not section:
@@ -236,15 +243,86 @@ async def complete_section(
     if section.status != "active":
         return None
 
+    # Daily closure check
+    if await _is_date_closed(db, get_today()):
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot complete section on a closed financial day. "
+                   "Ask a manager to unlock the day first."
+        )
+
+    # Grade completeness check (NULL vs 0 distinction)
+    enrolled_count = await _count_enrolled_students(db, section_id)
+    graded_count = await db.scalar(
+        select(func.count(FinalGrade.id)).where(FinalGrade.section_id == section_id)
+    ) or 0
+
+    ungraded = []
+    if enrolled_count > graded_count:
+        ungraded = await _get_ungraded_students(db, section_id)
+        if not force:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "message": "Section has ungraded students",
+                    "ungraded_students": [s["full_name"] for s in ungraded],
+                }
+            )
+
+    # Payment balance check
+    unpaid_students = []
+    enrollments_result = await db.execute(
+        select(Enrollment).where(
+            Enrollment.section_id == section_id,
+            Enrollment.deleted_at.is_(None),
+        )
+    )
+    for enrollment in enrollments_result.scalars().all():
+        net_price = _calculate_net_price(enrollment)
+        total_paid = await _sum_payments_for_enrollment(db, enrollment.id)
+        balance = net_price - total_paid
+
+        if balance > 0:
+            student = await db.get(Student, enrollment.student_id)
+            unpaid_students.append({
+                "student_id": student.id,
+                "student_name": student.full_name,
+                "balance": float(balance),
+            })
+
+    block_unpaid = await _get_config_bool(db, "block_completion_if_unpaid", True)
+    if unpaid_students and block_unpaid and not force:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "message": "Section has unpaid students",
+                "unpaid_students": unpaid_students,
+            }
+        )
+
+    # Force override audit trail
+    if force and (ungraded or unpaid_students):
+        db.add(SectionCompletionOverride(
+            section_id=section.id,
+            overridden_by=current_user.id,
+            bypass_grade_check=bool(ungraded),
+            bypass_payment_check=bool(unpaid_students),
+            reason=force_reason or "No reason provided",
+            ungraded_students=[s["full_name"] for s in (ungraded or [])],
+            unpaid_students=[s["student_name"] for s in (unpaid_students or [])],
+        ))
+
+    # Ledger settle
     if (
         section.contract
         and section.contract.status == ContractStatus.GRADES_SUBMITTED
-        and user_id
+        and current_user.id
     ):
-        await ledger_settle_contract(db, section.contract.id, settled_by=user_id)
+        await ledger_settle_contract(db, section.contract.id, settled_by=current_user.id)
 
     section.status = "completed"
 
+    # Certificates
     enrollments_result = await db.execute(
         select(Enrollment)
         .where(Enrollment.section_id == section_id, Enrollment.deleted_at.is_(None))
@@ -255,11 +333,58 @@ async def complete_section(
     )
     for enrollment in enrollments_result.scalars().all():
         try:
-            await create_certificate(db, enrollment, user_id=user_id)
+            await create_certificate(db, enrollment, user_id=current_user.id)
         except Exception:
             continue
 
     await db.flush()
+    return section
+
+
+async def _section_has_payments(db: AsyncSession, section_id: uuid.UUID) -> bool:
+    result = await db.execute(
+        select(exists().where(
+            Payment.enrollment_id == Enrollment.id,
+            Enrollment.section_id == section_id,
+            Enrollment.deleted_at.is_(None),
+        ))
+    )
+    return result.scalar() or False
+
+
+async def deactivate_section(
+    db: AsyncSession,
+    section_id: uuid.UUID,
+    current_user: User,
+    reason: str | None = None,
+) -> CourseSection:
+    section = await db.get(CourseSection, section_id)
+    if not section or section.deleted_at:
+        raise HTTPException(status_code=404, detail="Section not found")
+
+    if section.status != "active":
+        raise HTTPException(status_code=400, detail="Only active sections can be deactivated")
+
+    has_payments = await _section_has_payments(db, section_id)
+    if has_payments and not reason:
+        raise HTTPException(
+            status_code=400,
+            detail="Reason required: section has student payments recorded. "
+                   "Provide a reason for deactivation."
+        )
+
+    result = await db.execute(
+        select(SectionContract).where(SectionContract.section_id == section_id)
+    )
+    contract = result.scalar_one_or_none()
+    if contract and contract.status == ContractStatus.ACTIVE:
+        await ledger_deactivate_contract(
+            db, contract, reason or "Manager deactivation", deactivated_by=current_user.id
+        )
+
+    section.status = "pending"
+    await db.commit()
+    await db.refresh(section)
     return section
 
 
@@ -666,3 +791,89 @@ async def get_student_final_grade(
         )
     )
     return result.scalar_one_or_none()
+
+
+# --- Section Lifecycle Helpers (Phase 3) ---
+
+async def _count_enrolled_students(db: AsyncSession, section_id: uuid.UUID) -> int:
+    result = await db.scalar(
+        select(func.count(Enrollment.id)).where(
+            Enrollment.section_id == section_id,
+            Enrollment.deleted_at.is_(None),
+        )
+    )
+    return result or 0
+
+
+async def _get_ungraded_students(
+    db: AsyncSession, section_id: uuid.UUID
+) -> list[dict]:
+    final_grades_table = FinalGrade.__table__
+    enrollments_table = Enrollment.__table__
+    students_table = Student.__table__
+
+    query = (
+        select(students_table.c.id, students_table.c.full_name)
+        .select_from(
+            enrollments_table.join(
+                students_table,
+                students_table.c.id == enrollments_table.c.student_id,
+            ).outerjoin(
+                final_grades_table,
+                and_(
+                    final_grades_table.c.section_id == enrollments_table.c.section_id,
+                    final_grades_table.c.student_id == enrollments_table.c.student_id,
+                ),
+            )
+        )
+        .where(
+            enrollments_table.c.section_id == section_id,
+            enrollments_table.c.deleted_at.is_(None),
+            final_grades_table.c.id.is_(None),
+        )
+    )
+    result = await db.execute(query)
+    return [{"id": str(row.id), "full_name": row.full_name} for row in result.all()]
+
+
+def _calculate_net_price(enrollment: Enrollment) -> Decimal:
+    net_price = enrollment.agreed_price or Decimal("0")
+    if enrollment.agreed_price is not None and enrollment.admin_discount is not None:
+        net_price = enrollment.agreed_price - (
+            enrollment.agreed_price * enrollment.admin_discount / Decimal("100")
+        )
+    return Decimal(str(net_price)) if not isinstance(net_price, Decimal) else net_price
+
+
+async def _sum_payments_for_enrollment(
+    db: AsyncSession, enrollment_id: uuid.UUID
+) -> Decimal:
+    result = await db.scalar(
+        select(func.coalesce(func.sum(Payment.amount), 0)).where(
+            Payment.enrollment_id == enrollment_id
+        )
+    )
+    return Decimal(str(result))
+
+
+async def _get_config_bool(
+    db: AsyncSession, key: str, default: bool = True
+) -> bool:
+    result = await db.scalar(
+        select(SectionLifecycleConfig.value).where(
+            SectionLifecycleConfig.key == key
+        )
+    )
+    if result is None:
+        return default
+    return result.lower() == "true"
+
+
+async def _is_date_closed(db: AsyncSession, check_date: date) -> bool:
+    result = await db.scalar(
+        select(DailyJobsLog).where(
+            DailyJobsLog.job_name == "daily_financial_close",
+            DailyJobsLog.last_run_date == check_date,
+        )
+    )
+    return result is not None

@@ -27,7 +27,8 @@ import {
   CreditCard,
   ShoppingCart,
   BarChart3,
-  AlertCircle
+  AlertCircle,
+  HandCoins,
 } from "lucide-react";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -71,7 +72,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         ingestion: "استيراد المناهج",
         systemHealth: "صحة النظام",
         backups: "النسخ الاحتياطي",
-        settings: "الإعدادات"
+        settings: "الإعدادات",
+        cashierRefunds: "المبالغ المستردة",
       },
       loading: "جاري تحميل بيانات الجلسة...",
       langToggle: "English"
@@ -105,7 +107,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         ingestion: "Curriculum Ingestion",
         systemHealth: "System Health",
         backups: "Database Backups",
-        settings: "Settings"
+        settings: "Settings",
+        cashierRefunds: "Refunds",
       },
       loading: "Loading session data...",
       langToggle: "العربية"
@@ -158,6 +161,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     "page_teacher_wallet": ["superadmin", "manager", "teacher"],
     "page_daily_closures": ["superadmin", "manager", "secretary"],
     "page_pos": ["superadmin", "manager", "secretary"],
+    "page_cashier_refunds": ["superadmin", "manager", "accountant"],
     "page_ingestion": ["superadmin", "teacher"],
     "page_health": ["superadmin"],
     "page_backups": ["superadmin"],
@@ -192,6 +196,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     "dashboard/teacher-wallet": "page_teacher_wallet",
     "dashboard/daily-closures": "page_daily_closures",
     "dashboard/pos": "page_pos",
+    "dashboard/cashier/refunds": "page_cashier_refunds",
     "dashboard/ingestion": "page_ingestion",
     "dashboard/health": "page_health",
     "dashboard/backups": "page_backups",
@@ -233,6 +238,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { name: t.menu.teacherWallet, href: `/${locale}/dashboard/teacher-wallet`, icon: CreditCard, permission: "page_teacher_wallet" },
     { name: t.menu.dailyClosures, href: `/${locale}/dashboard/daily-closures`, icon: Calendar, permission: "page_daily_closures" },
     { name: t.menu.pos, href: `/${locale}/dashboard/pos`, icon: ShoppingCart, permission: "page_pos" },
+    { name: t.menu.cashierRefunds, href: `/${locale}/dashboard/cashier/refunds`, icon: HandCoins, permission: "page_cashier_refunds" },
     { name: t.menu.ingestion, href: `/${locale}/dashboard/ingestion`, icon: FileText, permission: "page_ingestion" },
     { name: t.menu.systemHealth, href: `/${locale}/dashboard/health`, icon: Activity, permission: "page_health" },
     { name: t.menu.backups, href: `/${locale}/dashboard/backups`, icon: Database, permission: "page_backups" },

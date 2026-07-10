@@ -1,3 +1,5 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
@@ -5,15 +7,24 @@ from slowapi.errors import RateLimitExceeded
 from app.core.rate_limit import limiter
 
 from app.core.config import settings
+from app.db.session import async_session_maker
+from app.modules.academic.section_startup_checks import run_daily_section_checks
 from app.modules.identity.router import auth_router, users_router, employees_router, permissions_router
 from app.modules.academic.router import academic_router
 from app.modules.lms.router import lms_router
 from app.modules.dashboard.router import dashboard_router
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    async with async_session_maker() as db:
+        await run_daily_section_checks(db)
+    yield
+
 app = FastAPI(
     title="LIMS API Server",
     description="Learning Institution Management System Core API Server (Lean MVP)",
-    version="1.7"
+    version="1.7",
+    lifespan=lifespan,
 )
 
 # Attach rate limiter to app state and exception handler

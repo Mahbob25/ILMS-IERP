@@ -426,3 +426,62 @@ async def cancel_contract(
     contract.updated_at = datetime.now(timezone.utc)
     await db.flush()
     return contract
+
+
+async def deactivate_contract(
+    db: AsyncSession,
+    contract: SectionContract,
+    reason: str,
+    deactivated_by: uuid.UUID,
+) -> SectionContract:
+    if contract.status != ContractStatus.ACTIVE:
+        raise ValueError(
+            f"Only ACTIVE contracts can be deactivated, current: {contract.status.value}"
+        )
+    if not contract.teacher_id:
+        raise ValueError("Cannot deactivate a contract without a teacher")
+
+    wallet = await get_or_create_wallet(db, contract.teacher_id)
+
+    agg_result = await db.execute(
+        select(
+            sa_func.coalesce(sa_func.sum(LedgerEntry.available_delta), 0),
+            sa_func.coalesce(sa_func.sum(LedgerEntry.frozen_delta), 0),
+        )
+        .where(
+            LedgerEntry.contract_id == contract.id,
+            LedgerEntry.wallet_id == wallet.id,
+            LedgerEntry.type == LedgerEntryType.ACTIVATION_CREDIT,
+        )
+    )
+    row = agg_result.one()
+    net_available = Decimal(str(row[0] or 0))
+    net_frozen = Decimal(str(row[1] or 0))
+    total_to_reverse = abs(net_available) + abs(net_frozen)
+
+    if total_to_reverse > 0:
+        wallet_balance = Decimal(str(wallet.balance or 0))
+        if wallet_balance < total_to_reverse:
+            raise ValueError(
+                "Cannot deactivate: teacher has withdrawn funds. "
+                "Activation credit cannot be recovered from wallet."
+            )
+
+        await record(
+            db=db,
+            wallet_id=wallet.id,
+            contract_id=contract.id,
+            entry_type=LedgerEntryType.DEACTIVATION_REVERSAL,
+            total_amount=total_to_reverse,
+            available_delta=-net_available,
+            frozen_delta=-net_frozen,
+            reference_type=None,
+            reference_id=None,
+            narrative=f"Deactivation reversal: {reason}",
+            created_by=deactivated_by,
+        )
+
+    contract.status = ContractStatus.ASSIGNED
+    contract.updated_at = datetime.now(timezone.utc)
+    await db.flush()
+    return contract

@@ -17,7 +17,14 @@ import {
   CheckCircle2,
   UserPlus,
   Eye,
+  Ban,
+  XCircle,
+  AlertTriangle,
+  Clock,
 } from "lucide-react";
+import CancelSectionModal from "@/components/sections/CancelSectionModal";
+import DeactivateSectionModal from "@/components/sections/DeactivateSectionModal";
+import CompleteSectionModal from "@/components/sections/CompleteSectionModal";
 
 interface CourseSection {
   id: string;
@@ -36,6 +43,10 @@ interface CourseSection {
   class_duration_minutes: number | null;
   classroom: string | null;
   price: number | null;
+  flags?: Record<string, any>;
+  cancelled_at?: string | null;
+  cancelled_by?: string | null;
+  cancellation_reason?: string | null;
 }
 
 interface Course {
@@ -89,6 +100,8 @@ export default function SectionsPage() {
       pending: "قيد الانتظار",
       active: "نشط",
       completed: "مكتمل",
+      ready_for_completion: "جاهز للإكمال",
+      cancelled: "ملغى",
       registerStudent: "تسجيل طالب",
       selectStudent: "اختر الطالب",
       register: "تسجيل",
@@ -144,6 +157,17 @@ export default function SectionsPage() {
       errMissingStartDate: "تاريخ البداية",
       errMissingClassTime: "وقت المحاضرة",
       errActivateMissingFields: "يرجى ملء جميع الحقول المطلوبة قبل التفعيل:",
+      cancelSection: "إلغاء الشعبة",
+      deactivateSection: "إلغاء التنشيط",
+      overdueLabel: "متأخر",
+      errAlreadyCancelled: "لا يمكن إلغاء شعبة ملغاة",
+      errCannotCancel: "لا يمكن إلغاء هذه الشعبة في حالتها الحالية",
+      confirmCancelTitle: "تأكيد الإلغاء",
+      cancelConfirmMsg: "هل أنت متأكد من إلغاء هذه الشعبة؟",
+      deactivateConfirmTitle: "تأكيد إلغاء التنشيط",
+      deactivateConfirmMsg: "هل تريد إلغاء تنشيط هذه الشعبة؟",
+      cancelSuccess: "تم إلغاء الشعبة بنجاح",
+      deactivateSuccess: "تم إلغاء تنشيط الشعبة بنجاح",
     },
     en: {
       title: "Course Sections",
@@ -172,6 +196,8 @@ export default function SectionsPage() {
       pending: "Pending",
       active: "Active",
       completed: "Completed",
+      ready_for_completion: "Ready for Completion",
+      cancelled: "Cancelled",
       registerStudent: "Register Student",
       selectStudent: "Select Student",
       register: "Register",
@@ -228,6 +254,17 @@ export default function SectionsPage() {
       errMissingStartDate: "Start Date",
       errMissingClassTime: "Class Time",
       errActivateMissingFields: "Please fill in all required fields before activating:",
+      cancelSection: "Cancel Section",
+      deactivateSection: "Deactivate",
+      overdueLabel: "Overdue",
+      errAlreadyCancelled: "Cannot cancel an already cancelled section",
+      errCannotCancel: "Cannot cancel this section in its current state",
+      confirmCancelTitle: "Confirm Cancellation",
+      cancelConfirmMsg: "Are you sure you want to cancel this section?",
+      deactivateConfirmTitle: "Confirm Deactivation",
+      deactivateConfirmMsg: "Do you want to deactivate this section?",
+      cancelSuccess: "Section cancelled successfully",
+      deactivateSuccess: "Section deactivated successfully",
     },
   }[locale === "en" ? "en" : "ar"];
 
@@ -264,6 +301,13 @@ export default function SectionsPage() {
   >({});
   const [deleteTarget, setDeleteTarget] = useState<CourseSection | null>(null);
 
+  const [cancelTarget, setCancelTarget] = useState<CourseSection | null>(null);
+  const [deactivateTarget, setDeactivateTarget] = useState<CourseSection | null>(null);
+  const [completeTarget, setCompleteTarget] = useState<CourseSection | null>(null);
+  const [completeOverride, setCompleteOverride] = useState<{
+    ungraded: any[];
+    unpaid: any[];
+  }>({ ungraded: [], unpaid: [] });
   const [showRegister, setShowRegister] = useState<string | null>(null);
   const [registerForm, setRegisterForm] = useState({
     student_id: "",
@@ -328,7 +372,9 @@ export default function SectionsPage() {
         const statusPriority: Record<string, number> = {
           pending: 0,
           active: 1,
-          completed: 2,
+          ready_for_completion: 2,
+          completed: 3,
+          cancelled: 4,
         };
         const sorted = [...res.data.items].sort(
           (a, b) => (statusPriority[a.status] ?? 3) - (statusPriority[b.status] ?? 3),
@@ -378,10 +424,7 @@ export default function SectionsPage() {
     user?.is_superadmin ||
     user?.role?.name === "manager" ||
     user?.role?.name === "secretary";
-  const canDelete =
-    user?.is_superadmin ||
-    user?.role?.name === "manager" ||
-    user?.role?.name === "secretary";
+  const canDelete = user?.is_superadmin;
   const canActivate =
     user?.is_superadmin ||
     user?.role?.name === "manager" ||
@@ -396,22 +439,34 @@ export default function SectionsPage() {
   const getTeacherName = (id: string) =>
     teachers.find((u) => u.id === id)?.full_name || id;
 
-  const statusBadge = (status: string) => {
+  const statusBadge = (status: string, flags?: Record<string, any>) => {
     const colors: Record<string, string> = {
       pending: "bg-amber-50 text-amber-600 border-amber-200",
       active: "bg-emerald-50 text-emerald-600 border-emerald-200",
       completed: "bg-slate-100 text-slate-500 border-slate-200",
+      ready_for_completion: "bg-yellow-50 text-yellow-600 border-yellow-300",
+      cancelled: "bg-red-50 text-red-600 border-red-200",
     };
     const labels: Record<string, string> = {
       pending: t.pending,
       active: t.active,
       completed: t.completed,
+      ready_for_completion: t.ready_for_completion,
+      cancelled: t.cancelled,
     };
+    const isOverdue = flags?.overdue === true;
     return (
       <span
-        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${colors[status] || colors.pending}`}
+        className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium border ${colors[status] || colors.pending}`}
       >
+        {status === "cancelled" && <Ban size={12} />}
+        {status === "ready_for_completion" && <AlertTriangle size={12} />}
         {labels[status] || status}
+        {isOverdue && (
+          <span className="ms-1 text-[10px] font-bold text-red-600">
+            ({t.overdueLabel})
+          </span>
+        )}
       </span>
     );
   };
@@ -721,10 +776,12 @@ export default function SectionsPage() {
           options={[
             { value: "pending", label: t.pending },
             { value: "active", label: t.active },
+            { value: "ready_for_completion", label: t.ready_for_completion },
             { value: "completed", label: t.completed },
+            { value: "cancelled", label: t.cancelled },
           ]}
           placeholder={t.allStatuses}
-          className="w-44"
+          className="w-48"
         />
         {search && (
           <button
@@ -1053,7 +1110,7 @@ export default function SectionsPage() {
                         {getTeacherName(section.teacher_id)}
                       </td>
                     )}
-                    <td>{statusBadge(section.status)}</td>
+                    <td>{statusBadge(section.status, section.flags)}</td>
                     <td>
                       <div className="flex items-center gap-2">
                         <div className="flex-1 bg-slate-100 rounded-full h-2 w-24">
@@ -1115,7 +1172,7 @@ export default function SectionsPage() {
                         >
                           <Eye size={14} />
                         </button>
-                        {canEdit && section.status !== "completed" && (
+                        {canEdit && section.status !== "completed" && section.status !== "cancelled" && (
                           <button
                             onClick={() => openEdit(section)}
                             className="btn-icon"
@@ -1131,6 +1188,27 @@ export default function SectionsPage() {
                             title={t.delete}
                           >
                             <Trash2 size={14} />
+                          </button>
+                        )}
+                        {/* Cancel Section - for pending or active sections */}
+                        {(user?.is_superadmin || user?.role?.name === "manager") &&
+                          (section.status === "pending" || section.status === "active") && (
+                            <button
+                              onClick={() => setCancelTarget(section)}
+                              className="btn-icon text-red-500"
+                              title={t.cancelSection}
+                            >
+                              <XCircle size={14} />
+                            </button>
+                          )}
+                        {/* Deactivate - for superadmin only, active sections */}
+                        {user?.is_superadmin && section.status === "active" && (
+                          <button
+                            onClick={() => setDeactivateTarget(section)}
+                            className="btn-icon text-amber-500"
+                            title={t.deactivateSection}
+                          >
+                            <Ban size={14} />
                           </button>
                         )}
                         {canActivate &&
@@ -1157,15 +1235,19 @@ export default function SectionsPage() {
                               <Play size={14} />
                             </button>
                           )}
-                        {canActivate && section.status === "active" && (
-                          <button
-                            onClick={() => handleComplete(section.id)}
-                            className="btn-icon text-blue-600"
-                            title={t.complete}
-                          >
-                            <CheckCircle2 size={14} />
-                          </button>
-                        )}
+                        {canActivate &&
+                          (section.status === "active" || section.status === "ready_for_completion") && (
+                            <button
+                              onClick={() => {
+                                setCompleteTarget(section);
+                                setCompleteOverride({ ungraded: [], unpaid: [] });
+                              }}
+                              className="btn-icon text-emerald-600"
+                              title={t.complete}
+                            >
+                              <CheckCircle2 size={14} />
+                            </button>
+                          )}
                         {canRegister && section.status === "pending" && (
                           <button
                             onClick={() => {
@@ -1404,6 +1486,48 @@ export default function SectionsPage() {
         isRtl={isRtl}
         onConfirm={() => deleteTarget && handleDelete(deleteTarget.id)}
         onCancel={() => setDeleteTarget(null)}
+      />
+
+      <CancelSectionModal
+        open={cancelTarget !== null}
+        onClose={() => setCancelTarget(null)}
+        sectionId={cancelTarget?.id || ""}
+        sectionName={cancelTarget ? getCourseName(cancelTarget.course_id) : ""}
+        isRtl={isRtl}
+        locale={locale}
+        onSuccess={() => {
+          setActionMessage({ type: "success", text: t.cancelSuccess });
+          fetchSections(search, statusFilter, page);
+        }}
+      />
+
+      <DeactivateSectionModal
+        open={deactivateTarget !== null}
+        onClose={() => setDeactivateTarget(null)}
+        sectionId={deactivateTarget?.id || ""}
+        sectionName={deactivateTarget ? getCourseName(deactivateTarget.course_id) : ""}
+        hasPayments={(deactivateTarget?.enrolled_count || 0) > 0}
+        isRtl={isRtl}
+        locale={locale}
+        onSuccess={() => {
+          setActionMessage({ type: "success", text: t.deactivateSuccess });
+          fetchSections(search, statusFilter, page);
+        }}
+      />
+
+      <CompleteSectionModal
+        open={completeTarget !== null}
+        onClose={() => setCompleteTarget(null)}
+        sectionId={completeTarget?.id || ""}
+        sectionName={completeTarget ? getCourseName(completeTarget.course_id) : ""}
+        ungradedStudents={completeOverride.ungraded}
+        unpaidStudents={completeOverride.unpaid}
+        isRtl={isRtl}
+        locale={locale}
+        onSuccess={() => {
+          setActionMessage({ type: "success", text: t.completedMsg });
+          fetchSections(search, statusFilter, page);
+        }}
       />
     </div>
   );

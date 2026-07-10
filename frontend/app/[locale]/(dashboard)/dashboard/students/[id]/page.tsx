@@ -9,6 +9,7 @@ import Modal from "@/components/Modal";
 import Select from "@/components/ui/Select";
 import { Loader2, ArrowLeft, Wallet, DollarSign, Plus, X, Award, Eye, FileDown, Check, Clock, AlertCircle } from "lucide-react";
 import CertificatePreview from "@/components/CertificatePreview";
+import PendingRefundBadge from "@/components/students/PendingRefundBadge";
 
 interface Student {
   id: string;
@@ -318,6 +319,8 @@ export default function StudentDetailPage() {
           )}
         </div>
       </div>
+
+      <PendingRefundBadge studentId={studentId} isRtl={isRtl} locale={locale} />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="card p-5">

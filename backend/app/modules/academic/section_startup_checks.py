@@ -13,9 +13,9 @@ from app.modules.academic.models import (
     DailyJobsLog,
     Enrollment,
     FinalGrade,
-    Payment,
     SectionLifecycleConfig,
 )
+from app.modules.lms.models import Payment
 
 
 async def run_daily_section_checks(db: AsyncSession) -> None:
