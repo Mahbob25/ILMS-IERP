@@ -1,0 +1,386 @@
+{
+  "version": "1.0.0",
+  "phase": 1,
+  "description": "Shared API contract for Section Lifecycle project. Consumed by phases 2-8.",
+  "base_url": "/api/v1",
+
+  "enums": {
+    "coursestatus": {
+      "values": ["pending", "active", "completed", "ready_for_completion", "cancelled"],
+      "description": "Status of a course section. Phase 1 added ready_for_completion and cancelled."
+    },
+    "ledgerentrytype": {
+      "values": ["activation_credit", "payment_share", "grade_unfreeze", "amendment_adjustment", "reversal", "withdrawal", "deactivation_reversal", "refund_disbursement"],
+      "description": "Type of ledger entry in teacher wallet. Phase 1 added deactivation_reversal and refund_disbursement."
+    },
+    "pending_refund_status": {
+      "values": ["UNCLAIMED", "CLAIMED", "FORFEITED"],
+      "description": "Status of a pending refund. Created in Phase 1."
+    },
+    "refund_policy": {
+      "values": ["authorize_refunds", "no_refund"],
+      "description": "Refund policy for a section cancellation."
+    }
+  },
+
+  "models": {
+    "CourseSection": {
+      "existing_fields": {
+        "id": "UUID PK",
+        "course_id": "UUID FK",
+        "teacher_id": "UUID FK (nullable)",
+        "capacity": "integer",
+        "enrolled_count": "integer",
+        "status": "coursestatus enum",
+        "teacher_percentage": "numeric(5,2) (nullable)",
+        "min_students_required": "integer (nullable)",
+        "start_date": "date (nullable)",
+        "end_date": "date (nullable)",
+        "class_time": "time (nullable)",
+        "class_duration_minutes": "integer (nullable)",
+        "classroom": "varchar(100) (nullable)",
+        "price": "numeric(12,2) (nullable)",
+        "deleted_at": "timestamptz (nullable)"
+      },
+      "new_fields": {
+        "flags": {"type": "JSONB", "default": "{}", "description": "Flexible flags for section lifecycle (overdue_warning_sent, etc.)"},
+        "cancelled_at": {"type": "TIMESTAMPTZ", "nullable": true, "description": "When the section was cancelled"},
+        "cancelled_by": {"type": "UUID FK→users", "nullable": true, "description": "Who cancelled the section"},
+        "cancellation_reason": {"type": "TEXT", "nullable": true, "description": "Why the section was cancelled"}
+      },
+      "new_relationships": {
+        "cancellations": "list[SectionCancellation]",
+        "completion_overrides": "list[SectionCompletionOverride]",
+        "cancelled_by_user": "User (nullable)"
+      }
+    },
+    "SectionCancellation": {
+      "table": "section_cancellations",
+      "fields": {
+        "id": "UUID PK",
+        "section_id": "UUID FK→course_sections",
+        "cancelled_by": "UUID FK→users",
+        "cancelled_at": "TIMESTAMPTZ",
+        "reason": "TEXT NOT NULL",
+        "refund_policy": "varchar(20) NOT NULL — 'authorize_refunds' | 'no_refund'",
+        "teacher_wallet_reversal_amount": "numeric(12,2) DEFAULT 0",
+        "total_payments_collected": "numeric(12,2) DEFAULT 0",
+        "total_refund_authorized": "numeric(12,2) DEFAULT 0",
+        "enrolled_student_count": "integer DEFAULT 0",
+        "has_attendance_records": "boolean DEFAULT false",
+        "has_final_grades": "boolean DEFAULT false",
+        "has_certificates": "boolean DEFAULT false"
+      },
+      "relationships": {
+        "section": "CourseSection",
+        "cancelled_by_user": "User",
+        "pending_refunds": "list[PendingRefund]"
+      }
+    },
+    "PendingRefund": {
+      "table": "pending_refunds",
+      "fields": {
+        "id": "UUID PK",
+        "enrollment_id": "UUID FK→enrollments",
+        "section_cancellation_id": "UUID FK→section_cancellations",
+        "amount": "numeric(12,2) NOT NULL",
+        "status": "pending_refund_status DEFAULT 'UNCLAIMED'",
+        "created_at": "TIMESTAMPTZ",
+        "expires_at": "TIMESTAMPTZ (nullable)"
+      },
+      "relationships": {
+        "enrollment": "Enrollment",
+        "section_cancellation": "SectionCancellation",
+        "refund": "Refund (nullable)"
+      }
+    },
+    "Refund": {
+      "table": "refunds",
+      "fields": {
+        "id": "UUID PK",
+        "pending_refund_id": "UUID FK→pending_refunds (unique)",
+        "receipt_number": "varchar(50) UNIQUE NOT NULL — RFD-YYYYMMDD-NNNN",
+        "amount": "numeric(12,2) NOT NULL",
+        "disbursed_at": "TIMESTAMPTZ",
+        "disbursed_by": "UUID FK→users",
+        "notes": "TEXT (nullable)"
+      },
+      "relationships": {
+        "pending_refund": "PendingRefund",
+        "disbursed_by_user": "User"
+      }
+    },
+    "DailyJobsLog": {
+      "table": "daily_jobs_log",
+      "fields": {
+        "id": "UUID PK",
+        "job_name": "varchar(100) NOT NULL",
+        "last_run_date": "DATE NOT NULL",
+        "created_at": "TIMESTAMPTZ"
+      },
+      "constraints": ["UNIQUE(job_name, last_run_date)"]
+    },
+    "SectionCompletionOverride": {
+      "table": "section_completion_overrides",
+      "fields": {
+        "id": "UUID PK",
+        "section_id": "UUID FK→course_sections",
+        "overridden_by": "UUID FK→users",
+        "overridden_at": "TIMESTAMPTZ",
+        "bypass_grade_check": "boolean DEFAULT false",
+        "bypass_payment_check": "boolean DEFAULT false",
+        "reason": "TEXT NOT NULL",
+        "ungraded_students": "JSONB (nullable)",
+        "unpaid_students": "JSONB (nullable)"
+      },
+      "relationships": {
+        "section": "CourseSection",
+        "overridden_by_user": "User"
+      }
+    },
+    "SectionLifecycleConfig": {
+      "table": "section_lifecycle_config",
+      "fields": {
+        "id": "UUID PK",
+        "key": "varchar(100) UNIQUE NOT NULL",
+        "value": "varchar(255) NOT NULL",
+        "description": "TEXT (nullable)",
+        "updated_at": "TIMESTAMPTZ"
+      },
+      "seed_data": [
+        {"key": "overdue_warning_days_before", "value": "7", "description": "Days before end_date to start showing warnings"},
+        {"key": "payment_due_before_end_days", "value": "14", "description": "Days before end date that payment is considered due"},
+        {"key": "block_completion_if_unpaid", "value": "true", "description": "Whether to block completion if students have balances"},
+        {"key": "block_completion_if_ungraded", "value": "true", "description": "Whether to block completion if grades are missing"}
+      ]
+    }
+  },
+
+  "endpoints": {
+    "new": [
+      {
+        "method": "GET",
+        "path": "/academic/sections/overdue-summary",
+        "auth": ["superadmin", "manager"],
+        "description": "Dashboard: ready, overdue, upcoming sections",
+        "query_params": {},
+        "request_body": null,
+        "response_schema": {
+          "type": "object",
+          "properties": {
+            "ready_for_completion": {"type": "array", "items": {"$ref": "#/models/CourseSection"}},
+            "overdue_sections": {"type": "array", "items": {"$ref": "#/models/CourseSection"}},
+            "upcoming_deadlines": {"type": "array", "items": {"$ref": "#/models/CourseSection"}}
+          }
+        },
+        "error_codes": [401, 403],
+        "implemented_in_phase": 2
+      },
+      {
+        "method": "GET",
+        "path": "/academic/course-sections/{id}/cancel-preview",
+        "auth": ["superadmin", "manager"],
+        "description": "Impact preview before cancellation. Shows financial and enrollment impact of cancelling a section.",
+        "query_params": {},
+        "request_body": null,
+        "response_schema": {
+          "type": "object",
+          "properties": {
+            "section_id": {"type": "string", "format": "uuid"},
+            "teacher_reversal_amount": {"type": "number", "description": "Amount to reverse from teacher wallet"},
+            "enrolled_count": {"type": "integer"},
+            "payments_collected": {"type": "number"},
+            "has_attendance_records": {"type": "boolean"},
+            "has_final_grades": {"type": "boolean"},
+            "has_certificates": {"type": "boolean"},
+            "warnings": {"type": "array", "items": {"type": "string"}}
+          }
+        },
+        "error_codes": [401, 403, 404],
+        "implemented_in_phase": 4
+      },
+      {
+        "method": "POST",
+        "path": "/academic/course-sections/{id}/cancel",
+        "auth": ["superadmin", "manager"],
+        "description": "Execute cancellation. Creates SectionCancellation record, optionally authorizes refunds.",
+        "query_params": {},
+        "request_body": {
+          "required": ["reason", "refund_policy"],
+          "properties": {
+            "reason": {"type": "string", "minLength": 1},
+            "refund_policy": {"type": "string", "enum": ["authorize_refunds", "no_refund"]}
+          }
+        },
+        "response_schema": {
+          "type": "object",
+          "properties": {
+            "success": {"type": "boolean"},
+            "section_cancellation_id": {"type": "string", "format": "uuid"}
+          }
+        },
+        "error_codes": [400, 401, 403, 404, 409],
+        "implemented_in_phase": 4
+      },
+      {
+        "method": "POST",
+        "path": "/academic/course-sections/{id}/deactivate",
+        "auth": ["superadmin"],
+        "description": "Return section from active/cancelled to pending. Reverses ledger entries if payments exist.",
+        "query_params": {},
+        "request_body": {
+          "properties": {
+            "reason": {"type": "string", "description": "Required if payments exist"}
+          }
+        },
+        "response_schema": {
+          "type": "object",
+          "properties": {
+            "success": {"type": "boolean"},
+            "message": {"type": "string"}
+          }
+        },
+        "error_codes": [400, 401, 403, 404],
+        "implemented_in_phase": 5
+      },
+      {
+        "method": "GET",
+        "path": "/academic/course-sections/{id}/cancellation",
+        "auth": ["superadmin", "manager"],
+        "description": "View cancellation audit record for a section.",
+        "query_params": {},
+        "request_body": null,
+        "response_schema": {
+          "$ref": "#/models/SectionCancellation"
+        },
+        "error_codes": [401, 403, 404],
+        "implemented_in_phase": 4
+      },
+      {
+        "method": "GET",
+        "path": "/lms/cashier/pending-refunds",
+        "auth": ["superadmin", "manager", "accountant"],
+        "description": "Queue of UNCLAIMED refunds for cashier processing.",
+        "query_params": {
+          "status": {"type": "string", "enum": ["UNCLAIMED", "CLAIMED", "FORFEITED"], "default": "UNCLAIMED"},
+          "page": {"type": "integer", "default": 1},
+          "per_page": {"type": "integer", "default": 20}
+        },
+        "request_body": null,
+        "response_schema": {
+          "type": "object",
+          "properties": {
+            "data": {"type": "array", "items": {"$ref": "#/models/PendingRefund"}},
+            "meta": {"type": "object", "properties": {"total": {"type": "integer"}, "page": {"type": "integer"}, "per_page": {"type": "integer"}}}
+          }
+        },
+        "error_codes": [401, 403],
+        "implemented_in_phase": 4
+      },
+      {
+        "method": "GET",
+        "path": "/lms/students/{id}/pending-refunds",
+        "auth": ["superadmin", "manager", "accountant"],
+        "description": "Student's pending refunds.",
+        "query_params": {},
+        "request_body": null,
+        "response_schema": {
+          "type": "array",
+          "items": {"$ref": "#/models/PendingRefund"}
+        },
+        "error_codes": [401, 403, 404],
+        "implemented_in_phase": 4
+      },
+      {
+        "method": "POST",
+        "path": "/lms/cashier/pending-refunds/{id}/disburse",
+        "auth": ["superadmin", "manager", "accountant"],
+        "description": "Execute disbursement for a pending refund. Generates a receipt and creates a Refund record.",
+        "query_params": {},
+        "request_body": {
+          "properties": {
+            "notes": {"type": "string", "description": "Optional notes for the disbursement"}
+          }
+        },
+        "response_schema": {
+          "type": "object",
+          "properties": {
+            "success": {"type": "boolean"},
+            "receipt_number": {"type": "string", "example": "RFD-20260710-0001"},
+            "refund_id": {"type": "string", "format": "uuid"}
+          }
+        },
+        "error_codes": [400, 401, 403, 404, 409],
+        "implemented_in_phase": 4
+      },
+      {
+        "method": "GET",
+        "path": "/lms/cashier/refunds",
+        "auth": ["superadmin", "manager", "accountant"],
+        "description": "Disbursement history for cashier's shift review.",
+        "query_params": {
+          "date_from": {"type": "string", "format": "date"},
+          "date_to": {"type": "string", "format": "date"},
+          "page": {"type": "integer", "default": 1},
+          "per_page": {"type": "integer", "default": 20}
+        },
+        "request_body": null,
+        "response_schema": {
+          "type": "object",
+          "properties": {
+            "data": {"type": "array", "items": {"$ref": "#/models/Refund"}},
+            "meta": {"type": "object", "properties": {"total": {"type": "integer"}, "page": {"type": "integer"}, "per_page": {"type": "integer"}}}
+          }
+        },
+        "error_codes": [401, 403],
+        "implemented_in_phase": 4
+      }
+    ],
+    "modified": [
+      {
+        "method": "POST",
+        "path": "/academic/course-sections/{id}/complete",
+        "auth": ["superadmin", "manager"],
+        "description": "Mark a section as completed. Phase 3 adds grade and payment checks with optional force override.",
+        "changes": [
+          "Add force (bool, optional) and reason (string, required if force=true) body params"
+        ],
+        "new_behavior": [
+          "Grade completeness check — verify all students have final grades (NULL vs 0 distinction)",
+          "Payment balance check per enrollment — verify no outstanding balances",
+          "Override audit trail — if force=true, create SectionCompletionOverride record",
+          "Status transitions: active → ready_for_completion → completed"
+        ],
+        "implemented_in_phase": 3
+      },
+      {
+        "method": "DELETE",
+        "path": "/academic/course-sections/{id}",
+        "auth": ["superadmin"],
+        "description": "Delete a course section. Restricted to superadmin only in Phase 1.",
+        "changes": [
+          "Restrict to superadmin only (remove manager-level access)"
+        ],
+        "new_behavior": [],
+        "implemented_in_phase": 1
+      }
+    ]
+  },
+
+  "database_tables": {
+    "new": [
+      "section_cancellations",
+      "pending_refunds",
+      "refunds",
+      "daily_jobs_log",
+      "section_completion_overrides",
+      "section_lifecycle_config"
+    ],
+    "modified": [
+      {
+        "table": "course_sections",
+        "additions": ["flags JSONB", "cancelled_at TIMESTAMPTZ", "cancelled_by UUID FK", "cancellation_reason TEXT"]
+      }
+    ]
+  }
+}
