@@ -1,6 +1,6 @@
 {
-  "version": "1.0.0",
-  "phase": 1,
+  "version": "1.1.0",
+  "phase": 7,
   "description": "Shared API contract for Section Lifecycle project. Consumed by phases 2-8.",
   "base_url": "/api/v1",
 
@@ -334,6 +334,144 @@
         },
         "error_codes": [401, 403],
         "implemented_in_phase": 4
+      },
+      {
+        "method": "GET",
+        "path": "/academic/sections/daily-reconciliation",
+        "auth": ["superadmin", "manager"],
+        "description": "Daily reconciliation report of section lifecycle activity.",
+        "query_params": {
+          "date": {"type": "string", "format": "date", "default": "today"}
+        },
+        "request_body": null,
+        "response_schema": {
+          "type": "object",
+          "properties": {
+            "report_date": {"type": "string", "format": "date"},
+            "generated_at": {"type": "string", "format": "datetime"},
+            "summary": {
+              "type": "object",
+              "properties": {
+                "total_active_sections": {"type": "integer"},
+                "newly_ready_for_completion": {"type": "integer"},
+                "sections_cancelled_today": {"type": "integer"},
+                "cancellations": {"type": "array", "items": {"type": "object"}},
+                "refunds_disbursed_today": {"type": "array", "items": {"type": "object"}},
+                "overrides_today": {"type": "array", "items": {"type": "object"}},
+                "overdue_sections_count": {"type": "integer"},
+                "unclaimed_pending_refunds_total": {"type": "number"}
+              }
+            }
+          }
+        },
+        "error_codes": [401, 403],
+        "implemented_in_phase": 7
+      },
+      {
+        "method": "GET",
+        "path": "/academic/admin/audit/cancellations",
+        "auth": ["superadmin"],
+        "description": "Paginated list of all cancellations with filters (date range, manager, section).",
+        "query_params": {
+          "page": {"type": "integer", "default": 1},
+          "per_page": {"type": "integer", "default": 20},
+          "date_from": {"type": "string", "format": "date"},
+          "date_to": {"type": "string", "format": "date"},
+          "manager_id": {"type": "string", "format": "uuid"},
+          "section_id": {"type": "string", "format": "uuid"}
+        },
+        "request_body": null,
+        "response_schema": {
+          "type": "object",
+          "properties": {
+            "data": {"type": "array", "items": {"type": "object"}},
+            "meta": {"type": "object", "properties": {"total": {"type": "integer"}, "page": {"type": "integer"}, "per_page": {"type": "integer"}}}
+          }
+        },
+        "error_codes": [401, 403],
+        "implemented_in_phase": 7
+      },
+      {
+        "method": "GET",
+        "path": "/academic/admin/audit/overrides",
+        "auth": ["superadmin"],
+        "description": "Paginated list of all force completion overrides with filters.",
+        "query_params": {
+          "page": {"type": "integer", "default": 1},
+          "per_page": {"type": "integer", "default": 20},
+          "date_from": {"type": "string", "format": "date"},
+          "date_to": {"type": "string", "format": "date"}
+        },
+        "request_body": null,
+        "response_schema": {
+          "type": "object",
+          "properties": {
+            "data": {"type": "array", "items": {"type": "object"}},
+            "meta": {"type": "object", "properties": {"total": {"type": "integer"}, "page": {"type": "integer"}, "per_page": {"type": "integer"}}}
+          }
+        },
+        "error_codes": [401, 403],
+        "implemented_in_phase": 7
+      },
+      {
+        "method": "GET",
+        "path": "/lms/admin/audit/refunds",
+        "auth": ["superadmin"],
+        "description": "Paginated list of all refund disbursements (admin view, no cashier filter).",
+        "query_params": {
+          "page": {"type": "integer", "default": 1},
+          "per_page": {"type": "integer", "default": 20},
+          "date_from": {"type": "string", "format": "date"},
+          "date_to": {"type": "string", "format": "date"}
+        },
+        "request_body": null,
+        "response_schema": {
+          "type": "object",
+          "properties": {
+            "data": {"type": "array", "items": {"type": "object"}},
+            "meta": {"type": "object", "properties": {"total": {"type": "integer"}, "page": {"type": "integer"}, "per_page": {"type": "integer"}}}
+          }
+        },
+        "error_codes": [401, 403],
+        "implemented_in_phase": 7
+      },
+      {
+        "method": "GET",
+        "path": "/academic/sections/financial-impact",
+        "auth": ["superadmin", "manager"],
+        "description": "YTD financial impact dashboard aggregating reversals, refunds, and overrides.",
+        "query_params": {},
+        "request_body": null,
+        "response_schema": {
+          "type": "object",
+          "properties": {
+            "total_teacher_wallet_reversed_ytd": {"type": "number"},
+            "total_refunds_authorized_ytd": {"type": "number"},
+            "total_refunds_disbursed_ytd": {"type": "number"},
+            "unclaimed_refund_liability": {"type": "number"},
+            "sections_cancelled_ytd": {"type": "integer"},
+            "overrides_ytd": {"type": "integer"}
+          }
+        },
+        "error_codes": [401, 403],
+        "implemented_in_phase": 7
+      },
+      {
+        "method": "GET",
+        "path": "/academic/health/startup-checks",
+        "auth": ["none"],
+        "description": "Health check for the daily startup check system. Returns last run date and healthy status.",
+        "query_params": {},
+        "request_body": null,
+        "response_schema": {
+          "type": "object",
+          "properties": {
+            "last_run_date": {"type": "string", "format": "date", "nullable": true},
+            "healthy": {"type": "boolean"}
+          }
+        },
+        "error_codes": [],
+        "implemented_in_phase": 7
       }
     ],
     "modified": [

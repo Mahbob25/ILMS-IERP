@@ -1,0 +1,153 @@
+import uuid
+from datetime import date
+from decimal import Decimal
+from typing import Optional
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, func
+from sqlalchemy.orm import joinedload
+from app.core.timezone import get_today
+from app.modules.academic.models import PendingRefund, Refund, Enrollment, Student
+from app.modules.lms.financial_service import is_date_closed
+
+
+async def get_pending_refunds_queue(
+    db: AsyncSession,
+    status: str = "UNCLAIMED",
+    page: int = 1,
+    per_page: int = 20,
+    search: Optional[str] = None,
+) -> dict:
+    query = (
+        select(PendingRefund)
+        .options(
+            joinedload(PendingRefund.enrollment).joinedload(Enrollment.student),
+            joinedload(PendingRefund.section_cancellation),
+        )
+        .where(PendingRefund.status == status)
+    )
+    count_query = (
+        select(func.count(PendingRefund.id))
+        .where(PendingRefund.status == status)
+    )
+
+    if search:
+        pattern = f"%{search}%"
+        student_filter = Enrollment.student.has(
+            (func.lower(Student.full_name).like(func.lower(pattern)))
+            | (func.lower(Student.student_code).like(func.lower(pattern)))
+        )
+        search_filter = PendingRefund.enrollment.has(student_filter)
+        query = query.where(search_filter)
+        count_query = count_query.where(search_filter)
+
+    total = (await db.execute(count_query)).scalar() or 0
+
+    offset = (page - 1) * per_page
+    result = await db.execute(
+        query.order_by(PendingRefund.created_at.desc()).offset(offset).limit(per_page)
+    )
+    items = result.scalars().all()
+
+    return {
+        "data": items,
+        "meta": {"total": total, "page": page, "per_page": per_page},
+    }
+
+
+async def disburse_pending_refund(
+    db: AsyncSession,
+    pending_refund_id: uuid.UUID,
+    disbursed_by: uuid.UUID,
+    notes: Optional[str] = None,
+) -> Refund:
+    result = await db.execute(
+        select(PendingRefund)
+        .options(
+            joinedload(PendingRefund.enrollment).joinedload(Enrollment.student),
+            joinedload(PendingRefund.section_cancellation),
+        )
+        .where(PendingRefund.id == pending_refund_id)
+    )
+    pending_refund = result.scalar_one_or_none()
+    if not pending_refund:
+        raise ValueError("Pending refund not found")
+
+    if pending_refund.status != "UNCLAIMED":
+        raise ValueError(
+            f"Cannot disburse: pending refund is already {pending_refund.status}"
+        )
+
+    today = get_today()
+    if await is_date_closed(db, today):
+        raise ValueError(
+            "Cannot disburse: today is closed. Cashier must unlock the day first."
+        )
+
+    receipt_number = await _generate_receipt_number(db, today)
+
+    refund = Refund(
+        pending_refund_id=pending_refund.id,
+        receipt_number=receipt_number,
+        amount=pending_refund.amount,
+        disbursed_by=disbursed_by,
+        notes=notes,
+    )
+    db.add(refund)
+
+    pending_refund.status = "CLAIMED"
+
+    await db.flush()
+    return refund
+
+
+async def _generate_receipt_number(db: AsyncSession, today: date) -> str:
+    count = await db.scalar(
+        select(func.count()).select_from(Refund).where(
+            func.date(Refund.disbursed_at) == today
+        )
+    )
+    seq = (count or 0) + 1
+    return f"RFD-{today.strftime('%Y%m%d')}-{seq:04d}"
+
+
+async def get_cashier_refund_history(
+    db: AsyncSession,
+    cashier_id: Optional[uuid.UUID] = None,
+    date_from: Optional[date] = None,
+    date_to: Optional[date] = None,
+    page: int = 1,
+    per_page: int = 20,
+) -> dict:
+    query = (
+        select(Refund)
+        .options(
+            joinedload(Refund.pending_refund)
+            .joinedload(PendingRefund.enrollment)
+            .joinedload(Enrollment.student),
+            joinedload(Refund.disbursed_by_user),
+        )
+    )
+    count_query = select(func.count(Refund.id))
+
+    if cashier_id:
+        query = query.where(Refund.disbursed_by == cashier_id)
+        count_query = count_query.where(Refund.disbursed_by == cashier_id)
+    if date_from:
+        query = query.where(func.date(Refund.disbursed_at) >= date_from)
+        count_query = count_query.where(func.date(Refund.disbursed_at) >= date_from)
+    if date_to:
+        query = query.where(func.date(Refund.disbursed_at) <= date_to)
+        count_query = count_query.where(func.date(Refund.disbursed_at) <= date_to)
+
+    total = (await db.execute(count_query)).scalar() or 0
+
+    offset = (page - 1) * per_page
+    result = await db.execute(
+        query.order_by(Refund.disbursed_at.desc()).offset(offset).limit(per_page)
+    )
+    items = result.scalars().all()
+
+    return {
+        "data": items,
+        "meta": {"total": total, "page": page, "per_page": per_page},
+    }

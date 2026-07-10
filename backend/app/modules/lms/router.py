@@ -2,14 +2,14 @@ from decimal import Decimal
 import uuid
 from datetime import date
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import joinedload
 from app.db.session import get_db
 from app.modules.identity.models import User
 from app.modules.identity.dependencies import get_current_user, RoleChecker
-from app.modules.academic.service import get_course_section
+from app.modules.academic.service import get_course_section, get_student as get_academic_student
 from app.modules.academic.models import CourseSection as CourseSectionModel
 from app.modules.lms.models import (
     SectionContract,
@@ -47,6 +47,7 @@ from app.modules.lms import service as lms_service
 from app.modules.lms import financial_service
 from app.modules.lms import ledger_service as lms_ledger
 from app.modules.lms import compensation_service
+from app.modules.lms import cashier_service
 from app.core.error_messages import get_error_detail
 
 lms_router = APIRouter(prefix="/lms", tags=["lms"])
@@ -988,3 +989,123 @@ async def get_wallet_detail(
         )
     summary = await lms_ledger.get_wallet_summary(db, wallet.id)
     return summary
+
+
+# --- Cashier / Refund Disbursement ---
+@lms_router.get("/cashier/pending-refunds")
+async def list_pending_refunds(
+    status: str = "UNCLAIMED",
+    page: int = 1,
+    per_page: int = 20,
+    search: Optional[str] = Query(None),
+    current_user: User = Depends(
+        RoleChecker(allowed_roles=["superadmin", "manager", "accountant"])
+    ),
+    db: AsyncSession = Depends(get_db),
+):
+    return await cashier_service.get_pending_refunds_queue(
+        db, status=status, page=page, per_page=per_page, search=search
+    )
+
+
+@lms_router.get("/students/{student_id}/pending-refunds")
+async def get_student_refunds(
+    student_id: uuid.UUID,
+    current_user: User = Depends(
+        RoleChecker(allowed_roles=["superadmin", "manager", "accountant"])
+    ),
+    db: AsyncSession = Depends(get_db),
+):
+    student = await get_academic_student(db, student_id)
+    if not student:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Student not found"
+        )
+
+    from app.modules.academic.cancellation_service import get_student_pending_refunds
+
+    refunds = await get_student_pending_refunds(db, student_id)
+    return [
+        {
+            "id": r.id,
+            "enrollment_id": r.enrollment_id,
+            "section_cancellation_id": r.section_cancellation_id,
+            "amount": float(r.amount),
+            "status": r.status,
+            "created_at": r.created_at,
+            "expires_at": r.expires_at,
+        }
+        for r in refunds
+    ]
+
+
+@lms_router.post("/cashier/pending-refunds/{pending_refund_id}/disburse")
+async def disburse_refund(
+    pending_refund_id: uuid.UUID,
+    body: dict,
+    current_user: User = Depends(
+        RoleChecker(allowed_roles=["superadmin", "manager", "accountant"])
+    ),
+    db: AsyncSession = Depends(get_db),
+):
+    notes = body.get("notes")
+
+    try:
+        refund = await cashier_service.disburse_pending_refund(
+            db,
+            pending_refund_id=pending_refund_id,
+            disbursed_by=current_user.id,
+            notes=notes,
+        )
+    except ValueError as e:
+        detail = str(e)
+        if "not found" in detail.lower():
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=detail)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=detail)
+
+    return {
+        "success": True,
+        "receipt_number": refund.receipt_number,
+        "refund_id": str(refund.id),
+    }
+
+
+@lms_router.get("/cashier/refunds")
+async def get_refund_history(
+    date_from: Optional[date] = None,
+    date_to: Optional[date] = None,
+    page: int = 1,
+    per_page: int = 20,
+    current_user: User = Depends(
+        RoleChecker(allowed_roles=["superadmin", "manager", "accountant"])
+    ),
+    db: AsyncSession = Depends(get_db),
+):
+    return await cashier_service.get_cashier_refund_history(
+        db,
+        cashier_id=current_user.id,
+        date_from=date_from,
+        date_to=date_to,
+        page=page,
+        per_page=per_page,
+    )
+
+
+# --- Phase 7: Admin Audit Views ---
+@lms_router.get("/admin/audit/refunds")
+async def list_admin_refunds(
+    page: int = Query(1, ge=1),
+    per_page: int = Query(20, ge=1, le=100),
+    date_from: Optional[date] = Query(None),
+    date_to: Optional[date] = Query(None),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin"])),
+):
+    return await cashier_service.get_cashier_refund_history(
+        db,
+        cashier_id=None,
+        date_from=date_from,
+        date_to=date_to,
+        page=page,
+        per_page=per_page,
+    )

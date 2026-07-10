@@ -1,7 +1,9 @@
 import uuid
+from datetime import date, timedelta
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, func
 from app.db.session import get_db
 from app.modules.identity.models import User
 from app.modules.identity.dependencies import get_current_user, RoleChecker
@@ -11,11 +13,18 @@ from app.modules.academic.schemas import (
     StudentCreate, StudentUpdate, StudentResponse,
     EnrollmentCreate, EnrollmentCreateWithStudent, EnrollmentResponse, EnrollmentDetailResponse,
     FinalGradeCreate, FinalGradeBulkCreate, FinalGradeResponse, StudentGradeSummary,
-    CertificateResponse,
+    CertificateResponse, DeactivateRequest,
     PaginatedResponse,
 )
 from app.modules.academic import service as academic_service
 from app.modules.academic import certificate_service
+from app.modules.academic import cancellation_service
+from app.modules.academic import reconciliation_service
+from app.modules.academic.models import (
+    CourseSection, SectionCancellation, SectionCompletionOverride,
+    PendingRefund, Refund, DailyJobsLog,
+)
+from app.core.timezone import get_today
 
 academic_router = APIRouter(prefix="/academic", tags=["academic"])
 
@@ -109,9 +118,11 @@ async def update_course_section(
 @academic_router.delete("/course-sections/{section_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_course_section(
     section_id: uuid.UUID,
-    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])),
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin"])),
     db: AsyncSession = Depends(get_db)
 ):
+    if current_user.role.name != "superadmin":
+        raise HTTPException(status_code=403, detail="Only superadmin can delete sections")
     deleted = await academic_service.delete_course_section(db, section_id)
     if not deleted:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course section not found")
@@ -154,12 +165,18 @@ async def activate_section(
     return section
 
 @academic_router.post("/course-sections/{section_id}/complete", response_model=CourseSectionResponse)
-async def complete_section(
+async def complete_section_endpoint(
     section_id: uuid.UUID,
+    force: bool = Body(False),
+    reason: str = Body(None),
     current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager"])),
     db: AsyncSession = Depends(get_db)
 ):
-    section = await academic_service.complete_section(db, section_id, user_id=current_user.id)
+    if force and not reason:
+        raise HTTPException(status_code=400, detail="reason is required when force=true")
+    section = await academic_service.complete_section(
+        db, section_id, current_user, force=force, force_reason=reason
+    )
     if not section:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -514,3 +531,319 @@ async def get_section_enrollments_detailed(
         if not section or section.teacher_id != teacher_employee_id:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied to this section")
     return await academic_service.get_section_enrollments_detailed(db, section_id)
+
+
+# --- Section Cancellation Management ---
+@academic_router.get("/course-sections/{section_id}/cancel-preview")
+async def get_cancel_preview(
+    section_id: uuid.UUID,
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager"])),
+    db: AsyncSession = Depends(get_db)
+):
+    try:
+        preview = await cancellation_service.preview_cancellation_impact(db, section_id)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+
+    return {
+        "section_id": str(preview.section_id),
+        "teacher_reversal_amount": float(preview.teacher_wallet_reversal_amount),
+        "enrolled_count": preview.enrolled_count,
+        "payments_collected": float(preview.payments_collected),
+        "has_attendance_records": preview.has_attendance_records,
+        "has_final_grades": preview.has_final_grades,
+        "has_certificates": preview.has_certificates,
+        "warnings": [],
+    }
+
+
+@academic_router.post("/course-sections/{section_id}/cancel")
+async def cancel_section_endpoint(
+    section_id: uuid.UUID,
+    body: dict,
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager"])),
+    db: AsyncSession = Depends(get_db)
+):
+    reason = body.get("reason")
+    refund_policy = body.get("refund_policy")
+
+    if not reason or not reason.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="reason is required"
+        )
+    if refund_policy not in ("authorize_refunds", "no_refund"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="refund_policy must be 'authorize_refunds' or 'no_refund'"
+        )
+
+    try:
+        cancellation = await cancellation_service.cancel_section(
+            db, section_id=section_id,
+            cancelled_by=current_user.id,
+            reason=reason.strip(),
+            refund_policy=refund_policy,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+
+    return {
+        "success": True,
+        "section_cancellation_id": str(cancellation.id),
+    }
+
+
+@academic_router.get("/course-sections/{section_id}/cancellation")
+async def get_cancellation_detail(
+    section_id: uuid.UUID,
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager"])),
+    db: AsyncSession = Depends(get_db)
+):
+    cancellation = await cancellation_service.get_cancellation_detail(db, section_id)
+    if not cancellation:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No cancellation record found for this section"
+        )
+    return {
+        "id": cancellation.id,
+        "section_id": cancellation.section_id,
+        "cancelled_by": cancellation.cancelled_by,
+        "cancelled_at": cancellation.cancelled_at,
+        "reason": cancellation.reason,
+        "refund_policy": cancellation.refund_policy,
+        "teacher_wallet_reversal_amount": float(cancellation.teacher_wallet_reversal_amount),
+        "total_payments_collected": float(cancellation.total_payments_collected),
+        "total_refund_authorized": float(cancellation.total_refund_authorized),
+        "enrolled_student_count": cancellation.enrolled_student_count,
+        "has_attendance_records": cancellation.has_attendance_records,
+        "has_final_grades": cancellation.has_final_grades,
+        "has_certificates": cancellation.has_certificates,
+    }
+
+
+# --- Deactivation ---
+@academic_router.post("/course-sections/{section_id}/deactivate")
+async def deactivate_section_endpoint(
+    section_id: uuid.UUID,
+    body: DeactivateRequest = Body(...),
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin"])),
+    db: AsyncSession = Depends(get_db),
+):
+    section = await academic_service.deactivate_section(
+        db, section_id, current_user, reason=body.reason
+    )
+    return {
+        "success": True,
+        "message": f"Section {section_id} deactivated to pending status",
+    }
+
+
+# --- Phase 7: Reconciliation & Monitoring ---
+
+@academic_router.get("/sections/daily-reconciliation")
+async def get_daily_reconciliation(
+    date: date = Query(default_factory=get_today),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager"])),
+):
+    return await reconciliation_service.generate_daily_reconciliation_report(db, date)
+
+
+@academic_router.get("/admin/audit/cancellations")
+async def list_cancellations(
+    page: int = Query(1, ge=1),
+    per_page: int = Query(20, ge=1, le=100),
+    date_from: Optional[date] = Query(None),
+    date_to: Optional[date] = Query(None),
+    manager_id: Optional[uuid.UUID] = Query(None),
+    section_id: Optional[uuid.UUID] = Query(None),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin"])),
+):
+    query = (
+        select(SectionCancellation)
+        .options(
+            joinedload(SectionCancellation.section).joinedload(CourseSection.course),
+            joinedload(SectionCancellation.cancelled_by_user),
+        )
+    )
+    count_query = select(func.count(SectionCancellation.id))
+
+    if date_from:
+        query = query.where(func.date(SectionCancellation.cancelled_at) >= date_from)
+        count_query = count_query.where(func.date(SectionCancellation.cancelled_at) >= date_from)
+    if date_to:
+        query = query.where(func.date(SectionCancellation.cancelled_at) <= date_to)
+        count_query = count_query.where(func.date(SectionCancellation.cancelled_at) <= date_to)
+    if manager_id:
+        query = query.where(SectionCancellation.cancelled_by == manager_id)
+        count_query = count_query.where(SectionCancellation.cancelled_by == manager_id)
+    if section_id:
+        query = query.where(SectionCancellation.section_id == section_id)
+        count_query = count_query.where(SectionCancellation.section_id == section_id)
+
+    total = (await db.execute(count_query)).scalar() or 0
+    offset = (page - 1) * per_page
+    result = await db.execute(
+        query.order_by(SectionCancellation.cancelled_at.desc()).offset(offset).limit(per_page)
+    )
+    items = result.scalars().all()
+
+    data = []
+    for c in items:
+        section = c.section
+        course_name = section.course.name if section and section.course else ""
+        cancelled_by_name = c.cancelled_by_user.full_name if c.cancelled_by_user else ""
+        data.append({
+            "id": str(c.id),
+            "section_id": str(c.section_id),
+            "course_name": course_name,
+            "cancelled_by": str(c.cancelled_by),
+            "cancelled_by_name": cancelled_by_name,
+            "cancelled_at": c.cancelled_at.isoformat(),
+            "reason": c.reason,
+            "refund_policy": c.refund_policy,
+            "teacher_wallet_reversal_amount": float(c.teacher_wallet_reversal_amount),
+            "total_payments_collected": float(c.total_payments_collected),
+            "total_refund_authorized": float(c.total_refund_authorized),
+            "enrolled_student_count": c.enrolled_student_count,
+        })
+
+    return {
+        "data": data,
+        "meta": {"total": total, "page": page, "per_page": per_page},
+    }
+
+
+@academic_router.get("/admin/audit/overrides")
+async def list_overrides(
+    page: int = Query(1, ge=1),
+    per_page: int = Query(20, ge=1, le=100),
+    date_from: Optional[date] = Query(None),
+    date_to: Optional[date] = Query(None),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin"])),
+):
+    query = (
+        select(SectionCompletionOverride)
+        .options(
+            joinedload(SectionCompletionOverride.section).joinedload(CourseSection.course),
+            joinedload(SectionCompletionOverride.overridden_by_user),
+        )
+    )
+    count_query = select(func.count(SectionCompletionOverride.id))
+
+    if date_from:
+        query = query.where(func.date(SectionCompletionOverride.overridden_at) >= date_from)
+        count_query = count_query.where(func.date(SectionCompletionOverride.overridden_at) >= date_from)
+    if date_to:
+        query = query.where(func.date(SectionCompletionOverride.overridden_at) <= date_to)
+        count_query = count_query.where(func.date(SectionCompletionOverride.overridden_at) <= date_to)
+
+    total = (await db.execute(count_query)).scalar() or 0
+    offset = (page - 1) * per_page
+    result = await db.execute(
+        query.order_by(SectionCompletionOverride.overridden_at.desc()).offset(offset).limit(per_page)
+    )
+    items = result.scalars().all()
+
+    data = []
+    for o in items:
+        section = o.section
+        section_label = ""
+        if section and section.course:
+            section_label = f"{section.course.name} ({str(section.id)[:8]})"
+        overridden_by_name = o.overridden_by_user.full_name if o.overridden_by_user else ""
+        data.append({
+            "id": str(o.id),
+            "section_id": str(o.section_id),
+            "section_label": section_label,
+            "overridden_by": str(o.overridden_by),
+            "overridden_by_name": overridden_by_name,
+            "overridden_at": o.overridden_at.isoformat(),
+            "bypass_grade_check": o.bypass_grade_check,
+            "bypass_payment_check": o.bypass_payment_check,
+            "reason": o.reason,
+            "ungraded_students": o.ungraded_students,
+            "unpaid_students": o.unpaid_students,
+        })
+
+    return {
+        "data": data,
+        "meta": {"total": total, "page": page, "per_page": per_page},
+    }
+
+
+@academic_router.get("/sections/financial-impact")
+async def get_financial_impact(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager"])),
+):
+    from app.core.timezone import get_today
+    today = get_today()
+    ytd_start = date(today.year, 1, 1)
+
+    teacher_reversal_result = await db.execute(
+        select(func.coalesce(func.sum(SectionCancellation.teacher_wallet_reversal_amount), 0))
+        .where(func.date(SectionCancellation.cancelled_at) >= ytd_start)
+    )
+    total_teacher_wallet_reversed_ytd = float(teacher_reversal_result.scalar() or 0)
+
+    refunds_authorized_result = await db.execute(
+        select(func.coalesce(func.sum(SectionCancellation.total_refund_authorized), 0))
+        .where(func.date(SectionCancellation.cancelled_at) >= ytd_start)
+    )
+    total_refunds_authorized_ytd = float(refunds_authorized_result.scalar() or 0)
+
+    refunds_disbursed_result = await db.execute(
+        select(func.coalesce(func.sum(Refund.amount), 0))
+        .where(func.date(Refund.disbursed_at) >= ytd_start)
+    )
+    total_refunds_disbursed_ytd = float(refunds_disbursed_result.scalar() or 0)
+
+    unclaimed_liability_result = await db.execute(
+        select(func.coalesce(func.sum(PendingRefund.amount), 0))
+        .where(PendingRefund.status == "UNCLAIMED")
+    )
+    unclaimed_refund_liability = float(unclaimed_liability_result.scalar() or 0)
+
+    sections_cancelled_ytd_result = await db.execute(
+        select(func.count(SectionCancellation.id))
+        .where(func.date(SectionCancellation.cancelled_at) >= ytd_start)
+    )
+    sections_cancelled_ytd = sections_cancelled_ytd_result.scalar() or 0
+
+    overrides_ytd_result = await db.execute(
+        select(func.count(SectionCompletionOverride.id))
+        .where(func.date(SectionCompletionOverride.overridden_at) >= ytd_start)
+    )
+    overrides_ytd = overrides_ytd_result.scalar() or 0
+
+    return {
+        "total_teacher_wallet_reversed_ytd": total_teacher_wallet_reversed_ytd,
+        "total_refunds_authorized_ytd": total_refunds_authorized_ytd,
+        "total_refunds_disbursed_ytd": total_refunds_disbursed_ytd,
+        "unclaimed_refund_liability": unclaimed_refund_liability,
+        "sections_cancelled_ytd": sections_cancelled_ytd,
+        "overrides_ytd": overrides_ytd,
+    }
+
+
+@academic_router.get("/health/startup-checks")
+async def check_startup_health(
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(DailyJobsLog)
+        .where(DailyJobsLog.job_name == "section_daily_check")
+        .order_by(DailyJobsLog.last_run_date.desc())
+        .limit(1)
+    )
+    record = result.scalar_one_or_none()
+    today = get_today()
+    return {
+        "last_run_date": record.last_run_date.isoformat() if record else None,
+        "healthy": record is not None and record.last_run_date >= today - timedelta(days=1),
+    }
