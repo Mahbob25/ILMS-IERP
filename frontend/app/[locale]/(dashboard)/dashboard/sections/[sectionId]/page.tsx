@@ -96,6 +96,20 @@ export default function SectionStudentsPage() {
       totalPaidSummary: "إجمالي المدفوع",
       remaining: "المتبقي",
       of: "من",
+      activationFailed: "فشل التفعيل",
+      completionFailed: "فشل الإكمال",
+      errCannotFinalize: "لا يمكن إنهاء التقييمات: ",
+      errNoTeacher: "لا يمكن تسوية العقد بدون مدرس",
+      errNoTeacherActivate: "لا يمكن تفعيل العقد بدون مدرس",
+      errNoCompModel: "لا يمكن تفعيل العقد بدون نموذج تعويض",
+      errOnlyActive: "يمكن إنهاء العقود النشطة فقط",
+      errOnlyGraded: "يمكن تسوية العقود المُقيّمة فقط",
+      errOnlyAssigned: "يمكن تفعيل العقود المُعيّنة فقط",
+      errMissingPrice: "السعر",
+      errMissingTeacher: "المدرس",
+      errMissingStartDate: "تاريخ البداية",
+      errMissingClassTime: "وقت المحاضرة",
+      errActivateMissingFields: "يرجى ملء جميع الحقول المطلوبة قبل التفعيل:",
     },
     en: {
       title: "Section Students",
@@ -130,6 +144,20 @@ export default function SectionStudentsPage() {
       totalPaidSummary: "Total Paid",
       remaining: "Remaining",
       of: "of",
+      activationFailed: "Activation failed",
+      completionFailed: "Completion failed",
+      errCannotFinalize: "Cannot finalize grades: ",
+      errNoTeacher: "Cannot settle a contract without a teacher",
+      errNoTeacherActivate: "Cannot activate a contract without a teacher",
+      errNoCompModel: "Cannot activate a contract without a compensation model",
+      errOnlyActive: "Only ACTIVE contracts can be finalized",
+      errOnlyGraded: "Only GRADES_SUBMITTED contracts can be settled",
+      errOnlyAssigned: "Only ASSIGNED contracts can be activated",
+      errMissingPrice: "Price",
+      errMissingTeacher: "Teacher",
+      errMissingStartDate: "Start Date",
+      errMissingClassTime: "Class Time",
+      errActivateMissingFields: "Please fill in all required fields before activating:",
     },
   }[locale === "en" ? "en" : "ar"];
 
@@ -142,6 +170,7 @@ export default function SectionStudentsPage() {
   const [completing, setCompleting] = useState(false);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const canActivate = user?.is_superadmin || user?.role?.name === "manager" || user?.role?.name === "secretary";
 
@@ -299,9 +328,20 @@ export default function SectionStudentsPage() {
             <div className="flex items-center gap-2">
               {section.status === "pending" && contract?.status === "assigned" && (
                 <button onClick={async () => {
+                  setError(null);
+                  const missing: string[] = [];
+                  if (section.price == null) missing.push(t.errMissingPrice);
+                  if (!section.teacher_id) missing.push(t.errMissingTeacher);
+                  if (!section.start_date) missing.push(t.errMissingStartDate);
+                  if (!section.class_time) missing.push(t.errMissingClassTime);
+                  if (missing.length > 0) {
+                    setError(`${t.errActivateMissingFields} ${missing.join(", ")}`);
+                    return;
+                  }
                   setActivating(true);
                   try {
                     await apiClient.post(`/lms/sections/${sectionId}/contract/activate`);
+                    setError(null);
                     const refetch = await apiClient.get<ContractInfo>(`/lms/sections/${sectionId}/contract`).catch(() => null);
                     if (refetch) setContract(refetch.data);
                     const sectRefetch = await apiClient.get<{ items: SectionInfo[]; total: number }>(
@@ -312,18 +352,50 @@ export default function SectionStudentsPage() {
                       if (found) setSection(found);
                     }
                   } catch (activateErr) {
-                    console.error("Activation failed:", activateErr);
+                    const err = activateErr as { response?: { data?: { detail?: string } } };
+                    const detail = err?.response?.data?.detail;
+                    if (detail) {
+                      if (locale === "en") {
+                        setError(detail);
+                      } else {
+                        const patterns: [RegExp, (...m: string[]) => string][] = [
+                          [/^Cannot activate a contract without a teacher$/, () => t.errNoTeacherActivate],
+                          [/^Cannot activate a contract without a compensation model$/, () => t.errNoCompModel],
+                          [/^Cannot activate a section without a price/, () => t.errMissingPrice],
+                          [/^Cannot activate a section without a start date/, () => t.errMissingStartDate],
+                          [/^Cannot activate a section without a class time/, () => t.errMissingClassTime],
+                          [/^Cannot activate section\. Missing required fields: (.+)$/, (fields) => `${t.errActivateMissingFields} ${fields}`],
+                          [/^Only ASSIGNED contracts can be activated, current: (.+)$/, (s) => `${t.errOnlyAssigned}، الحالة الحالية: ${s}`],
+                        ];
+                        let translated: string | null = null;
+                        for (const [regex, fn] of patterns) {
+                          const m = detail.match(regex);
+                          if (m) { translated = fn(...m.slice(1)); break; }
+                        }
+                        setError(translated || detail);
+                      }
+                    } else {
+                      setError(t.activationFailed);
+                    }
                   } finally { setActivating(false); }
-                }} disabled={activating} className="btn-primary px-3 py-1.5 text-xs flex items-center gap-1">
+                }} disabled={activating || section.price == null || !section.teacher_id || !section.start_date || !section.class_time} className="btn-primary px-3 py-1.5 text-xs flex items-center gap-1" title={
+                  section.price == null ? `${t.errMissingPrice}`
+                    : !section.teacher_id ? `${t.errMissingTeacher}`
+                      : !section.start_date ? `${t.errMissingStartDate}`
+                        : !section.class_time ? `${t.errMissingClassTime}`
+                          : undefined
+                }>
                   <Play size={12} />{activating ? "..." : "Activate"}
                 </button>
               )}
               {section.status === "active" && contract?.status === "active" && (
                 <button
                   onClick={async () => {
+                    setError(null);
                     setCompleting(true);
                     try {
                       await apiClient.post(`/lms/sections/${sectionId}/contract/complete`);
+                      setError(null);
                       const refetch = await apiClient.get<ContractInfo>(`/lms/sections/${sectionId}/contract`).catch(() => null);
                       if (refetch) setContract(refetch.data);
                       const sectRefetch = await apiClient.get<{ items: SectionInfo[]; total: number }>(
@@ -334,7 +406,28 @@ export default function SectionStudentsPage() {
                         if (found) setSection(found);
                       }
                     } catch (completeErr) {
-                      console.error("Completion failed:", completeErr);
+                      const err = completeErr as { response?: { data?: { detail?: string } } };
+                      const detail = err?.response?.data?.detail;
+                      if (detail) {
+                        if (locale === "en") {
+                          setError(detail);
+                        } else {
+                          const patterns: [RegExp, (...m: string[]) => string][] = [
+                            [/^Cannot finalize grades: (\d+) of (\d+) students are missing final scores$/, (a, b) => `${t.errCannotFinalize}${a} من ${b} طالب يفتقدون للدرجات النهائية`],
+                            [/^Cannot settle a contract without a teacher$/, () => t.errNoTeacher],
+                            [/^Only ACTIVE contracts can be finalized, current: (.+)$/, (s) => `${t.errOnlyActive}، الحالة الحالية: ${s}`],
+                            [/^Only GRADES_SUBMITTED contracts can be settled, current: (.+)$/, (s) => `${t.errOnlyGraded}، الحالة الحالية: ${s}`],
+                          ];
+                          let translated: string | null = null;
+                          for (const [regex, fn] of patterns) {
+                            const m = detail.match(regex);
+                            if (m) { translated = fn(...m.slice(1)); break; }
+                          }
+                          setError(translated || detail);
+                        }
+                      } else {
+                        setError(t.completionFailed);
+                      }
                     } finally { setCompleting(false); }
                   }}
                   disabled={completing || !allGradesFilled}
@@ -368,6 +461,13 @@ export default function SectionStudentsPage() {
               </span>
             </div>
           )}
+        </div>
+      )}
+
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md text-sm flex items-center justify-between">
+          <span>{error}</span>
+          <button onClick={() => setError(null)} className="text-red-500 hover:text-red-700 font-bold ms-2">&times;</button>
         </div>
       )}
 

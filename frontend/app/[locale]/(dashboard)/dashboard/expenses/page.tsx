@@ -6,7 +6,7 @@ import { apiClient } from "@/lib/api";
 import { useAuth } from "@/components/AuthContext";
 import Modal from "@/components/Modal";
 import Select from "@/components/ui/Select";
-import { Plus, Loader2, RefreshCw, Eye, X } from "lucide-react";
+import { Plus, Loader2, RefreshCw, Eye, X, Search } from "lucide-react";
 import ReceiptModal, { ReceiptData } from "@/components/ReceiptModal";
 import { getLocalDateString, formatDisplayDate } from "@/lib/dates";
 
@@ -72,7 +72,9 @@ export default function ExpensesPage() {
       generalExpense: "مصروف عام",
       teacherWithdrawal: "سحب معلم",
       secretaryAdvance: "سلفة سكرتير",
+      salaryPayment: "صرف راتب",
       filterType: "تصفية حسب النوع",
+      searchReceipt: "بحث برقم السند",
       all: "الكل",
       availableBalance: "الرصيد المتاح",
       remainingStipend: "المتبقي من الراتب",
@@ -120,7 +122,9 @@ export default function ExpensesPage() {
       generalExpense: "General Expense",
       teacherWithdrawal: "Teacher Withdrawal",
       secretaryAdvance: "Secretary Advance",
+      salaryPayment: "Salary Payment",
       filterType: "Filter by Type",
+      searchReceipt: "Search by voucher number",
       all: "All",
       availableBalance: "Available Balance",
       remainingStipend: "Remaining Stipend",
@@ -142,10 +146,24 @@ export default function ExpensesPage() {
   const [showForm, setShowForm] = useState(false);
   const [showVoucher, setShowVoucher] = useState<Expense | null>(null);
   const [filterType, setFilterType] = useState("");
-  const [eligibleRecipients, setEligibleRecipients] = useState<EligibleRecipient[]>([]);
+  const [receiptSearch, setReceiptSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(receiptSearch), 300);
+    return () => clearTimeout(timer);
+  }, [receiptSearch]);
+  const [eligibleRecipients, setEligibleRecipients] = useState<
+    EligibleRecipient[]
+  >([]);
   const [availableLimit, setAvailableLimit] = useState<number | null>(null);
-  const [selectedRecipientEligible, setSelectedRecipientEligible] = useState<boolean | null>(null);
-  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [selectedRecipientEligible, setSelectedRecipientEligible] = useState<
+    boolean | null
+  >(null);
+  const [message, setMessage] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
   const [formError, setFormError] = useState("");
   const [closedDates, setClosedDates] = useState<Set<string>>(new Set());
   const [form, setForm] = useState({
@@ -157,18 +175,22 @@ export default function ExpensesPage() {
     date: getLocalDateString(),
   });
 
-  const canCreate = user?.is_superadmin || user?.role?.name === "manager" || user?.role?.name === "secretary";
+  const canCreate =
+    user?.is_superadmin ||
+    user?.role?.name === "manager" ||
+    user?.role?.name === "secretary";
 
   const fetchExpenses = useCallback(async () => {
     try {
       const params: Record<string, string> = {};
       if (filterType) params.type = filterType;
+      if (debouncedSearch) params.receipt_number = debouncedSearch;
       const res = await apiClient.get<Expense[]>("/lms/expenses", { params });
       setExpenses(res.data);
     } catch (e) {
       console.error(e);
     }
-  }, [filterType]);
+  }, [filterType, debouncedSearch]);
 
   const loadAll = useCallback(async () => {
     setLoading(true);
@@ -176,17 +198,26 @@ export default function ExpensesPage() {
     setLoading(false);
   }, [fetchExpenses]);
 
-  useEffect(() => { loadAll(); }, [loadAll]);
+  useEffect(() => {
+    loadAll();
+  }, [loadAll]);
 
   const fetchEligibleRecipients = useCallback(async (type: string) => {
-    if (type !== "teacher_withdrawal" && type !== "secretary_advance") {
+    if (
+      type !== "teacher_withdrawal" &&
+      type !== "secretary_advance" &&
+      type !== "salary_payment"
+    ) {
       setEligibleRecipients([]);
       setAvailableLimit(null);
       setSelectedRecipientEligible(null);
       return;
     }
     try {
-      const res = await apiClient.get<EligibleRecipient[]>("/lms/expenses/eligible-recipients", { params: { type } });
+      const res = await apiClient.get<EligibleRecipient[]>(
+        "/lms/expenses/eligible-recipients",
+        { params: { type } },
+      );
       setEligibleRecipients(res.data);
     } catch (e) {
       console.error(e);
@@ -196,8 +227,12 @@ export default function ExpensesPage() {
 
   const fetchClosedDates = useCallback(async () => {
     try {
-      const res = await apiClient.get<{ date: string; status: string }[]>("/lms/daily-closures");
-      const closed = new Set(res.data.filter((c) => c.status === "closed").map((c) => c.date));
+      const res = await apiClient.get<{ date: string; status: string }[]>(
+        "/lms/daily-closures",
+      );
+      const closed = new Set(
+        res.data.filter((c) => c.status === "closed").map((c) => c.date),
+      );
       setClosedDates(closed);
     } catch (e) {
       console.error(e);
@@ -231,7 +266,11 @@ export default function ExpensesPage() {
   const handleRecipientSelect = (id: string) => {
     const recipient = eligibleRecipients.find((r) => r.id === id);
     if (recipient) {
-      setForm({ ...form, recipient_id: id, recipient_name: recipient.full_name });
+      setForm({
+        ...form,
+        recipient_id: id,
+        recipient_name: recipient.full_name,
+      });
       setAvailableLimit(recipient.available_limit);
       setSelectedRecipientEligible(recipient.is_eligible);
     } else {
@@ -252,14 +291,18 @@ export default function ExpensesPage() {
       general_expense: "bg-slate-100 text-slate-600 border-slate-200",
       teacher_withdrawal: "bg-amber-50 text-amber-600 border-amber-200",
       secretary_advance: "bg-purple-50 text-purple-600 border-purple-200",
+      salary_payment: "bg-emerald-50 text-emerald-600 border-emerald-200",
     };
     const labels: Record<string, string> = {
       general_expense: t.generalExpense,
       teacher_withdrawal: t.teacherWithdrawal,
       secretary_advance: t.secretaryAdvance,
+      salary_payment: t.salaryPayment,
     };
     return (
-      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${colors[type] || colors.general_expense}`}>
+      <span
+        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${colors[type] || colors.general_expense}`}
+      >
         {labels[type] || type}
       </span>
     );
@@ -270,19 +313,30 @@ export default function ExpensesPage() {
       general_expense: "general",
       teacher_withdrawal: "teacher",
       secretary_advance: "secretary",
+      salary_payment: "salary",
     };
     const labelMap: Record<string, string> = {
       general_expense: t.generalExpense,
       teacher_withdrawal: t.teacherWithdrawal,
       secretary_advance: t.secretaryAdvance,
+      salary_payment: t.salaryPayment,
     };
-    return { variant: variantMap[type] || "general", label: labelMap[type] || type };
+    return {
+      variant: variantMap[type] || "general",
+      label: labelMap[type] || type,
+    };
   };
 
   const handleSave = async () => {
     if (!form.amount) return;
     if (form.type === "general_expense" && !form.recipient_name) return;
-    if ((form.type === "teacher_withdrawal" || form.type === "secretary_advance") && !form.recipient_id) return;
+    if (
+      (form.type === "teacher_withdrawal" ||
+        form.type === "secretary_advance" ||
+        form.type === "salary_payment") &&
+      !form.recipient_id
+    )
+      return;
     if (selectedRecipientEligible === false) {
       setMessage({ type: "error", text: t.recipientNotEligible });
       return;
@@ -326,13 +380,34 @@ export default function ExpensesPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-6xl mx-auto animate-fade-in" dir={isRtl ? "rtl" : "ltr"}>
+    <div
+      className="space-y-6 max-w-6xl mx-auto animate-fade-in"
+      dir={isRtl ? "rtl" : "ltr"}
+    >
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-bold text-slate-900">{t.title}</h2>
           <p className="text-sm text-slate-500 mt-1">{t.subtitle}</p>
         </div>
         <div className="flex items-center gap-2">
+          <div className="relative">
+            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            <input
+              type="text"
+              value={receiptSearch}
+              onChange={(e) => setReceiptSearch(e.target.value)}
+              placeholder={t.searchReceipt}
+              className="input-field pl-8 w-44 text-sm"
+            />
+            {receiptSearch && (
+              <button
+                onClick={() => setReceiptSearch("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
           <Select
             value={filterType}
             onChange={setFilterType}
@@ -340,15 +415,24 @@ export default function ExpensesPage() {
               { value: "general_expense", label: t.generalExpense },
               { value: "teacher_withdrawal", label: t.teacherWithdrawal },
               { value: "secretary_advance", label: t.secretaryAdvance },
+              { value: "salary_payment", label: t.salaryPayment },
             ]}
             placeholder={t.all}
             className="w-36"
           />
-          <button onClick={handleRefresh} disabled={refreshing} className="btn-icon" title={t.refresh}>
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="btn-icon"
+            title={t.refresh}
+          >
             <RefreshCw size={16} className={refreshing ? "animate-spin" : ""} />
           </button>
           {canCreate && (
-            <button onClick={() => setShowForm(true)} className="btn-primary flex items-center gap-2">
+            <button
+              onClick={() => setShowForm(true)}
+              className="btn-primary flex items-center gap-2"
+            >
               <Plus size={16} />
               <span>{t.add}</span>
             </button>
@@ -356,11 +440,22 @@ export default function ExpensesPage() {
         </div>
       </div>
 
-      <Modal open={showForm} onClose={() => { setShowForm(false); setFormError(""); setSelectedRecipientEligible(null); }} title={t.add} size="xl">
+      <Modal
+        open={showForm}
+        onClose={() => {
+          setShowForm(false);
+          setFormError("");
+          setSelectedRecipientEligible(null);
+        }}
+        title={t.add}
+        size="xl"
+      >
         <div className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">{t.selectType}</label>
+              <label className="block text-xs font-medium text-slate-700 mb-1">
+                {t.selectType}
+              </label>
               <Select
                 value={form.type}
                 onChange={handleTypeChange}
@@ -368,16 +463,29 @@ export default function ExpensesPage() {
                   { value: "general_expense", label: t.generalExpense },
                   { value: "teacher_withdrawal", label: t.teacherWithdrawal },
                   { value: "secretary_advance", label: t.secretaryAdvance },
+                  { value: "salary_payment", label: t.salaryPayment },
                 ]}
               />
             </div>
             <div>
               <label className="block text-xs font-medium text-slate-700 mb-1">
                 {t.enterRecipient}
-                {form.type === "secretary_advance" && <span className="text-purple-600 text-[10px] ms-2">({t.remainingStipend})</span>}
+                {(form.type === "secretary_advance" ||
+                  form.type === "salary_payment") && (
+                  <span className="text-emerald-600 text-[10px] ms-2">
+                    ({t.remainingStipend})
+                  </span>
+                )}
               </label>
               {form.type === "general_expense" ? (
-                <input type="text" value={form.recipient_name} onChange={(e) => setForm({ ...form, recipient_name: e.target.value })} className="input-field" />
+                <input
+                  type="text"
+                  value={form.recipient_name}
+                  onChange={(e) =>
+                    setForm({ ...form, recipient_name: e.target.value })
+                  }
+                  className="input-field"
+                />
               ) : (
                 <div className="space-y-1">
                   <Select
@@ -385,7 +493,7 @@ export default function ExpensesPage() {
                     onChange={handleRecipientSelect}
                     options={eligibleRecipients.map((r) => ({
                       value: r.id,
-                      label: `${r.full_name}${form.type === "secretary_advance" ? ` (${r.available_limit.toFixed(2)} ${t.sar})` : ""} | ${r.is_eligible ? t.eligible : t.notEligible}`,
+                      label: `${r.full_name}${form.type === "secretary_advance" || form.type === "salary_payment" ? ` (${r.available_limit.toFixed(2)} ${t.sar})` : ""} | ${r.is_eligible ? t.eligible : t.notEligible}`,
                     }))}
                     placeholder={t.selectRecipient}
                   />
@@ -394,42 +502,91 @@ export default function ExpensesPage() {
                       ⚠ {t.ineligibleRecipientWarning}
                     </p>
                   )}
-                  {form.type === "secretary_advance" && selectedRecipientEligible === true && availableLimit !== null && (
-                    <p className="text-xs text-slate-500">
-                      {t.limitLabel}: <span className="font-semibold text-slate-800">{availableLimit.toFixed(2)} {t.sar}</span>
-                    </p>
-                  )}
+                  {(form.type === "secretary_advance" ||
+                    form.type === "salary_payment") &&
+                    selectedRecipientEligible === true &&
+                    availableLimit !== null && (
+                      <p className="text-xs text-slate-500">
+                        {t.limitLabel}:{" "}
+                        <span className="font-semibold text-slate-800">
+                          {availableLimit.toFixed(2)} {t.sar}
+                        </span>
+                      </p>
+                    )}
                 </div>
               )}
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">{t.enterAmount}</label>
-              <input type="number" step="0.01" min="0" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} className="input-field" placeholder="0.00" />
+              <label className="block text-xs font-medium text-slate-700 mb-1">
+                {t.enterAmount}
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={form.amount}
+                onChange={(e) => setForm({ ...form, amount: e.target.value })}
+                className="input-field"
+                placeholder="0.00"
+              />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">{t.date}</label>
-              <input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} className="input-field" />
+              <label className="block text-xs font-medium text-slate-700 mb-1">
+                {t.date}
+              </label>
+              <input
+                type="date"
+                value={form.date}
+                onChange={(e) => setForm({ ...form, date: e.target.value })}
+                className="input-field"
+              />
               {closedDates.has(form.date) && (
-                <p className="text-xs text-red-600 font-medium mt-1">⚠ {t.dateIsClosed}</p>
+                <p className="text-xs text-red-600 font-medium mt-1">
+                  ⚠ {t.dateIsClosed}
+                </p>
               )}
             </div>
             <div className="md:col-span-2">
-              <label className="block text-xs font-medium text-slate-700 mb-1">{t.enterDescription}</label>
-              <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="input-field" rows={2} />
+              <label className="block text-xs font-medium text-slate-700 mb-1">
+                {t.enterDescription}
+              </label>
+              <textarea
+                value={form.description}
+                onChange={(e) =>
+                  setForm({ ...form, description: e.target.value })
+                }
+                className="input-field"
+                rows={2}
+              />
             </div>
           </div>
           {formError && (
-            <div className="text-sm text-red-600 bg-red-50 p-3 rounded-lg">{formError}</div>
+            <div className="text-sm text-red-600 bg-red-50 p-3 rounded-lg">
+              {formError}
+            </div>
           )}
           <div className="flex gap-3 pt-2">
-            <button onClick={handleSave} className="btn-primary">{t.save}</button>
-            <button onClick={() => { setShowForm(false); setFormError(""); setSelectedRecipientEligible(null); }} className="btn-secondary">{t.cancel}</button>
+            <button onClick={handleSave} className="btn-primary">
+              {t.save}
+            </button>
+            <button
+              onClick={() => {
+                setShowForm(false);
+                setFormError("");
+                setSelectedRecipientEligible(null);
+              }}
+              className="btn-secondary"
+            >
+              {t.cancel}
+            </button>
           </div>
         </div>
       </Modal>
 
       {expenses.length === 0 ? (
-        <div className="card p-8 text-center text-sm text-slate-500">{t.empty}</div>
+        <div className="card p-8 text-center text-sm text-slate-500">
+          {t.empty}
+        </div>
       ) : (
         <div className="card overflow-hidden">
           <table className="data-table">
@@ -447,14 +604,28 @@ export default function ExpensesPage() {
             <tbody>
               {expenses.map((exp) => (
                 <tr key={exp.id}>
-                  <td><span className="badge badge-warning">{exp.receipt_number}</span></td>
-                  <td>{typeBadge(exp.type)}</td>
-                  <td className="font-medium text-slate-900">{exp.recipient_name}</td>
-                  <td className="font-semibold text-slate-900">{exp.amount.toFixed(2)} {t.sar}</td>
-                  <td className="text-slate-500">{formatDate(exp.date)}</td>
-                  <td className="text-slate-600">{exp.created_by_name || "—"}</td>
                   <td>
-                    <button onClick={() => setShowVoucher(exp)} className="btn-icon" title={t.voucherPreview}>
+                    <span className="badge badge-warning">
+                      {exp.receipt_number}
+                    </span>
+                  </td>
+                  <td>{typeBadge(exp.type)}</td>
+                  <td className="font-medium text-slate-900">
+                    {exp.recipient_name}
+                  </td>
+                  <td className="font-semibold text-slate-900">
+                    {exp.amount.toFixed(2)} {t.sar}
+                  </td>
+                  <td className="text-slate-500">{formatDate(exp.date)}</td>
+                  <td className="text-slate-600">
+                    {exp.created_by_name || "—"}
+                  </td>
+                  <td>
+                    <button
+                      onClick={() => setShowVoucher(exp)}
+                      className="btn-icon"
+                      title={t.voucherPreview}
+                    >
                       <Eye size={15} />
                     </button>
                   </td>
@@ -468,16 +639,21 @@ export default function ExpensesPage() {
       <ReceiptModal
         open={showVoucher !== null}
         onClose={() => setShowVoucher(null)}
-        data={showVoucher ? {
-          id: showVoucher.id,
-          type: "expense",
-          receipt_number: showVoucher.receipt_number,
-          date: showVoucher.date,
-          amount: showVoucher.amount,
-          recipient_name: showVoucher.recipient_name,
-          expense_type_label: expenseTypeMeta(showVoucher.type).label,
-          expense_type_variant: expenseTypeMeta(showVoucher.type).variant as "general" | "teacher" | "secretary",
-        } : null}
+        data={
+          showVoucher
+            ? {
+                id: showVoucher.id,
+                type: "expense",
+                receipt_number: showVoucher.receipt_number,
+                date: showVoucher.date,
+                amount: showVoucher.amount,
+                recipient_name: showVoucher.recipient_name,
+                expense_type_label: expenseTypeMeta(showVoucher.type).label,
+                expense_type_variant: expenseTypeMeta(showVoucher.type)
+                  .variant as "general" | "teacher" | "secretary" | "salary",
+              }
+            : null
+        }
         locale={locale}
         isRtl={isRtl}
         instituteName={t.instituteName}

@@ -480,7 +480,7 @@ export default function StudentDetailPage() {
             <div>
               <label className="block text-xs font-medium text-slate-700 mb-1">{t.discount}</label>
               <input type="number" value={quickEnrollDiscount} onChange={(e) => setQuickEnrollDiscount(e.target.value)}
-                className="input-field" min={0} />
+                className="input-field" min={0} max={100} />
             </div>
           )}
           <div className="flex gap-3 pt-2">

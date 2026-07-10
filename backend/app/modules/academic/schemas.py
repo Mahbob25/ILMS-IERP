@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field, field_validator
 
 T = TypeVar("T")
 
+
 class PaginatedResponse(BaseModel, Generic[T]):
     items: list[T]
     total: int
@@ -17,11 +18,13 @@ class CourseCreate(BaseModel):
     description: Optional[str] = None
     credits: int = 3
 
+
 class CourseUpdate(BaseModel):
     name: Optional[str] = None
     code: Optional[str] = None
     description: Optional[str] = None
     credits: Optional[int] = None
+
 
 class CourseResponse(BaseModel):
     id: uuid.UUID
@@ -48,6 +51,7 @@ class CourseSectionCreate(BaseModel):
     price: Optional[float] = None
     teacher_percentage: Optional[float] = None
 
+
 class CourseSectionUpdate(BaseModel):
     teacher_id: Optional[uuid.UUID] = None
     capacity: Optional[int] = None
@@ -60,6 +64,7 @@ class CourseSectionUpdate(BaseModel):
     price: Optional[float] = None
     teacher_percentage: Optional[float] = None
 
+
 class CourseSectionResponse(BaseModel):
     id: uuid.UUID
     course_id: uuid.UUID
@@ -68,6 +73,8 @@ class CourseSectionResponse(BaseModel):
     enrolled_count: int
     status: str = "pending"
     teacher_percentage: Optional[float] = None
+    contract_status: Optional[str] = None
+    contract_compensation_model: Optional[str] = None
     min_students_required: Optional[int] = None
     start_date: Optional[date] = None
     end_date: Optional[date] = None
@@ -75,8 +82,10 @@ class CourseSectionResponse(BaseModel):
     class_duration_minutes: Optional[int] = None
     classroom: Optional[str] = None
     price: Optional[float] = None
+
     class Config:
         from_attributes = True
+
 
 class SectionActivate(BaseModel):
     teacher_percentage: Optional[float] = None
@@ -88,10 +97,12 @@ class StudentCreate(BaseModel):
     full_name: str
     email: Optional[str] = None
 
+
 class StudentUpdate(BaseModel):
     student_code: Optional[str] = None
     full_name: Optional[str] = None
     email: Optional[str] = None
+
 
 class StudentResponse(BaseModel):
     id: uuid.UUID
@@ -109,6 +120,18 @@ class EnrollmentCreate(BaseModel):
     section_id: uuid.UUID
     admin_discount: Optional[float] = None
 
+    @field_validator("admin_discount")
+    @classmethod
+    def validate_discount(cls, v: Optional[float]) -> Optional[float]:
+        if v is None:
+            return v
+        if v < 0:
+            raise ValueError("Discount cannot be negative")
+        if v > 100:
+            raise ValueError("Discount cannot exceed 100%")
+        return round(v, 2)
+
+
 class EnrollmentCreateWithStudent(BaseModel):
     student_id: Optional[uuid.UUID] = None
     section_id: uuid.UUID
@@ -117,6 +140,18 @@ class EnrollmentCreateWithStudent(BaseModel):
     full_name: Optional[str] = None
     email: Optional[str] = None
 
+    @field_validator("admin_discount")
+    @classmethod
+    def validate_discount(cls, v: Optional[float]) -> Optional[float]:
+        if v is None:
+            return v
+        if v < 0:
+            raise ValueError("Discount cannot be negative")
+        if v > 100:
+            raise ValueError("Discount cannot exceed 100%")
+        return round(v, 2)
+
+
 class EnrollmentResponse(BaseModel):
     id: uuid.UUID
     student_id: uuid.UUID
@@ -124,9 +159,12 @@ class EnrollmentResponse(BaseModel):
     enrolled_at: datetime
     agreed_price: Optional[float] = None
     admin_discount: Optional[float] = None
+    total_paid: float = 0
+    balance_remaining: Optional[float] = None
 
     class Config:
         from_attributes = True
+
 
 class EnrollmentDetailResponse(BaseModel):
     id: uuid.UUID
@@ -157,13 +195,16 @@ class FinalGradeCreate(BaseModel):
             raise ValueError("Final score must be between 0 and 100")
         return round(v, 2)
 
+
 class FinalGradeBulkCreate(BaseModel):
     grades: list[FinalGradeCreate]
+
 
 class StudentGradeSummary(BaseModel):
     section_id: uuid.UUID
     final_score: float
     grade_label: str
+
 
 class FinalGradeResponse(BaseModel):
     id: uuid.UUID

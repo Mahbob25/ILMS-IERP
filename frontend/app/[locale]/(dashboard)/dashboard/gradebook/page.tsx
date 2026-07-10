@@ -27,6 +27,18 @@ export default function GradebookPage() {
   const locale = (params?.locale as string) || "ar";
   const isRtl = locale === "ar";
 
+  const statusLabels: Record<string, { ar: string; en: string }> = {
+    pending: { ar: "قيد الانتظار", en: "Pending" },
+    active: { ar: "نشط", en: "Active" },
+    completed: { ar: "مكتمل", en: "Completed" },
+  };
+
+  const statusColors: Record<string, string> = {
+    pending: "bg-amber-50 text-amber-600 border-amber-200",
+    active: "bg-emerald-50 text-emerald-600 border-emerald-200",
+    completed: "bg-slate-100 text-slate-500 border-slate-200",
+  };
+
   const t = {
     ar: {
       title: "سجل الدرجات",
@@ -98,7 +110,7 @@ export default function GradebookPage() {
           apiClient.get<{ items: Enrollment[]; total: number }>(
             `/academic/enrollments?section_id=${selectedSectionId}&limit=1000`
           ),
-          apiClient.get<FinalGrade[]>(`/academic/sections/${selectedSectionId}/final-grades`).catch(() => [] as FinalGrade[]),
+          apiClient.get<FinalGrade[]>(`/academic/sections/${selectedSectionId}/final-grades`).then(r => r.data).catch(() => [] as FinalGrade[]),
         ]);
         setEnrollments(enrRes.data.items);
 
@@ -111,8 +123,7 @@ export default function GradebookPage() {
         }
 
         const gradeMap: Record<string, { score: string; notes: string }> = {};
-        const gradesData = Array.isArray(gradeRes) ? gradeRes : [];
-        for (const g of gradesData) {
+        for (const g of gradeRes) {
           gradeMap[g.student_id] = {
             score: String(g.final_score),
             notes: g.notes || "",
@@ -200,7 +211,19 @@ export default function GradebookPage() {
             setSelectedSectionId(val);
             setSelectedSection(sections.find((s) => s.id === val) || null);
           }}
-          options={sections.map((sec) => ({ value: sec.id, label: getCourseName(sec.course_id) }))}
+          options={sections.map((sec) => {
+            const statusLabel = statusLabels[sec.status];
+            return {
+              value: sec.id,
+              label: getCourseName(sec.course_id),
+              badge: statusLabel
+                ? {
+                    label: isRtl ? statusLabel.ar : statusLabel.en,
+                    className: statusColors[sec.status] || "",
+                  }
+                : undefined,
+            };
+          })}
           placeholder="--"
           className="max-w-md"
         />

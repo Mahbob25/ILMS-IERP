@@ -55,7 +55,9 @@ export default function EmployeeDetailPage() {
       linkedUser: "حساب النظام المرتبط", email: "البريد الإلكتروني",
       role: "الدور", userStatus: "حالة الحساب",
       compensationType: "نظام التعويض", defaultPct: "النسبة الافتراضية",
-      monthlySalary: "راتب", percentage: "نسبة مئوية", hybrid: "نظام هجين",
+      monthlySalary: "راتب شهري", percentage: "نسبة مئوية", hybrid: "نظام هجين",
+      compensationSalary: "الراتب",
+      manualPaymentHint: "يتم صرف الراتب يدويًا عبر المصروفات",
     },
     en: {
       back: "Back to Employees", hrInfo: "Employee Information", type: "Employee Type",
@@ -66,7 +68,9 @@ export default function EmployeeDetailPage() {
       linkedUser: "Linked User Account", email: "Email",
       role: "Role", userStatus: "Account Status",
       compensationType: "Compensation Type", defaultPct: "Default Percentage",
-      monthlySalary: "Stipend", percentage: "Percentage", hybrid: "Hybrid",
+      monthlySalary: "Monthly Salary", percentage: "Percentage", hybrid: "Hybrid",
+      compensationSalary: "Stipend",
+      manualPaymentHint: "Salary is disbursed manually via Expenses",
     },
   }[locale === "en" ? "en" : "ar"];
 
@@ -148,11 +152,24 @@ export default function EmployeeDetailPage() {
           <div className="flex items-center gap-2 text-slate-600">
             <DollarSign size={14} className="text-slate-400" />
             <span className="text-slate-900 font-medium">
-              {data.default_salary !== null ? `${t.monthlySalary}: ${data.default_salary.toFixed(2)}` : ''}
-              {data.default_salary !== null && data.default_percentage !== null ? ' | ' : ''}
-              {data.default_percentage !== null ? `${t.defaultPct}: ${data.default_percentage}%` : ''}
-              {data.default_salary === null && data.default_percentage === null ? '\u2014' : ''}
+              {data.employee_type === "teacher" ? (
+                <>
+                  {data.default_salary !== null ? `${t.compensationSalary}: ${data.default_salary.toFixed(2)}` : ''}
+                  {data.default_salary !== null && data.default_percentage !== null ? ' | ' : ''}
+                  {data.default_percentage !== null ? `${t.defaultPct}: ${data.default_percentage}%` : ''}
+                  {data.default_salary === null && data.default_percentage === null ? '\u2014' : ''}
+                </>
+              ) : (
+                <>
+                  {data.default_salary !== null ? `${t.monthlySalary}: ${data.default_salary.toFixed(2)}` : '\u2014'}
+                </>
+              )}
             </span>
+            {data.employee_type !== "teacher" && data.default_salary !== null && (
+              <span className="text-xs text-slate-400 ms-1">
+                ({t.manualPaymentHint})
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-2 text-slate-600">
             <Calendar size={14} className="text-slate-400" />

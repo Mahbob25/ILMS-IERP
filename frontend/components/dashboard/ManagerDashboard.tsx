@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { apiClient } from "@/lib/api";
+import ConfirmModal from "@/components/ConfirmModal";
 import {
   Users,
   BookOpen,
@@ -60,6 +61,14 @@ export default function ManagerDashboard() {
   const [data, setData] = useState<ManagerDashboardData | null>(null);
   const [amendments, setAmendments] = useState<PendingAmendment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [confirmAmendment, setConfirmAmendment] = useState<{
+    id: string;
+    action: "approve" | "reject";
+  } | null>(null);
+  const [message, setMessage] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
 
   useEffect(() => {
     Promise.all([
@@ -80,6 +89,15 @@ export default function ManagerDashboard() {
       recentActivity: "نشاطات هذا الشهر",
       noApprovals: "لا توجد طلبات معلقة",
       revVsExp: "الإيرادات vs المصروفات",
+      confirmApproveTitle: "تأكيد الموافقة",
+      confirmApproveMsg: "هل أنت متأكد من الموافقة على طلب الزيادة هذا؟",
+      confirmRejectTitle: "تأكيد الرفض",
+      confirmRejectMsg: "هل أنت متأكد من رفض طلب الزيادة هذا؟",
+      confirmYes: "تأكيد",
+      cancel: "إلغاء",
+      approveSuccess: "تمت الموافقة على طلب الزيادة",
+      rejectSuccess: "تم رفض طلب الزيادة",
+      requestError: "فشل في تنفيذ العملية",
     },
     en: {
       students: "Total Students",
@@ -92,6 +110,15 @@ export default function ManagerDashboard() {
       recentActivity: "This Month's Activity",
       noApprovals: "No pending requests",
       revVsExp: "Revenue vs Expenses",
+      confirmApproveTitle: "Confirm Approval",
+      confirmApproveMsg: "Are you sure you want to approve this increase request?",
+      confirmRejectTitle: "Confirm Rejection",
+      confirmRejectMsg: "Are you sure you want to reject this increase request?",
+      confirmYes: "Confirm",
+      cancel: "Cancel",
+      approveSuccess: "Increase request approved",
+      rejectSuccess: "Increase request rejected",
+      requestError: "Failed to process request",
     },
   }[locale === "en" ? "en" : "ar"];
 
@@ -126,7 +153,7 @@ export default function ManagerDashboard() {
   ];
 
   return (
-    <div className="space-y-6 max-w-6xl mx-auto animate-fade-in">
+    <><div className="space-y-6 max-w-6xl mx-auto animate-fade-in">
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="card p-5 flex items-center gap-4">
           <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
@@ -198,6 +225,17 @@ export default function ManagerDashboard() {
             <AlertCircle size={16} className="text-amber-500" />
             <span>{t.pendingApprovals}</span>
           </h3>
+          {message && (
+            <div
+              className={`mb-3 px-3 py-2 rounded-lg text-sm ${
+                message.type === "success"
+                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                  : "bg-red-50 text-red-700 border border-red-200"
+              }`}
+            >
+              {message.text}
+            </div>
+          )}
           {data.pending_unlock_requests.length === 0 && data.pending_withdrawals_count === 0 && amendments.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-10 text-slate-400">
               <CheckCircle size={40} className="mb-3 text-emerald-300" />
@@ -216,24 +254,14 @@ export default function ManagerDashboard() {
                     </div>
                     <div className="flex items-center gap-1">
                       <button
-                        onClick={async () => {
-                          try {
-                            await apiClient.put(`/lms/amendments/${am.id}/approve`);
-                            setAmendments((prev) => prev.filter((a) => a.id !== am.id));
-                          } catch { /* ignore */ }
-                        }}
+                        onClick={() => setConfirmAmendment({ id: am.id, action: "approve" })}
                         className="p-1 rounded text-emerald-600 hover:bg-emerald-100"
                         title="Approve"
                       >
                         <CheckCircle size={14} />
                       </button>
                       <button
-                        onClick={async () => {
-                          try {
-                            await apiClient.put(`/lms/amendments/${am.id}/reject`);
-                            setAmendments((prev) => prev.filter((a) => a.id !== am.id));
-                          } catch { /* ignore */ }
-                        }}
+                        onClick={() => setConfirmAmendment({ id: am.id, action: "reject" })}
                         className="p-1 rounded text-red-500 hover:bg-red-100"
                         title="Reject"
                       >
@@ -284,5 +312,42 @@ export default function ManagerDashboard() {
         </div>
       </div>
     </div>
+
+    <ConfirmModal
+      open={confirmAmendment !== null}
+      title={
+        confirmAmendment?.action === "approve"
+          ? t.confirmApproveTitle
+          : t.confirmRejectTitle
+      }
+      message={
+        confirmAmendment?.action === "approve"
+          ? t.confirmApproveMsg
+          : t.confirmRejectMsg
+      }
+      confirmLabel={t.confirmYes}
+      cancelLabel={t.cancel}
+      isRtl={locale === "ar"}
+      onConfirm={async () => {
+        if (!confirmAmendment) return;
+        const { id, action } = confirmAmendment;
+        setConfirmAmendment(null);
+        setMessage(null);
+        try {
+          await apiClient.put(`/lms/amendments/${id}/${action}`);
+          setAmendments((prev) => prev.filter((a) => a.id !== id));
+          setMessage({
+            type: "success",
+            text: action === "approve" ? t.approveSuccess : t.rejectSuccess,
+          });
+        } catch {
+          setMessage({
+            type: "error",
+            text: t.requestError,
+          });
+        }
+      }}
+      onCancel={() => setConfirmAmendment(null)}
+    /></>
   );
 }

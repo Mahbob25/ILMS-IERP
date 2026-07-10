@@ -12,20 +12,35 @@ from app.modules.identity.dependencies import get_current_user, RoleChecker
 from app.modules.academic.service import get_course_section
 from app.modules.academic.models import CourseSection as CourseSectionModel
 from app.modules.lms.models import (
-    SectionContract, CompensationAmendmentRequest, AmendmentStatus,
-    CompensationModel, TeacherWallet, ContractStatus,
+    SectionContract,
+    CompensationAmendmentRequest,
+    AmendmentStatus,
+    CompensationModel,
+    TeacherWallet,
+    ContractStatus,
 )
 from app.modules.lms.schemas import (
-    AttendanceSessionCreate, AttendanceSessionResponse,
-    AttendanceRecordResponse, AttendanceSubmit, StudentAttendanceSummary,
-    PaymentCreate, PaymentResponse,
+    AttendanceSessionCreate,
+    AttendanceSessionResponse,
+    AttendanceRecordResponse,
+    AttendanceSubmit,
+    StudentAttendanceSummary,
+    PaymentCreate,
+    PaymentResponse,
     TeacherWalletResponse,
-    ExpenseCreate, ExpenseResponse, EligibleRecipientResponse,
-    DailyClosureResponse, DailyLedgerResponse,
+    ExpenseCreate,
+    ExpenseResponse,
+    EligibleRecipientResponse,
+    DailyClosureResponse,
+    DailyLedgerResponse,
     RevenueOverviewResponse,
-    SectionContractResponse, ContractAssignRequest,
-    AmendmentCreateRequest, AmendmentResponse,
-    AmendmentApproveRequest, AmendmentRejectRequest, AmendmentPendingItem,
+    SectionContractResponse,
+    ContractAssignRequest,
+    AmendmentCreateRequest,
+    AmendmentResponse,
+    AmendmentApproveRequest,
+    AmendmentRejectRequest,
+    AmendmentPendingItem,
     WalletDetailResponse,
 )
 from app.modules.lms import service as lms_service
@@ -38,90 +53,143 @@ lms_router = APIRouter(prefix="/lms", tags=["lms"])
 
 
 # --- Attendance ---
-@lms_router.post("/attendance/sessions", response_model=AttendanceSessionResponse, status_code=status.HTTP_201_CREATED)
+@lms_router.post(
+    "/attendance/sessions",
+    response_model=AttendanceSessionResponse,
+    status_code=status.HTTP_201_CREATED,
+)
 async def create_attendance_session(
     data: AttendanceSessionCreate,
-    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary", "teacher"])),
-    db: AsyncSession = Depends(get_db)
+    current_user: User = Depends(
+        RoleChecker(allowed_roles=["superadmin", "manager", "secretary", "teacher"])
+    ),
+    db: AsyncSession = Depends(get_db),
 ):
     section = await get_course_section(db, data.section_id)
     if not section:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Section not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Section not found"
+        )
     if section.status != "active":
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot create attendance for a section that is not active")
-    if current_user.role.name == "teacher" and section.teacher_id != current_user.employee_id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not your section")
-    return await lms_service.create_attendance_session(db, data.section_id, data.date, current_user.id)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot create attendance for a section that is not active",
+        )
+    if (
+        current_user.role.name == "teacher"
+        and section.teacher_id != current_user.employee_id
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Not your section"
+        )
+    return await lms_service.create_attendance_session(
+        db, data.section_id, data.date, current_user.id
+    )
+
 
 @lms_router.get("/attendance/sessions", response_model=list[AttendanceSessionResponse])
 async def list_attendance_sessions(
     section_id: Optional[uuid.UUID] = None,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     if current_user.role.name == "teacher":
         if section_id:
             section = await get_course_section(db, section_id)
             if not section or section.teacher_id != current_user.employee_id:
-                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not your section")
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN, detail="Not your section"
+                )
     return await lms_service.list_attendance_sessions(db, section_id=section_id)
 
-@lms_router.get("/attendance/sessions/{session_id}", response_model=AttendanceSessionResponse)
+
+@lms_router.get(
+    "/attendance/sessions/{session_id}", response_model=AttendanceSessionResponse
+)
 async def get_attendance_session(
     session_id: uuid.UUID,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     session = await lms_service.get_attendance_session(db, session_id)
     if not session:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Session not found"
+        )
     return session
 
-@lms_router.post("/attendance/sessions/{session_id}/records", response_model=list[AttendanceRecordResponse])
+
+@lms_router.post(
+    "/attendance/sessions/{session_id}/records",
+    response_model=list[AttendanceRecordResponse],
+)
 async def submit_attendance(
     session_id: uuid.UUID,
     data: AttendanceSubmit,
-    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary", "teacher"])),
-    db: AsyncSession = Depends(get_db)
+    current_user: User = Depends(
+        RoleChecker(allowed_roles=["superadmin", "manager", "secretary", "teacher"])
+    ),
+    db: AsyncSession = Depends(get_db),
 ):
     session = await lms_service.get_attendance_session(db, session_id)
     if not session:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Session not found"
+        )
     if current_user.role.name == "teacher" and session.created_by != current_user.id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not your session")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Not your session"
+        )
     records_data = [r.model_dump() for r in data.records]
     return await lms_service.set_attendance_records(db, session_id, records_data)
 
 
-@lms_router.get("/attendance/students/{student_id}/summary", response_model=list[StudentAttendanceSummary])
+@lms_router.get(
+    "/attendance/students/{student_id}/summary",
+    response_model=list[StudentAttendanceSummary],
+)
 async def get_student_attendance_summary(
     student_id: uuid.UUID,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     return await lms_service.get_student_attendance_summary(db, student_id)
 
 
 # --- Payments ---
-@lms_router.post("/payments", response_model=PaymentResponse, status_code=status.HTTP_201_CREATED)
+@lms_router.post(
+    "/payments", response_model=PaymentResponse, status_code=status.HTTP_201_CREATED
+)
 async def create_payment(
     data: PaymentCreate,
     locale: str = "ar",
-    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])),
-    db: AsyncSession = Depends(get_db)
+    current_user: User = Depends(
+        RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])
+    ),
+    db: AsyncSession = Depends(get_db),
 ):
     payment_date = date.fromisoformat(data.date) if data.date else date.today()
     if await financial_service.is_date_closed(db, payment_date):
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=get_error_detail("date_is_closed", locale))
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=get_error_detail("date_is_closed", locale),
+        )
     payment = await financial_service.create_payment(
-        db, data.enrollment_id, data.amount, current_user.id, payment_date,
+        db,
+        data.enrollment_id,
+        data.amount,
+        current_user.id,
+        payment_date,
         payment_method=data.payment_method,
         transaction_number=data.transaction_number,
         locale=locale,
     )
     if not payment:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Enrollment not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Enrollment not found"
+        )
     return payment
+
 
 @lms_router.get("/payments", response_model=list[PaymentResponse])
 async def list_payments(
@@ -129,28 +197,41 @@ async def list_payments(
     student_id: Optional[uuid.UUID] = None,
     date_from: Optional[date] = None,
     date_to: Optional[date] = None,
-    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary", "teacher"])),
-    db: AsyncSession = Depends(get_db)
+    receipt_number: Optional[str] = None,
+    current_user: User = Depends(
+        RoleChecker(allowed_roles=["superadmin", "manager", "secretary", "teacher"])
+    ),
+    db: AsyncSession = Depends(get_db),
 ):
-    return await financial_service.list_payments(db, enrollment_id, student_id, date_from, date_to)
+    return await financial_service.list_payments(
+        db, enrollment_id, student_id, date_from, date_to, receipt_number
+    )
+
 
 @lms_router.get("/payments/summary/{enrollment_id}")
 async def get_payment_summary(
     enrollment_id: uuid.UUID,
-    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary", "teacher"])),
-    db: AsyncSession = Depends(get_db)
+    current_user: User = Depends(
+        RoleChecker(allowed_roles=["superadmin", "manager", "secretary", "teacher"])
+    ),
+    db: AsyncSession = Depends(get_db),
 ):
     return await financial_service.get_student_payment_summary(db, enrollment_id)
+
 
 @lms_router.get("/payments/{payment_id}", response_model=PaymentResponse)
 async def get_payment(
     payment_id: uuid.UUID,
-    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary", "teacher"])),
-    db: AsyncSession = Depends(get_db)
+    current_user: User = Depends(
+        RoleChecker(allowed_roles=["superadmin", "manager", "secretary", "teacher"])
+    ),
+    db: AsyncSession = Depends(get_db),
 ):
     payment = await financial_service.get_payment(db, payment_id)
     if not payment:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Payment not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Payment not found"
+        )
     return payment
 
 
@@ -159,12 +240,15 @@ async def preview_receipt(
     payment_id: uuid.UUID,
     locale: str = "ar",
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     html = await financial_service.get_receipt_html_content(db, payment_id, locale)
     if not html:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Receipt not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Receipt not found"
+        )
     from fastapi.responses import HTMLResponse
+
     return HTMLResponse(content=html)
 
 
@@ -174,7 +258,7 @@ async def get_revenue_overview(
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
     current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager"])),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     return await financial_service.get_revenue_overview(db, start_date, end_date)
 
@@ -183,54 +267,86 @@ async def get_revenue_overview(
 @lms_router.get("/teacher-wallets/{employee_id}", response_model=TeacherWalletResponse)
 async def get_teacher_wallet(
     employee_id: uuid.UUID,
-    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary", "teacher"])),
-    db: AsyncSession = Depends(get_db)
+    current_user: User = Depends(
+        RoleChecker(allowed_roles=["superadmin", "manager", "secretary", "teacher"])
+    ),
+    db: AsyncSession = Depends(get_db),
 ):
     wallet = await financial_service.get_teacher_wallet(db, employee_id)
     if not wallet:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Teacher wallet not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Teacher wallet not found"
+        )
     return wallet
 
 
-@lms_router.get("/teacher-wallets/{employee_id}/withdrawals", response_model=list[ExpenseResponse])
+@lms_router.get(
+    "/teacher-wallets/{employee_id}/withdrawals", response_model=list[ExpenseResponse]
+)
 async def get_teacher_withdrawals(
     employee_id: uuid.UUID,
-    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary", "teacher"])),
-    db: AsyncSession = Depends(get_db)
+    current_user: User = Depends(
+        RoleChecker(allowed_roles=["superadmin", "manager", "secretary", "teacher"])
+    ),
+    db: AsyncSession = Depends(get_db),
 ):
-    if current_user.role and current_user.role.name == "teacher" and current_user.employee_id != employee_id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cannot view other teachers' withdrawals")
+    if (
+        current_user.role
+        and current_user.role.name == "teacher"
+        and current_user.employee_id != employee_id
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Cannot view other teachers' withdrawals",
+        )
     return await financial_service.get_teacher_withdrawals(db, employee_id)
 
 
 # --- Expenses ---
-@lms_router.get("/expenses/eligible-recipients", response_model=list[EligibleRecipientResponse])
+@lms_router.get(
+    "/expenses/eligible-recipients", response_model=list[EligibleRecipientResponse]
+)
 async def list_eligible_recipients(
     type: str,
-    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])),
-    db: AsyncSession = Depends(get_db)
+    current_user: User = Depends(
+        RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])
+    ),
+    db: AsyncSession = Depends(get_db),
 ):
-    if type not in ("teacher_withdrawal", "secretary_advance"):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid recipient type")
+    if type not in ("teacher_withdrawal", "secretary_advance", "salary_payment"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid recipient type"
+        )
     return await financial_service.get_eligible_recipients(db, type)
 
 
-@lms_router.post("/expenses", response_model=ExpenseResponse, status_code=status.HTTP_201_CREATED)
+@lms_router.post(
+    "/expenses", response_model=ExpenseResponse, status_code=status.HTTP_201_CREATED
+)
 async def create_expense(
     data: ExpenseCreate,
     locale: str = "ar",
-    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])),
-    db: AsyncSession = Depends(get_db)
+    current_user: User = Depends(
+        RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])
+    ),
+    db: AsyncSession = Depends(get_db),
 ):
     expense_date = date.fromisoformat(data.date) if data.date else date.today()
     if await financial_service.is_date_closed(db, expense_date):
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=get_error_detail("date_is_closed", locale))
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=get_error_detail("date_is_closed", locale),
+        )
     try:
         expense = await financial_service.create_expense(
-            db, amount=data.amount, created_by=current_user.id,
+            db,
+            amount=data.amount,
+            created_by=current_user.id,
             recipient_name=data.recipient_name,
             recipient_id=data.recipient_id,
-            expense_type=data.type, description=data.description, expense_date=expense_date,
+            expense_type=data.type,
+            description=data.description,
+            expense_date=expense_date,
             locale=locale,
         )
     except ValueError as e:
@@ -244,21 +360,35 @@ async def list_expenses(
     date_from: Optional[date] = None,
     date_to: Optional[date] = None,
     recipient_name: Optional[str] = None,
-    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])),
-    db: AsyncSession = Depends(get_db)
+    receipt_number: Optional[str] = None,
+    current_user: User = Depends(
+        RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])
+    ),
+    db: AsyncSession = Depends(get_db),
 ):
-    return await financial_service.list_expenses(db, expense_type=type, date_from=date_from, date_to=date_to, recipient_name=recipient_name)
+    return await financial_service.list_expenses(
+        db,
+        expense_type=type,
+        date_from=date_from,
+        date_to=date_to,
+        recipient_name=recipient_name,
+        receipt_number=receipt_number,
+    )
 
 
 @lms_router.get("/expenses/{expense_id}", response_model=ExpenseResponse)
 async def get_expense(
     expense_id: uuid.UUID,
-    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])),
-    db: AsyncSession = Depends(get_db)
+    current_user: User = Depends(
+        RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])
+    ),
+    db: AsyncSession = Depends(get_db),
 ):
     expense = await financial_service.get_expense(db, expense_id)
     if not expense:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Expense not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Expense not found"
+        )
     return expense
 
 
@@ -267,52 +397,72 @@ async def preview_voucher(
     expense_id: uuid.UUID,
     locale: str = "ar",
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     html = await financial_service.get_voucher_html_content(db, expense_id, locale)
     if not html:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Voucher not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Voucher not found"
+        )
     from fastapi.responses import HTMLResponse
+
     return HTMLResponse(content=html)
 
 
 # --- Daily Closures ---
-@lms_router.post("/daily-closures/{closure_date}/close", response_model=DailyClosureResponse)
+@lms_router.post(
+    "/daily-closures/{closure_date}/close", response_model=DailyClosureResponse
+)
 async def close_day(
     closure_date: date,
     locale: str = "ar",
     current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager"])),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     closure = await financial_service.close_day(db, closure_date, current_user.id)
     if not closure:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=get_error_detail("date_already_closed", locale))
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=get_error_detail("date_already_closed", locale),
+        )
     return closure
 
 
-@lms_router.post("/daily-closures/{closure_date}/unlock-request", response_model=DailyClosureResponse)
+@lms_router.post(
+    "/daily-closures/{closure_date}/unlock-request", response_model=DailyClosureResponse
+)
 async def request_unlock(
     closure_date: date,
     locale: str = "ar",
-    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])),
-    db: AsyncSession = Depends(get_db)
+    current_user: User = Depends(
+        RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])
+    ),
+    db: AsyncSession = Depends(get_db),
 ):
     closure = await financial_service.request_unlock(db, closure_date)
     if not closure:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=get_error_detail("date_not_closed_or_already_unlocked", locale))
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=get_error_detail("date_not_closed_or_already_unlocked", locale),
+        )
     return closure
 
 
-@lms_router.post("/daily-closures/{closure_date}/approve-unlock", response_model=DailyClosureResponse)
+@lms_router.post(
+    "/daily-closures/{closure_date}/approve-unlock", response_model=DailyClosureResponse
+)
 async def approve_unlock(
     closure_date: date,
     locale: str = "ar",
     current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager"])),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     closure = await financial_service.approve_unlock(db, closure_date)
     if not closure:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=get_error_detail("no_unlock_request_pending", locale))
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=get_error_detail("no_unlock_request_pending", locale),
+        )
     return closure
 
 
@@ -320,27 +470,37 @@ async def approve_unlock(
 async def list_closures(
     date_from: Optional[date] = None,
     date_to: Optional[date] = None,
-    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])),
-    db: AsyncSession = Depends(get_db)
+    current_user: User = Depends(
+        RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])
+    ),
+    db: AsyncSession = Depends(get_db),
 ):
-    return await financial_service.list_closures(db, date_from=date_from, date_to=date_to)
+    return await financial_service.list_closures(
+        db, date_from=date_from, date_to=date_to
+    )
 
 
-@lms_router.get("/daily-closures/{closure_date}/ledger", response_model=DailyLedgerResponse)
+@lms_router.get(
+    "/daily-closures/{closure_date}/ledger", response_model=DailyLedgerResponse
+)
 async def get_daily_ledger(
     closure_date: date,
-    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])),
-    db: AsyncSession = Depends(get_db)
+    current_user: User = Depends(
+        RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])
+    ),
+    db: AsyncSession = Depends(get_db),
 ):
     return await financial_service.get_daily_ledger(db, closure_date)
 
 
 # --- Section Contracts ---
-@lms_router.get("/sections/{section_id}/contract", response_model=SectionContractResponse)
+@lms_router.get(
+    "/sections/{section_id}/contract", response_model=SectionContractResponse
+)
 async def get_section_contract(
     section_id: uuid.UUID,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(
         select(SectionContract)
@@ -351,7 +511,9 @@ async def get_section_contract(
     )
     contract = result.scalar_one_or_none()
     if not contract:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Contract not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Contract not found"
+        )
     section_data = None
     if contract.section:
         section_data = {
@@ -363,7 +525,9 @@ async def get_section_contract(
         id=contract.id,
         section_id=contract.section_id,
         teacher_id=contract.teacher_id,
-        compensation_model=contract.compensation_model.value if contract.compensation_model else None,
+        compensation_model=(
+            contract.compensation_model.value if contract.compensation_model else None
+        ),
         fixed_amount=float(contract.fixed_amount) if contract.fixed_amount else None,
         percentage=float(contract.percentage) if contract.percentage else None,
         holdback_rate=float(contract.holdback_rate),
@@ -374,30 +538,53 @@ async def get_section_contract(
     )
 
 
-@lms_router.put("/sections/{section_id}/contract/assign", response_model=SectionContractResponse)
+@lms_router.put(
+    "/sections/{section_id}/contract/assign", response_model=SectionContractResponse
+)
 async def assign_section_contract(
     section_id: uuid.UUID,
     data: ContractAssignRequest,
-    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager"])),
-    db: AsyncSession = Depends(get_db)
+    current_user: User = Depends(
+        RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])
+    ),
+    db: AsyncSession = Depends(get_db),
 ):
     section = await get_course_section(db, section_id)
     if not section:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Section not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Section not found"
+        )
     comp_model = data.compensation_model.lower()
     if comp_model not in ("fixed", "percentage"):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="compensation_model must be 'fixed' or 'percentage'")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="compensation_model must be 'fixed' or 'percentage'",
+        )
 
-    model_enum = CompensationModel.FIXED if comp_model == "fixed" else CompensationModel.PERCENTAGE
+    model_enum = (
+        CompensationModel.FIXED
+        if comp_model == "fixed"
+        else CompensationModel.PERCENTAGE
+    )
     try:
         contract = await lms_ledger.assign_contract(
             db=db,
             section_id=section_id,
             teacher_id=data.teacher_id,
             compensation_model=model_enum,
-            fixed_amount=Decimal(str(data.fixed_amount)) if data.fixed_amount is not None else None,
-            percentage=Decimal(str(data.percentage)) if data.percentage is not None else None,
-            holdback_rate=Decimal(str(data.holdback_rate)) if data.holdback_rate is not None else None,
+            fixed_amount=(
+                Decimal(str(data.fixed_amount))
+                if data.fixed_amount is not None
+                else None
+            ),
+            percentage=(
+                Decimal(str(data.percentage)) if data.percentage is not None else None
+            ),
+            holdback_rate=(
+                Decimal(str(data.holdback_rate))
+                if data.holdback_rate is not None
+                else None
+            ),
         )
         await db.refresh(contract, ["section"])
     except ValueError as e:
@@ -414,7 +601,9 @@ async def assign_section_contract(
         id=contract.id,
         section_id=contract.section_id,
         teacher_id=contract.teacher_id,
-        compensation_model=contract.compensation_model.value if contract.compensation_model else None,
+        compensation_model=(
+            contract.compensation_model.value if contract.compensation_model else None
+        ),
         fixed_amount=float(contract.fixed_amount) if contract.fixed_amount else None,
         percentage=float(contract.percentage) if contract.percentage else None,
         holdback_rate=float(contract.holdback_rate),
@@ -425,18 +614,25 @@ async def assign_section_contract(
     )
 
 
-@lms_router.post("/sections/{section_id}/contract/activate", response_model=SectionContractResponse)
+@lms_router.post(
+    "/sections/{section_id}/contract/activate", response_model=SectionContractResponse
+)
 async def activate_section_contract(
     section_id: uuid.UUID,
-    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])),
-    db: AsyncSession = Depends(get_db)
+    current_user: User = Depends(
+        RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])
+    ),
+    db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(
         select(SectionContract).where(SectionContract.section_id == section_id)
     )
     contract = result.scalar_one_or_none()
     if not contract:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Contract not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No contract assigned to this section. Assign a contract before activating.",
+        )
     try:
         contract = await lms_ledger.activate_contract(db, contract.id, current_user.id)
         await db.refresh(contract, ["section"])
@@ -453,7 +649,9 @@ async def activate_section_contract(
         id=contract.id,
         section_id=contract.section_id,
         teacher_id=contract.teacher_id,
-        compensation_model=contract.compensation_model.value if contract.compensation_model else None,
+        compensation_model=(
+            contract.compensation_model.value if contract.compensation_model else None
+        ),
         fixed_amount=float(contract.fixed_amount) if contract.fixed_amount else None,
         percentage=float(contract.percentage) if contract.percentage else None,
         holdback_rate=float(contract.holdback_rate),
@@ -464,21 +662,29 @@ async def activate_section_contract(
     )
 
 
-@lms_router.post("/sections/{section_id}/contract/complete", response_model=SectionContractResponse)
+@lms_router.post(
+    "/sections/{section_id}/contract/complete", response_model=SectionContractResponse
+)
 async def complete_section_contract(
     section_id: uuid.UUID,
-    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])),
-    db: AsyncSession = Depends(get_db)
+    current_user: User = Depends(
+        RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])
+    ),
+    db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(
         select(SectionContract).where(SectionContract.section_id == section_id)
     )
     contract = result.scalar_one_or_none()
     if not contract:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Contract not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Contract not found"
+        )
     try:
         if contract.status == ContractStatus.ACTIVE:
-            contract = await lms_ledger.finalize_grades_for_section(db, contract.section_id)
+            contract = await lms_ledger.finalize_grades_for_section(
+                db, contract.section_id
+            )
         contract = await lms_ledger.settle_contract(db, contract.id, current_user.id)
         await db.refresh(contract, ["section"])
     except ValueError as e:
@@ -494,7 +700,9 @@ async def complete_section_contract(
         id=contract.id,
         section_id=contract.section_id,
         teacher_id=contract.teacher_id,
-        compensation_model=contract.compensation_model.value if contract.compensation_model else None,
+        compensation_model=(
+            contract.compensation_model.value if contract.compensation_model else None
+        ),
         fixed_amount=float(contract.fixed_amount) if contract.fixed_amount else None,
         percentage=float(contract.percentage) if contract.percentage else None,
         holdback_rate=float(contract.holdback_rate),
@@ -506,30 +714,53 @@ async def complete_section_contract(
 
 
 # --- Compensation Amendments ---
-@lms_router.post("/sections/{section_id}/contract/amend", response_model=AmendmentResponse)
+@lms_router.post(
+    "/sections/{section_id}/contract/amend", response_model=AmendmentResponse
+)
 async def create_amendment(
     section_id: uuid.UUID,
     data: AmendmentCreateRequest,
-    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "teacher"])),
-    db: AsyncSession = Depends(get_db)
+    current_user: User = Depends(
+        RoleChecker(allowed_roles=["superadmin", "manager", "secretary", "teacher"])
+    ),
+    db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(
         select(SectionContract).where(SectionContract.section_id == section_id)
     )
     contract = result.scalar_one_or_none()
     if not contract:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Contract not found")
-    if current_user.role.name == "teacher" and contract.teacher_id != current_user.employee_id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not your contract")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Contract not found"
+        )
+    if (
+        current_user.role.name == "teacher"
+        and contract.teacher_id != current_user.employee_id
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Not your contract"
+        )
 
     if contract.compensation_model and contract.compensation_model.value == "fixed":
         requested_fixed = Decimal(str(data.requested_amount))
         requested_pct = None
-    elif contract.compensation_model and contract.compensation_model.value == "percentage":
+    elif (
+        contract.compensation_model
+        and contract.compensation_model.value == "percentage"
+    ):
         requested_fixed = None
         requested_pct = Decimal(str(data.requested_amount))
     else:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Contract has no compensation model")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Contract has no compensation model",
+        )
+    requested_by = current_user.employee_id or contract.teacher_id
+    if not requested_by:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot identify requester",
+        )
     try:
         amendment = await compensation_service.create_amendment(
             db=db,
@@ -537,17 +768,33 @@ async def create_amendment(
             requested_fixed_amount=requested_fixed,
             requested_percentage=requested_pct,
             reason=data.reason,
-            requested_by=current_user.employee_id,
+            requested_by=requested_by,
         )
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     return AmendmentResponse(
         id=amendment.id,
         contract_id=amendment.contract_id,
-        previous_fixed_amount=float(amendment.previous_fixed_amount) if amendment.previous_fixed_amount else None,
-        requested_fixed_amount=float(amendment.requested_fixed_amount) if amendment.requested_fixed_amount else None,
-        previous_percentage=float(amendment.previous_percentage) if amendment.previous_percentage else None,
-        requested_percentage=float(amendment.requested_percentage) if amendment.requested_percentage else None,
+        previous_fixed_amount=(
+            float(amendment.previous_fixed_amount)
+            if amendment.previous_fixed_amount
+            else None
+        ),
+        requested_fixed_amount=(
+            float(amendment.requested_fixed_amount)
+            if amendment.requested_fixed_amount
+            else None
+        ),
+        previous_percentage=(
+            float(amendment.previous_percentage)
+            if amendment.previous_percentage
+            else None
+        ),
+        requested_percentage=(
+            float(amendment.requested_percentage)
+            if amendment.requested_percentage
+            else None
+        ),
         reason=amendment.reason,
         requested_by=amendment.requested_by,
         requested_at=amendment.requested_at,
@@ -561,7 +808,7 @@ async def create_amendment(
 @lms_router.get("/amendments/pending", response_model=list[AmendmentPendingItem])
 async def list_pending_amendments(
     current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager"])),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(
         select(CompensationAmendmentRequest)
@@ -582,26 +829,42 @@ async def list_pending_amendments(
         course = section.course if section else None
         requestor = am.requestor
         teacher_name = requestor.full_name if requestor else ""
-        comp_model = contract.compensation_model.value if contract and contract.compensation_model else None
+        comp_model = (
+            contract.compensation_model.value
+            if contract and contract.compensation_model
+            else None
+        )
         if comp_model == "fixed":
-            current_amount = float(contract.fixed_amount) if contract and contract.fixed_amount else None
-            requested_amount = float(am.requested_fixed_amount) if am.requested_fixed_amount else None
+            current_amount = (
+                float(contract.fixed_amount)
+                if contract and contract.fixed_amount
+                else None
+            )
+            requested_amount = (
+                float(am.requested_fixed_amount) if am.requested_fixed_amount else None
+            )
         else:
-            current_amount = float(contract.percentage) if contract and contract.percentage else None
-            requested_amount = float(am.requested_percentage) if am.requested_percentage else None
-        items.append(AmendmentPendingItem(
-            id=am.id,
-            contract_id=am.contract_id,
-            section_name=str(section.id) if section else "",
-            course_name=course.name if course else "",
-            teacher_name=teacher_name,
-            compensation_model=comp_model,
-            current_amount=current_amount,
-            requested_amount=requested_amount,
-            reason=am.reason,
-            requested_by_name=teacher_name,
-            requested_at=am.requested_at,
-        ))
+            current_amount = (
+                float(contract.percentage) if contract and contract.percentage else None
+            )
+            requested_amount = (
+                float(am.requested_percentage) if am.requested_percentage else None
+            )
+        items.append(
+            AmendmentPendingItem(
+                id=am.id,
+                contract_id=am.contract_id,
+                section_name=str(section.id) if section else "",
+                course_name=course.name if course else "",
+                teacher_name=teacher_name,
+                compensation_model=comp_model,
+                current_amount=current_amount,
+                requested_amount=requested_amount,
+                reason=am.reason,
+                requested_by_name=teacher_name,
+                requested_at=am.requested_at,
+            )
+        )
     return items
 
 
@@ -610,19 +873,37 @@ async def approve_amendment(
     amendment_id: uuid.UUID,
     data: AmendmentApproveRequest = AmendmentApproveRequest(),
     current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager"])),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     try:
-        amendment = await compensation_service.approve_amendment(db, amendment_id, current_user.employee_id)
+        amendment = await compensation_service.approve_amendment(
+            db, amendment_id, current_user.employee_id
+        )
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     return AmendmentResponse(
         id=amendment.id,
         contract_id=amendment.contract_id,
-        previous_fixed_amount=float(amendment.previous_fixed_amount) if amendment.previous_fixed_amount else None,
-        requested_fixed_amount=float(amendment.requested_fixed_amount) if amendment.requested_fixed_amount else None,
-        previous_percentage=float(amendment.previous_percentage) if amendment.previous_percentage else None,
-        requested_percentage=float(amendment.requested_percentage) if amendment.requested_percentage else None,
+        previous_fixed_amount=(
+            float(amendment.previous_fixed_amount)
+            if amendment.previous_fixed_amount
+            else None
+        ),
+        requested_fixed_amount=(
+            float(amendment.requested_fixed_amount)
+            if amendment.requested_fixed_amount
+            else None
+        ),
+        previous_percentage=(
+            float(amendment.previous_percentage)
+            if amendment.previous_percentage
+            else None
+        ),
+        requested_percentage=(
+            float(amendment.requested_percentage)
+            if amendment.requested_percentage
+            else None
+        ),
         reason=amendment.reason,
         requested_by=amendment.requested_by,
         requested_at=amendment.requested_at,
@@ -638,7 +919,7 @@ async def reject_amendment(
     amendment_id: uuid.UUID,
     data: AmendmentRejectRequest = AmendmentRejectRequest(),
     current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager"])),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     try:
         amendment = await compensation_service.reject_amendment(
@@ -649,10 +930,26 @@ async def reject_amendment(
     return AmendmentResponse(
         id=amendment.id,
         contract_id=amendment.contract_id,
-        previous_fixed_amount=float(amendment.previous_fixed_amount) if amendment.previous_fixed_amount else None,
-        requested_fixed_amount=float(amendment.requested_fixed_amount) if amendment.requested_fixed_amount else None,
-        previous_percentage=float(amendment.previous_percentage) if amendment.previous_percentage else None,
-        requested_percentage=float(amendment.requested_percentage) if amendment.requested_percentage else None,
+        previous_fixed_amount=(
+            float(amendment.previous_fixed_amount)
+            if amendment.previous_fixed_amount
+            else None
+        ),
+        requested_fixed_amount=(
+            float(amendment.requested_fixed_amount)
+            if amendment.requested_fixed_amount
+            else None
+        ),
+        previous_percentage=(
+            float(amendment.previous_percentage)
+            if amendment.previous_percentage
+            else None
+        ),
+        requested_percentage=(
+            float(amendment.requested_percentage)
+            if amendment.requested_percentage
+            else None
+        ),
         reason=amendment.reason,
         requested_by=amendment.requested_by,
         requested_at=amendment.requested_at,
@@ -664,19 +961,30 @@ async def reject_amendment(
 
 
 # --- Wallet Detail ---
-@lms_router.get("/teacher-wallets/{teacher_id}/detail", response_model=WalletDetailResponse)
+@lms_router.get(
+    "/teacher-wallets/{teacher_id}/detail", response_model=WalletDetailResponse
+)
 async def get_wallet_detail(
     teacher_id: uuid.UUID,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
-    if current_user.role and current_user.role.name == "teacher" and current_user.employee_id != teacher_id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cannot view other teachers' wallet")
+    if (
+        current_user.role
+        and current_user.role.name == "teacher"
+        and current_user.employee_id != teacher_id
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Cannot view other teachers' wallet",
+        )
     wallet_result = await db.execute(
         select(TeacherWallet).where(TeacherWallet.teacher_id == teacher_id)
     )
     wallet = wallet_result.scalar_one_or_none()
     if not wallet:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Teacher wallet not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Teacher wallet not found"
+        )
     summary = await lms_ledger.get_wallet_summary(db, wallet.id)
     return summary

@@ -6,7 +6,7 @@ import { apiClient } from "@/lib/api";
 import { useAuth } from "@/components/AuthContext";
 import Modal from "@/components/Modal";
 import Select from "@/components/ui/Select";
-import { Plus, Loader2, RefreshCw, Eye } from "lucide-react";
+import { Plus, Loader2, RefreshCw, Eye, Search, X } from "lucide-react";
 import ReceiptModal, { ReceiptData } from "@/components/ReceiptModal";
 import { getLocalDateString, formatDisplayDate } from "@/lib/dates";
 
@@ -82,6 +82,7 @@ export default function PaymentsPage() {
       transactionNumber: "رقم العملية",
       enterTransactionNumber: "أدخل رقم العملية",
       createdBy: "تم بواسطة",
+      searchReceipt: "بحث برقم الإيصال",
       sar: "ريال",
     },
     en: {
@@ -124,6 +125,7 @@ export default function PaymentsPage() {
       transactionNumber: "Transaction Number",
       enterTransactionNumber: "Enter transaction number",
       createdBy: "Created By",
+      searchReceipt: "Search by receipt number",
       sar: "YER",
     },
   }[locale === "en" ? "en" : "ar"];
@@ -139,6 +141,13 @@ export default function PaymentsPage() {
   const [formError, setFormError] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [showReceipt, setShowReceipt] = useState<Payment | null>(null);
+  const [receiptSearch, setReceiptSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(receiptSearch), 300);
+    return () => clearTimeout(timer);
+  }, [receiptSearch]);
   const [receiptSummary, setReceiptSummary] = useState<PaymentSummary | null>(null);
   const [form, setForm] = useState<{
     enrollment_id: string;
@@ -152,12 +161,14 @@ export default function PaymentsPage() {
 
   const fetchPayments = useCallback(async () => {
     try {
-      const res = await apiClient.get<Payment[]>("/lms/payments");
+      const params: Record<string, string> = {};
+      if (debouncedSearch) params.receipt_number = debouncedSearch;
+      const res = await apiClient.get<Payment[]>("/lms/payments", { params });
       setPayments(res.data);
     } catch (e) {
       console.error(e);
     }
-  }, []);
+  }, [debouncedSearch]);
 
   const fetchLookups = useCallback(async () => {
     try {
@@ -278,6 +289,24 @@ export default function PaymentsPage() {
           <p className="text-sm text-slate-500 mt-1">{t.subtitle}</p>
         </div>
         <div className="flex items-center gap-2">
+          <div className="relative">
+            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            <input
+              type="text"
+              value={receiptSearch}
+              onChange={(e) => setReceiptSearch(e.target.value)}
+              placeholder={t.searchReceipt}
+              className="input-field pl-8 w-44 text-sm"
+            />
+            {receiptSearch && (
+              <button
+                onClick={() => setReceiptSearch("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
           <button onClick={handleRefresh} disabled={refreshing} className="btn-icon" title={t.refresh}>
             <RefreshCw size={16} className={refreshing ? "animate-spin" : ""} />
           </button>

@@ -7,7 +7,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import joinedload
 from sqlalchemy import func, or_
-from app.modules.academic.models import Course, CourseSection, Student, Enrollment, FinalGrade
+from app.modules.academic.models import (
+    Course,
+    CourseSection,
+    Student,
+    Enrollment,
+    FinalGrade,
+)
 from app.modules.academic.certificate_service import create_certificate, get_grade_label
 from app.modules.lms.models import Payment, ContractStatus
 from app.modules.lms.ledger_service import (
@@ -21,20 +27,27 @@ from app.modules.lms.ledger_service import (
 async def create_course(db: AsyncSession, data: dict) -> Course:
     if "code" in data and data["code"]:
         existing = await db.execute(
-            select(Course).where(Course.code == data["code"], Course.deleted_at.is_(None))
+            select(Course).where(
+                Course.code == data["code"], Course.deleted_at.is_(None)
+            )
         )
         if existing.scalar_one_or_none():
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Course code already exists")
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Course code already exists",
+            )
     course = Course(**data)
     db.add(course)
     await db.flush()
     return course
+
 
 async def get_course(db: AsyncSession, course_id: uuid.UUID) -> Optional[Course]:
     result = await db.execute(
         select(Course).where(Course.id == course_id, Course.deleted_at.is_(None))
     )
     return result.scalar_one_or_none()
+
 
 async def list_courses(
     db: AsyncSession,
@@ -58,7 +71,10 @@ async def list_courses(
     items = result.scalars().all()
     return {"items": items, "total": total}
 
-async def update_course(db: AsyncSession, course_id: uuid.UUID, data: dict) -> Optional[Course]:
+
+async def update_course(
+    db: AsyncSession, course_id: uuid.UUID, data: dict
+) -> Optional[Course]:
     course = await get_course(db, course_id)
     if not course:
         return None
@@ -66,6 +82,7 @@ async def update_course(db: AsyncSession, course_id: uuid.UUID, data: dict) -> O
         setattr(course, key, value)
     await db.flush()
     return course
+
 
 async def delete_course(db: AsyncSession, course_id: uuid.UUID) -> bool:
     course = await get_course(db, course_id)
@@ -82,18 +99,26 @@ async def create_course_section(db: AsyncSession, data: dict) -> CourseSection:
     if course_id:
         course = await get_course(db, course_id)
         if not course:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Course not found"
+            )
 
     section = CourseSection(**data)
     db.add(section)
     await db.flush()
     return section
 
-async def get_course_section(db: AsyncSession, section_id: uuid.UUID) -> Optional[CourseSection]:
+
+async def get_course_section(
+    db: AsyncSession, section_id: uuid.UUID
+) -> Optional[CourseSection]:
     result = await db.execute(
-        select(CourseSection).where(CourseSection.id == section_id, CourseSection.deleted_at.is_(None))
+        select(CourseSection).where(
+            CourseSection.id == section_id, CourseSection.deleted_at.is_(None)
+        )
     )
     return result.scalar_one_or_none()
+
 
 async def list_course_sections(
     db: AsyncSession,
@@ -106,7 +131,9 @@ async def list_course_sections(
     sort_order: str = "asc",
 ) -> dict:
     query = select(CourseSection).where(CourseSection.deleted_at.is_(None))
-    count_query = select(func.count(CourseSection.id)).where(CourseSection.deleted_at.is_(None))
+    count_query = select(func.count(CourseSection.id)).where(
+        CourseSection.deleted_at.is_(None)
+    )
     if teacher_id:
         query = query.where(CourseSection.teacher_id == teacher_id)
         count_query = count_query.where(CourseSection.teacher_id == teacher_id)
@@ -116,15 +143,30 @@ async def list_course_sections(
     if search:
         pattern = f"%{search}%"
         query = query.join(CourseSection.course).where(Course.name.ilike(pattern))
-        count_query = count_query.join(CourseSection.course).where(Course.name.ilike(pattern))
+        count_query = count_query.join(CourseSection.course).where(
+            Course.name.ilike(pattern)
+        )
     total = (await db.execute(count_query)).scalar() or 0
     sort_col = getattr(CourseSection, sort_by, CourseSection.id)
     order = sort_col.asc() if sort_order == "asc" else sort_col.desc()
+    query = query.options(joinedload(CourseSection.contract))
     result = await db.execute(query.order_by(order).offset(skip).limit(limit))
-    items = result.scalars().all()
+    items = result.unique().scalars().all()
+
+    for item in items:
+        item.contract_status = item.contract.status.value if item.contract else None
+        item.contract_compensation_model = (
+            item.contract.compensation_model.value
+            if item.contract and item.contract.compensation_model
+            else None
+        )
+
     return {"items": items, "total": total}
 
-async def update_course_section(db: AsyncSession, section_id: uuid.UUID, data: dict) -> Optional[CourseSection]:
+
+async def update_course_section(
+    db: AsyncSession, section_id: uuid.UUID, data: dict
+) -> Optional[CourseSection]:
     section = await get_course_section(db, section_id)
     if not section:
         return None
@@ -135,6 +177,7 @@ async def update_course_section(db: AsyncSession, section_id: uuid.UUID, data: d
     await db.flush()
     return section
 
+
 async def delete_course_section(db: AsyncSession, section_id: uuid.UUID) -> bool:
     section = await get_course_section(db, section_id)
     if not section:
@@ -142,6 +185,7 @@ async def delete_course_section(db: AsyncSession, section_id: uuid.UUID) -> bool
     section.deleted_at = datetime.now(timezone.utc)
     await db.flush()
     return True
+
 
 async def activate_section(
     db: AsyncSession,
@@ -157,25 +201,46 @@ async def activate_section(
     min_req = section.min_students_required or 1
     if section.enrolled_count < min_req:
         return None
+    if section.price is None:
+        return None
+    if section.teacher_id is None:
+        return None
+    if section.start_date is None:
+        return None
+    if section.class_time is None:
+        return None
 
     section.status = "active"
     if teacher_percentage is not None:
         section.teacher_percentage = teacher_percentage
 
-    if section.contract and section.contract.status == ContractStatus.ASSIGNED and activated_by:
-        await ledger_activate_contract(db, section.contract.id, activated_by=activated_by)
+    if (
+        section.contract
+        and section.contract.status == ContractStatus.ASSIGNED
+        and activated_by
+    ):
+        await ledger_activate_contract(
+            db, section.contract.id, activated_by=activated_by
+        )
 
     await db.flush()
     return section
 
-async def complete_section(db: AsyncSession, section_id: uuid.UUID, user_id: Optional[uuid.UUID] = None) -> Optional[CourseSection]:
+
+async def complete_section(
+    db: AsyncSession, section_id: uuid.UUID, user_id: Optional[uuid.UUID] = None
+) -> Optional[CourseSection]:
     section = await get_course_section(db, section_id)
     if not section:
         return None
     if section.status != "active":
         return None
 
-    if section.contract and section.contract.status == ContractStatus.GRADES_SUBMITTED and user_id:
+    if (
+        section.contract
+        and section.contract.status == ContractStatus.GRADES_SUBMITTED
+        and user_id
+    ):
         await ledger_settle_contract(db, section.contract.id, settled_by=user_id)
 
     section.status = "completed"
@@ -185,7 +250,7 @@ async def complete_section(db: AsyncSession, section_id: uuid.UUID, user_id: Opt
         .where(Enrollment.section_id == section_id, Enrollment.deleted_at.is_(None))
         .options(
             joinedload(Enrollment.student),
-            joinedload(Enrollment.section).joinedload(CourseSection.course)
+            joinedload(Enrollment.section).joinedload(CourseSection.course),
         )
     )
     for enrollment in enrollments_result.scalars().all():
@@ -202,14 +267,21 @@ async def complete_section(db: AsyncSession, section_id: uuid.UUID, user_id: Opt
 async def create_student(db: AsyncSession, data: dict) -> Student:
     if "student_code" in data and data["student_code"]:
         existing = await db.execute(
-            select(Student).where(Student.student_code == data["student_code"], Student.deleted_at.is_(None))
+            select(Student).where(
+                Student.student_code == data["student_code"],
+                Student.deleted_at.is_(None),
+            )
         )
         if existing.scalar_one_or_none():
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Student code already exists")
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Student code already exists",
+            )
     student = Student(**data)
     db.add(student)
     await db.flush()
     return student
+
 
 async def get_student(db: AsyncSession, student_id: uuid.UUID) -> Optional[Student]:
     result = await db.execute(
@@ -217,11 +289,17 @@ async def get_student(db: AsyncSession, student_id: uuid.UUID) -> Optional[Stude
     )
     return result.scalar_one_or_none()
 
-async def find_student_by_code(db: AsyncSession, student_code: str) -> Optional[Student]:
+
+async def find_student_by_code(
+    db: AsyncSession, student_code: str
+) -> Optional[Student]:
     result = await db.execute(
-        select(Student).where(Student.student_code == student_code, Student.deleted_at.is_(None))
+        select(Student).where(
+            Student.student_code == student_code, Student.deleted_at.is_(None)
+        )
     )
     return result.scalar_one_or_none()
+
 
 async def list_students(
     db: AsyncSession,
@@ -235,7 +313,11 @@ async def list_students(
     count_query = select(func.count(Student.id)).where(Student.deleted_at.is_(None))
     if search:
         pattern = f"%{search}%"
-        filter_clause = or_(Student.full_name.ilike(pattern), Student.student_code.ilike(pattern), Student.email.ilike(pattern))
+        filter_clause = or_(
+            Student.full_name.ilike(pattern),
+            Student.student_code.ilike(pattern),
+            Student.email.ilike(pattern),
+        )
         query = query.where(filter_clause)
         count_query = count_query.where(filter_clause)
     total = (await db.execute(count_query)).scalar() or 0
@@ -245,7 +327,10 @@ async def list_students(
     items = result.scalars().all()
     return {"items": items, "total": total}
 
-async def update_student(db: AsyncSession, student_id: uuid.UUID, data: dict) -> Optional[Student]:
+
+async def update_student(
+    db: AsyncSession, student_id: uuid.UUID, data: dict
+) -> Optional[Student]:
     student = await get_student(db, student_id)
     if not student:
         return None
@@ -253,6 +338,7 @@ async def update_student(db: AsyncSession, student_id: uuid.UUID, data: dict) ->
         setattr(student, key, value)
     await db.flush()
     return student
+
 
 async def delete_student(db: AsyncSession, student_id: uuid.UUID) -> bool:
     student = await get_student(db, student_id)
@@ -264,10 +350,13 @@ async def delete_student(db: AsyncSession, student_id: uuid.UUID) -> bool:
 
 
 # --- Enrollment CRUD ---
-async def create_enrollment(db: AsyncSession, section_id: uuid.UUID,
-                            student_id: Optional[uuid.UUID] = None,
-                            admin_discount: Optional[float] = None,
-                            student_data: Optional[dict] = None) -> Optional[Enrollment]:
+async def create_enrollment(
+    db: AsyncSession,
+    section_id: uuid.UUID,
+    student_id: Optional[uuid.UUID] = None,
+    admin_discount: Optional[float] = None,
+    student_data: Optional[dict] = None,
+) -> Optional[Enrollment]:
     if not student_id and student_data:
         existing = await find_student_by_code(db, student_data["student_code"])
         if existing:
@@ -293,11 +382,17 @@ async def create_enrollment(db: AsyncSession, section_id: uuid.UUID,
     await db.flush()
     return enrollment
 
-async def get_enrollment(db: AsyncSession, enrollment_id: uuid.UUID) -> Optional[Enrollment]:
+
+async def get_enrollment(
+    db: AsyncSession, enrollment_id: uuid.UUID
+) -> Optional[Enrollment]:
     result = await db.execute(
-        select(Enrollment).where(Enrollment.id == enrollment_id, Enrollment.deleted_at.is_(None))
+        select(Enrollment).where(
+            Enrollment.id == enrollment_id, Enrollment.deleted_at.is_(None)
+        )
     )
     return result.scalar_one_or_none()
+
 
 async def list_enrollments(
     db: AsyncSession,
@@ -310,7 +405,9 @@ async def list_enrollments(
     sort_order: str = "desc",
 ) -> dict:
     query = select(Enrollment).where(Enrollment.deleted_at.is_(None))
-    count_query = select(func.count(Enrollment.id)).where(Enrollment.deleted_at.is_(None))
+    count_query = select(func.count(Enrollment.id)).where(
+        Enrollment.deleted_at.is_(None)
+    )
     if section_id:
         query = query.where(Enrollment.section_id == section_id)
         count_query = count_query.where(Enrollment.section_id == section_id)
@@ -330,7 +427,31 @@ async def list_enrollments(
     order = sort_col.asc() if sort_order == "asc" else sort_col.desc()
     result = await db.execute(query.order_by(order).offset(skip).limit(limit))
     items = result.scalars().all()
+
+    if items:
+        enrollment_ids = [e.id for e in items]
+        total_paid_rows = await db.execute(
+            select(Payment.enrollment_id, func.coalesce(func.sum(Payment.amount), 0))
+            .where(Payment.enrollment_id.in_(enrollment_ids))
+            .group_by(Payment.enrollment_id)
+        )
+        total_paid_map = {row[0]: Decimal(str(row[1])) for row in total_paid_rows.all()}
+
+        for e in items:
+            total_paid = float(total_paid_map.get(e.id, Decimal("0")))
+            agreed_price = float(e.agreed_price) if e.agreed_price is not None else None
+            admin_discount = (
+                float(e.admin_discount) if e.admin_discount is not None else None
+            )
+            net_price = agreed_price
+            if agreed_price is not None and admin_discount is not None:
+                net_price = agreed_price - (agreed_price * admin_discount / 100)
+            balance = (net_price - total_paid) if net_price is not None else None
+            e.total_paid = total_paid
+            e.balance_remaining = balance
+
     return {"items": items, "total": total}
+
 
 async def delete_enrollment(db: AsyncSession, enrollment_id: uuid.UUID) -> bool:
     enrollment = await get_enrollment(db, enrollment_id)
@@ -342,6 +463,7 @@ async def delete_enrollment(db: AsyncSession, enrollment_id: uuid.UUID) -> bool:
     enrollment.deleted_at = datetime.now(timezone.utc)
     await db.flush()
     return True
+
 
 async def get_section_enrollments_detailed(
     db: AsyncSession, section_id: uuid.UUID
@@ -367,8 +489,7 @@ async def get_section_enrollments_detailed(
     total_paid_map = {row[0]: Decimal(str(row[1])) for row in total_paid_rows.all()}
 
     grade_rows = await db.execute(
-        select(FinalGrade)
-        .where(
+        select(FinalGrade).where(
             FinalGrade.section_id == section_id,
             FinalGrade.student_id.in_(student_ids),
         )
@@ -378,7 +499,7 @@ async def get_section_enrollments_detailed(
 
     results = []
     for e in enrollments:
-        total_paid = total_paid_map.get(e.id, Decimal('0'))
+        total_paid = total_paid_map.get(e.id, Decimal("0"))
         net_price = e.agreed_price
         if e.agreed_price is not None and e.admin_discount is not None:
             net_price = e.agreed_price - (e.agreed_price * e.admin_discount / 100)
@@ -388,21 +509,23 @@ async def get_section_enrollments_detailed(
         final_score = float(final_grade.final_score) if final_grade else None
         grade_label = get_grade_label(final_score) if final_score is not None else None
 
-        results.append({
-            "id": e.id,
-            "student_id": e.student_id,
-            "section_id": e.section_id,
-            "enrolled_at": e.enrolled_at,
-            "agreed_price": e.agreed_price,
-            "admin_discount": e.admin_discount,
-            "student_name": e.student.full_name,
-            "student_code": e.student.student_code,
-            "student_email": e.student.email,
-            "total_paid": total_paid,
-            "balance_remaining": balance,
-            "final_score": final_score,
-            "grade_label": grade_label,
-        })
+        results.append(
+            {
+                "id": e.id,
+                "student_id": e.student_id,
+                "section_id": e.section_id,
+                "enrolled_at": e.enrolled_at,
+                "agreed_price": e.agreed_price,
+                "admin_discount": e.admin_discount,
+                "student_name": e.student.full_name,
+                "student_code": e.student.student_code,
+                "student_email": e.student.email,
+                "total_paid": total_paid,
+                "balance_remaining": balance,
+                "final_score": final_score,
+                "grade_label": grade_label,
+            }
+        )
 
     return results
 
@@ -440,6 +563,7 @@ async def set_final_grade(
     await db.flush()
     return existing
 
+
 async def set_final_grades_bulk(
     db: AsyncSession,
     section_id: uuid.UUID,
@@ -449,23 +573,31 @@ async def set_final_grades_bulk(
     results = []
     for g in grades:
         fg = await set_final_grade(
-            db, section_id=section_id, student_id=g["student_id"],
-            final_score=g["final_score"], graded_by=graded_by, notes=g.get("notes")
+            db,
+            section_id=section_id,
+            student_id=g["student_id"],
+            final_score=g["final_score"],
+            graded_by=graded_by,
+            notes=g.get("notes"),
         )
         results.append(fg)
 
-    enrolled_count = await db.scalar(
-        select(func.count(Enrollment.id))
-        .where(
-            Enrollment.section_id == section_id,
-            Enrollment.deleted_at.is_(None),
+    enrolled_count = (
+        await db.scalar(
+            select(func.count(Enrollment.id)).where(
+                Enrollment.section_id == section_id,
+                Enrollment.deleted_at.is_(None),
+            )
         )
-    ) or 0
+        or 0
+    )
 
-    graded_count = await db.scalar(
-        select(func.count(FinalGrade.id))
-        .where(FinalGrade.section_id == section_id)
-    ) or 0
+    graded_count = (
+        await db.scalar(
+            select(func.count(FinalGrade.id)).where(FinalGrade.section_id == section_id)
+        )
+        or 0
+    )
 
     if enrolled_count > 0 and graded_count >= enrolled_count:
         try:
@@ -474,6 +606,7 @@ async def set_final_grades_bulk(
             pass
 
     return results
+
 
 async def list_final_grades(
     db: AsyncSession,
@@ -488,20 +621,25 @@ async def list_final_grades(
     result = await db.execute(query)
     rows = []
     for fg, student_name, student_code in result.all():
-        rows.append({
-            "id": fg.id,
-            "student_id": fg.student_id,
-            "section_id": fg.section_id,
-            "final_score": fg.final_score,
-            "graded_by": fg.graded_by,
-            "graded_at": fg.graded_at,
-            "notes": fg.notes,
-            "student_name": student_name,
-            "student_code": student_code,
-        })
+        rows.append(
+            {
+                "id": fg.id,
+                "student_id": fg.student_id,
+                "section_id": fg.section_id,
+                "final_score": fg.final_score,
+                "graded_by": fg.graded_by,
+                "graded_at": fg.graded_at,
+                "notes": fg.notes,
+                "student_name": student_name,
+                "student_code": student_code,
+            }
+        )
     return rows
 
-async def get_student_final_grades(db: AsyncSession, student_id: uuid.UUID) -> list[dict]:
+
+async def get_student_final_grades(
+    db: AsyncSession, student_id: uuid.UUID
+) -> list[dict]:
     result = await db.execute(
         select(FinalGrade).where(FinalGrade.student_id == student_id)
     )
@@ -514,6 +652,7 @@ async def get_student_final_grades(db: AsyncSession, student_id: uuid.UUID) -> l
         }
         for g in grades
     ]
+
 
 async def get_student_final_grade(
     db: AsyncSession,

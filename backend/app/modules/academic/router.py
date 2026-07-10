@@ -123,11 +123,33 @@ async def activate_section(
     current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])),
     db: AsyncSession = Depends(get_db)
 ):
+    sec = await academic_service.get_course_section(db, section_id)
+    if not sec:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Section not found")
+    if sec.status != "pending":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Section is not in pending status"
+        )
+    missing = []
+    if sec.price is None:
+        missing.append("price")
+    if sec.teacher_id is None:
+        missing.append("teacher")
+    if sec.start_date is None:
+        missing.append("start_date")
+    if sec.class_time is None:
+        missing.append("class_time")
+    if missing:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot activate section. Missing required fields: {', '.join(missing)}"
+        )
     section = await academic_service.activate_section(db, section_id, data.teacher_percentage)
     if not section:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot activate: insufficient enrollment or section not in pending status"
+            detail="Cannot activate: insufficient enrollment"
         )
     return section
 

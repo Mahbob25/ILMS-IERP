@@ -2,7 +2,7 @@ import uuid
 import enum
 from datetime import date, datetime
 from typing import Optional, TYPE_CHECKING
-from sqlalchemy import String, Integer, Float, Date, DateTime, ForeignKey, Text, Enum as SAEnum, UniqueConstraint, Numeric
+from sqlalchemy import String, Integer, Date, DateTime, ForeignKey, Text, Enum as SAEnum, UniqueConstraint, Numeric
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
@@ -201,7 +201,7 @@ class Expense(Base):
     )
     date: Mapped[date] = mapped_column(Date, nullable=False)
     receipt_number: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True)
-    type: Mapped[str] = mapped_column(SAEnum('general_expense', 'teacher_withdrawal', 'secretary_advance', name='expensetype'), nullable=False, default="general_expense", server_default="general_expense")
+    type: Mapped[str] = mapped_column(SAEnum('general_expense', 'teacher_withdrawal', 'secretary_advance', 'salary_payment', name='expensetype'), nullable=False, default="general_expense", server_default="general_expense")
 
     created_by: Mapped[uuid.UUID] = mapped_column(
         PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), nullable=False, index=True

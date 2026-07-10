@@ -502,10 +502,11 @@ async def delete_user(
 async def list_employees(
     employee_type: Optional[str] = Query(None, description="Filter by employee type"),
     search: Optional[str] = Query(None, description="Search by name"),
+    has_account: Optional[bool] = Query(None, description="Filter by whether employee has a user account"),
     current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager"])),
     db: AsyncSession = Depends(get_db)
 ):
-    return await identity_service.list_employees(db, employee_type=employee_type, search=search)
+    return await identity_service.list_employees(db, employee_type=employee_type, search=search, has_account=has_account)
 
 
 @employees_router.post("", response_model=EmployeeResponse, status_code=status.HTTP_201_CREATED)

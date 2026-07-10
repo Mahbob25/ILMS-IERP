@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useParams } from "next/navigation";
 import { apiClient } from "@/lib/api";
 import { useAuth } from "@/components/AuthContext";
@@ -32,6 +32,8 @@ interface Enrollment {
   enrolled_at: string;
   agreed_price: number | null;
   admin_discount: number | null;
+  total_paid: number;
+  balance_remaining: number | null;
 }
 
 interface PaymentSummary {
@@ -154,6 +156,10 @@ export default function POSPage() {
   const [showDropdown, setShowDropdown] = useState(false);
 
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
+  const activeEnrollments = useMemo(
+    () => enrollments.filter(enr => enr.balance_remaining !== 0),
+    [enrollments]
+  );
   const [courseSections, setCourseSections] = useState<CourseSection[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
 
@@ -460,11 +466,11 @@ export default function POSPage() {
               <div className="flex items-center justify-center py-4">
                 <Loader2 size={20} className="animate-spin text-slate-400" />
               </div>
-            ) : enrollments.length === 0 ? (
+            ) : activeEnrollments.length === 0 ? (
               <div className="text-sm text-slate-500 py-3">{t.noEnrollments}</div>
             ) : (
               <div className="space-y-2">
-                {enrollments.map((enr) => {
+                {activeEnrollments.map((enr) => {
                   const isSelected = selectedSectionId === enr.section_id;
                   const courseName = getCourseNameForEnrollment(enr.section_id);
                   return (
@@ -475,13 +481,13 @@ export default function POSPage() {
                         setSelectedEnrollmentId(enr.id);
                         setResult(null);
                         setError("");
+                        setAmount(enr.balance_remaining != null ? enr.balance_remaining.toString() : "");
                         try {
                           const res = await apiClient.get<PaymentSummary>(`/lms/payments/summary/${enr.id}`);
                           setSummary(res.data);
                           setAmount(res.data.balance_remaining != null ? res.data.balance_remaining.toString() : "");
                         } catch {
                           setSummary(null);
-                          setAmount(enr.agreed_price ? Math.max(0, enr.agreed_price - (enr.admin_discount || 0)).toString() : "");
                         }
                       }}
                       className={`w-full text-start p-3 rounded-xl border transition-colors ${
@@ -497,11 +503,15 @@ export default function POSPage() {
                             {courseName}
                           </span>
                         </div>
-                        {enr.agreed_price != null && (
+                        {enr.balance_remaining != null ? (
+                          <span className="text-xs text-slate-500">
+                            {t.remaining}: {enr.balance_remaining.toFixed(2)} {t.sar}
+                          </span>
+                        ) : enr.agreed_price != null ? (
                           <span className="text-xs text-slate-500">
                             {t.agreedPrice}: {enr.agreed_price.toFixed(2)} {t.sar}
                           </span>
-                        )}
+                        ) : null}
                       </div>
                     </button>
                   );

@@ -6,6 +6,7 @@ import { ChevronDown, Search } from "lucide-react";
 interface SelectOption {
   value: string | number;
   label: string;
+  badge?: { label: string; className: string };
 }
 
 interface SelectProps {
@@ -189,6 +190,13 @@ export default function Select({
         >
           {displayText}
         </span>
+        {selectedOption?.badge && (
+          <span
+            className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border shrink-0 ${selectedOption.badge.className}`}
+          >
+            {selectedOption.badge.label}
+          </span>
+        )}
         <ChevronDown
           size={16}
           className={`text-slate-400 shrink-0 transition-transform duration-200 ${
@@ -248,7 +256,7 @@ export default function Select({
                   aria-selected={option.value === value}
                   onClick={() => handleSelect(option)}
                   onMouseEnter={() => setHighlightedIndex(index)}
-                  className={`px-3 py-2 text-sm cursor-pointer transition-colors ${
+                  className={`px-3 py-2 text-sm cursor-pointer transition-colors flex items-center gap-2 ${
                     option.value === value
                       ? "bg-brand-50 text-brand-700 font-medium"
                       : index === highlightedIndex
@@ -256,9 +264,18 @@ export default function Select({
                         : "text-slate-700 hover:bg-slate-50"
                   }`}
                 >
-                  {searchable && search
-                    ? highlightMatch(option.label)
-                    : option.label}
+                  <span className="flex-1 truncate">
+                    {searchable && search
+                      ? highlightMatch(option.label)
+                      : option.label}
+                  </span>
+                  {option.badge && (
+                    <span
+                      className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border shrink-0 ${option.badge.className}`}
+                    >
+                      {option.badge.label}
+                    </span>
+                  )}
                 </li>
               ))
             )}

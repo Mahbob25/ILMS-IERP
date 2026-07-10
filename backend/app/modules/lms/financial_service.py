@@ -178,6 +178,7 @@ async def list_payments(
     student_id: Optional[uuid.UUID] = None,
     date_from: Optional[date] = None,
     date_to: Optional[date] = None,
+    receipt_number: Optional[str] = None,
 ) -> list[dict]:
     query = (
         select(Payment)
@@ -192,6 +193,8 @@ async def list_payments(
         query = query.where(Payment.date >= date_from)
     if date_to:
         query = query.where(Payment.date <= date_to)
+    if receipt_number:
+        query = query.where(Payment.receipt_number.ilike(f"%{receipt_number}%"))
     result = await db.execute(query)
     payments = result.scalars().all()
     return [
@@ -284,7 +287,6 @@ async def get_eligible_recipients(db: AsyncSession, recipient_type: str) -> list
         )
         secretaries = employees_result.scalars().all()
 
-        # Calculate total advances this month for each secretary
         total_advances_result = await db.execute(
             select(
                 Expense.recipient_id,
@@ -308,6 +310,40 @@ async def get_eligible_recipients(db: AsyncSession, recipient_type: str) -> list
                 "full_name": emp.full_name,
                 "role": "secretary",
                 "available_limit": remaining if stipend > 0 else 0,
+                "is_eligible": remaining > 0,
+            })
+        return result
+
+    elif recipient_type == "salary_payment":
+        employees_result = await db.execute(
+            select(Employee)
+            .where(Employee.employee_type != EmployeeType.TEACHER, Employee.is_active)
+        )
+        employees = employees_result.scalars().all()
+
+        total_payments_result = await db.execute(
+            select(
+                Expense.recipient_id,
+                func.coalesce(func.sum(Expense.amount), 0)
+            ).where(
+                Expense.type == "salary_payment",
+                Expense.date >= month_start,
+                Expense.date <= now,
+                Expense.recipient_id.isnot(None),
+            ).group_by(Expense.recipient_id)
+        )
+        payments_map = dict(total_payments_result.fetchall())
+
+        result = []
+        for emp in employees:
+            monthly_salary = emp.default_salary or 0
+            total_paid = payments_map.get(emp.id, 0)
+            remaining = monthly_salary - total_paid
+            result.append({
+                "id": str(emp.id),
+                "full_name": emp.full_name,
+                "role": emp.employee_type.value if hasattr(emp.employee_type, 'value') else emp.employee_type,
+                "available_limit": remaining if monthly_salary > 0 else 0,
                 "is_eligible": remaining > 0,
             })
         return result
@@ -345,7 +381,7 @@ async def create_expense(
     amount = Decimal(str(amount))
 
     # Validate and resolve recipient for teacher_withdrawal and secretary_advance
-    if expense_type in ("teacher_withdrawal", "secretary_advance"):
+    if expense_type in ("teacher_withdrawal", "secretary_advance", "salary_payment"):
         if not recipient_id:
             raise ValueError(f"recipient_id is required for {expense_type}")
 
@@ -357,9 +393,16 @@ async def create_expense(
             raise ValueError("Recipient not found")
         if not employee.is_active:
             raise ValueError("Recipient is not active")
-        expected_type = EmployeeType.TEACHER if expense_type == "teacher_withdrawal" else EmployeeType.SECRETARY
-        if employee.employee_type != expected_type:
+        if expense_type == "teacher_withdrawal":
+            expected_type = EmployeeType.TEACHER
+        elif expense_type == "secretary_advance":
+            expected_type = EmployeeType.SECRETARY
+        else:
+            expected_type = None
+        if expected_type and employee.employee_type != expected_type:
             raise ValueError(f"Recipient must be a {expected_type.value}")
+        if expense_type == "salary_payment" and employee.employee_type == EmployeeType.TEACHER:
+            raise ValueError("Salary payment is not applicable to teachers")
         recipient_name = employee.full_name
 
         if expense_type == "teacher_withdrawal":
@@ -371,23 +414,23 @@ async def create_expense(
             if not wallet or available_balance < amount:
                 raise ValueError("Insufficient wallet balance")
 
-        elif expense_type == "secretary_advance":
-            stipend = employee.default_salary or 0
+        elif expense_type in ("secretary_advance", "salary_payment"):
+            monthly_limit = employee.default_salary or 0
             month_start = expense_date.replace(day=1)
             total_result = await db.execute(
                 select(func.coalesce(func.sum(Expense.amount), 0))
                 .where(
-                    Expense.type == "secretary_advance",
+                    Expense.type == expense_type,
                     Expense.recipient_id == recipient_id,
                     Expense.date >= month_start,
                     Expense.date <= expense_date,
                 )
             )
-            total_advances = total_result.scalar() or 0
-            remaining = stipend - total_advances
+            total_paid = total_result.scalar() or 0
+            remaining = monthly_limit - total_paid
             if remaining < amount:
                 raise ValueError(
-                    f"Insufficient remaining stipend. Available: {remaining}, Requested: {amount}"
+                    f"Insufficient remaining monthly salary. Available: {remaining}, Requested: {amount}"
                 )
 
     receipt_number = await get_next_voucher_number(db, expense_date)
@@ -431,6 +474,7 @@ async def list_expenses(
     date_from: Optional[date] = None,
     date_to: Optional[date] = None,
     recipient_name: Optional[str] = None,
+    receipt_number: Optional[str] = None,
 ) -> list[dict]:
     query = (
         select(Expense)
@@ -445,6 +489,8 @@ async def list_expenses(
         query = query.where(Expense.date <= date_to)
     if recipient_name:
         query = query.where(Expense.recipient_name.ilike(f"%{recipient_name}%"))
+    if receipt_number:
+        query = query.where(Expense.receipt_number.ilike(f"%{receipt_number}%"))
     result = await db.execute(query)
     expenses = result.scalars().all()
     return [
@@ -928,18 +974,21 @@ EXPENSE_TYPE_LABELS_EN = {
     "general_expense": "General Expense",
     "teacher_withdrawal": "Teacher Withdrawal",
     "secretary_advance": "Secretary Advance",
+    "salary_payment": "Salary Payment",
 }
 
 EXPENSE_TYPE_LABELS_AR = {
     "general_expense": "مصروف عام",
     "teacher_withdrawal": "سحب معلم",
     "secretary_advance": "سلفة سكرتير",
+    "salary_payment": "صرف راتب",
 }
 
 EXPENSE_TYPE_BADGE = {
     "general_expense": "badge-general",
     "teacher_withdrawal": "badge-teacher",
     "secretary_advance": "badge-secretary",
+    "salary_payment": "badge-salary",
 }
 
 

@@ -394,7 +394,7 @@ export default function EnrollmentsPage() {
               <div>
                 <label className="block text-xs font-medium text-slate-700 mb-1">{t.discount}</label>
                 <input type="number" value={form.admin_discount} onChange={(e) => setForm({ ...form, admin_discount: e.target.value })}
-                  className="input-field" min={0} />
+                  className="input-field" min={0} max={100} />
               </div>
             )}
           </div>

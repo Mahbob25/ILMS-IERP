@@ -76,11 +76,12 @@ export default function EmployeesPage() {
       userCreated: "تم إنشاء حساب المستخدم بنجاح",
       passwordHint: "8 أحرف على الأقل: حرف كبير، حرف صغير، رقم، رمز خاص",
       compensationType: "نظام التعويض",
-      monthlySalary: "راتب",
+      monthlySalary: "راتب شهري",
       percentage: "نسبة مئوية",
       hybrid: "نظام هجين",
       defaultPct: "النسبة الافتراضية (%)",
       compensationSalary: "الراتب",
+      manualPaymentHint: "يتم صرف الراتب يدويًا عبر المصروفات",
     },
     en: {
       title: "Employee Management", subtitle: "Manage employee records (HR data)",
@@ -101,11 +102,12 @@ export default function EmployeesPage() {
       userCreated: "User account created successfully",
       passwordHint: "Min 8 chars: uppercase, lowercase, digit, special character",
       compensationType: "Compensation Type",
-      monthlySalary: "Stipend",
+      monthlySalary: "Monthly Salary",
       percentage: "Percentage",
       hybrid: "Hybrid",
       defaultPct: "Default Percentage (%)",
-      compensationSalary: "Salary",
+      compensationSalary: "Stipend",
+      manualPaymentHint: "Salary is disbursed manually via Expenses",
     },
   }[locale === "en" ? "en" : "ar"];
 
@@ -117,7 +119,7 @@ export default function EmployeesPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
   const [form, setForm] = useState({
-    full_name: "", employee_type: "teacher",
+    full_name: "", employee_type: "",
     phone_number: "", salary: "", hire_date: "",
     contract_end_date: "", address: "",
     compensation_type: "salary", default_percentage: "",
@@ -164,27 +166,41 @@ export default function EmployeesPage() {
   );
 
   const openCreate = () => {
-    setForm({ full_name: "", employee_type: "teacher", phone_number: "", salary: "", hire_date: "", contract_end_date: "", address: "", compensation_type: "salary", default_percentage: "" });
+    setForm({ full_name: "", employee_type: "", phone_number: "", salary: "", hire_date: "", contract_end_date: "", address: "", compensation_type: "salary", default_percentage: "" });
     setEditingId(null);
     setShowForm(true);
   };
 
   const openEdit = (emp: Employee) => {
-    const compType = (emp.default_salary && emp.default_percentage) ? "hybrid"
-      : emp.default_salary ? "salary"
-      : emp.default_percentage ? "percentage"
-      : "salary";
-    setForm({
-      full_name: emp.full_name,
-      employee_type: emp.employee_type,
-      phone_number: emp.phone_number || "",
-      salary: emp.default_salary?.toString() || "",
-      hire_date: emp.hire_date || "",
-      contract_end_date: emp.contract_end_date || "",
-      address: emp.address || "",
-      compensation_type: compType,
-      default_percentage: emp.default_percentage?.toString() || "",
-    });
+    if (emp.employee_type === "teacher") {
+      const compType = (emp.default_salary && emp.default_percentage) ? "hybrid"
+        : emp.default_salary ? "salary"
+        : emp.default_percentage ? "percentage"
+        : "salary";
+      setForm({
+        full_name: emp.full_name,
+        employee_type: emp.employee_type,
+        phone_number: emp.phone_number || "",
+        salary: emp.default_salary?.toString() || "",
+        hire_date: emp.hire_date || "",
+        contract_end_date: emp.contract_end_date || "",
+        address: emp.address || "",
+        compensation_type: compType,
+        default_percentage: emp.default_percentage?.toString() || "",
+      });
+    } else {
+      setForm({
+        full_name: emp.full_name,
+        employee_type: emp.employee_type,
+        phone_number: emp.phone_number || "",
+        salary: emp.default_salary?.toString() || "",
+        hire_date: emp.hire_date || "",
+        contract_end_date: emp.contract_end_date || "",
+        address: emp.address || "",
+        compensation_type: "salary",
+        default_percentage: "",
+      });
+    }
     setEditingId(emp.id);
     setShowForm(true);
   };
@@ -196,8 +212,12 @@ export default function EmployeesPage() {
         employee_type: form.employee_type,
       };
       if (form.phone_number) payload.phone_number = form.phone_number;
-      if (form.salary && form.compensation_type !== "percentage") payload.default_salary = parseFloat(form.salary);
-      if (form.default_percentage && form.compensation_type !== "salary") payload.default_percentage = parseFloat(form.default_percentage);
+      if (form.employee_type === "teacher") {
+        if (form.salary && form.compensation_type !== "percentage") payload.default_salary = parseFloat(form.salary);
+        if (form.default_percentage && form.compensation_type !== "salary") payload.default_percentage = parseFloat(form.default_percentage);
+      } else {
+        if (form.salary) payload.default_salary = parseFloat(form.salary);
+      }
       if (form.hire_date) payload.hire_date = form.hire_date;
       if (form.contract_end_date) payload.contract_end_date = form.contract_end_date;
       if (form.address) payload.address = form.address;
@@ -338,42 +358,60 @@ export default function EmployeesPage() {
               <label className="block text-xs font-medium text-slate-700 mb-1">{t.type}</label>
               <Select
                 value={form.employee_type}
-                onChange={(value) => setForm({ ...form, employee_type: value })}
+                onChange={(value) => {
+                  const isTeacher = value === "teacher";
+                  setForm({
+                    ...form,
+                    employee_type: value,
+                    default_percentage: isTeacher ? form.default_percentage : "",
+                  });
+                }}
                 options={EMPLOYEE_TYPES.map((type) => ({ value: type, label: type }))}
+                placeholder={locale === "ar" ? "اختر النوع" : "Select type..."}
               />
             </div>
             <div>
               <label className="block text-xs font-medium text-slate-700 mb-1">{t.phone}</label>
               <input type="text" value={form.phone_number} onChange={(e) => setForm({ ...form, phone_number: e.target.value })} className="input-field" />
             </div>
-            <div className="md:col-span-3">
-              <label className="block text-xs font-medium text-slate-700 mb-1">{t.compensationType}</label>
-              <div className="flex gap-3">
-                {(["salary", "percentage", "hybrid"] as const).map((type) => (
-                  <label key={type} className={`flex items-center gap-2 px-4 py-2 rounded-lg border cursor-pointer transition-all text-sm ${form.compensation_type === type ? "bg-brand-50 text-brand-600 border-brand-200" : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"}`}>
-                    <input
-                      type="radio" name="compensation_type" value={type}
-                      checked={form.compensation_type === type}
-                      onChange={() => {
-                        setForm({ ...form, compensation_type: type, salary: type === "percentage" ? "0" : form.salary, default_percentage: type === "salary" ? "" : form.default_percentage });
-                      }}
-                      className="sr-only"
-                    />
-                    {type === "salary" ? t.monthlySalary : type === "percentage" ? t.percentage : t.hybrid}
-                  </label>
-                ))}
-              </div>
-            </div>
-            {(form.compensation_type === "salary" || form.compensation_type === "hybrid") && (
-              <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">{t.compensationSalary}</label>
-                <input type="number" value={form.salary} onChange={(e) => setForm({ ...form, salary: e.target.value })} className="input-field" />
-              </div>
+            {form.employee_type === "teacher" && (
+              <>
+                <div className="md:col-span-3">
+                  <label className="block text-xs font-medium text-slate-700 mb-1">{t.compensationType}</label>
+                  <div className="flex gap-3">
+                    {(["salary", "percentage", "hybrid"] as const).map((type) => (
+                      <label key={type} className={`flex items-center gap-2 px-4 py-2 rounded-lg border cursor-pointer transition-all text-sm ${form.compensation_type === type ? "bg-brand-50 text-brand-600 border-brand-200" : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"}`}>
+                        <input
+                          type="radio" name="compensation_type" value={type}
+                          checked={form.compensation_type === type}
+                          onChange={() => {
+                            setForm({ ...form, compensation_type: type, salary: type === "percentage" ? "0" : form.salary, default_percentage: type === "salary" ? "" : form.default_percentage });
+                          }}
+                          className="sr-only"
+                        />
+                        {type === "salary" ? t.monthlySalary : type === "percentage" ? t.percentage : t.hybrid}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                {(form.compensation_type === "salary" || form.compensation_type === "hybrid") && (
+                  <div>
+                    <label className="block text-xs font-medium text-slate-700 mb-1">{t.compensationSalary}</label>
+                    <input type="number" value={form.salary} onChange={(e) => setForm({ ...form, salary: e.target.value })} className="input-field" />
+                  </div>
+                )}
+                {(form.compensation_type === "percentage" || form.compensation_type === "hybrid") && (
+                  <div>
+                    <label className="block text-xs font-medium text-slate-700 mb-1">{t.defaultPct}</label>
+                    <input type="number" value={form.default_percentage} onChange={(e) => setForm({ ...form, default_percentage: e.target.value })} className="input-field" min={0} max={100} />
+                  </div>
+                )}
+              </>
             )}
-            {(form.compensation_type === "percentage" || form.compensation_type === "hybrid") && (
+            {form.employee_type !== "" && form.employee_type !== "teacher" && (
               <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">{t.defaultPct}</label>
-                <input type="number" value={form.default_percentage} onChange={(e) => setForm({ ...form, default_percentage: e.target.value })} className="input-field" min={0} max={100} />
+                <label className="block text-xs font-medium text-slate-700 mb-1">{t.monthlySalary}</label>
+                <input type="number" value={form.salary} onChange={(e) => setForm({ ...form, salary: e.target.value })} className="input-field" />
               </div>
             )}
             <div>
@@ -431,14 +469,26 @@ export default function EmployeesPage() {
                   </td>
                   <td className="text-slate-600 text-sm">{emp.phone_number || "—"}</td>
                   <td>
-                    {emp.default_salary !== null && (
-                      <span className="badge bg-blue-50 text-blue-600 border-blue-100">{t.monthlySalary}: {emp.default_salary.toFixed(2)}</span>
-                    )}
-                    {emp.default_percentage !== null && (
-                      <span className="badge bg-emerald-50 text-emerald-600 border-emerald-100">{t.defaultPct}: {emp.default_percentage}%</span>
-                    )}
-                    {emp.default_salary === null && emp.default_percentage === null && (
-                      <span className="text-slate-400 text-sm">&mdash;</span>
+                    {emp.employee_type === "teacher" ? (
+                      <>
+                        {emp.default_salary !== null && (
+                          <span className="badge bg-blue-50 text-blue-600 border-blue-100">{t.compensationSalary}: {emp.default_salary.toFixed(2)}</span>
+                        )}
+                        {emp.default_percentage !== null && (
+                          <span className="badge bg-emerald-50 text-emerald-600 border-emerald-100">{t.defaultPct}: {emp.default_percentage}%</span>
+                        )}
+                        {emp.default_salary === null && emp.default_percentage === null && (
+                          <span className="text-slate-400 text-sm">&mdash;</span>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        {emp.default_salary !== null ? (
+                          <span className="badge bg-blue-50 text-blue-600 border-blue-100">{t.monthlySalary}: {emp.default_salary.toFixed(2)}</span>
+                        ) : (
+                          <span className="text-slate-400 text-sm">&mdash;</span>
+                        )}
+                      </>
                     )}
                   </td>
                   <td>

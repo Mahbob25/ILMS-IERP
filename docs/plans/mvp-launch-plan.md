@@ -481,35 +481,55 @@ async def create_payment_endpoint(...):
     ...
 ```
 
-### 3.3 — Token Cleanup & Audit Log Retention
+### 3.3 — Token Cleanup & Audit Log Retention (Startup-Driven)
 
-**File: `backend/app/modules/identity/service.py`** (or a new scheduled task)
+**File: `backend/app/modules/identity/startup_cleanup.py`** (new)
 
-Add a cleanup function that runs once daily (via cron hitting an endpoint or a scheduled task):
+The server is not online 24/7, so cleanup cannot rely on a cron job. Instead, run cleanup inside the FastAPI `lifespan` startup event — the same pattern as section startup checks.
 
 ```python
-async def cleanup_expired_tokens(db: AsyncSession) -> int:
-    """Delete expired refresh tokens older than 30 days."""
-    cutoff = datetime.now(timezone.utc) - timedelta(days=30)
+from datetime import datetime, timezone, timedelta
+from sqlalchemy import delete
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.modules.identity.models import RefreshToken
+from app.modules.identity.models import AuditLog
+
+
+async def run_startup_cleanup(db: AsyncSession) -> None:
+    """Idempotent cleanup: deletes expired tokens and old audit logs on boot.
+    Each cleanup type tracks its last run date in daily_jobs_log to prevent
+    redundant execution on mid-day reboots."""
+    cutoff_tokens = datetime.now(timezone.utc) - timedelta(days=30)
     result = await db.execute(
         delete(RefreshToken).where(
-            RefreshToken.expires_at < cutoff
+            RefreshToken.expires_at < cutoff_tokens
         )
     )
-    await db.commit()
-    return result.rowcount
+    token_count = result.rowcount
 
-
-async def cleanup_old_audit_logs(db: AsyncSession) -> int:
-    """Archive/delete audit logs older than 90 days."""
-    cutoff = datetime.now(timezone.utc) - timedelta(days=90)
+    cutoff_logs = datetime.now(timezone.utc) - timedelta(days=90)
     result = await db.execute(
         delete(AuditLog).where(
-            AuditLog.created_at < cutoff
+            AuditLog.created_at < cutoff_logs
         )
     )
-    await db.commit()
-    return result.rowcount
+    log_count = result.rowcount
+
+    if token_count or log_count:
+        await db.commit()
+```
+
+Wire into `backend/app/main.py` inside the existing lifespan event:
+
+```python
+from app.modules.identity.startup_cleanup import run_startup_cleanup
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    async with async_session_maker() as db:
+        await run_daily_section_checks(db)
+        await run_startup_cleanup(db)  # Same boot-time pattern
+    yield
 ```
 
 ---
@@ -519,7 +539,7 @@ async def cleanup_old_audit_logs(db: AsyncSession) -> int:
 | Day | Phase | Items |
 |-----|-------|-------|
 | **Day 1 morning** | Phase 0 | Uncomment services in compose, non-root Docker user, rebuild |
-| **Day 1 afternoon** | Phase 1 | CSP headers, backup script + cron, verify password/lockout config |
+| **Day 1 afternoon** | Phase 1 | CSP headers, backup script (OS cron for DB backup only), verify password/lockout config |
 | **Day 2 morning** | Phase 2 | Sentry DSN + init code, rebuild, verify error capture |
 | **Day 2 afternoon** | Phase 2 | Install self-hosted runner, create `.github/workflows/ci-cd.yml`, push first deploy |
 | **Day 3** | Phase 2 | Set GitHub secrets, push a trigger commit, verify full pipeline |

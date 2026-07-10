@@ -186,6 +186,7 @@ async def list_employees(
     db: AsyncSession,
     employee_type: Optional[str] = None,
     search: Optional[str] = None,
+    has_account: Optional[bool] = None,
 ) -> list[dict]:
     query = select(Employee).order_by(Employee.full_name)
 
@@ -198,6 +199,13 @@ async def list_employees(
 
     if search:
         query = query.where(Employee.full_name.ilike(f"%{search}%"))
+
+    if has_account is not None:
+        subq = select(User.employee_id).where(User.employee_id.isnot(None)).scalar_subquery()
+        if has_account:
+            query = query.where(Employee.id.in_(subq))
+        else:
+            query = query.where(Employee.id.notin_(subq))
 
     result = await db.execute(query)
     employees = result.scalars().all()
@@ -276,6 +284,9 @@ async def create_employee(db: AsyncSession, data: dict) -> Employee:
     except ValueError:
         raise ValueError(f"Invalid employee type: {data['employee_type']}")
 
+    if type_enum != EmployeeType.TEACHER and data.get("default_percentage") is not None:
+        raise ValueError("Compensation percentage is only applicable to teachers")
+
     employee = Employee(
         full_name=data["full_name"],
         employee_type=type_enum,
@@ -298,9 +309,17 @@ async def create_employee(db: AsyncSession, data: dict) -> Employee:
 async def update_employee(db: AsyncSession, employee: Employee, data: dict) -> Employee:
     if "employee_type" in data and data["employee_type"]:
         try:
-            data["employee_type"] = EmployeeType(data["employee_type"])
+            new_type = data["employee_type"]
+            data["employee_type"] = EmployeeType(new_type)
         except ValueError:
             raise ValueError(f"Invalid employee type: {data['employee_type']}")
+
+    resolved_type = data.get("employee_type", employee.employee_type)
+    if resolved_type != EmployeeType.TEACHER and "default_percentage" in data and data["default_percentage"] is not None:
+        raise ValueError("Compensation percentage is only applicable to teachers")
+
+    if resolved_type != EmployeeType.TEACHER:
+        data["default_percentage"] = None
 
     for key, value in data.items():
         if value is not None:

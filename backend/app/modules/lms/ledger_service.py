@@ -231,6 +231,19 @@ async def activate_contract(
     if not contract.compensation_model:
         raise ValueError("Cannot activate a contract without a compensation model")
 
+    section_result = await db.execute(
+        select(CourseSection).where(CourseSection.id == contract.section_id)
+    )
+    section = section_result.scalar_one_or_none()
+    if not section:
+        raise ValueError(f"Section {contract.section_id} not found")
+    if section.price is None:
+        raise ValueError("Cannot activate a section without a price. Set the price before activating.")
+    if section.start_date is None:
+        raise ValueError("Cannot activate a section without a start date. Set the start date before activating.")
+    if section.class_time is None:
+        raise ValueError("Cannot activate a section without a class time. Set the class time before activating.")
+
     wallet = await get_or_create_wallet(db, contract.teacher_id)
 
     if contract.compensation_model == CompensationModel.FIXED:
@@ -254,13 +267,7 @@ async def activate_contract(
 
     contract.status = ContractStatus.ACTIVE
     contract.updated_at = datetime.now(timezone.utc)
-
-    section_result = await db.execute(
-        select(CourseSection).where(CourseSection.id == contract.section_id)
-    )
-    section = section_result.scalar_one_or_none()
-    if section:
-        section.status = "active"
+    section.status = "active"
 
     await db.flush()
     return contract

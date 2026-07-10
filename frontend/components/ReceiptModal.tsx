@@ -18,7 +18,7 @@ export interface ReceiptData {
   transaction_number?: string | null;
   recipient_name?: string;
   expense_type_label?: string;
-  expense_type_variant?: "general" | "teacher" | "secretary";
+  expense_type_variant?: "general" | "teacher" | "secretary" | "salary";
   agreed_price?: number | null;
   admin_discount?: number | null;
   total_paid?: number | null;
@@ -40,6 +40,7 @@ const typeStyles: Record<string, string> = {
   general: "bg-slate-100 text-slate-600 border-slate-200",
   teacher: "bg-amber-50 text-amber-600 border-amber-200",
   secretary: "bg-purple-50 text-purple-600 border-purple-200",
+  salary: "bg-emerald-50 text-emerald-600 border-emerald-200",
 };
 
 export default function ReceiptModal({
@@ -86,7 +87,7 @@ export default function ReceiptModal({
     (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     },
-    [onClose]
+    [onClose],
   );
 
   useEffect(() => {
@@ -169,7 +170,8 @@ export default function ReceiptModal({
 
   const isPayment = data.type === "payment";
 
-  const paymentMethodLabel = data.payment_method === "online" ? labels.online : labels.cash;
+  const paymentMethodLabel =
+    data.payment_method === "online" ? labels.online : labels.cash;
 
   const expenseTypeClass = data.expense_type_variant
     ? typeStyles[data.expense_type_variant] || typeStyles.general
@@ -236,27 +238,40 @@ export default function ReceiptModal({
                 </div>
                 {data.transaction_number && (
                   <div className="flex justify-between py-1.5 text-sm">
-                    <span className="text-slate-400">{labels.transactionNo}</span>
+                    <span className="text-slate-400">
+                      {labels.transactionNo}
+                    </span>
                     <span className="font-mono text-xs text-slate-700">
                       {data.transaction_number}
                     </span>
                   </div>
                 )}
 
-                {(data.agreed_price != null || showDiscount || data.total_paid != null || data.balance_remaining != null) && (
+                {(data.agreed_price != null ||
+                  showDiscount ||
+                  data.total_paid != null ||
+                  data.balance_remaining != null) && (
                   <>
                     <hr className="border-t border-dashed border-slate-200 my-3" />
                     <div className="space-y-1.5">
                       {data.agreed_price != null && (
                         <div className="flex justify-between text-sm">
-                          <span className="text-slate-400">{labels.agreedPrice}</span>
-                          <span className="text-slate-700">{formatCurrency(data.agreed_price)}</span>
+                          <span className="text-slate-400">
+                            {labels.agreedPrice}
+                          </span>
+                          <span className="text-slate-700">
+                            {formatCurrency(data.agreed_price)}
+                          </span>
                         </div>
                       )}
                       {showDiscount && (
                         <div className="flex justify-between text-sm">
-                          <span className="text-slate-400">{labels.discount}</span>
-                          <span className="text-red-500">-{formatCurrency(data.admin_discount!)}</span>
+                          <span className="text-slate-400">
+                            {labels.discount}
+                          </span>
+                          <span className="text-red-500">
+                            -{formatCurrency(data.admin_discount!)}
+                          </span>
                         </div>
                       )}
                     </div>
@@ -269,7 +284,9 @@ export default function ReceiptModal({
                 <div className="flex justify-between py-1.5 text-sm">
                   <span className="text-slate-400">{labels.type}</span>
                   <span>
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${expenseTypeClass}`}>
+                    <span
+                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${expenseTypeClass}`}
+                    >
                       {data.expense_type_label || "—"}
                     </span>
                   </span>
@@ -287,7 +304,9 @@ export default function ReceiptModal({
               <span className="text-base font-bold text-slate-800">
                 {isPayment ? labels.paid : labels.paid}
               </span>
-              <span className={`text-2xl font-extrabold ${isPayment ? "text-emerald-600" : "text-red-500"}`}>
+              <span
+                className={`text-2xl font-extrabold ${isPayment ? "text-emerald-600" : "text-red-500"}`}
+              >
                 {formatCurrency(data.amount)}
               </span>
             </div>
@@ -295,19 +314,27 @@ export default function ReceiptModal({
             {isPayment && data.balance_remaining != null && (
               <div className="flex justify-between text-sm pt-1 border-t border-dashed border-slate-200">
                 <span className="text-slate-400">{labels.balance}</span>
-                <span className={`font-semibold ${data.balance_remaining > 0 ? "text-amber-600" : "text-emerald-600"}`}>
+                <span
+                  className={`font-semibold ${data.balance_remaining > 0 ? "text-amber-600" : "text-emerald-600"}`}
+                >
                   {formatCurrency(data.balance_remaining)}
                 </span>
               </div>
             )}
 
             <div className="flex justify-between pt-8 text-[11px] text-slate-400">
-              <span>{labels.cashier}: {cashierName ? cashierName : "_______________"}</span>
+              <span>
+                {labels.cashier}:{" "}
+                {cashierName ? cashierName : "_______________"}
+              </span>
               <span>
                 {isPayment
-                  ? isAr ? "توقيع الطالب: _______________" : `Student ${labels.signature}: _______________`
-                  : isAr ? "توقيع المستلم: _______________" : `Recipient ${labels.signature}: _______________`
-                }
+                  ? isAr
+                    ? "توقيع الطالب: _______________"
+                    : `Student ${labels.signature}: _______________`
+                  : isAr
+                    ? "توقيع المستلم: _______________"
+                    : `Recipient ${labels.signature}: _______________`}
               </span>
             </div>
           </div>

@@ -26,6 +26,14 @@ interface AppUser {
   is_active: boolean;
   is_superadmin: boolean;
   role: RoleInfo;
+  employee_id?: string | null;
+}
+
+interface EmployeeOption {
+  id: string;
+  full_name: string;
+  employee_type: string;
+  has_user_account: boolean;
 }
 
 const ROLE_COLORS: Record<string, string> = {
@@ -86,6 +94,10 @@ export default function UsersPage() {
       localePref: "اللغة",
       arabic: "العربية",
       english: "English",
+      selectEmployee: "اختر موظف...",
+      passwordRequirements: "كلمة المرور يجب أن تحتوي على الأقل 8 أحرف، حرف كبير، حرف صغير، رقم، وحرف خاص",
+      noEmployeesAvailable: "لا يوجد موظفون بدون حسابات",
+      fetchEmployeesFailed: "فشل تحميل الموظفين",
     },
     en: {
       title: "User Management",
@@ -122,6 +134,10 @@ export default function UsersPage() {
       localePref: "Language",
       arabic: "Arabic",
       english: "English",
+      selectEmployee: "Select employee...",
+      passwordRequirements: "Password must be at least 8 characters with uppercase, lowercase, digit, and special character",
+      noEmployeesAvailable: "No employees without accounts",
+      fetchEmployeesFailed: "Failed to load employees",
     },
   }[locale === "en" ? "en" : "ar"];
 
@@ -132,10 +148,40 @@ export default function UsersPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState<string>("all");
-  const [form, setForm] = useState({ email: "", password: "", role_id: "", locale_pref: "ar" });
+  const [form, setForm] = useState({ email: "", password: "", role_id: "", locale_pref: "ar", employee_id: "" });
+  const [employees, setEmployees] = useState<EmployeeOption[]>([]);
+  const [employeesLoading, setEmployeesLoading] = useState(false);
+  const [employeesError, setEmployeesError] = useState<string | null>(null);
   const [toggleTarget, setToggleTarget] = useState<AppUser | null>(null);
   const [toggleAction, setToggleAction] = useState<"deactivate" | "reactivate">("deactivate");
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
+
+  const extractApiError = (e: any): string => {
+    const detail = e?.response?.data?.detail;
+    if (!detail) return "";
+    if (typeof detail === "string") return detail;
+    if (Array.isArray(detail)) {
+      return detail.map((d: any) => d.msg || d.message).filter(Boolean).join("; ");
+    }
+    return String(detail);
+  };
+
+  const translateError = (msg: string): string => {
+    if (!isRtl) return msg;
+    const translations: Record<string, string> = {
+      "Password must contain at least one lowercase letter": "كلمة المرور يجب أن تحتوي على حرف صغير واحد على الأقل",
+      "Password must contain at least one uppercase letter": "كلمة المرور يجب أن تحتوي على حرف كبير واحد على الأقل",
+      "Password must contain at least one digit": "كلمة المرور يجب أن تحتوي على رقم واحد على الأقل",
+      "Password must contain at least one special character": "كلمة المرور يجب أن تحتوي على حرف خاص واحد على الأقل",
+      "String should have at least 8 characters": "كلمة المرور يجب أن تحتوي على 8 أحرف على الأقل",
+      "Email address already registered": "البريد الإلكتروني مسجل بالفعل",
+      "employee_id is required: every user must be linked to an employee": "يجب ربط المستخدم بموظف",
+      "Specified employee does not exist": "الموظف المحدد غير موجود",
+      "Specified role ID does not exist": "الدور المحدد غير موجود",
+    };
+    return translations[msg] || msg;
+  };
 
   const fetchUsers = useCallback(async () => {
     setMessage(null);
@@ -176,15 +222,29 @@ export default function UsersPage() {
     return matchesSearch && matchesRole;
   });
 
-  const openCreate = () => {
+  const openCreate = async () => {
     setForm({
       email: "",
       password: "",
       role_id: roles.find((r) => r.name === "teacher")?.id || roles[0]?.id || "",
       locale_pref: "ar",
+      employee_id: "",
     });
     setEditingId(null);
     setShowForm(true);
+    setFormError(null);
+    setEmployees([]);
+    setEmployeesLoading(true);
+    setEmployeesError(null);
+    try {
+      const res = await apiClient.get<EmployeeOption[]>("/employees?has_account=false");
+      setEmployees(res.data);
+    } catch (e: any) {
+      setEmployeesError(translateError(extractApiError(e) || e?.message || t.fetchEmployeesFailed));
+      console.error("Failed to fetch employees", e);
+    } finally {
+      setEmployeesLoading(false);
+    }
   };
 
   const openEdit = (target: AppUser) => {
@@ -193,9 +253,11 @@ export default function UsersPage() {
       password: "",
       role_id: target.role.id,
       locale_pref: target.locale_pref,
+      employee_id: target.employee_id || "",
     });
     setEditingId(target.id);
     setShowForm(true);
+    setFormError(null);
   };
 
   const handleSave = async () => {
@@ -213,14 +275,14 @@ export default function UsersPage() {
           password: form.password,
           role_id: form.role_id,
           locale_pref: form.locale_pref,
+          employee_id: form.employee_id,
         });
       }
       setShowForm(false);
       setEditingId(null);
       fetchUsers();
     } catch (e: any) {
-      const detail = e?.response?.data?.detail || "Error";
-      setMessage({ type: "error", text: detail });
+      setFormError(extractApiError(e) || t.actionFailed);
     }
   };
 
@@ -236,7 +298,7 @@ export default function UsersPage() {
       fetchUsers();
     } catch (e: any) {
       setToggleTarget(null);
-      const detail = e?.response?.data?.detail || t.actionFailed;
+      const detail = extractApiError(e) || t.actionFailed;
       setMessage({ type: "error", text: detail });
     }
   };
@@ -330,18 +392,47 @@ export default function UsersPage() {
         </div>
       )}
 
-      <Modal open={showForm} onClose={() => setShowForm(false)} title={editingId ? t.editTitle : t.createTitle} size="xl">
+      <Modal open={showForm} onClose={() => { setShowForm(false); setFormError(null); }} title={editingId ? t.editTitle : t.createTitle} size="xl">
         <div className="space-y-6">
+          {formError && (
+            <div className="px-4 py-3 rounded-lg text-sm font-medium bg-red-50 text-red-700 border border-red-200" dir={isRtl ? "rtl" : "ltr"}>
+              {translateError(formError)}
+            </div>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <div>
               <label className="block text-xs font-medium text-slate-700 mb-1">{t.fullName}</label>
-              <input
-                type="text"
-                value={editingId ? (users.find(u => u.id === editingId)?.full_name || "") : ""}
-                className="input-field bg-slate-50 text-slate-500"
-                disabled
-                placeholder={t.fullName}
-              />
+              {editingId ? (
+                <input
+                  type="text"
+                  value={users.find((u) => u.id === editingId)?.full_name || ""}
+                  className="input-field bg-slate-50 text-slate-500"
+                  disabled
+                  placeholder={t.fullName}
+                />
+              ) : employeesLoading ? (
+                <div className="input-field flex items-center gap-2 text-slate-400">
+                  <Loader2 size={14} className="animate-spin" />
+                  <span className="text-sm">{t.loading}</span>
+                </div>
+              ) : employeesError ? (
+                <div className="text-xs text-red-500 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                  {employeesError}
+                </div>
+              ) : employees.length === 0 ? (
+                <div className="text-xs text-slate-400 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+                  {t.noEmployeesAvailable}
+                </div>
+              ) : (
+                <Select
+                  value={form.employee_id}
+                  onChange={(value) => setForm({ ...form, employee_id: value })}
+                  options={employees.map((e) => ({ value: e.id, label: e.full_name }))}
+                  placeholder={t.selectEmployee}
+                  searchable
+                  isRtl={isRtl}
+                />
+              )}
             </div>
             <div>
               <label className="block text-xs font-medium text-slate-700 mb-1">{t.email}</label>
@@ -359,8 +450,11 @@ export default function UsersPage() {
                 value={form.password}
                 onChange={(e) => setForm({ ...form, password: e.target.value })}
                 className="input-field"
-                placeholder={editingId ? "(leave empty to keep)" : ""}
+                placeholder={editingId ? (isRtl ? "(اتركه فارغًا للاحتفاظ)" : "(leave empty to keep)") : ""}
               />
+              {!editingId && (
+                <p className="mt-1 text-[11px] text-slate-400">{t.passwordRequirements}</p>
+              )}
             </div>
             <div>
               <label className="block text-xs font-medium text-slate-700 mb-1">{t.role}</label>
