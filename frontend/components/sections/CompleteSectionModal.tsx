@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { apiClient } from "@/lib/api";
 import Modal from "@/components/Modal";
-import { Loader2, AlertTriangle, Users, DollarSign } from "lucide-react";
+import { Loader2, AlertTriangle, CheckCircle2, DollarSign } from "lucide-react";
 
 interface BypassItem {
   student_name?: string;
@@ -15,7 +15,8 @@ interface CompleteSectionModalProps {
   open: boolean;
   onClose: () => void;
   sectionId: string;
-  sectionName: string;
+  bypassGradeCheck?: boolean;
+  bypassPaymentCheck?: boolean;
   ungradedStudents?: BypassItem[];
   unpaidStudents?: BypassItem[];
   isRtl?: boolean;
@@ -27,7 +28,8 @@ export default function CompleteSectionModal({
   open,
   onClose,
   sectionId,
-  sectionName,
+  bypassGradeCheck = false,
+  bypassPaymentCheck = false,
   ungradedStudents = [],
   unpaidStudents = [],
   isRtl = false,
@@ -42,8 +44,9 @@ export default function CompleteSectionModal({
     ar: {
       title: "إكمال الشعبة مع تجاوز",
       bypassWarning: "سيتم تجاوز الفحوصات التالية",
-      ungraded: "طلاب بدون درجات",
-      unpaid: "طلاب عليهم مدفوعات",
+      gradeCheck: "فحص الدرجات",
+      paymentCheck: "فحص الدفع",
+      students: "طالب",
       reasonLabel: "سبب التجاوز",
       reasonPlaceholder: "يرجى توضيح سبب تجاوز فحوصات الإكمال...",
       confirm: "إكمال على أي حال",
@@ -55,8 +58,9 @@ export default function CompleteSectionModal({
     en: {
       title: "Complete Section with Override",
       bypassWarning: "The following checks will be bypassed",
-      ungraded: "Ungraded Students",
-      unpaid: "Unpaid Students",
+      gradeCheck: "Grade Check",
+      paymentCheck: "Payment Check",
+      students: "students",
       reasonLabel: "Override Reason",
       reasonPlaceholder: "Explain why you are overriding the completion checks...",
       confirm: "Complete Anyway",
@@ -67,7 +71,7 @@ export default function CompleteSectionModal({
     },
   }[locale === "en" ? "en" : "ar"];
 
-  const hasBypassItems = ungradedStudents.length > 0 || unpaidStudents.length > 0;
+  const hasBypassItems = bypassGradeCheck || bypassPaymentCheck;
 
   const handleConfirm = async () => {
     setLoading(true);
@@ -79,8 +83,9 @@ export default function CompleteSectionModal({
       });
       onSuccess();
       onClose();
-    } catch (e: any) {
-      setError(e?.response?.data?.detail || t.error);
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { detail?: string } } };
+      setError(err?.response?.data?.detail || t.error);
     } finally {
       setLoading(false);
     }
@@ -95,33 +100,30 @@ export default function CompleteSectionModal({
               <AlertTriangle size={14} />
               {t.bypassWarning}
             </p>
-            {ungradedStudents.length > 0 && (
-              <div>
-                <p className="text-xs font-medium text-amber-600 flex items-center gap-1">
-                  <Users size={12} /> {t.ungraded} ({ungradedStudents.length})
-                </p>
-                <ul className="text-xs text-amber-600 ms-4 list-disc">
-                  {ungradedStudents.map((s, i) => (
-                    <li key={i}>{s.student_name || s.student_code || `#${i + 1}`}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-            {unpaidStudents.length > 0 && (
-              <div>
-                <p className="text-xs font-medium text-amber-600 flex items-center gap-1">
-                  <DollarSign size={12} /> {t.unpaid} ({unpaidStudents.length})
-                </p>
-                <ul className="text-xs text-amber-600 ms-4 list-disc">
-                  {unpaidStudents.map((s, i) => (
-                    <li key={i}>
-                      {s.student_name || s.student_code || `#${i + 1}`}
-                      {s.amount != null ? ` — ${s.amount.toFixed(2)}` : ""}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
+            <div className="space-y-1.5">
+              {bypassGradeCheck && (
+                <div className="flex items-center gap-2 text-xs text-amber-700 bg-amber-100/50 rounded px-2 py-1.5">
+                  <CheckCircle2 size={14} className="text-amber-500" />
+                  <span className="font-medium">{t.gradeCheck}</span>
+                  {ungradedStudents.length > 0 && (
+                    <span className="ms-auto text-amber-600">
+                      {ungradedStudents.length} {ungradedStudents.length === 1 && locale === "en" ? "student" : t.students}
+                    </span>
+                  )}
+                </div>
+              )}
+              {bypassPaymentCheck && (
+                <div className="flex items-center gap-2 text-xs text-amber-700 bg-amber-100/50 rounded px-2 py-1.5">
+                  <DollarSign size={14} className="text-amber-500" />
+                  <span className="font-medium">{t.paymentCheck}</span>
+                  {unpaidStudents.length > 0 && (
+                    <span className="ms-auto text-amber-600">
+                      {unpaidStudents.length} {unpaidStudents.length === 1 && locale === "en" ? "student" : t.students}
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -134,8 +136,12 @@ export default function CompleteSectionModal({
             onChange={(e) => setReason(e.target.value)}
             className="input-field"
             rows={3}
+            maxLength={500}
             placeholder={t.reasonPlaceholder}
           />
+          {reason.length > 0 && (
+            <p className="text-xs text-slate-400 mt-1">{reason.length}/500</p>
+          )}
         </div>
 
         {error && (

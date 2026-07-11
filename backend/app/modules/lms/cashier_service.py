@@ -6,7 +6,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from sqlalchemy.orm import joinedload
 from app.core.timezone import get_today
-from app.modules.academic.models import PendingRefund, Refund, Enrollment, Student
+from app.modules.academic.models import (
+    PendingRefund, Refund, SectionCancellation, Enrollment, Student, CourseSection,
+)
 from app.modules.lms.financial_service import is_date_closed
 
 
@@ -21,7 +23,9 @@ async def get_pending_refunds_queue(
         select(PendingRefund)
         .options(
             joinedload(PendingRefund.enrollment).joinedload(Enrollment.student),
-            joinedload(PendingRefund.section_cancellation),
+            joinedload(PendingRefund.section_cancellation)
+            .joinedload(SectionCancellation.section)
+            .joinedload(CourseSection.course),
         )
         .where(PendingRefund.status == status)
     )
@@ -48,8 +52,25 @@ async def get_pending_refunds_queue(
     )
     items = result.scalars().all()
 
+    data = []
+    for pr in items:
+        student = pr.enrollment.student if pr.enrollment else None
+        section = pr.section_cancellation.section if pr.section_cancellation else None
+        data.append({
+            "id": str(pr.id),
+            "enrollment_id": str(pr.enrollment_id),
+            "section_cancellation_id": str(pr.section_cancellation_id),
+            "amount": float(pr.amount),
+            "status": pr.status,
+            "created_at": pr.created_at.isoformat() if pr.created_at else None,
+            "expires_at": pr.expires_at.isoformat() if pr.expires_at else None,
+            "student_name": student.full_name if student else None,
+            "student_code": student.student_code if student else None,
+            "section_name": section.course.name if section and section.course else None,
+        })
+
     return {
-        "data": items,
+        "data": data,
         "meta": {"total": total, "page": page, "per_page": per_page},
     }
 
@@ -147,7 +168,23 @@ async def get_cashier_refund_history(
     )
     items = result.scalars().all()
 
+    data = []
+    for rf in items:
+        pr = rf.pending_refund
+        student = pr.enrollment.student if pr and pr.enrollment else None
+        data.append({
+            "id": str(rf.id),
+            "pending_refund_id": str(rf.pending_refund_id),
+            "receipt_number": rf.receipt_number,
+            "amount": float(rf.amount),
+            "disbursed_at": rf.disbursed_at.isoformat() if rf.disbursed_at else None,
+            "disbursed_by": str(rf.disbursed_by) if rf.disbursed_by else None,
+            "notes": rf.notes,
+            "student_name": student.full_name if student else None,
+            "student_code": student.student_code if student else None,
+        })
+
     return {
-        "data": items,
+        "data": data,
         "meta": {"total": total, "page": page, "per_page": per_page},
     }

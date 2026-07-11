@@ -17,9 +17,12 @@ import {
   Ban,
 } from "lucide-react";
 import SectionWarningBanner from "@/components/sections/SectionWarningBanner";
+import SectionStatusBadge from "@/components/sections/SectionStatusBadge";
+import FinancialSummary from "@/components/sections/FinancialSummary";
 import CancelSectionModal from "@/components/sections/CancelSectionModal";
 import DeactivateSectionModal from "@/components/sections/DeactivateSectionModal";
 import CompleteSectionModal from "@/components/sections/CompleteSectionModal";
+import { useSectionActivation } from "@/components/sections/useSectionActivation";
 
 interface SectionEnrollmentDetail {
   id: string;
@@ -69,8 +72,15 @@ interface ContractInfo {
   created_at: string;
 }
 
-interface Course { id: string; name: string; code: string; }
-interface Employee { id: string; full_name: string; }
+interface Course {
+  id: string;
+  name: string;
+  code: string;
+}
+interface Employee {
+  id: string;
+  full_name: string;
+}
 
 export default function SectionStudentsPage() {
   const params = useParams();
@@ -130,6 +140,14 @@ export default function SectionStudentsPage() {
       errActivateMissingFields: "يرجى ملء جميع الحقول المطلوبة قبل التفعيل:",
       ready_for_completion: "جاهز للإكمال",
       cancelled: "ملغى",
+      activate: "تفعيل",
+      activating: "جاري التفعيل...",
+      activated: "تم التفعيل بنجاح",
+      contractAssigned: "معيّن",
+      contractActive: "نشط",
+      contractGraded: "تم التقييم",
+      contractSettled: "تم التسوية",
+      contractCancelled: "ملغى",
       cancelSection: "إلغاء الشعبة",
       deactivateSection: "إلغاء التنشيط",
       completeSection: "إكمال الشعبة",
@@ -143,7 +161,8 @@ export default function SectionStudentsPage() {
       deactivateSuccess: "تم إلغاء التنشيط بنجاح",
       completeSuccess: "تم إكمال الشعبة بنجاح",
       missingGradesCount: (n: number, t: number) => `${n} من ${t} طالب مكتمل`,
-      outstandingPayments: (n: number, a: number) => `${n} طالب عليهم ${a.toFixed(2)}`,
+      outstandingPayments: (n: number, a: number) =>
+        `${n} طالب عليهم ${a.toFixed(2)}`,
     },
     en: {
       title: "Section Students",
@@ -168,7 +187,8 @@ export default function SectionStudentsPage() {
       loading: "Loading...",
       empty: "No students enrolled in this section",
       sar: "YER",
-      gradesRequired: "Please fill final scores for all students before completing",
+      gradesRequired:
+        "Please fill final scores for all students before completing",
       pending: "Pending",
       active: "Active",
       completed: "Completed",
@@ -191,9 +211,18 @@ export default function SectionStudentsPage() {
       errMissingTeacher: "Teacher",
       errMissingStartDate: "Start Date",
       errMissingClassTime: "Class Time",
-      errActivateMissingFields: "Please fill in all required fields before activating:",
+      errActivateMissingFields:
+        "Please fill in all required fields before activating:",
       ready_for_completion: "Ready for Completion",
       cancelled: "Cancelled",
+      activate: "Activate",
+      activating: "Activating...",
+      activated: "Activated successfully",
+      contractAssigned: "Assigned",
+      contractActive: "Active",
+      contractGraded: "Graded",
+      contractSettled: "Settled",
+      contractCancelled: "Cancelled",
       cancelSection: "Cancel Section",
       deactivateSection: "Deactivate",
       completeSection: "Complete Section",
@@ -207,7 +236,8 @@ export default function SectionStudentsPage() {
       deactivateSuccess: "Section deactivated successfully",
       completeSuccess: "Section completed successfully",
       missingGradesCount: (n: number, t: number) => `${n}/${t} students graded`,
-      outstandingPayments: (n: number, a: number) => `${n} students owe ${a.toFixed(2)}`,
+      outstandingPayments: (n: number, a: number) =>
+        `${n} students owe ${a.toFixed(2)}`,
     },
   }[locale === "en" ? "en" : "ar"];
 
@@ -216,8 +246,6 @@ export default function SectionStudentsPage() {
   const [courses, setCourses] = useState<Course[]>([]);
   const [teachers, setTeachers] = useState<any[]>([]);
   const [contract, setContract] = useState<ContractInfo | null>(null);
-  const [activating, setActivating] = useState(false);
-  const [completing, setCompleting] = useState(false);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -229,24 +257,48 @@ export default function SectionStudentsPage() {
     unpaid: any[];
   }>({ ungraded: [], unpaid: [] });
 
-  const canActivate = user?.is_superadmin || user?.role?.name === "manager" || user?.role?.name === "secretary";
+  const { activate, activating, error: activationError, setError: setActivationError } = useSectionActivation({
+    sectionId,
+    locale,
+    t,
+    onSuccess: (updatedSection, updatedContract) => {
+      setSection(updatedSection);
+      if (updatedContract) setContract(updatedContract);
+    },
+  });
+
+  const canActivate =
+    user?.is_superadmin ||
+    user?.role?.name === "manager" ||
+    user?.role?.name === "secretary";
 
   const fetchData = useCallback(async () => {
     if (!sectionId) return;
     setLoading(true);
     setNotFound(false);
     try {
-      const [sectRes, enrollRes, courseRes, teachersRes, contractRes] = await Promise.all([
-        apiClient.get<{ items: SectionInfo[]; total: number }>(
-          `/academic/course-sections?limit=1000`
-        ).catch(() => null),
-        apiClient.get<SectionEnrollmentDetail[]>(
-          `/academic/sections/${sectionId}/enrollments/detailed`
-        ).catch(() => null),
-        apiClient.get<{ items: Course[]; total: number }>("/academic/courses?limit=1000").catch(() => null),
-        apiClient.get<any[]>("/users/teachers").catch(() => null),
-        apiClient.get<ContractInfo>(`/lms/sections/${sectionId}/contract`).catch(() => null),
-      ]);
+      const [sectRes, enrollRes, courseRes, teachersRes, contractRes] =
+        await Promise.all([
+          apiClient
+            .get<{ items: SectionInfo[]; total: number }>(
+              `/academic/course-sections?limit=1000`,
+            )
+            .catch(() => null),
+          apiClient
+            .get<SectionEnrollmentDetail[]>(
+              `/academic/sections/${sectionId}/enrollments/detailed`,
+            )
+            .catch(() => null),
+          apiClient
+            .get<{ items: Course[]; total: number }>(
+              "/academic/courses?limit=1000",
+            )
+            .catch(() => null),
+          apiClient.get<any[]>("/users/teachers").catch(() => null),
+          apiClient
+            .get<ContractInfo>(`/lms/sections/${sectionId}/contract`)
+            .catch(() => null),
+        ]);
 
       if (courseRes) setCourses(courseRes.data.items);
       if (teachersRes) setTeachers(teachersRes.data);
@@ -254,7 +306,7 @@ export default function SectionStudentsPage() {
       if (contractRes) setContract(contractRes.data);
 
       if (sectRes) {
-        const found = sectRes.data.items.find(s => s.id === sectionId);
+        const found = sectRes.data.items.find((s) => s.id === sectionId);
         if (found) {
           setSection(found);
         } else {
@@ -271,53 +323,50 @@ export default function SectionStudentsPage() {
     }
   }, [sectionId]);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const formatDate = (d: string) => {
     try {
-      return new Date(d).toLocaleDateString(locale === "ar" ? "ar-SA" : "en-US", {
-        year: "numeric", month: "short", day: "numeric",
-      });
-    } catch { return d; }
+      return new Date(d).toLocaleDateString(
+        locale === "ar" ? "ar-SA" : "en-US",
+        {
+          year: "numeric",
+          month: "short",
+          day: "numeric",
+        },
+      );
+    } catch {
+      return d;
+    }
   };
 
-  const financialSummary = useMemo(() => {
-    const fullAmount = students.reduce((sum, s) => {
-      const price = s.agreed_price ?? section?.price ?? 0;
-      return sum + price;
-    }, 0);
-    const totalPaid = students.reduce((sum, s) => sum + (s.total_paid || 0), 0);
-    const remaining = fullAmount - totalPaid;
-    const percentage = fullAmount > 0 ? (totalPaid / fullAmount) * 100 : 0;
-    return { fullAmount, totalPaid, remaining, percentage };
-  }, [students, section]);
-
   const allGradesFilled = useMemo(() => {
-    return students.length > 0 && students.every(s => s.final_score != null);
+    return students.length > 0 && students.every((s) => s.final_score != null);
   }, [students]);
 
-  const getCourseName = (courseId: string) => courses.find((c) => c.id === courseId)?.name || courseId;
-  const getTeacherName = (teacherId: string) => teachers.find((u) => u.id === teacherId)?.full_name || teacherId;
+  const getCourseName = (courseId: string) =>
+    courses.find((c) => c.id === courseId)?.name || courseId;
+  const getTeacherName = (teacherId: string) =>
+    teachers.find((u) => u.id === teacherId)?.full_name || teacherId;
 
-  const statusBadge = (status: string) => {
+  const contractStatusBadge = (status: string) => {
     const colors: Record<string, string> = {
-      pending: "bg-amber-50 text-amber-600 border-amber-200",
       active: "bg-emerald-50 text-emerald-600 border-emerald-200",
-      completed: "bg-slate-100 text-slate-500 border-slate-200",
-      ready_for_completion: "bg-yellow-50 text-yellow-600 border-yellow-300",
-      cancelled: "bg-red-50 text-red-600 border-red-200",
+      assigned: "bg-blue-50 text-blue-600 border-blue-200",
+      grades_submitted: "bg-purple-50 text-purple-600 border-purple-200",
+      settled: "bg-slate-100 text-slate-500 border-slate-200",
     };
     const labels: Record<string, string> = {
-      pending: t.pending,
-      active: t.active,
-      completed: t.completed,
-      ready_for_completion: t.ready_for_completion,
-      cancelled: t.cancelled,
+      assigned: t.contractAssigned,
+      active: t.contractActive,
+      grades_submitted: t.contractGraded,
+      settled: t.contractSettled,
+      cancelled: t.contractCancelled,
     };
     return (
-      <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium border ${colors[status] || colors.pending}`}>
-        {status === "cancelled" && <Ban size={12} />}
-        {status === "ready_for_completion" && <AlertTriangle size={12} />}
+      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${colors[status] || "bg-slate-50 text-slate-400 border-slate-200"}`}>
         {labels[status] || status}
       </span>
     );
@@ -335,23 +384,33 @@ export default function SectionStudentsPage() {
     return (
       <div className="text-center py-12 text-slate-500">
         <p>{t.notFound}</p>
-        <button onClick={() => router.back()} className="btn-primary mt-4">{t.back}</button>
+        <button onClick={() => router.back()} className="btn-primary mt-4">
+          {t.back}
+        </button>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 max-w-6xl mx-auto animate-fade-in" dir={isRtl ? "rtl" : "ltr"}>
+    <div
+      className="space-y-6 max-w-6xl mx-auto animate-fade-in"
+      dir={isRtl ? "rtl" : "ltr"}
+    >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <button onClick={() => router.back()} className="btn-icon" title={t.back}>
+          <button
+            onClick={() => router.back()}
+            className="btn-icon"
+            title={t.back}
+          >
             <ArrowLeft size={18} className={isRtl ? "rotate-180" : ""} />
           </button>
           <div>
             <h2 className="text-xl font-bold text-slate-900">{t.title}</h2>
             {section && (
               <p className="text-sm text-slate-500 mt-1">
-                {getCourseName(section.course_id)} &middot; {t.teacher}: {getTeacherName(section.teacher_id)}
+                {getCourseName(section.course_id)} &middot; {t.teacher}:{" "}
+                {getTeacherName(section.teacher_id)}
               </p>
             )}
           </div>
@@ -363,159 +422,101 @@ export default function SectionStudentsPage() {
         <div className="card p-4 flex flex-wrap items-center gap-4 text-sm">
           <div className="flex items-center gap-2">
             <span className="text-slate-500">{t.course}:</span>
-            <span className="font-semibold text-slate-900">{getCourseName(section.course_id)}</span>
+            <span className="font-semibold text-slate-900">
+              {getCourseName(section.course_id)}
+            </span>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-slate-500">{t.teacher}:</span>
-            <span className="font-semibold text-slate-900">{getTeacherName(section.teacher_id)}</span>
+            <span className="font-semibold text-slate-900">
+              {getTeacherName(section.teacher_id)}
+            </span>
           </div>
           <div className="flex items-center gap-2">
-            {statusBadge(section.status)}
+            <SectionStatusBadge
+              status={section.status}
+              labels={{ pending: t.pending, active: t.active, completed: t.completed, ready_for_completion: t.ready_for_completion, cancelled: t.cancelled }}
+              isRtl={isRtl}
+            />
             {contract && (
-              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${
-                contract.status === "active" ? "bg-emerald-50 text-emerald-600 border-emerald-200" :
-                contract.status === "assigned" ? "bg-blue-50 text-blue-600 border-blue-200" :
-                contract.status === "grades_submitted" ? "bg-purple-50 text-purple-600 border-purple-200" :
-                contract.status === "settled" ? "bg-slate-100 text-slate-500 border-slate-200" :
-                "bg-slate-50 text-slate-400 border-slate-200"
-              }`}>
-                {contract.status === "assigned" ? "Assigned" :
-                 contract.status === "active" ? "Active" :
-                 contract.status === "grades_submitted" ? "Graded" :
-                 contract.status === "settled" ? "Settled" :
-                 contract.status === "cancelled" ? "Cancelled" : contract.status}
-              </span>
+              contractStatusBadge(contract.status)
             )}
           </div>
-          {(section.status === "pending" || section.status === "active" || section.status === "ready_for_completion") && canActivate && (
-            <div className="flex items-center gap-2">
-              {section.status === "pending" && contract?.status === "assigned" && (
-                <button onClick={async () => {
-                  setError(null);
-                  const missing: string[] = [];
-                  if (section.price == null) missing.push(t.errMissingPrice);
-                  if (!section.teacher_id) missing.push(t.errMissingTeacher);
-                  if (!section.start_date) missing.push(t.errMissingStartDate);
-                  if (!section.class_time) missing.push(t.errMissingClassTime);
-                  if (missing.length > 0) {
-                    setError(`${t.errActivateMissingFields} ${missing.join(", ")}`);
-                    return;
-                  }
-                  setActivating(true);
-                  try {
-                    await apiClient.post(`/lms/sections/${sectionId}/contract/activate`);
-                    setError(null);
-                    const refetch = await apiClient.get<ContractInfo>(`/lms/sections/${sectionId}/contract`).catch(() => null);
-                    if (refetch) setContract(refetch.data);
-                    const sectRefetch = await apiClient.get<{ items: SectionInfo[]; total: number }>(
-                      `/academic/course-sections?limit=1000`
-                    ).catch(() => null);
-                    if (sectRefetch) {
-                      const found = sectRefetch.data.items.find(s => s.id === sectionId);
-                      if (found) setSection(found);
-                    }
-                  } catch (activateErr) {
-                    const err = activateErr as { response?: { data?: { detail?: string } } };
-                    const detail = err?.response?.data?.detail;
-                    if (detail) {
-                      if (locale === "en") {
-                        setError(detail);
-                      } else {
-                        const patterns: [RegExp, (...m: string[]) => string][] = [
-                          [/^Cannot activate a contract without a teacher$/, () => t.errNoTeacherActivate],
-                          [/^Cannot activate a contract without a compensation model$/, () => t.errNoCompModel],
-                          [/^Cannot activate a section without a price/, () => t.errMissingPrice],
-                          [/^Cannot activate a section without a start date/, () => t.errMissingStartDate],
-                          [/^Cannot activate a section without a class time/, () => t.errMissingClassTime],
-                          [/^Cannot activate section\. Missing required fields: (.+)$/, (fields) => `${t.errActivateMissingFields} ${fields}`],
-                          [/^Only ASSIGNED contracts can be activated, current: (.+)$/, (s) => `${t.errOnlyAssigned}، الحالة الحالية: ${s}`],
-                        ];
-                        let translated: string | null = null;
-                        for (const [regex, fn] of patterns) {
-                          const m = detail.match(regex);
-                          if (m) { translated = fn(...m.slice(1)); break; }
-                        }
-                        setError(translated || detail);
-                      }
-                    } else {
-                      setError(t.activationFailed);
-                    }
-                  } finally { setActivating(false); }
-                }} disabled={activating || section.price == null || !section.teacher_id || !section.start_date || !section.class_time} className="btn-primary px-3 py-1.5 text-xs flex items-center gap-1" title={
-                  section.price == null ? `${t.errMissingPrice}`
-                    : !section.teacher_id ? `${t.errMissingTeacher}`
-                      : !section.start_date ? `${t.errMissingStartDate}`
+          {(section.status === "pending" ||
+            section.status === "active" ||
+            section.status === "ready_for_completion") &&
+            canActivate && (
+              <div className="flex items-center gap-2">
+                {section.status === "pending" &&
+                  contract?.status === "assigned" && (
+                    <button
+                      onClick={() => activate(section)}
+                      disabled={activating || section.price == null || !section.teacher_id || !section.start_date || !section.class_time}
+                      className="btn-primary px-3 py-1.5 text-xs flex items-center gap-1"
+                      title={
+                        section.price == null ? `${t.errMissingPrice}`
+                        : !section.teacher_id ? `${t.errMissingTeacher}`
+                        : !section.start_date ? `${t.errMissingStartDate}`
                         : !section.class_time ? `${t.errMissingClassTime}`
-                          : undefined
-                }>
-                  <Play size={12} />{activating ? "..." : "Activate"}
-                </button>
-              )}
-              {/* Complete button for active and ready_for_completion */}
-              {(section.status === "active" || section.status === "ready_for_completion") && (
-                <button
-                  onClick={async () => {
-                    setError(null);
-                    setCompleting(true);
-                    try {
-                      await apiClient.post(`/academic/course-sections/${sectionId}/complete`);
+                        : undefined
+                      }
+                    >
+                      <Play size={12} />
+                      {activating ? t.activating : t.activate}
+                    </button>
+                  )}
+                {(section.status === "active" ||
+                  section.status === "ready_for_completion") && (
+                  <button
+                    onClick={() => {
                       setError(null);
-                      const sectRefetch = await apiClient.get<{ items: SectionInfo[]; total: number }>(
-                        `/academic/course-sections?limit=1000`
-                      ).catch(() => null);
-                      if (sectRefetch) {
-                        const found = sectRefetch.data.items.find(s => s.id === sectionId);
-                        if (found) setSection(found);
-                      }
-                    } catch (completeErr: any) {
-                      const detail = completeErr?.response?.data?.detail || "";
-                      // If the error says grades are missing or payments outstanding, offer override
-                      if (detail.includes("missing") || detail.includes("grades") || detail.includes("payment") || detail.includes("unpaid")) {
-                        setOverrideData({
-                          ungraded: students.filter(s => s.final_score == null).map(s => ({ student_name: s.student_name, student_code: s.student_code })),
-                          unpaid: students.filter(s => (s.balance_remaining || 0) > 0).map(s => ({ student_name: s.student_name, student_code: s.student_code, amount: s.balance_remaining })),
-                        });
-                        setShowCompleteOverride(true);
-                      } else {
-                        setError(detail || t.completionFailed);
-                      }
-                    } finally { setCompleting(false); }
-                  }}
-                  disabled={completing}
-                  className="btn-primary px-3 py-1.5 text-xs flex items-center gap-1 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <CheckCircle2 size={12} />{completing ? "..." : t.completeSection || "Complete"}
-                </button>
-              )}
-              {/* Cancel Section button */}
-              {(user?.is_superadmin || user?.role?.name === "manager") &&
-                (section.status === "pending" || section.status === "active") && (
-                <button
-                  onClick={() => setShowCancelModal(true)}
-                  className="px-3 py-1.5 text-xs flex items-center gap-1 bg-red-50 text-red-600 border border-red-200 rounded-lg hover:bg-red-100 font-medium"
-                >
-                  <XCircle size={12} /> {t.cancelSection}
-                </button>
-              )}
-              {/* Deactivate button */}
-              {user?.is_superadmin && section.status === "active" && (
-                <button
-                  onClick={() => setShowDeactivateModal(true)}
-                  className="px-3 py-1.5 text-xs flex items-center gap-1 bg-amber-50 text-amber-600 border border-amber-200 rounded-lg hover:bg-amber-100 font-medium"
-                >
-                  <Ban size={12} /> {t.deactivateSection}
-                </button>
-              )}
-            </div>
-          )}
+                      setOverrideData({
+                        ungraded: students
+                          .filter((s) => s.final_score == null)
+                          .map((s) => ({ student_name: s.student_name, student_code: s.student_code })),
+                        unpaid: students
+                          .filter((s) => (s.balance_remaining || 0) > 0)
+                          .map((s) => ({ student_name: s.student_name, student_code: s.student_code, amount: s.balance_remaining })),
+                      });
+                      setShowCompleteOverride(true);
+                    }}
+                    className="btn-primary px-3 py-1.5 text-xs flex items-center gap-1 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <CheckCircle2 size={12} />
+                    {t.completeSection || "Complete"}
+                  </button>
+                )}
+                {(user?.is_superadmin || user?.role?.name === "manager") &&
+                  (section.status === "pending" || section.status === "active") && (
+                    <button
+                      onClick={() => setShowCancelModal(true)}
+                      className="px-3 py-1.5 text-xs flex items-center gap-1 bg-red-50 text-red-600 border border-red-200 rounded-lg hover:bg-red-100 font-medium"
+                    >
+                      <XCircle size={12} /> {t.cancelSection}
+                    </button>
+                  )}
+                {user?.is_superadmin && section.status === "active" && (
+                  <button
+                    onClick={() => setShowDeactivateModal(true)}
+                    className="px-3 py-1.5 text-xs flex items-center gap-1 bg-amber-50 text-amber-600 border border-amber-200 rounded-lg hover:bg-amber-100 font-medium"
+                  >
+                    <Ban size={12} /> {t.deactivateSection}
+                  </button>
+                )}
+              </div>
+            )}
           <div className="flex items-center gap-2">
             <span className="text-slate-500">{t.capacity}:</span>
-            <span className="font-semibold text-slate-900">{section.enrolled_count}/{section.capacity}</span>
+            <span className="font-semibold text-slate-900">
+              {section.enrolled_count}/{section.capacity}
+            </span>
           </div>
           {section.price != null && (
             <div className="flex items-center gap-2">
               <span className="text-slate-500">{t.price}:</span>
-              <span className="font-semibold text-slate-900">{section.price} {t.sar}</span>
+              <span className="font-semibold text-slate-900">
+                {section.price} {t.sar}
+              </span>
             </div>
           )}
           {(section.start_date || section.class_time || section.classroom) && (
@@ -523,121 +524,93 @@ export default function SectionStudentsPage() {
               <span className="text-slate-500">{t.schedule}:</span>
               <span className="font-semibold text-slate-900 text-xs">
                 {section.start_date && (
-                  <span>{section.start_date}{section.end_date ? ` → ${section.end_date}` : ""}</span>
+                  <span>
+                    {section.start_date}
+                    {section.end_date ? ` → ${section.end_date}` : ""}
+                  </span>
                 )}
-                {section.class_time && <span className="ms-1">{section.class_time}</span>}
-                {section.classroom && <span className="ms-1">({section.classroom})</span>}
+                {section.class_time && (
+                  <span className="ms-1">{section.class_time}</span>
+                )}
+                {section.classroom && (
+                  <span className="ms-1">({section.classroom})</span>
+                )}
               </span>
             </div>
           )}
         </div>
       )}
 
-      {section && section.end_date && (() => {
-        const endDate = new Date(section.end_date + "T00:00:00");
-        const now = new Date();
-        const diffDays = Math.floor((now.getTime() - endDate.getTime()) / (1000 * 60 * 60 * 24));
-        if (section.status === "cancelled") return null;
-        if (diffDays > 0) {
-          return (
-            <SectionWarningBanner
-              type="overdue"
-              daysPastEnd={diffDays}
-              endDate={section.end_date}
-              missingGradeCount={students.filter(s => s.final_score == null).length}
-              totalStudentCount={students.length}
-              outstandingPaymentCount={students.filter(s => (s.balance_remaining || 0) > 0).length}
-              outstandingPaymentTotal={students.reduce((sum, s) => sum + (s.balance_remaining || 0), 0)}
-              isRtl={isRtl}
-              locale={locale}
-            />
+      {section &&
+        section.end_date &&
+        (() => {
+          const endDate = new Date(section.end_date + "T00:00:00");
+          const now = new Date();
+          const diffDays = Math.floor(
+            (now.getTime() - endDate.getTime()) / (1000 * 60 * 60 * 24),
           );
-        }
-        if (diffDays >= -7) {
-          return (
-            <SectionWarningBanner
-              type="approaching"
-              endDate={section.end_date}
-              missingGradeCount={students.filter(s => s.final_score == null).length}
-              totalStudentCount={students.length}
-              outstandingPaymentCount={students.filter(s => (s.balance_remaining || 0) > 0).length}
-              outstandingPaymentTotal={students.reduce((sum, s) => sum + (s.balance_remaining || 0), 0)}
-              isRtl={isRtl}
-              locale={locale}
-            />
-          );
-        }
-        return null;
-      })()}
+          if (section.status === "cancelled") return null;
+          if (diffDays > 0) {
+            return (
+              <SectionWarningBanner
+                type="overdue"
+                daysPastEnd={diffDays}
+                endDate={section.end_date}
+                missingGradeCount={students.filter((s) => s.final_score == null).length}
+                totalStudentCount={students.length}
+                outstandingPaymentCount={students.filter((s) => (s.balance_remaining || 0) > 0).length}
+                outstandingPaymentTotal={students.reduce((sum, s) => sum + (s.balance_remaining || 0), 0)}
+                isRtl={isRtl}
+                locale={locale}
+              />
+            );
+          }
+          if (diffDays >= -7) {
+            return (
+              <SectionWarningBanner
+                type="approaching"
+                endDate={section.end_date}
+                missingGradeCount={students.filter((s) => s.final_score == null).length}
+                totalStudentCount={students.length}
+                outstandingPaymentCount={students.filter((s) => (s.balance_remaining || 0) > 0).length}
+                outstandingPaymentTotal={students.reduce((sum, s) => sum + (s.balance_remaining || 0), 0)}
+                isRtl={isRtl}
+                locale={locale}
+              />
+            );
+          }
+          return null;
+        })()}
 
       {section?.status === "ready_for_completion" && (
         <SectionWarningBanner
           type="ready"
-          missingGradeCount={students.filter(s => s.final_score != null).length}
+          missingGradeCount={students.filter((s) => s.final_score != null).length}
           totalStudentCount={students.length}
           isRtl={isRtl}
           locale={locale}
         />
       )}
 
-      {error && (
+      {(error || activationError) && (
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md text-sm flex items-center justify-between">
-          <span>{error}</span>
-          <button onClick={() => setError(null)} className="text-red-500 hover:text-red-700 font-bold ms-2">&times;</button>
+          <span>{error || activationError}</span>
+          <button
+            onClick={() => { setError(null); setActivationError(null); }}
+            className="text-red-500 hover:text-red-700 font-bold ms-2"
+          >
+            &times;
+          </button>
         </div>
       )}
 
       {students.length > 0 && (
-        <div className="card p-4">
-          <h3 className="text-sm font-bold text-slate-900 mb-3">{t.financialSummary}</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
-            <div className="bg-slate-50 rounded-lg p-3">
-              <p className="text-xs text-slate-500 mb-1">{t.sectionFullAmount}</p>
-              <p className="text-lg font-bold text-slate-900">
-                {financialSummary.fullAmount.toFixed(2)} {t.sar}
-              </p>
-            </div>
-            <div className="bg-emerald-50 rounded-lg p-3">
-              <p className="text-xs text-emerald-600 mb-1">{t.totalPaidSummary}</p>
-              <p className="text-lg font-bold text-emerald-700">
-                {financialSummary.totalPaid.toFixed(2)} {t.sar}
-              </p>
-            </div>
-            <div className="bg-amber-50 rounded-lg p-3">
-              <p className="text-xs text-amber-600 mb-1">{t.remaining}</p>
-              <p className={`text-lg font-bold ${
-                financialSummary.remaining > 0 ? "text-amber-700" : "text-emerald-700"
-              }`}>
-                {financialSummary.remaining.toFixed(2)} {t.sar}
-              </p>
-            </div>
-          </div>
-          <div>
-            <div className="flex items-center justify-between text-xs text-slate-500 mb-1">
-              <span>{financialSummary.totalPaid.toFixed(2)} {t.sar}</span>
-              <span>{financialSummary.fullAmount.toFixed(2)} {t.sar}</span>
-            </div>
-            <div className="w-full bg-slate-200 rounded-full h-2.5 overflow-hidden">
-              <div
-                className={`h-full rounded-full transition-all duration-500 ${
-                  financialSummary.percentage >= 100
-                    ? "bg-emerald-500"
-                    : financialSummary.percentage > 0
-                    ? "bg-amber-500"
-                    : "bg-slate-300"
-                }`}
-                style={{
-                  [isRtl ? "marginRight" : "marginLeft"]: 0,
-                  width: `${Math.min(financialSummary.percentage, 100)}%`,
-                  marginInlineStart: 0,
-                }}
-              />
-            </div>
-            <p className="text-xs text-slate-400 mt-1">
-              {financialSummary.percentage.toFixed(1)}% {t.of} {financialSummary.fullAmount.toFixed(2)} {t.sar}
-            </p>
-          </div>
-        </div>
+        <FinancialSummary
+          students={students}
+          sectionPrice={section?.price ?? null}
+          t={t}
+          isRtl={isRtl}
+        />
       )}
 
       <div className="card overflow-hidden">
@@ -646,7 +619,9 @@ export default function SectionStudentsPage() {
           {t.enrolled} ({students.length})
         </div>
         {students.length === 0 ? (
-          <div className="p-8 text-center text-sm text-slate-500">{t.empty}</div>
+          <div className="p-8 text-center text-sm text-slate-500">
+            {t.empty}
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="data-table">
@@ -656,7 +631,7 @@ export default function SectionStudentsPage() {
                   <th>{t.studentCode}</th>
                   <th className="hidden md:table-cell">{t.email}</th>
                   <th>{t.enrollDate}</th>
-                  <th className="hidden md:table-cell">{t.agreedPrice}</th>
+                  <th>{t.agreedPrice}</th>
                   <th className="hidden md:table-cell">{t.discount}</th>
                   <th>{t.totalPaid}</th>
                   <th>{t.balance}</th>
@@ -669,29 +644,43 @@ export default function SectionStudentsPage() {
                   <tr key={enr.id}>
                     <td className="font-medium text-slate-900">
                       <button
-                        onClick={() => router.push(`/${locale}/dashboard/students/${enr.student_id}`)}
+                        onClick={() =>
+                          router.push(
+                            `/${locale}/dashboard/students/${enr.student_id}`,
+                          )
+                        }
                         className="text-blue-600 hover:underline text-start"
                       >
                         {enr.student_name}
                       </button>
                     </td>
                     <td className="text-slate-600">{enr.student_code}</td>
-                    <td className="hidden md:table-cell text-slate-500 text-xs">{enr.student_email || "—"}</td>
-                    <td className="text-slate-600 text-xs">{formatDate(enr.enrolled_at)}</td>
-                    <td className="hidden md:table-cell text-slate-600">
-                      {enr.agreed_price != null ? `${enr.agreed_price.toFixed(2)} ${t.sar}` : "—"}
+                    <td className="hidden md:table-cell text-slate-500 text-xs">
+                      {enr.student_email || "—"}
+                    </td>
+                    <td className="text-slate-600 text-xs">
+                      {formatDate(enr.enrolled_at)}
+                    </td>
+                    <td className="text-slate-600">
+                      {enr.agreed_price != null
+                        ? `${enr.agreed_price.toFixed(2)} ${t.sar}`
+                        : "—"}
                     </td>
                     <td className="hidden md:table-cell text-slate-600">
-                      {enr.admin_discount != null ? `${enr.admin_discount}%` : "—"}
+                      {enr.admin_discount != null
+                        ? `${enr.admin_discount}%`
+                        : "—"}
                     </td>
                     <td className="font-semibold text-emerald-600">
-                      {enr.total_paid > 0 ? `${enr.total_paid.toFixed(2)} ${t.sar}` : "—"}
+                      {enr.total_paid > 0
+                        ? `${enr.total_paid.toFixed(2)} ${t.sar}`
+                        : "—"}
                     </td>
                     <td>
                       {enr.balance_remaining != null ? (
-                        <span className={`font-semibold ${
-                          enr.balance_remaining > 0 ? "text-amber-600" : "text-emerald-600"
-                        }`}>
+                        <span
+                          className={`font-semibold ${enr.balance_remaining > 0 ? "text-amber-600" : "text-emerald-600"}`}
+                        >
                           {enr.balance_remaining > 0
                             ? `${enr.balance_remaining.toFixed(2)} ${t.sar}`
                             : "0"}
@@ -721,10 +710,7 @@ export default function SectionStudentsPage() {
         sectionName={section ? getCourseName(section.course_id) : ""}
         isRtl={isRtl}
         locale={locale}
-        onSuccess={() => {
-          setError(null);
-          fetchData();
-        }}
+        onSuccess={() => { setError(null); fetchData(); }}
       />
 
       <DeactivateSectionModal
@@ -732,28 +718,23 @@ export default function SectionStudentsPage() {
         onClose={() => setShowDeactivateModal(false)}
         sectionId={sectionId}
         sectionName={section ? getCourseName(section.course_id) : ""}
-        hasPayments={students.some(s => (s.total_paid || 0) > 0)}
+        hasPayments={students.some((s) => (s.total_paid || 0) > 0)}
         isRtl={isRtl}
         locale={locale}
-        onSuccess={() => {
-          setError(null);
-          fetchData();
-        }}
+        onSuccess={() => { setError(null); fetchData(); }}
       />
 
       <CompleteSectionModal
         open={showCompleteOverride}
         onClose={() => setShowCompleteOverride(false)}
         sectionId={sectionId}
-        sectionName={section ? getCourseName(section.course_id) : ""}
+        bypassGradeCheck={overrideData.ungraded.length > 0}
+        bypassPaymentCheck={overrideData.unpaid.length > 0}
         ungradedStudents={overrideData.ungraded}
         unpaidStudents={overrideData.unpaid}
         isRtl={isRtl}
         locale={locale}
-        onSuccess={() => {
-          setError(null);
-          fetchData();
-        }}
+        onSuccess={() => { setError(null); fetchData(); }}
       />
     </div>
   );

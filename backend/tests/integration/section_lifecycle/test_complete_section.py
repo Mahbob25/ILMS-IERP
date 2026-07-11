@@ -84,13 +84,9 @@ class TestCompleteSection:
     async def test_complete_section_blocked_ungraded(self, mock_db, mock_user):
         section = self._make_section()
 
-        exec_order = [
-            result_mock(scalar_one_or_none=section),
-            result_mock(scalar=2),
-            result_mock(scalar=1),
-        ]
-        mock_db.execute = AsyncMock(side_effect=exec_order)
-        mock_db.scalar = AsyncMock(return_value=1)
+        mock_db.execute = AsyncMock(return_value=result_mock(scalar_one_or_none=section))
+        scalar_calls = [2, 1]
+        mock_db.scalar = AsyncMock(side_effect=scalar_calls)
 
         with patch("app.modules.academic.service._get_ungraded_students", AsyncMock(return_value=[{"full_name": "Ungraded Student"}])):
             with pytest.raises(HTTPException) as exc_info:
@@ -104,15 +100,12 @@ class TestCompleteSection:
         student = Mock(id=uuid.uuid4(), full_name="Unpaid Student")
         enrollment = self._make_enrollment(student_id=student.id, student=student, section=section)
 
-        exec_order = [
+        mock_db.execute = AsyncMock(side_effect=[
             result_mock(scalar_one_or_none=section),
-            result_mock(scalar=1),
-            result_mock(scalar=1),
             result_mock(scalars_all=[enrollment]),
-            result_mock(scalar=Decimal("0")),
-        ]
-        mock_db.execute = AsyncMock(side_effect=exec_order)
-        mock_db.scalar = AsyncMock(return_value=1)
+            result_mock(scalars_all=[]),
+        ])
+        mock_db.scalar = AsyncMock(side_effect=[1, 1, Decimal("0")])
         mock_db.get = AsyncMock(side_effect=lambda model, pk: student if pk == student.id else None)
 
         with pytest.raises(HTTPException) as exc_info:
@@ -124,13 +117,12 @@ class TestCompleteSection:
     async def test_force_override_bypasses_grade_check(self, mock_db, mock_user):
         section = self._make_section()
 
-        exec_order = [
+        mock_db.execute = AsyncMock(side_effect=[
             result_mock(scalar_one_or_none=section),
-            result_mock(scalar=2),
-            result_mock(scalar=1),
-        ]
-        mock_db.execute = AsyncMock(side_effect=exec_order)
-        mock_db.scalar = AsyncMock(return_value=1)
+            result_mock(scalars_all=[]),
+            result_mock(scalars_all=[]),
+        ])
+        mock_db.scalar = AsyncMock(side_effect=[2, 1])
         mock_db.add = Mock()
 
         with patch("app.modules.academic.service._get_ungraded_students", AsyncMock(return_value=[{"full_name": "Ungraded Student"}])):
@@ -142,17 +134,17 @@ class TestCompleteSection:
 
     async def test_force_override_bypasses_payment_check(self, mock_db, mock_user):
         section = self._make_section()
+        student = Mock(id=uuid.uuid4(), full_name="Unpaid Student")
+        enrollment = self._make_enrollment(student_id=student.id, student=student, section=section)
 
-        exec_order = [
+        mock_db.execute = AsyncMock(side_effect=[
             result_mock(scalar_one_or_none=section),
-            result_mock(scalar=1),
-            result_mock(scalar=1),
+            result_mock(scalars_all=[enrollment]),
             result_mock(scalars_all=[]),
-            result_mock(scalar=Decimal("0")),
-        ]
-        mock_db.execute = AsyncMock(side_effect=exec_order)
-        mock_db.scalar = AsyncMock(return_value=1)
+        ])
+        mock_db.scalar = AsyncMock(side_effect=[1, 1, Decimal("0")])
         mock_db.add = Mock()
+        mock_db.get = AsyncMock(side_effect=lambda model, pk: student if pk == student.id else None)
 
         result = await self._run(mock_db, section.id, mock_user, force=True, force_reason="Override for unpaid")
 
@@ -163,15 +155,11 @@ class TestCompleteSection:
     async def test_force_requires_reason(self, mock_db, mock_user):
         section = self._make_section()
 
-        exec_order = [
+        mock_db.execute = AsyncMock(side_effect=[
             result_mock(scalar_one_or_none=section),
-            result_mock(scalar=1),
-            result_mock(scalar=1),
             result_mock(scalars_all=[]),
-            result_mock(scalar=Decimal("500")),
-            result_mock(scalar_one_or_none=None),
-        ]
-        mock_db.execute = AsyncMock(side_effect=exec_order)
+            result_mock(scalars_all=[]),
+        ])
         mock_db.scalar = AsyncMock(return_value=1)
 
         result = await self._run(mock_db, section.id, mock_user, force=True, force_reason=None)
@@ -182,13 +170,12 @@ class TestCompleteSection:
     async def test_override_audit_log_created(self, mock_db, mock_user):
         section = self._make_section()
 
-        exec_order = [
+        mock_db.execute = AsyncMock(side_effect=[
             result_mock(scalar_one_or_none=section),
-            result_mock(scalar=2),
-            result_mock(scalar=1),
-        ]
-        mock_db.execute = AsyncMock(side_effect=exec_order)
-        mock_db.scalar = AsyncMock(return_value=1)
+            result_mock(scalars_all=[]),
+            result_mock(scalars_all=[]),
+        ])
+        mock_db.scalar = AsyncMock(side_effect=[2, 1])
         mock_db.add = Mock()
 
         with patch("app.modules.academic.service._get_ungraded_students", AsyncMock(return_value=[{"full_name": "Ungraded Student"}])):
@@ -204,14 +191,13 @@ class TestCompleteSection:
     async def test_daily_closure_blocks_completion(self, mock_db, mock_user):
         section = self._make_section()
 
-        mock_db.execute = AsyncMock(side_effect=[
-            result_mock(scalar_one_or_none=section),
-        ])
-        mock_db.scalar = AsyncMock(return_value=1)
+        mock_db.execute = AsyncMock(return_value=result_mock(scalar_one_or_none=section))
 
         with patch("app.modules.academic.service._is_date_closed", AsyncMock(return_value=True)):
-            with pytest.raises(HTTPException) as exc_info:
-                await self._run(mock_db, section.id, mock_user)
+            with patch("app.modules.academic.service._get_config_bool", AsyncMock(return_value=True)):
+                with patch("app.modules.academic.service.create_certificate", AsyncMock()):
+                    with pytest.raises(HTTPException) as exc_info:
+                        await complete_section(mock_db, section.id, mock_user)
 
         assert exc_info.value.status_code == 400
         assert "closed" in str(exc_info.value.detail).lower()
@@ -219,16 +205,11 @@ class TestCompleteSection:
     async def test_complete_section_without_contract(self, mock_db, mock_user):
         section = self._make_section(contract=None, teacher_id=None)
 
-        exec_order = [
+        mock_db.execute = AsyncMock(side_effect=[
             result_mock(scalar_one_or_none=section),
-            result_mock(scalar=1),
-            result_mock(scalar=1),
             result_mock(scalars_all=[]),
-            result_mock(scalar=Decimal("500")),
-            result_mock(scalar_one_or_none=None),
             result_mock(scalars_all=[]),
-        ]
-        mock_db.execute = AsyncMock(side_effect=exec_order)
+        ])
         mock_db.scalar = AsyncMock(return_value=1)
 
         result = await self._run(mock_db, section.id, mock_user)

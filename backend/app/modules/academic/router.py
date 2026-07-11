@@ -156,7 +156,7 @@ async def activate_section(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Cannot activate section. Missing required fields: {', '.join(missing)}"
         )
-    section = await academic_service.activate_section(db, section_id, data.teacher_percentage)
+    section = await academic_service.activate_section(db, section_id, data.teacher_percentage, activated_by=current_user.id)
     if not section:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

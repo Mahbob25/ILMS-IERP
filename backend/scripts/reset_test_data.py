@@ -31,24 +31,33 @@ from app.core.config import settings  # noqa: E402
 
 DELETE_ORDER = [
     # Academic & LMS leaf tables (deepest FK dependencies first)
-    "grades",                    # FK → submissions (CASCADE)
-    "submissions",               # FK → assignments, students (CASCADE)
-    "assignments",               # FK → course_sections (CASCADE)
-    "attendance_records",        # FK → attendance_sessions, students (CASCADE)
-    "attendance_sessions",       # FK → course_sections (CASCADE), users (RESTRICT)
-    "final_grades",              # FK → course_sections, students, users (RESTRICT)
-    "certificates",              # FK → students, course_sections, enrollments (RESTRICT)
-    "payments",                  # FK → enrollments (RESTRICT)
-    "enrollments",               # FK → students, course_sections (CASCADE)
-    "students",                  # No FKs to other non-seed tables
-    "course_sections",           # FK → courses (CASCADE), employees (RESTRICT)
-    "courses",                   # No FKs to other non-seed tables
+    "grades",                          # FK → submissions (CASCADE)
+    "submissions",                     # FK → assignments, students (CASCADE)
+    "assignments",                     # FK → course_sections (CASCADE)
+    "attendance_records",              # FK → attendance_sessions, students (CASCADE)
+    "attendance_sessions",             # FK → course_sections (CASCADE), users (RESTRICT)
+    "final_grades",                    # FK → course_sections, students, users (RESTRICT)
+    "certificates",                    # FK → students, course_sections, enrollments (RESTRICT)
+    "payments",                        # FK → enrollments (RESTRICT)
+    "refunds",                         # FK → pending_refunds (RESTRICT), users (RESTRICT)
+    "pending_refunds",                 # FK → enrollments (RESTRICT), section_cancellations (RESTRICT)
+    "section_cancellations",           # FK → course_sections (RESTRICT), users (RESTRICT)
+    "enrollments",                     # FK → students, course_sections (CASCADE)
+    "students",                        # No FKs to other non-seed tables
+    "compensation_amendment_requests", # FK → section_contracts (CASCADE), employees (RESTRICT), ledger_entries (SET NULL)
+    "ledger_entries",                  # FK → teacher_wallets (RESTRICT), section_contracts (SET NULL), users (RESTRICT)
+    "section_contracts",               # FK → course_sections (CASCADE), employees (SET NULL)
+    "section_completion_overrides",    # FK → course_sections (CASCADE), users (RESTRICT)
+    "course_sections",                 # FK → courses (CASCADE), employees (RESTRICT)
+    "courses",                         # No FKs to other non-seed tables
     # Identity & financial tables
-    "daily_closures",            # FK → users (SET NULL)
-    "refresh_tokens",            # FK → users (CASCADE)
-    "audit_logs",                # FK → users (SET NULL)
-    "teacher_wallets",           # FK → employees (CASCADE)
-    "expenses",                  # FK → employees (SET NULL)
+    "daily_closures",                  # FK → users (SET NULL)
+    "daily_jobs_log",                  # No FKs
+    "section_lifecycle_config",        # No FKs
+    "refresh_tokens",                  # FK → users (CASCADE)
+    "audit_logs",                      # FK → users (SET NULL)
+    "teacher_wallets",                 # FK → employees (CASCADE)
+    "expenses",                        # FK → employees (SET NULL)
 ]
 
 KEEP_TABLES = {
@@ -111,29 +120,42 @@ def run(conn: psycopg.Connection, dry_run: bool) -> DeletionResult:
 
     for table in DELETE_ORDER:
         try:
-            count = delete_table(conn, table)
-            result.rows_deleted[table] = count
+            with conn.transaction():
+                count = delete_table(conn, table)
+                result.rows_deleted[table] = count
         except psycopg.Error as exc:
             result.errors.append(f"Failed to delete {table}: {exc}")
 
-    with conn.cursor() as cur:
-        cur.execute(
-            "DELETE FROM users WHERE id != %s::uuid",
-            (user_id,),
-        )
-        result.rows_deleted["users"] = cur.rowcount
+    try:
+        with conn.transaction():
+            with conn.cursor() as cur:
+                cur.execute(
+                    "DELETE FROM users WHERE id != %s::uuid",
+                    (user_id,),
+                )
+                result.rows_deleted["users"] = cur.rowcount
+    except psycopg.Error as exc:
+        result.errors.append(f"Failed to delete users: {exc}")
 
     if employee_id:
-        with conn.cursor() as cur:
-            cur.execute(
-                "DELETE FROM employees WHERE id != %s::uuid",
-                (employee_id,),
-            )
-            result.rows_deleted["employees"] = cur.rowcount
+        try:
+            with conn.transaction():
+                with conn.cursor() as cur:
+                    cur.execute(
+                        "DELETE FROM employees WHERE id != %s::uuid",
+                        (employee_id,),
+                    )
+                    result.rows_deleted["employees"] = cur.rowcount
+        except psycopg.Error as exc:
+            result.errors.append(f"Failed to delete employees: {exc}")
     else:
-        with conn.cursor() as cur:
-            cur.execute("DELETE FROM employees")
-            result.rows_deleted["employees"] = cur.rowcount
+        try:
+            with conn.transaction():
+                with conn.cursor() as cur:
+                    cur.execute("DELETE FROM employees")
+                    result.rows_deleted["employees"] = cur.rowcount
+        except psycopg.Error as exc:
+            result.errors.append(f"Failed to delete employees: {exc}")
 
     return result
 

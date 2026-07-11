@@ -52,6 +52,9 @@ next_error.txt
 next_output.txt
 .npm-cache/
 
+# --- TypeScript ---
+tsconfig.tsbuildinfo
+
 # --- Cookie debug files ---
 cookie.txt
 cookies*.txt

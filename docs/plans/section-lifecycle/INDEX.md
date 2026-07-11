@@ -7,10 +7,10 @@
 ```
 Phase 1 ──┬──► Phase 2 ──┐
   (Foundation) ├──► Phase 3 ──┤
-               ├──► Phase 4 ──┤──► Phase 7 ──► Phase 8
-               ├──► Phase 5 ──┤   (Reconcile)   (Testing)
-               └──► Phase 6 ──┘   ↑ last parallel
-                    (Frontend)      phase to merge
+                ├──► Phase 4 ──┤──► Phase 7 ──► Phase 8
+                ├──► Phase 5 ──┤   (Reconcile)   (Testing)
+                └──► Phase 6 ──┘   ↑ last parallel
+                     (Frontend)      phase to merge
 ```
 
 - **Sequential gate:** Phase 1 must finish before any other phase starts.

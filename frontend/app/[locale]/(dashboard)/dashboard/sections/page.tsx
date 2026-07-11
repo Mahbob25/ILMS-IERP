@@ -10,21 +10,14 @@ import Modal from "@/components/Modal";
 import Select from "@/components/ui/Select";
 import {
   Plus,
-  Pencil,
-  Trash2,
   Loader2,
-  Play,
-  CheckCircle2,
-  UserPlus,
-  Eye,
-  Ban,
-  XCircle,
-  AlertTriangle,
-  Clock,
 } from "lucide-react";
 import CancelSectionModal from "@/components/sections/CancelSectionModal";
 import DeactivateSectionModal from "@/components/sections/DeactivateSectionModal";
 import CompleteSectionModal from "@/components/sections/CompleteSectionModal";
+import SectionFormModal from "@/components/sections/SectionFormModal";
+import SectionsTable from "@/components/sections/SectionsTable";
+import { getSectionsTranslations } from "@/lib/sections/sectionsTranslations";
 
 interface CourseSection {
   id: string;
@@ -71,202 +64,7 @@ export default function SectionsPage() {
   const { user } = useAuth();
   const locale = (params?.locale as string) || "ar";
   const isRtl = locale === "ar";
-
-  const t = {
-    ar: {
-      title: "الشعب الدراسية",
-      subtitle: "إدارة شعب المقررات وربطها بالمدرسين",
-      course: "المقرر",
-      teacher: "المدرس",
-      capacity: "السعة",
-      enrolled: "المسجلون",
-      status: "الحالة",
-      teacherPct: "نسبة المعلم",
-      minStudents: "الحد الأدنى",
-      quota: "الحصة",
-      actions: "الإجراءات",
-      add: "إضافة شعبة",
-      edit: "تعديل",
-      delete: "حذف",
-      save: "حفظ",
-      cancel: "إلغاء",
-      loading: "جاري التحميل...",
-      empty: "لا توجد شعب دراسية بعد",
-      confirmDelete: "هل أنت متأكد من حذف هذه الشعبة؟",
-      yes: "نعم",
-      no: "لا",
-      activate: "تفعيل",
-      complete: "إكمال",
-      pending: "قيد الانتظار",
-      active: "نشط",
-      completed: "مكتمل",
-      ready_for_completion: "جاهز للإكمال",
-      cancelled: "ملغى",
-      registerStudent: "تسجيل طالب",
-      selectStudent: "اختر الطالب",
-      register: "تسجيل",
-      refresh: "تحديث",
-      search: "بحث باسم المقرر...",
-      showing: "عرض",
-      of: "من",
-      prev: "السابق",
-      next: "التالي",
-      allStatuses: "جميع الحالات",
-      teacherPctLabel: "نسبة المعلم (%)",
-      deleted: "تم حذف الشعبة بنجاح",
-      activated: "تم تفعيل الشعبة بنجاح",
-      completedMsg: "تم إكمال الشعبة بنجاح",
-      confirmTitle: "تأكيد الحذف",
-      paymentsExist: "لا يمكن حذف الشعبة لوجود تسجيلات عليها مدفوعات",
-      startDate: "تاريخ البداية",
-      endDate: "تاريخ النهاية",
-      classTime: "وقت المحاضرة",
-      classDuration: "مدة المحاضرة (دقيقة)",
-      classroom: "القاعة الدراسية",
-      price: "السعر",
-      schedule: "الجدول الزمني",
-      validationRequired: "يرجى ملء جميع الحقول المطلوبة",
-      validationSelectCourse: "يرجى اختيار المقرر",
-      validationSelectTeacher: "يرجى اختيار المدرس",
-      compModel: "نموذج التعويض",
-      comp: "التعويض",
-      fixedAmount: "المبلغ الثابت (ريال)",
-      requestIncrease: "طلب زيادة",
-      currentTerms: "الشروط الحالية",
-      newAmount: "المبلغ الجديد",
-      newPercentage: "النسبة الجديدة",
-      reason: "السبب",
-      reasonPlaceholder: "اشرح سبب الزيادة المطلوبة...",
-      requestSubmitted: "تم تقديم طلب الزيادة",
-      submit: "إرسال",
-      errorGeneric: "حدث خطأ أثناء حفظ الشعبة",
-      activationFailed: "فشل التفعيل",
-      completionFailed: "فشل الإكمال",
-      deleteFailed: "فشل الحذف",
-      registrationFailed: "فشل تسجيل الطالب",
-      studentRegistered: "تم تسجيل الطالب بنجاح",
-      errCannotFinalize: "لا يمكن إنهاء التقييمات: ",
-      errNoTeacher: "لا يمكن تسوية العقد بدون مدرس",
-      errNoTeacherActivate: "لا يمكن تفعيل العقد بدون مدرس",
-      errNoCompModel: "لا يمكن تفعيل العقد بدون نموذج تعويض",
-      errOnlyActive: "يمكن إنهاء العقود النشطة فقط",
-      errOnlyGraded: "يمكن تسوية العقود المُقيّمة فقط",
-      errOnlyAssigned: "يمكن تفعيل العقود المُعيّنة فقط",
-      errMissingPrice: "السعر",
-      errMissingTeacher: "المدرس",
-      errMissingStartDate: "تاريخ البداية",
-      errMissingClassTime: "وقت المحاضرة",
-      errActivateMissingFields: "يرجى ملء جميع الحقول المطلوبة قبل التفعيل:",
-      cancelSection: "إلغاء الشعبة",
-      deactivateSection: "إلغاء التنشيط",
-      overdueLabel: "متأخر",
-      errAlreadyCancelled: "لا يمكن إلغاء شعبة ملغاة",
-      errCannotCancel: "لا يمكن إلغاء هذه الشعبة في حالتها الحالية",
-      confirmCancelTitle: "تأكيد الإلغاء",
-      cancelConfirmMsg: "هل أنت متأكد من إلغاء هذه الشعبة؟",
-      deactivateConfirmTitle: "تأكيد إلغاء التنشيط",
-      deactivateConfirmMsg: "هل تريد إلغاء تنشيط هذه الشعبة؟",
-      cancelSuccess: "تم إلغاء الشعبة بنجاح",
-      deactivateSuccess: "تم إلغاء تنشيط الشعبة بنجاح",
-    },
-    en: {
-      title: "Course Sections",
-      subtitle: "Manage course sections and teacher assignments",
-      course: "Course",
-      teacher: "Teacher",
-      capacity: "Capacity",
-      enrolled: "Enrolled",
-      status: "Status",
-      teacherPct: "Teacher %",
-      minStudents: "Min Students",
-      quota: "Quota",
-      actions: "Actions",
-      add: "Add Section",
-      edit: "Edit",
-      delete: "Delete",
-      save: "Save",
-      cancel: "Cancel",
-      loading: "Loading...",
-      empty: "No course sections yet",
-      confirmDelete: "Are you sure you want to delete this section?",
-      yes: "Yes",
-      no: "No",
-      activate: "Activate",
-      complete: "Complete",
-      pending: "Pending",
-      active: "Active",
-      completed: "Completed",
-      ready_for_completion: "Ready for Completion",
-      cancelled: "Cancelled",
-      registerStudent: "Register Student",
-      selectStudent: "Select Student",
-      register: "Register",
-      refresh: "Refresh",
-      search: "Search by course name...",
-      showing: "Showing",
-      of: "of",
-      prev: "Previous",
-      next: "Next",
-      allStatuses: "All statuses",
-      teacherPctLabel: "Teacher Percentage (%)",
-      confirmTitle: "Confirm Deletion",
-      deleted: "Section deleted successfully",
-      activated: "Section activated successfully",
-      completedMsg: "Section completed successfully",
-      paymentsExist:
-        "Cannot delete section with existing enrollments or payments",
-      startDate: "Start Date",
-      endDate: "End Date",
-      classTime: "Class Time",
-      classDuration: "Duration (min)",
-      classroom: "Classroom",
-      price: "Price",
-      schedule: "Schedule",
-      validationRequired: "Please fill in all required fields",
-      validationSelectCourse: "Please select a course",
-      validationSelectTeacher: "Please select a teacher",
-      compModel: "Compensation Model",
-      comp: "Comp",
-      fixedAmount: "Fixed Amount (SAR)",
-      requestIncrease: "Request Increase",
-      currentTerms: "Current Terms",
-      newAmount: "New Amount",
-      newPercentage: "New Percentage",
-      reason: "Reason",
-      reasonPlaceholder: "Explain why the increase is needed...",
-      requestSubmitted: "Increase request submitted",
-      submit: "Submit",
-      errorGeneric: "An error occurred while saving the section",
-      activationFailed: "Activation failed",
-      completionFailed: "Completion failed",
-      deleteFailed: "Delete failed",
-      registrationFailed: "Registration failed",
-      studentRegistered: "Student registered",
-      errCannotFinalize: "Cannot finalize grades: ",
-      errNoTeacher: "Cannot settle a contract without a teacher",
-      errNoTeacherActivate: "Cannot activate a contract without a teacher",
-      errNoCompModel: "Cannot activate a contract without a compensation model",
-      errOnlyActive: "Only ACTIVE contracts can be finalized",
-      errOnlyGraded: "Only GRADES_SUBMITTED contracts can be settled",
-      errOnlyAssigned: "Only ASSIGNED contracts can be activated",
-      errMissingPrice: "Price",
-      errMissingTeacher: "Teacher",
-      errMissingStartDate: "Start Date",
-      errMissingClassTime: "Class Time",
-      errActivateMissingFields: "Please fill in all required fields before activating:",
-      cancelSection: "Cancel Section",
-      deactivateSection: "Deactivate",
-      overdueLabel: "Overdue",
-      errAlreadyCancelled: "Cannot cancel an already cancelled section",
-      errCannotCancel: "Cannot cancel this section in its current state",
-      confirmCancelTitle: "Confirm Cancellation",
-      cancelConfirmMsg: "Are you sure you want to cancel this section?",
-      deactivateConfirmTitle: "Confirm Deactivation",
-      deactivateConfirmMsg: "Do you want to deactivate this section?",
-      cancelSuccess: "Section cancelled successfully",
-      deactivateSuccess: "Section deactivated successfully",
-    },
-  }[locale === "en" ? "en" : "ar"];
+  const t = getSectionsTranslations(locale);
 
   const [sections, setSections] = useState<CourseSection[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
@@ -274,9 +72,6 @@ export default function SectionsPage() {
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [showIncreaseModal, setShowIncreaseModal] = useState(false);
-  const [increaseReason, setIncreaseReason] = useState("");
-  const [increaseAmount, setIncreaseAmount] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState({
     course_id: "",
@@ -301,13 +96,6 @@ export default function SectionsPage() {
   >({});
   const [deleteTarget, setDeleteTarget] = useState<CourseSection | null>(null);
 
-  const [cancelTarget, setCancelTarget] = useState<CourseSection | null>(null);
-  const [deactivateTarget, setDeactivateTarget] = useState<CourseSection | null>(null);
-  const [completeTarget, setCompleteTarget] = useState<CourseSection | null>(null);
-  const [completeOverride, setCompleteOverride] = useState<{
-    ungraded: any[];
-    unpaid: any[];
-  }>({ ungraded: [], unpaid: [] });
   const [showRegister, setShowRegister] = useState<string | null>(null);
   const [registerForm, setRegisterForm] = useState({
     student_id: "",
@@ -326,6 +114,7 @@ export default function SectionsPage() {
   const [page, setPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const limit = 15;
+  const [completingSection, setCompletingSection] = useState<string | null>(null);
 
   const fetchLookups = useCallback(async () => {
     const [coursesRes, teachersRes, studentsRes] = await Promise.all([
@@ -438,38 +227,6 @@ export default function SectionsPage() {
     courses.find((c) => c.id === id)?.name || id;
   const getTeacherName = (id: string) =>
     teachers.find((u) => u.id === id)?.full_name || id;
-
-  const statusBadge = (status: string, flags?: Record<string, any>) => {
-    const colors: Record<string, string> = {
-      pending: "bg-amber-50 text-amber-600 border-amber-200",
-      active: "bg-emerald-50 text-emerald-600 border-emerald-200",
-      completed: "bg-slate-100 text-slate-500 border-slate-200",
-      ready_for_completion: "bg-yellow-50 text-yellow-600 border-yellow-300",
-      cancelled: "bg-red-50 text-red-600 border-red-200",
-    };
-    const labels: Record<string, string> = {
-      pending: t.pending,
-      active: t.active,
-      completed: t.completed,
-      ready_for_completion: t.ready_for_completion,
-      cancelled: t.cancelled,
-    };
-    const isOverdue = flags?.overdue === true;
-    return (
-      <span
-        className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium border ${colors[status] || colors.pending}`}
-      >
-        {status === "cancelled" && <Ban size={12} />}
-        {status === "ready_for_completion" && <AlertTriangle size={12} />}
-        {labels[status] || status}
-        {isOverdue && (
-          <span className="ms-1 text-[10px] font-bold text-red-600">
-            ({t.overdueLabel})
-          </span>
-        )}
-      </span>
-    );
-  };
 
   const openCreate = () => {
     setForm({
@@ -624,29 +381,6 @@ export default function SectionsPage() {
     }
   };
 
-  const translateError = (detail: string | undefined, fallback: string) => {
-    if (!detail) return fallback;
-    if (locale === "en") return detail;
-    const patterns: [RegExp, (...m: string[]) => string][] = [
-      [/^Cannot finalize grades: (\d+) of (\d+) students are missing final scores$/, (a, b) => `${t.errCannotFinalize}${a} من ${b} طالب يفتقدون للدرجات النهائية`],
-      [/^Cannot settle a contract without a teacher$/, () => t.errNoTeacher],
-      [/^Cannot activate a contract without a teacher$/, () => t.errNoTeacherActivate],
-      [/^Cannot activate a contract without a compensation model$/, () => t.errNoCompModel],
-      [/^Cannot activate a section without a price/, () => t.errMissingPrice],
-      [/^Cannot activate a section without a start date/, () => t.errMissingStartDate],
-      [/^Cannot activate a section without a class time/, () => t.errMissingClassTime],
-      [/^Cannot activate section\. Missing required fields: (.+)$/, (fields) => `${t.errActivateMissingFields} ${fields}`],
-      [/^Only ACTIVE contracts can be finalized, current: (.+)$/, (s) => `${t.errOnlyActive}، الحالة الحالية: ${s}`],
-      [/^Only GRADES_SUBMITTED contracts can be settled, current: (.+)$/, (s) => `${t.errOnlyGraded}، الحالة الحالية: ${s}`],
-      [/^Only ASSIGNED contracts can be activated, current: (.+)$/, (s) => `${t.errOnlyAssigned}، الحالة الحالية: ${s}`],
-    ];
-    for (const [regex, fn] of patterns) {
-      const m = detail.match(regex);
-      if (m) return fn(...m.slice(1));
-    }
-    return detail;
-  };
-
   const handleActivate = async (sectionId: string) => {
     const section = sections.find(s => s.id === sectionId);
     if (section) {
@@ -676,18 +410,27 @@ export default function SectionsPage() {
     }
   };
 
-  const handleComplete = async (sectionId: string) => {
-    try {
-      await apiClient.post(`/lms/sections/${sectionId}/contract/complete`);
-      setActionMessage({ type: "success", text: t.completedMsg });
-      fetchSections(search, statusFilter, page);
-    } catch (e: unknown) {
-      const err = e as { response?: { data?: { detail?: string } } };
-      setActionMessage({
-        type: "error",
-        text: translateError(err?.response?.data?.detail, t.completionFailed),
-      });
+  const translateError = (detail: string | undefined, fallback: string) => {
+    if (!detail) return fallback;
+    if (locale === "en") return detail;
+    const patterns: [RegExp, (...m: string[]) => string][] = [
+      [/^Cannot finalize grades: (\d+) of (\d+) students are missing final scores$/, (a, b) => `${t.errCannotFinalize}${a} من ${b} طالب يفتقدون للدرجات النهائية`],
+      [/^Cannot settle a contract without a teacher$/, () => t.errNoTeacher],
+      [/^Cannot activate a contract without a teacher$/, () => t.errNoTeacherActivate],
+      [/^Cannot activate a contract without a compensation model$/, () => t.errNoCompModel],
+      [/^Cannot activate a section without a price/, () => t.errMissingPrice],
+      [/^Cannot activate a section without a start date/, () => t.errMissingStartDate],
+      [/^Cannot activate a section without a class time/, () => t.errMissingClassTime],
+      [/^Cannot activate section\. Missing required fields: (.+)$/, (fields) => `${t.errActivateMissingFields} ${fields}`],
+      [/^Only ACTIVE contracts can be finalized, current: (.+)$/, (s) => `${t.errOnlyActive}، الحالة الحالية: ${s}`],
+      [/^Only GRADES_SUBMITTED contracts can be settled, current: (.+)$/, (s) => `${t.errOnlyGraded}، الحالة الحالية: ${s}`],
+      [/^Only ASSIGNED contracts can be activated, current: (.+)$/, (s) => `${t.errOnlyAssigned}، الحالة الحالية: ${s}`],
+    ];
+    for (const [regex, fn] of patterns) {
+      const m = detail.match(regex);
+      if (m) return fn(...m.slice(1));
     }
+    return detail;
   };
 
   const handleRegister = async () => {
@@ -815,493 +558,55 @@ export default function SectionsPage() {
         </div>
       )}
 
-      <Modal
+      <SectionFormModal
         open={showForm}
         onClose={() => setShowForm(false)}
-        title={editingId ? t.edit : t.add}
-        size="xl"
-      >
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">
-                {t.course}
-              </label>
-              <Select
-                value={form.course_id}
-                onChange={(value) => setForm({ ...form, course_id: value })}
-                options={courses.map((c) => ({
-                  value: c.id,
-                  label: `${c.name} (${c.code})`,
-                }))}
-                placeholder="--"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">
-                {t.teacher}
-              </label>
-              <Select
-                value={form.teacher_id}
-                onChange={(value) => {
-                  const def = teacherDefaultMap[value];
-                  const defaultPct = def?.default_percentage?.toString() || "";
-                  const defaultSal = def?.default_salary?.toString() || "";
-                  setForm({
-                    ...form,
-                    teacher_id: value,
-                    teacher_percentage: defaultPct,
-                    teacher_salary: defaultSal,
-                  });
-                }}
-                options={teachers.map((u) => ({
-                  value: u.id,
-                  label: u.full_name,
-                }))}
-                placeholder="--"
-              />
-            </div>
-            {form.teacher_id && (
-              <div className="col-span-2 bg-blue-50 p-3 rounded border border-blue-200">
-                <div className="grid grid-cols-3 gap-3">
-                  <div>
-                    <label className="block text-xs font-medium text-slate-700 mb-1">
-                      {t.compModel || "Compensation"}
-                    </label>
-                    <Select
-                      value={form.comp_model}
-                      onChange={(value) =>
-                        setForm({ ...form, comp_model: value })
-                      }
-                      options={[
-                        { value: "fixed", label: "Fixed Amount" },
-                        { value: "percentage", label: "Percentage" },
-                      ]}
-                      placeholder="--"
-                    />
-                  </div>
-                  {form.comp_model === "fixed" && (
-                    <div>
-                      <label className="block text-xs font-medium text-slate-700 mb-1">
-                        {t.fixedAmount || "Fixed Amount (SAR)"}
-                      </label>
-                      <input
-                        type="number"
-                        value={form.teacher_salary}
-                        onChange={(e) =>
-                          setForm({ ...form, teacher_salary: e.target.value })
-                        }
-                        className="input-field"
-                        min={0}
-                        readOnly={user?.role?.name === "secretary"}
-                      />
-                    </div>
-                  )}
-                  {form.comp_model === "percentage" && (
-                    <div>
-                      <label className="block text-xs font-medium text-slate-700 mb-1">
-                        {t.teacherPctLabel}
-                      </label>
-                      <input
-                        type="number"
-                        value={form.teacher_percentage}
-                        onChange={(e) =>
-                          setForm({
-                            ...form,
-                            teacher_percentage: e.target.value,
-                          })
-                        }
-                        className="input-field"
-                        min={0}
-                        max={100}
-                        readOnly={user?.role?.name === "secretary"}
-                      />
-                    </div>
-                  )}
-                  {editingId && (
-                    <div className="flex items-end">
-                      <button
-                        type="button"
-                        onClick={() => setShowIncreaseModal(true)}
-                        className="px-3 py-1.5 text-xs font-medium text-amber-700 bg-amber-50 border border-amber-300 rounded hover:bg-amber-100"
-                      >
-                        {t.requestIncrease || "Request Increase"}
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-            <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">
-                {t.capacity}
-              </label>
-              <input
-                type="number"
-                value={form.capacity}
-                onChange={(e) =>
-                  setForm({ ...form, capacity: parseInt(e.target.value) || 0 })
-                }
-                className="input-field"
-                min={1}
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">
-                {t.minStudents}
-              </label>
-              <input
-                type="number"
-                value={form.min_students_required}
-                onChange={(e) =>
-                  setForm({
-                    ...form,
-                    min_students_required: parseInt(e.target.value) || 0,
-                  })
-                }
-                className="input-field"
-                min={0}
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">
-                {t.startDate}
-              </label>
-              <input
-                type="date"
-                value={form.start_date}
-                onChange={(e) =>
-                  setForm({ ...form, start_date: e.target.value })
-                }
-                className="input-field"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">
-                {t.endDate}
-              </label>
-              <input
-                type="date"
-                value={form.end_date}
-                onChange={(e) => setForm({ ...form, end_date: e.target.value })}
-                className="input-field"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">
-                {t.classTime}
-              </label>
-              <input
-                type="time"
-                value={form.class_time}
-                onChange={(e) =>
-                  setForm({ ...form, class_time: e.target.value })
-                }
-                className="input-field"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">
-                {t.classDuration}
-              </label>
-              <input
-                type="number"
-                value={form.class_duration_minutes}
-                onChange={(e) =>
-                  setForm({
-                    ...form,
-                    class_duration_minutes: parseInt(e.target.value) || 0,
-                  })
-                }
-                className="input-field"
-                min={0}
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">
-                {t.classroom}
-              </label>
-              <input
-                type="text"
-                value={form.classroom}
-                onChange={(e) =>
-                  setForm({ ...form, classroom: e.target.value })
-                }
-                className="input-field"
-                placeholder="A101"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">
-                {t.price}
-              </label>
-              <input
-                type="number"
-                value={form.price}
-                onChange={(e) => setForm({ ...form, price: e.target.value })}
-                className="input-field"
-                min={0}
-                placeholder="0"
-              />
-            </div>
-          </div>
-          {message && (
-            <div
-              className={`px-4 py-3 rounded-lg text-sm font-medium ${
-                message.type === "success"
-                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                  : "bg-red-50 text-red-700 border border-red-200"
-              }`}
-            >
-              {message.text}
-              <button
-                onClick={() => setMessage(null)}
-                className="ms-2 float-end"
-              >
-                &times;
-              </button>
-            </div>
-          )}
-          <div className="flex gap-3 pt-2">
-            <button onClick={handleSave} className="btn-primary">
-              {t.save}
-            </button>
-            <button
-              onClick={() => setShowForm(false)}
-              className="btn-secondary"
-            >
-              {t.cancel}
-            </button>
-          </div>
-        </div>
-      </Modal>
+        sectionId={editingId}
+        form={form}
+        onFormChange={setForm}
+        onSave={handleSave}
+        t={t}
+        courses={courses}
+        teachers={teachers}
+        teacherDefaultMap={teacherDefaultMap}
+        user={user}
+        message={message}
+        onMessageClear={() => setMessage(null)}
+        onShowMessage={(msg) => setMessage(msg)}
+      />
 
-      {sections.length === 0 ? (
-        <div className="card p-8 text-center text-sm text-slate-500">
-          {t.empty}
-        </div>
-      ) : (
-        <div className="card overflow-hidden">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>{t.course}</th>
-                {user?.role?.name !== "teacher" && <th>{t.teacher}</th>}
-                <th>{t.status}</th>
-                <th>{t.quota}</th>
-                <th>{t.comp || "Comp"}</th>
-                <th>{t.price}</th>
-                <th>{t.schedule}</th>
-                <th>{t.actions}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sections.map((section) => {
-                const enrolled = section.enrolled_count;
-                const minReq = section.min_students_required || 1;
-                const quotaMet = enrolled >= minReq;
-                return (
-                  <tr key={section.id}>
-                    <td className="font-medium text-slate-900">
-                      {getCourseName(section.course_id)}
-                    </td>
-                    {user?.role?.name !== "teacher" && (
-                      <td className="text-slate-600">
-                        {getTeacherName(section.teacher_id)}
-                      </td>
-                    )}
-                    <td>{statusBadge(section.status, section.flags)}</td>
-                    <td>
-                      <div className="flex items-center gap-2">
-                        <div className="flex-1 bg-slate-100 rounded-full h-2 w-24">
-                          <div
-                            className={`h-2 rounded-full transition-all ${quotaMet ? "bg-emerald-500" : "bg-amber-400"}`}
-                            style={{
-                              width: `${Math.min(100, (enrolled / minReq) * 100)}%`,
-                            }}
-                          />
-                        </div>
-                        <span className="text-xs text-slate-500 whitespace-nowrap">
-                          {enrolled}/{minReq}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="text-slate-600">
-                      {section.teacher_id ? "Assigned" : "—"}
-                    </td>
-                    <td className="text-slate-600">
-                      {section.price != null ? `${section.price}` : "—"}
-                    </td>
-                    <td className="text-xs text-slate-500">
-                      {section.start_date ||
-                      section.class_time ||
-                      section.classroom ? (
-                        <span className="space-y-0.5 block">
-                          {section.start_date && (
-                            <span className="block">
-                              {section.start_date}
-                              {section.end_date ? ` → ${section.end_date}` : ""}
-                            </span>
-                          )}
-                          {section.class_time && (
-                            <span className="block">
-                              {section.class_time}
-                              {section.class_duration_minutes
-                                ? ` (${section.class_duration_minutes}min)`
-                                : ""}
-                            </span>
-                          )}
-                          {section.classroom && (
-                            <span className="block">{section.classroom}</span>
-                          )}
-                        </span>
-                      ) : (
-                        "—"
-                      )}
-                    </td>
-                    <td>
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={() =>
-                            router.push(
-                              `/${locale}/dashboard/sections/${section.id}`,
-                            )
-                          }
-                          className="btn-icon"
-                          title="View Details"
-                        >
-                          <Eye size={14} />
-                        </button>
-                        {canEdit && section.status !== "completed" && section.status !== "cancelled" && (
-                          <button
-                            onClick={() => openEdit(section)}
-                            className="btn-icon"
-                            title={t.edit}
-                          >
-                            <Pencil size={14} />
-                          </button>
-                        )}
-                        {canDelete && (
-                          <button
-                            onClick={() => setDeleteTarget(section)}
-                            className="btn-icon text-red-500"
-                            title={t.delete}
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        )}
-                        {/* Cancel Section - for pending or active sections */}
-                        {(user?.is_superadmin || user?.role?.name === "manager") &&
-                          (section.status === "pending" || section.status === "active") && (
-                            <button
-                              onClick={() => setCancelTarget(section)}
-                              className="btn-icon text-red-500"
-                              title={t.cancelSection}
-                            >
-                              <XCircle size={14} />
-                            </button>
-                          )}
-                        {/* Deactivate - for superadmin only, active sections */}
-                        {user?.is_superadmin && section.status === "active" && (
-                          <button
-                            onClick={() => setDeactivateTarget(section)}
-                            className="btn-icon text-amber-500"
-                            title={t.deactivateSection}
-                          >
-                            <Ban size={14} />
-                          </button>
-                        )}
-                        {canActivate &&
-                          section.status === "pending" &&
-                          section.contract_status === "assigned" && (
-                            <button
-                              onClick={() => handleActivate(section.id)}
-                              disabled={!quotaMet || section.price == null || !section.teacher_id || !section.start_date || !section.class_time}
-                              className={`btn-icon ${quotaMet && section.price != null && section.teacher_id && section.start_date && section.class_time ? "text-emerald-600" : "text-slate-300"}`}
-                              title={
-                                !quotaMet
-                                  ? `${t.activate} (${t.quota}: ${section.enrolled_count}/${section.min_students_required || 1})`
-                                  : section.price == null
-                                    ? `${t.activate} (${t.errMissingPrice})`
-                                    : !section.teacher_id
-                                      ? `${t.activate} (${t.errMissingTeacher})`
-                                      : !section.start_date
-                                        ? `${t.activate} (${t.errMissingStartDate})`
-                                        : !section.class_time
-                                          ? `${t.activate} (${t.errMissingClassTime})`
-                                          : t.activate
-                              }
-                            >
-                              <Play size={14} />
-                            </button>
-                          )}
-                        {canActivate &&
-                          (section.status === "active" || section.status === "ready_for_completion") && (
-                            <button
-                              onClick={() => {
-                                setCompleteTarget(section);
-                                setCompleteOverride({ ungraded: [], unpaid: [] });
-                              }}
-                              className="btn-icon text-emerald-600"
-                              title={t.complete}
-                            >
-                              <CheckCircle2 size={14} />
-                            </button>
-                          )}
-                        {canRegister && section.status === "pending" && (
-                          <button
-                            onClick={() => {
-                              setShowRegister(section.id);
-                              setRegisterForm({
-                                student_id: "",
-                                admin_discount: "",
-                              });
-                            }}
-                            className="btn-icon text-indigo-600"
-                            title={t.registerStudent}
-                          >
-                            <UserPlus size={14} />
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-          <div className="flex items-center justify-between px-4 py-3 border-t border-slate-200 text-sm text-slate-600">
-            <span>
-              {t.showing} {Math.min((page - 1) * limit + 1, totalCount)}–
-              {Math.min(page * limit, totalCount)} {t.of} {totalCount}
-            </span>
-            <div className="flex items-center gap-2">
-              <button
-                disabled={page <= 1}
-                onClick={() => {
-                  const p = page - 1;
-                  setPage(p);
-                  fetchSections(search, statusFilter, p);
-                }}
-                className="px-3 py-1 rounded border border-slate-300 text-sm disabled:opacity-40 hover:bg-slate-100"
-              >
-                {t.prev}
-              </button>
-              <button
-                disabled={page >= Math.ceil(totalCount / limit)}
-                onClick={() => {
-                  const p = page + 1;
-                  setPage(p);
-                  fetchSections(search, statusFilter, p);
-                }}
-                className="px-3 py-1 rounded border border-slate-300 text-sm disabled:opacity-40 hover:bg-slate-100"
-              >
-                {t.next}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <SectionsTable
+        sections={sections}
+        totalCount={totalCount}
+        page={page}
+        limit={limit}
+        search={search}
+        statusFilter={statusFilter}
+        getCourseName={getCourseName}
+        getTeacherName={getTeacherName}
+        canEdit={canEdit}
+        canDelete={canDelete}
+        canActivate={canActivate}
+        canRegister={canRegister}
+        user={user}
+        t={t}
+        isRtl={isRtl}
+        locale={locale}
+        completingSection={completingSection}
+        onEdit={openEdit}
+        onDelete={(section) => setDeleteTarget(section)}
+        onActivate={handleActivate}
+        onRegister={(sectionId) => {
+          setShowRegister(sectionId);
+          setRegisterForm({ student_id: "", admin_discount: "" });
+        }}
+        onPageChange={(p) => {
+          setPage(p);
+          fetchSections(search, statusFilter, p);
+        }}
+        onRefresh={() => fetchSections(search, statusFilter, page)}
+        onActionMessage={setActionMessage}
+      />
 
       <Modal
         open={showRegister !== null}
@@ -1372,107 +677,6 @@ export default function SectionsPage() {
         </div>
       </Modal>
 
-      <Modal
-        open={showIncreaseModal}
-        onClose={() => setShowIncreaseModal(false)}
-        title={t.requestIncrease || "Request Compensation Increase"}
-        size="md"
-      >
-        <div className="space-y-6">
-          {form.teacher_id && (
-            <>
-              <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">
-                  {t.currentTerms || "Current Terms"}
-                </label>
-                <div className="text-sm text-slate-600 bg-slate-50 p-2 rounded">
-                  {form.comp_model === "fixed"
-                    ? `Fixed: SAR ${form.teacher_salary || "—"}`
-                    : form.comp_model === "percentage"
-                      ? `Percentage: ${form.teacher_percentage || "—"}%`
-                      : "Not set"}
-                </div>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">
-                  {form.comp_model === "percentage"
-                    ? t.newPercentage || "New Percentage"
-                    : t.newAmount || "New Amount"}{" "}
-                  <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="number"
-                  value={increaseAmount}
-                  onChange={(e) => setIncreaseAmount(e.target.value)}
-                  className="input-field"
-                  min={0}
-                  placeholder="0"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">
-                  {t.reason || "Reason"} <span className="text-red-500">*</span>
-                </label>
-                <textarea
-                  value={increaseReason}
-                  onChange={(e) => setIncreaseReason(e.target.value)}
-                  className="input-field"
-                  rows={3}
-                  placeholder={
-                    t.reasonPlaceholder ||
-                    "Explain why the increase is needed..."
-                  }
-                />
-              </div>
-              <div className="flex gap-3 pt-2">
-                <button
-                  onClick={async () => {
-                    if (!increaseAmount || !increaseReason || !editingId)
-                      return;
-                    try {
-                      await apiClient.post(
-                        `/lms/sections/${editingId}/contract/amend`,
-                        {
-                          requested_amount: parseFloat(increaseAmount),
-                          reason: increaseReason,
-                        },
-                      );
-                      setShowIncreaseModal(false);
-                      setIncreaseAmount("");
-                      setIncreaseReason("");
-                      setMessage({
-                        type: "success",
-                        text:
-                          t.requestSubmitted || "Increase request submitted",
-                      });
-                    } catch (e) {
-                      const err = e as {
-                        response?: { data?: { detail?: string } };
-                      };
-                      setMessage({
-                        type: "error",
-                        text:
-                          err?.response?.data?.detail ||
-                          "Failed to submit increase request",
-                      });
-                    }
-                  }}
-                  className="btn-primary"
-                >
-                  {t.submit || "Submit"}
-                </button>
-                <button
-                  onClick={() => setShowIncreaseModal(false)}
-                  className="btn-secondary"
-                >
-                  {t.cancel}
-                </button>
-              </div>
-            </>
-          )}
-        </div>
-      </Modal>
-
       <ConfirmModal
         open={deleteTarget !== null}
         title={t.confirmTitle}
@@ -1486,48 +690,6 @@ export default function SectionsPage() {
         isRtl={isRtl}
         onConfirm={() => deleteTarget && handleDelete(deleteTarget.id)}
         onCancel={() => setDeleteTarget(null)}
-      />
-
-      <CancelSectionModal
-        open={cancelTarget !== null}
-        onClose={() => setCancelTarget(null)}
-        sectionId={cancelTarget?.id || ""}
-        sectionName={cancelTarget ? getCourseName(cancelTarget.course_id) : ""}
-        isRtl={isRtl}
-        locale={locale}
-        onSuccess={() => {
-          setActionMessage({ type: "success", text: t.cancelSuccess });
-          fetchSections(search, statusFilter, page);
-        }}
-      />
-
-      <DeactivateSectionModal
-        open={deactivateTarget !== null}
-        onClose={() => setDeactivateTarget(null)}
-        sectionId={deactivateTarget?.id || ""}
-        sectionName={deactivateTarget ? getCourseName(deactivateTarget.course_id) : ""}
-        hasPayments={(deactivateTarget?.enrolled_count || 0) > 0}
-        isRtl={isRtl}
-        locale={locale}
-        onSuccess={() => {
-          setActionMessage({ type: "success", text: t.deactivateSuccess });
-          fetchSections(search, statusFilter, page);
-        }}
-      />
-
-      <CompleteSectionModal
-        open={completeTarget !== null}
-        onClose={() => setCompleteTarget(null)}
-        sectionId={completeTarget?.id || ""}
-        sectionName={completeTarget ? getCourseName(completeTarget.course_id) : ""}
-        ungradedStudents={completeOverride.ungraded}
-        unpaidStudents={completeOverride.unpaid}
-        isRtl={isRtl}
-        locale={locale}
-        onSuccess={() => {
-          setActionMessage({ type: "success", text: t.completedMsg });
-          fetchSections(search, statusFilter, page);
-        }}
       />
     </div>
   );

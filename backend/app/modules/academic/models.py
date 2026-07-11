@@ -116,7 +116,7 @@ class CourseSection(Base):
     )
     capacity: Mapped[int] = mapped_column(Integer, default=30, server_default="30")
     enrolled_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
-    status: Mapped[str] = mapped_column(SAEnum('pending', 'active', 'completed', name='coursestatus'), nullable=False, default="pending", server_default="pending")
+    status: Mapped[str] = mapped_column(SAEnum('pending', 'active', 'completed', 'cancelled', 'ready_for_completion', name='coursestatus'), nullable=False, default="pending", server_default="pending")
     teacher_percentage: Mapped[Optional[float]] = mapped_column(Numeric(5, 2), nullable=True)
     min_students_required: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     start_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)

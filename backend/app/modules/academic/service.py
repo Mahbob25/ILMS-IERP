@@ -119,11 +119,13 @@ async def get_course_section(
     db: AsyncSession, section_id: uuid.UUID
 ) -> Optional[CourseSection]:
     result = await db.execute(
-        select(CourseSection).where(
+        select(CourseSection)
+        .where(
             CourseSection.id == section_id, CourseSection.deleted_at.is_(None)
         )
+        .options(joinedload(CourseSection.contract))
     )
-    return result.scalar_one_or_none()
+    return result.unique().scalar_one_or_none()
 
 
 async def list_course_sections(
@@ -180,6 +182,22 @@ async def update_course_section(
     for key, value in data.items():
         if value is not None:
             setattr(section, key, value)
+
+    # Propagate price to enrollments without an agreed_price.
+    # Direct ORM mutation is intentional - SQLAlchemy tracks these changes
+    # and will persist them on the next flush/commit.
+    if "price" in data and data["price"] is not None:
+        result = await db.execute(
+            select(Enrollment).where(
+                Enrollment.section_id == section_id,
+                Enrollment.deleted_at.is_(None),
+                Enrollment.agreed_price.is_(None),
+            )
+        )
+        enrollments_to_update = result.scalars().all()
+        for enrollment in enrollments_to_update:
+            enrollment.agreed_price = data["price"]
+
     await db.flush()
     return section
 
@@ -529,7 +547,11 @@ async def list_enrollments(
     sort_by: str = "enrolled_at",
     sort_order: str = "desc",
 ) -> dict:
-    query = select(Enrollment).where(Enrollment.deleted_at.is_(None))
+    query = (
+        select(Enrollment)
+        .options(joinedload(Enrollment.section))
+        .where(Enrollment.deleted_at.is_(None))
+    )
     count_query = select(func.count(Enrollment.id)).where(
         Enrollment.deleted_at.is_(None)
     )
@@ -564,7 +586,8 @@ async def list_enrollments(
 
         for e in items:
             total_paid = float(total_paid_map.get(e.id, Decimal("0")))
-            agreed_price = float(e.agreed_price) if e.agreed_price is not None else None
+            effective_price = e.agreed_price or (e.section.price if e.section else None)
+            agreed_price = float(effective_price) if effective_price is not None else None
             admin_discount = (
                 float(e.admin_discount) if e.admin_discount is not None else None
             )
@@ -593,6 +616,9 @@ async def delete_enrollment(db: AsyncSession, enrollment_id: uuid.UUID) -> bool:
 async def get_section_enrollments_detailed(
     db: AsyncSession, section_id: uuid.UUID
 ) -> list[dict]:
+    section = await get_course_section(db, section_id)
+    section_price = section.price if section else None
+
     result = await db.execute(
         select(Enrollment)
         .options(joinedload(Enrollment.student))
@@ -625,9 +651,10 @@ async def get_section_enrollments_detailed(
     results = []
     for e in enrollments:
         total_paid = total_paid_map.get(e.id, Decimal("0"))
-        net_price = e.agreed_price
-        if e.agreed_price is not None and e.admin_discount is not None:
-            net_price = e.agreed_price - (e.agreed_price * e.admin_discount / 100)
+        effective_price = e.agreed_price or section_price
+        net_price = effective_price
+        if effective_price is not None and e.admin_discount is not None:
+            net_price = effective_price - (effective_price * e.admin_discount / 100)
         balance = (net_price - total_paid) if net_price is not None else None
 
         final_grade = grade_map.get(e.student_id)
@@ -640,7 +667,7 @@ async def get_section_enrollments_detailed(
                 "student_id": e.student_id,
                 "section_id": e.section_id,
                 "enrolled_at": e.enrolled_at,
-                "agreed_price": e.agreed_price,
+                "agreed_price": e.agreed_price or section_price,
                 "admin_discount": e.admin_discount,
                 "student_name": e.student.full_name,
                 "student_code": e.student.student_code,

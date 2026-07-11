@@ -162,16 +162,12 @@ class TestFullLifecycle:
 
         exec_order = [
             result_mock(scalar_one_or_none=section),  # get_course_section
-            result_mock(scalar=2),  # enrolled count
-            result_mock(scalar=1),  # graded count
-            result_mock(scalars_all=[enrollment]),  # enrollments
-            result_mock(scalar=Decimal("500")),  # payment sum
-            result_mock(scalar_one_or_none=None),  # config
-            result_mock(scalars_all=[enrollment]),  # second enrollment query for certs
+            result_mock(scalars_all=[enrollment]),  # enrollments for payment check
+            result_mock(scalars_all=[enrollment]),  # enrollments for certificates
         ]
 
         mock_db.execute = AsyncMock(side_effect=exec_order)
-        mock_db.scalar = AsyncMock(return_value=1)
+        mock_db.scalar = AsyncMock(side_effect=[2, 1, Decimal("500")])
         mock_db.add = Mock()
         mock_db.flush = AsyncMock()
 

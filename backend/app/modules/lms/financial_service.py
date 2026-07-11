@@ -87,7 +87,7 @@ async def create_payment(
         .where(Payment.enrollment_id == enrollment_id)
     )
     total_paid_before = Decimal(str(total_paid_result.scalar() or 0))
-    agreed_price = enrollment.agreed_price or 0
+    agreed_price = enrollment.agreed_price or (enrollment.section.price if enrollment.section else 0) or 0
     discount_pct = enrollment.admin_discount or 0
     discount_amount = agreed_price * discount_pct / 100
     net_price = agreed_price - discount_amount
@@ -941,11 +941,15 @@ async def get_student_payment_summary(
     total_paid = Decimal(str(total_paid_result.scalar() or 0))
 
     enrollment_result = await db.execute(
-        select(Enrollment).where(Enrollment.id == enrollment_id)
+        select(Enrollment)
+        .options(joinedload(Enrollment.section))
+        .where(Enrollment.id == enrollment_id)
     )
     enrollment = enrollment_result.scalar_one_or_none()
 
     agreed_price = enrollment.agreed_price if enrollment else None
+    if agreed_price is None and enrollment and enrollment.section:
+        agreed_price = enrollment.section.price
     admin_discount = enrollment.admin_discount if enrollment else None
     discount_amount = (agreed_price * admin_discount / 100) if (agreed_price is not None and admin_discount is not None) else None
     net_price = (agreed_price - discount_amount) if (agreed_price is not None and discount_amount is not None) else agreed_price

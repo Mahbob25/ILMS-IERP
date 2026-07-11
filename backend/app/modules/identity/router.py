@@ -32,6 +32,7 @@ from app.modules.identity.dependencies import (
 )
 from app.modules.identity import service as identity_service
 from app.core.rate_limit import limiter
+from app.core.config import settings
 
 auth_router = APIRouter(prefix="/auth", tags=["auth"])
 users_router = APIRouter(prefix="/users", tags=["users"])
@@ -45,11 +46,12 @@ def _hash_token(token: str) -> str:
 
 
 def _set_auth_cookies(response: Response, access_token: str, refresh_token: str) -> None:
+    secure = settings.ENVIRONMENT != "development"
     response.set_cookie(
         key="access_token",
         value=access_token,
         httponly=True,
-        secure=True,
+        secure=secure,
         samesite="lax",
         path="/",
         max_age=15 * 60
@@ -58,7 +60,7 @@ def _set_auth_cookies(response: Response, access_token: str, refresh_token: str)
         key="refresh_token",
         value=refresh_token,
         httponly=True,
-        secure=True,
+        secure=secure,
         samesite="lax",
         path="/",
         max_age=7 * 24 * 60 * 60
@@ -66,8 +68,9 @@ def _set_auth_cookies(response: Response, access_token: str, refresh_token: str)
 
 
 def _clear_auth_cookies(response: Response) -> None:
-    response.delete_cookie(key="access_token", path="/", secure=True, httponly=True, samesite="lax")
-    response.delete_cookie(key="refresh_token", path="/", secure=True, httponly=True, samesite="lax")
+    secure = settings.ENVIRONMENT != "development"
+    response.delete_cookie(key="access_token", path="/", secure=secure, httponly=True, samesite="lax")
+    response.delete_cookie(key="refresh_token", path="/", secure=secure, httponly=True, samesite="lax")
 
 
 # --- Auth Endpoints ---

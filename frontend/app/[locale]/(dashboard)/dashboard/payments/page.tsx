@@ -22,10 +22,27 @@ interface Payment {
   created_by_name: string;
 }
 
-interface Student { id: string; student_code: string; full_name: string; }
-interface Course { id: string; name: string; code: string; }
-interface CourseSection { id: string; course_id: string; }
-interface Enrollment { id: string; student_id: string; section_id: string; agreed_price: number | null; admin_discount: number | null; }
+interface Student {
+  id: string;
+  student_code: string;
+  full_name: string;
+}
+interface Course {
+  id: string;
+  name: string;
+  code: string;
+}
+interface CourseSection {
+  id: string;
+  course_id: string;
+}
+interface Enrollment {
+  id: string;
+  student_id: string;
+  section_id: string;
+  agreed_price: number | null;
+  admin_discount: number | null;
+}
 
 interface PaymentSummary {
   total_paid: number;
@@ -73,6 +90,8 @@ export default function PaymentsPage() {
       remaining: "المتبقي",
       netPrice: "صافي السعر",
       totalPaid: "المدفوع",
+      agreedPrice: "السعر المتفق عليه",
+      discount: "الخصم",
       positiveAmount: "يجب أن يكون المبلغ أكبر من صفر",
       exceedsBalance: "المبلغ يتجاوز الرصيد المتبقي",
       paymentFailed: "فشل تسجيل الدفعة",
@@ -83,6 +102,7 @@ export default function PaymentsPage() {
       enterTransactionNumber: "أدخل رقم العملية",
       createdBy: "تم بواسطة",
       searchReceipt: "بحث برقم الإيصال",
+      unknownStudent: "غير معروف",
       sar: "ريال",
     },
     en: {
@@ -116,17 +136,20 @@ export default function PaymentsPage() {
       remaining: "Remaining",
       netPrice: "Net Price",
       totalPaid: "Total Paid",
+      agreedPrice: "Agreed Price",
+      discount: "Discount",
       positiveAmount: "Amount must be positive",
       exceedsBalance: "Amount exceeds remaining balance",
       paymentFailed: "Payment failed",
       cash: "Cash",
       online: "Bank Transfer",
       paymentMethod: "Payment Method",
-      transactionNumber: "Transaction Number",
+      transactionNumber: "Transaction No.",
       enterTransactionNumber: "Enter transaction number",
       createdBy: "Created By",
       searchReceipt: "Search by receipt number",
-      sar: "YER",
+      unknownStudent: "Unknown",
+      sar: "SAR",
     },
   }[locale === "en" ? "en" : "ar"];
 
@@ -148,16 +171,27 @@ export default function PaymentsPage() {
     const timer = setTimeout(() => setDebouncedSearch(receiptSearch), 300);
     return () => clearTimeout(timer);
   }, [receiptSearch]);
-  const [receiptSummary, setReceiptSummary] = useState<PaymentSummary | null>(null);
+  const [receiptSummary, setReceiptSummary] = useState<PaymentSummary | null>(
+    null,
+  );
   const [form, setForm] = useState<{
     enrollment_id: string;
     amount: string;
     date: string;
     payment_method: string;
     transaction_number: string;
-  }>({ enrollment_id: "", amount: "", date: getLocalDateString(), payment_method: "cash", transaction_number: "" });
+  }>({
+    enrollment_id: "",
+    amount: "",
+    date: getLocalDateString(),
+    payment_method: "cash",
+    transaction_number: "",
+  });
 
-  const canCreate = user?.is_superadmin || user?.role?.name === "manager" || user?.role?.name === "secretary";
+  const canCreate =
+    user?.is_superadmin ||
+    user?.role?.name === "manager" ||
+    user?.role?.name === "secretary";
 
   const fetchPayments = useCallback(async () => {
     try {
@@ -172,12 +206,21 @@ export default function PaymentsPage() {
 
   const fetchLookups = useCallback(async () => {
     try {
-      const [studentsRes, coursesRes, sectionsRes, enrollmentsRes] = await Promise.all([
-        apiClient.get<{ items: Student[]; total: number }>("/academic/students?limit=1000"),
-        apiClient.get<{ items: Course[]; total: number }>("/academic/courses?limit=1000"),
-        apiClient.get<{ items: CourseSection[]; total: number }>("/academic/course-sections?limit=1000"),
-        apiClient.get<{ items: Enrollment[]; total: number }>("/academic/enrollments?limit=1000"),
-      ]);
+      const [studentsRes, coursesRes, sectionsRes, enrollmentsRes] =
+        await Promise.all([
+          apiClient.get<{ items: Student[]; total: number }>(
+            "/academic/students?limit=1000",
+          ),
+          apiClient.get<{ items: Course[]; total: number }>(
+            "/academic/courses?limit=1000",
+          ),
+          apiClient.get<{ items: CourseSection[]; total: number }>(
+            "/academic/course-sections?limit=1000",
+          ),
+          apiClient.get<{ items: Enrollment[]; total: number }>(
+            "/academic/enrollments?limit=1000",
+          ),
+        ]);
       setStudents(studentsRes.data.items);
       setCourses(coursesRes.data.items);
       setSections(sectionsRes.data.items);
@@ -193,7 +236,9 @@ export default function PaymentsPage() {
     setLoading(false);
   }, [fetchPayments, fetchLookups]);
 
-  useEffect(() => { loadAll(); }, [loadAll]);
+  useEffect(() => {
+    loadAll();
+  }, [loadAll]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -203,7 +248,13 @@ export default function PaymentsPage() {
 
   const openCreate = async () => {
     await fetchLookups();
-    setForm({ enrollment_id: "", amount: "", date: getLocalDateString(), payment_method: "cash", transaction_number: "" });
+    setForm({
+      enrollment_id: "",
+      amount: "",
+      date: getLocalDateString(),
+      payment_method: "cash",
+      transaction_number: "",
+    });
     setSummary(null);
     setFormError("");
     setShowForm(true);
@@ -214,7 +265,9 @@ export default function PaymentsPage() {
     if (!enrollment) return null;
     const student = students.find((s) => s.id === enrollment.student_id);
     const section = sections.find((s) => s.id === enrollment.section_id);
-    const course = section ? courses.find((c) => c.id === section.course_id) : null;
+    const course = section
+      ? courses.find((c) => c.id === section.course_id)
+      : null;
     return { enrollment, student, section, course };
   };
 
@@ -231,7 +284,8 @@ export default function PaymentsPage() {
   const enrollmentLabel = (enrollmentId: string) => {
     const resolved = resolveEnrollment(enrollmentId);
     if (!resolved) return enrollmentId.slice(0, 8);
-    return `${resolved.student?.full_name || "?"} - ${resolved.course?.name || "?"}`;
+    const price = resolved.enrollment?.agreed_price;
+    return `${resolved.student?.full_name || "?"} - ${resolved.course?.name || "?"}${price != null ? ` (${t.sar} ${price.toFixed(2)})` : ""}`;
   };
 
   const handleSave = async () => {
@@ -254,7 +308,9 @@ export default function PaymentsPage() {
       const res = await apiClient.post("/lms/payments", payload);
       setShowForm(false);
       setFormError("");
-      const updatedSummary = await apiClient.get<PaymentSummary>(`/lms/payments/summary/${form.enrollment_id}`);
+      const updatedSummary = await apiClient.get<PaymentSummary>(
+        `/lms/payments/summary/${form.enrollment_id}`,
+      );
       setShowReceipt(res.data);
       setReceiptSummary(updatedSummary.data);
       fetchPayments();
@@ -282,7 +338,10 @@ export default function PaymentsPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-6xl mx-auto animate-fade-in" dir={isRtl ? "rtl" : "ltr"}>
+    <div
+      className="space-y-6 max-w-6xl mx-auto animate-fade-in"
+      dir={isRtl ? "rtl" : "ltr"}
+    >
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-bold text-slate-900">{t.title}</h2>
@@ -290,7 +349,10 @@ export default function PaymentsPage() {
         </div>
         <div className="flex items-center gap-2">
           <div className="relative">
-            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            <Search
+              size={14}
+              className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+            />
             <input
               type="text"
               value={receiptSearch}
@@ -307,11 +369,19 @@ export default function PaymentsPage() {
               </button>
             )}
           </div>
-          <button onClick={handleRefresh} disabled={refreshing} className="btn-icon" title={t.refresh}>
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="btn-icon"
+            title={t.refresh}
+          >
             <RefreshCw size={16} className={refreshing ? "animate-spin" : ""} />
           </button>
           {canCreate && (
-            <button onClick={openCreate} className="btn-primary flex items-center gap-2">
+            <button
+              onClick={openCreate}
+              className="btn-primary flex items-center gap-2"
+            >
               <Plus size={16} />
               <span>{t.add}</span>
             </button>
@@ -319,11 +389,18 @@ export default function PaymentsPage() {
         </div>
       </div>
 
-      <Modal open={showForm} onClose={() => setShowForm(false)} title={t.add} size="xl">
+      <Modal
+        open={showForm}
+        onClose={() => setShowForm(false)}
+        title={t.add}
+        size="xl"
+      >
         <div className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">{t.selectEnrollment}</label>
+              <label className="block text-xs font-medium text-slate-700 mb-1">
+                {t.selectEnrollment}
+              </label>
               <Select
                 value={form.enrollment_id}
                 onChange={async (value) => {
@@ -332,59 +409,124 @@ export default function PaymentsPage() {
                   setFormError("");
                   if (!value) return;
                   try {
-                    const res = await apiClient.get<PaymentSummary>(`/lms/payments/summary/${value}`);
+                    const res = await apiClient.get<PaymentSummary>(
+                      `/lms/payments/summary/${value}`,
+                    );
                     setSummary(res.data);
                     if (res.data.balance_remaining != null) {
-                      setForm(prev => ({ ...prev, enrollment_id: value, amount: res.data!.balance_remaining!.toString() }));
+                      setForm((prev) => ({
+                        ...prev,
+                        enrollment_id: value,
+                        amount: res.data!.balance_remaining!.toString(),
+                      }));
                     }
                   } catch {
                     // fallback
                   }
                 }}
-                options={enrollments.map((e) => ({ value: e.id, label: enrollmentLabel(e.id) }))}
+                options={enrollments.map((e) => ({
+                  value: e.id,
+                  label: enrollmentLabel(e.id),
+                }))}
                 placeholder="--"
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">{t.enterAmount}</label>
-              <input type="number" step="0.01" min="0" max={summary?.balance_remaining ?? ""} value={form.amount}
+              <label className="block text-xs font-medium text-slate-700 mb-1">
+                {t.enterAmount}
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                max={summary?.balance_remaining ?? ""}
+                value={form.amount}
                 onChange={(e) => {
                   const val = e.target.value;
-                  if (summary?.balance_remaining != null && parseFloat(val) > summary.balance_remaining) {
-                    setForm({ ...form, amount: summary.balance_remaining.toString() });
+                  if (
+                    summary?.balance_remaining != null &&
+                    parseFloat(val) > summary.balance_remaining
+                  ) {
+                    setForm({
+                      ...form,
+                      amount: summary.balance_remaining.toString(),
+                    });
                   } else {
                     setForm({ ...form, amount: val });
                   }
                 }}
-                className="input-field" placeholder="0.00" />
+                className="input-field"
+                placeholder="0.00"
+              />
+              {!form.enrollment_id && (
+                <p className="text-xs text-slate-400 mt-2">
+                  {t.selectEnrollment}
+                </p>
+              )}
               {summary && (
                 <div className="text-xs text-slate-600 space-y-0.5 mt-2 p-2 bg-slate-50 rounded-lg">
                   <div className="flex justify-between">
+                    <span>{t.agreedPrice}:</span>
+                    <span className="font-medium">
+                      {summary.agreed_price?.toFixed(2) ?? "—"} {t.sar}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>{t.discount}:</span>
+                    <span className="font-medium">
+                      {summary.admin_discount != null
+                        ? `${summary.admin_discount}%`
+                        : "—"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
                     <span>{t.netPrice}:</span>
-                    <span className="font-medium">{summary.net_price?.toFixed(2)} {t.sar}</span>
+                    <span className="font-medium">
+                      {summary.net_price?.toFixed(2)} {t.sar}
+                    </span>
                   </div>
                   <div className="flex justify-between">
                     <span>{t.totalPaid}:</span>
-                    <span className="font-medium">{summary.total_paid.toFixed(2)} {t.sar}</span>
+                    <span className="font-medium">
+                      {summary.total_paid.toFixed(2)} {t.sar}
+                    </span>
                   </div>
                   <div className="flex justify-between text-emerald-700 font-semibold">
                     <span>{t.remaining}:</span>
-                    <span>{summary.balance_remaining != null ? summary.balance_remaining.toFixed(2) : "—"} {t.sar}</span>
+                    <span>
+                      {summary.balance_remaining != null
+                        ? summary.balance_remaining.toFixed(2)
+                        : "—"}{" "}
+                      {t.sar}
+                    </span>
                   </div>
                 </div>
               )}
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">{t.paymentDate}</label>
-              <input type="date" value={form.date}
+              <label className="block text-xs font-medium text-slate-700 mb-1">
+                {t.paymentDate}
+              </label>
+              <input
+                type="date"
+                value={form.date}
                 onChange={(e) => setForm({ ...form, date: e.target.value })}
-                className="input-field" />
+                className="input-field"
+              />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">{t.paymentMethod}</label>
+              <label className="block text-xs font-medium text-slate-700 mb-1">
+                {t.paymentMethod}
+              </label>
               <div className="flex gap-2">
                 <button
-                  onClick={() => setForm({ ...form, payment_method: "cash", transaction_number: "" })}
+                  onClick={() =>
+                    setForm({
+                      ...form,
+                      payment_method: "cash",
+                      transaction_number: "",
+                    })
+                  }
                   className={`flex-1 py-2 px-3 text-sm font-medium rounded-lg border transition-colors ${
                     form.payment_method === "cash"
                       ? "border-emerald-400 bg-emerald-50 text-emerald-700"
@@ -408,7 +550,9 @@ export default function PaymentsPage() {
                 <input
                   type="text"
                   value={form.transaction_number}
-                  onChange={(e) => setForm({ ...form, transaction_number: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, transaction_number: e.target.value })
+                  }
                   placeholder={t.enterTransactionNumber}
                   className="input-field mt-2"
                   required
@@ -417,17 +561,28 @@ export default function PaymentsPage() {
             </div>
           </div>
           {formError && (
-            <div className="text-sm text-red-600 bg-red-50 p-3 rounded-lg">{formError}</div>
+            <div className="text-sm text-red-600 bg-red-50 p-3 rounded-lg">
+              {formError}
+            </div>
           )}
           <div className="flex gap-3 pt-2">
-            <button onClick={handleSave} className="btn-primary">{t.save}</button>
-            <button onClick={() => setShowForm(false)} className="btn-secondary">{t.cancel}</button>
+            <button onClick={handleSave} className="btn-primary">
+              {t.save}
+            </button>
+            <button
+              onClick={() => setShowForm(false)}
+              className="btn-secondary"
+            >
+              {t.cancel}
+            </button>
           </div>
         </div>
       </Modal>
 
       {payments.length === 0 ? (
-        <div className="card p-8 text-center text-sm text-slate-500">{t.empty}</div>
+        <div className="card p-8 text-center text-sm text-slate-500">
+          {t.empty}
+        </div>
       ) : (
         <div className="card overflow-hidden">
           <table className="data-table">
@@ -446,30 +601,57 @@ export default function PaymentsPage() {
             <tbody>
               {payments.map((payment) => {
                 const resolved = resolveEnrollment(payment.enrollment_id);
-                const studentName = resolved?.student?.full_name || payment.enrollment_id.slice(0, 8);
-                const courseName = resolved?.course?.name || payment.enrollment_id.slice(0, 8);
+                const studentName =
+                  resolved?.student?.full_name || t.unknownStudent;
+                const courseName =
+                  resolved?.course?.name || t.unknownStudent;
                 return (
                   <tr key={payment.id}>
-                    <td><span className="badge badge-success">{payment.receipt_number}</span></td>
-                    <td className="font-medium text-slate-900">{studentName}</td>
+                    <td>
+                      <span className="badge badge-success">
+                        {payment.receipt_number}
+                      </span>
+                    </td>
+                    <td className="font-medium text-slate-900">
+                      {studentName}
+                    </td>
                     <td className="text-slate-600">{courseName}</td>
                     <td>
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${
-                        payment.payment_method === "online"
-                          ? "bg-blue-50 text-blue-600 border-blue-200"
-                          : "bg-slate-50 text-slate-600 border-slate-200"
-                      }`}>
-                        {payment.payment_method === "online" ? t.online : t.cash}
+                      <span
+                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${
+                          payment.payment_method === "online"
+                            ? "bg-blue-50 text-blue-600 border-blue-200"
+                            : "bg-slate-50 text-slate-600 border-slate-200"
+                        }`}
+                      >
+                        {payment.payment_method === "online"
+                          ? t.online
+                          : t.cash}
                       </span>
                       {payment.transaction_number && (
-                        <div className="text-xs text-slate-400 mt-0.5 font-mono">{payment.transaction_number}</div>
+                        <div className="text-xs text-slate-400 mt-0.5 font-mono">
+                          {payment.transaction_number}
+                        </div>
                       )}
                     </td>
-                    <td className="font-semibold text-slate-900">{payment.amount.toFixed(2)} {t.sar}</td>
-                    <td className="text-slate-500">{formatDate(payment.date)}</td>
-                    <td className="text-slate-600">{payment.created_by_name || "—"}</td>
+                    <td className="font-semibold text-slate-900">
+                      {payment.amount.toFixed(2)} {t.sar}
+                    </td>
+                    <td className="text-slate-500">
+                      {formatDate(payment.date)}
+                    </td>
+                    <td className="text-slate-600">
+                      {payment.created_by_name || "—"}
+                    </td>
                     <td>
-                      <button onClick={() => { setShowReceipt(payment); setReceiptSummary(null); }} className="btn-icon" title={t.receiptPreview}>
+                      <button
+                        onClick={() => {
+                          setShowReceipt(payment);
+                          setReceiptSummary(null);
+                        }}
+                        className="btn-icon"
+                        title={t.receiptPreview}
+                      >
                         <Eye size={15} />
                       </button>
                     </td>
@@ -483,22 +665,33 @@ export default function PaymentsPage() {
 
       <ReceiptModal
         open={showReceipt !== null}
-        onClose={() => { setShowReceipt(null); setReceiptSummary(null); }}
-        data={showReceipt ? {
-          id: showReceipt.id,
-          type: "payment",
-          receipt_number: showReceipt.receipt_number,
-          date: showReceipt.date,
-          amount: showReceipt.amount,
-          student_name: resolveEnrollment(showReceipt.enrollment_id)?.student?.full_name || showReceipt.enrollment_id.slice(0, 8),
-          course_name: resolveEnrollment(showReceipt.enrollment_id)?.course?.name || showReceipt.enrollment_id.slice(0, 8),
-          payment_method: showReceipt.payment_method,
-          transaction_number: showReceipt.transaction_number,
-          agreed_price: receiptSummary?.agreed_price ?? null,
-          admin_discount: receiptSummary?.admin_discount ?? null,
-          total_paid: receiptSummary?.total_paid ?? null,
-          balance_remaining: receiptSummary?.balance_remaining ?? null,
-        } : null}
+        onClose={() => {
+          setShowReceipt(null);
+          setReceiptSummary(null);
+        }}
+        data={
+          showReceipt
+            ? {
+                id: showReceipt.id,
+                type: "payment",
+                receipt_number: showReceipt.receipt_number,
+                date: showReceipt.date,
+                amount: showReceipt.amount,
+                student_name:
+                  resolveEnrollment(showReceipt.enrollment_id)?.student
+                    ?.full_name || t.unknownStudent,
+                course_name:
+                  resolveEnrollment(showReceipt.enrollment_id)?.course?.name ||
+                  t.unknownStudent,
+                payment_method: showReceipt.payment_method,
+                transaction_number: showReceipt.transaction_number,
+                agreed_price: receiptSummary?.agreed_price ?? null,
+                admin_discount: receiptSummary?.admin_discount ?? null,
+                total_paid: receiptSummary?.total_paid ?? null,
+                balance_remaining: receiptSummary?.balance_remaining ?? null,
+              }
+            : null
+        }
         locale={locale}
         isRtl={isRtl}
         instituteName={t.instituteName}

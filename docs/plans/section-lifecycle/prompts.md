@@ -333,7 +333,7 @@ Also read the relevant existing service files to understand data structures:
 You are implementing Phase 8 — System Testing for the Section Lifecycle project.
 
 ## Context
-ALL previous phases (1-7) are COMPLETE and merged into main. The entire section lifecycle system is deployed:
+ALL previous phases (1-7) are COMPLETE and MERGED into main. The entire section lifecycle system is deployed:
 - Database schema, models ✅
 - Startup daily checks ✅
 - Grade & payment enforcement ✅
@@ -342,12 +342,33 @@ ALL previous phases (1-7) are COMPLETE and merged into main. The entire section 
 - Frontend UI ✅
 - Reconciliation & monitoring ✅
 
-Your job is to write comprehensive tests that verify everything works together.
+**Environment:** Docker containers (Caddy reverse proxy, database) are already running. Frontend is already running. For the backend, you need to start it manually:
+```bash
+cd backend
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+**Important: Test files ALREADY EXIST on main.** They were created alongside the implementation. Your job is NOT to create them from scratch — instead:
+1. Review the existing test files against the phase doc requirements
+2. Run them and fix any failures (likely due to API drift during parallel development)
+3. Fill in any missing test cases
+
+## Existing Test Files
+These already exist on `main` at:
+- `backend/tests/integration/section_lifecycle/conftest.py` — shared fixtures
+- `backend/tests/integration/section_lifecycle/test_startup_checks.py`
+- `backend/tests/integration/section_lifecycle/test_complete_section.py`
+- `backend/tests/integration/section_lifecycle/test_cancellation.py`
+- `backend/tests/integration/section_lifecycle/test_disbursement.py`
+- `backend/tests/integration/section_lifecycle/test_deactivation.py`
+- `backend/tests/integration/section_lifecycle/test_full_lifecycle.py`
+- `backend/tests/integration/section_lifecycle/test_reconciliation.py`
+- `frontend/tests/e2e/section-lifecycle/cashier-dashboard.spec.ts`
 
 ## What to Read
-Read `docs/plans/section-lifecycle/phase-08-system-testing.md` — it lists every test you need to write.
+Read `docs/plans/section-lifecycle/phase-08-system-testing.md` — it lists every test that should exist.
 
-Also read all the backend service files to understand how to mock/stub:
+Also read all backend service files and existing test files to understand current state:
 - `section_startup_checks.py`
 - `service.py` (especially `complete_section()`)
 - `cancellation_service.py`
@@ -355,26 +376,23 @@ Also read all the backend service files to understand how to mock/stub:
 - `ledger_service.py` (especially `deactivate_contract()`)
 
 ## Tasks
-Create these test files with ALL tests listed in the phase document:
-
-1. **Integration tests** — 7 test files covering:
-   - Startup checks (8 tests)
-   - Grade & payment enforcement (11 tests)
-   - Cancellation (9 tests)
-   - Disbursement (8 tests)
-   - Deactivation (6 tests)
-   - Full lifecycle flows (4 tests)
-   - Reconciliation (5 tests)
-
-2. **E2E tests** — 1 file covering cashier dashboard flow (5 tests)
+1. **Audit existing tests** — Compare each test file against the phase doc requirements. Note missing tests.
+2. **Run the test suite** — `pytest tests/integration/section_lifecycle/ -v`
+3. **Fix failures** — Tests may fail due to:
+   - API changes made during parallel development
+   - Import paths that don't match the merged code
+   - Fixtures that reference models/states that changed
+4. **Add missing tests** — If the audit reveals gaps, add them
+5. **Run E2E tests** — `npx playwright test tests/e2e/section-lifecycle/`
+6. **Fix E2E failures** — Adjust selectors, flows, or backend mocks as needed
 
 ## Key Rules
 1. Each test file must be independently runnable with its own fixtures
 2. Use clean data per test (no test pollution)
-3. Mock external services (Supabase, etc.) — not the business logic
+3. Mock external services — not the business logic
 4. Test NULL vs 0 grade distinction thoroughly (this is a critical business rule)
 5. Test all edge cases: closed days, duplicate disbursement, certificate blocks, teacher withdrawal blocks, force overrides
-6. Do NOT skip tests or mark tests as "fixme" without a clear reason
+6. Do NOT modify any production code — only touch test files and, if absolutely necessary, conftest.py
 
 ## Merge Instructions
 - Branch name: `phase-08-testing`

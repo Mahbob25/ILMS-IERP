@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from unittest.mock import AsyncMock, Mock, patch
 import uuid
@@ -133,6 +133,14 @@ class TestDisbursement:
         pending.status = "UNCLAIMED"
         pending.amount = Decimal("500")
 
+        async def execute_side_effect(query):
+            qs = str(query)
+            if "pending_refund" in qs.lower():
+                return _make_result(scalar_one_or_none=pending)
+            return _make_result()
+
+        mock_db.execute = AsyncMock(side_effect=execute_side_effect)
+
         with patch("app.modules.lms.cashier_service.is_date_closed", AsyncMock(return_value=True)):
             with pytest.raises(ValueError) as exc_info:
                 await disburse_pending_refund(
@@ -216,13 +224,22 @@ class TestDisbursement:
         msg = str(exc_info.value).lower()
         assert "already" in msg or "forfeit" in msg
 
-    async def test_cashier_refund_history(self, mock_db, mock_user):
+    async def test_cashier_refund_history(self, mock_db, mock_user, mock_student):
+        enrollment_mock = Mock()
+        enrollment_mock.student = mock_student
+
+        pending_mock = Mock()
+        pending_mock.enrollment = enrollment_mock
+
         refund_mock = Mock()
         refund_mock.id = uuid.uuid4()
+        refund_mock.pending_refund_id = uuid.uuid4()
         refund_mock.receipt_number = "RFD-20260710-0001"
         refund_mock.amount = Decimal("500")
         refund_mock.disbursed_by = mock_user.id
         refund_mock.notes = None
+        refund_mock.disbursed_at = datetime(2026, 7, 10, 10, 30, 0, tzinfo=timezone.utc)
+        refund_mock.pending_refund = pending_mock
 
         async def execute_side_effect(query):
             qs = str(query)
@@ -237,3 +254,6 @@ class TestDisbursement:
         assert "data" in result
         assert "meta" in result
         assert result["meta"]["total"] == 1
+        assert result["data"][0]["student_name"] == "Test Student"
+        assert result["data"][0]["student_code"] == "STU001"
+        assert result["data"][0]["receipt_number"] == "RFD-20260710-0001"
