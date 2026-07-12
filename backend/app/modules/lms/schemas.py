@@ -118,6 +118,7 @@ class DailyClosureResponse(BaseModel):
     closed_by_manager_id: Optional[uuid.UUID] = None
     total_payments_in: float = 0
     total_expenses_out: float = 0
+    total_refunds_out: float = 0
     net_cash_flow: float = 0
 
     class Config:
@@ -147,15 +148,28 @@ class ExpenseDetailItem(BaseModel):
     created_by: Optional[uuid.UUID] = None
     created_by_name: str = ""
 
+class RefundDetailItem(BaseModel):
+    id: uuid.UUID
+    amount: float
+    receipt_number: str
+    student_name: str
+    course_name: str
+    disbursed_by: Optional[uuid.UUID] = None
+    disbursed_by_name: str = ""
+    disbursed_at: datetime
+    notes: Optional[str] = None
+
 class DailyLedgerResponse(BaseModel):
     date: date
     total_payments_in: float
     total_expenses_out: float
+    total_refunds_out: float = 0
     net_cash_flow: float
     status: str
     closed_by_manager_id: Optional[uuid.UUID] = None
     payments: list[PaymentDetailItem]
     expenses: list[ExpenseDetailItem]
+    refunds: list[RefundDetailItem] = []
     prev_date: date
     next_date: date
 
@@ -165,6 +179,7 @@ class MonthlyRevenueItem(BaseModel):
     month: str
     revenue: float
     expenses: float
+    refunds: float = 0
 
 class CourseRevenueItem(BaseModel):
     course_name: str
@@ -180,6 +195,7 @@ class DailyRevenueItem(BaseModel):
     date: str
     revenue: float
     expenses: float
+    refunds: float = 0
 
 class RevenueComparison(BaseModel):
     current_period: float
@@ -189,6 +205,7 @@ class RevenueComparison(BaseModel):
 class RevenueOverviewResponse(BaseModel):
     total_revenue: float
     total_expenses: float
+    total_refunds: float = 0
     net_revenue: float
     transaction_count: int
     avg_per_student: float

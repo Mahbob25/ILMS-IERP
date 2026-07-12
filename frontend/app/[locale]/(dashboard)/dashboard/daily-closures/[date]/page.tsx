@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { apiClient } from "@/lib/api";
 import { useAuth } from "@/components/AuthContext";
-import { Loader2, ChevronLeft, ChevronRight, Lock, ArrowLeft } from "lucide-react";
+import { Loader2, ChevronLeft, ChevronRight, Lock, ArrowLeft, RotateCcw } from "lucide-react";
 import { formatDisplayDate } from "@/lib/dates";
 
 interface PaymentDetail {
@@ -15,6 +15,14 @@ interface PaymentDetail {
   transaction_number: string | null;
   enrollment_id: string;
   student_id: string;
+  student_name: string;
+  course_name: string;
+}
+
+interface RefundDetail {
+  id: string;
+  amount: number;
+  receipt_number: string;
   student_name: string;
   course_name: string;
 }
@@ -33,11 +41,13 @@ interface DailyLedger {
   date: string;
   total_payments_in: number;
   total_expenses_out: number;
+  total_refunds_out: number;
   net_cash_flow: number;
   status: string;
   closed_by_manager_id: string | null;
   payments: PaymentDetail[];
   expenses: ExpenseDetail[];
+  refunds: RefundDetail[];
   prev_date: string;
   next_date: string;
 }
@@ -58,6 +68,7 @@ export default function DailyLedgerPage() {
       status: "الحالة",
       paymentsIn: "المدفوعات",
       expensesOut: "المصروفات",
+      refundsOut: "المردودات",
       netCash: "صافي التدفق",
       closed: "مقفل",
       pending: "معلق",
@@ -79,6 +90,7 @@ export default function DailyLedgerPage() {
       secretaryAdvance: "سلفة سكرتير",
       noPayments: "لا توجد مدفوعات في هذا اليوم",
       noExpenses: "لا توجد مصروفات في هذا اليوم",
+      noRefunds: "لا توجد مردودات في هذا اليوم",
       closeDay: "إقفال اليوم",
       closeConfirm: "هل أنت متأكد من إقفال هذا اليوم؟",
       confirm: "تأكيد",
@@ -98,6 +110,7 @@ export default function DailyLedgerPage() {
       status: "Status",
       paymentsIn: "Payments In",
       expensesOut: "Expenses Out",
+      refundsOut: "Refunds Out",
       netCash: "Net Cash Flow",
       closed: "Closed",
       pending: "Pending",
@@ -119,6 +132,7 @@ export default function DailyLedgerPage() {
       secretaryAdvance: "Secretary Advance",
       noPayments: "No payments on this date",
       noExpenses: "No expenses on this date",
+      noRefunds: "No refunds on this date",
       closeDay: "Close Day",
       closeConfirm: "Are you sure you want to close this day?",
       confirm: "Confirm",
@@ -148,8 +162,7 @@ export default function DailyLedgerPage() {
     try {
       const res = await apiClient.get<DailyLedger>(`/lms/daily-closures/${d}/ledger`);
       setLedger(res.data);
-    } catch (e) {
-      console.error(e);
+    } catch {
       setError(t.error);
     }
     setLoading(false);
@@ -204,8 +217,8 @@ export default function DailyLedgerPage() {
       await apiClient.post(`/lms/daily-closures/${ledger.date}/close`);
       await fetchLedger(ledger.date);
       setCloseConfirm(false);
-    } catch (e) {
-      console.error(e);
+    } catch {
+      setError(t.error);
     }
     setClosing(false);
   };
@@ -263,7 +276,7 @@ export default function DailyLedgerPage() {
             <div className="mt-1">{statusBadge(ledger.status)}</div>
           </div>
         </div>
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-4 gap-4">
           <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200">
             <p className="text-xs text-emerald-600 font-medium">{t.paymentsIn}</p>
             <p className="text-lg font-bold text-emerald-700 mt-1">{ledger.total_payments_in.toFixed(2)} {t.sar}</p>
@@ -271,6 +284,10 @@ export default function DailyLedgerPage() {
           <div className="p-3 bg-red-50 rounded-xl border border-red-200">
             <p className="text-xs text-red-600 font-medium">{t.expensesOut}</p>
             <p className="text-lg font-bold text-red-700 mt-1">{ledger.total_expenses_out.toFixed(2)} {t.sar}</p>
+          </div>
+          <div className="p-3 bg-amber-50 rounded-xl border border-amber-200">
+            <p className="text-xs text-amber-600 font-medium">{t.refundsOut}</p>
+            <p className="text-lg font-bold text-amber-700 mt-1">{ledger.total_refunds_out.toFixed(2)} {t.sar}</p>
           </div>
           <div className={`p-3 rounded-xl border ${ledger.net_cash_flow >= 0 ? "bg-emerald-50 border-emerald-200" : "bg-red-50 border-red-200"}`}>
             <p className={`text-xs font-medium ${ledger.net_cash_flow >= 0 ? "text-emerald-600" : "text-red-600"}`}>{t.netCash}</p>
@@ -355,6 +372,39 @@ export default function DailyLedgerPage() {
                     <td className="font-semibold text-slate-900">{e.amount.toFixed(2)} {t.sar}</td>
                     <td className="text-slate-600">{e.recipient_name || "—"}</td>
                     <td className="text-sm text-slate-500 max-w-[200px] truncate" title={e.description || ""}>{e.description || "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Refunds Table */}
+      <div className="card overflow-hidden">
+        <div className="px-5 py-3 border-b border-slate-200">
+          <h3 className="text-sm font-semibold text-slate-900">{t.refundsOut}</h3>
+        </div>
+        {ledger.refunds.length === 0 ? (
+          <div className="p-5 text-sm text-slate-500">{t.noRefunds}</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>{t.receiptNumber}</th>
+                  <th>{t.student}</th>
+                  <th>{t.course}</th>
+                  <th>{t.amount}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {ledger.refunds.map((r) => (
+                  <tr key={r.id}>
+                    <td><span className="badge badge-warning">{r.receipt_number}</span></td>
+                    <td className="font-medium text-slate-900">{r.student_name}</td>
+                    <td className="text-slate-600">{r.course_name}</td>
+                    <td className="font-semibold text-amber-600">{r.amount.toFixed(2)} {t.sar}</td>
                   </tr>
                 ))}
               </tbody>

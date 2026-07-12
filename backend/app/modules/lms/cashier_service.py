@@ -9,7 +9,7 @@ from app.core.timezone import get_today
 from app.modules.academic.models import (
     PendingRefund, Refund, SectionCancellation, Enrollment, Student, CourseSection,
 )
-from app.modules.lms.financial_service import is_date_closed
+from app.modules.lms.closure_service import is_date_closed
 
 
 async def get_pending_refunds_queue(
@@ -122,13 +122,17 @@ async def disburse_pending_refund(
 
 
 async def _generate_receipt_number(db: AsyncSession, today: date) -> str:
-    count = await db.scalar(
-        select(func.count()).select_from(Refund).where(
-            func.date(Refund.disbursed_at) == today
-        )
+    prefix = f"RFD-{today.strftime('%Y%m%d')}-"
+    result = await db.execute(
+        select(func.coalesce(func.max(Refund.receipt_number), ""))
+        .where(Refund.receipt_number.like(f"{prefix}%"))
     )
-    seq = (count or 0) + 1
-    return f"RFD-{today.strftime('%Y%m%d')}-{seq:04d}"
+    max_num = result.scalar() or ""
+    if max_num:
+        seq = int(max_num.split("-")[-1]) + 1
+    else:
+        seq = 1
+    return f"{prefix}{seq:04d}"
 
 
 async def get_cashier_refund_history(

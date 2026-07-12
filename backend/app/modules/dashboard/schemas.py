@@ -45,12 +45,15 @@ class DailyTransaction(BaseModel):
     amount: float
     date: date
     time: str
+    direction: str = "in"
 
 class SecretaryDashboardResponse(BaseModel):
     today_payments_count: int
     today_payments_total: float
     today_expenses_count: int
     today_expenses_total: float
+    today_refunds_count: int = 0
+    today_refunds_total: float = 0
     pending_students: int
     daily_closure_status: str
     recent_enrollments_count: int
@@ -70,6 +73,7 @@ class ManagerDashboardResponse(BaseModel):
     total_teachers: int
     monthly_revenue: float
     monthly_expenses: float
+    monthly_refunds: float = 0
     pending_unlock_requests: list[UnlockRequest]
     pending_withdrawals_count: int
     recent_activity_count: int
@@ -94,6 +98,7 @@ class SuperadminDashboardResponse(BaseModel):
     total_teachers: int
     monthly_revenue: float
     monthly_expenses: float
+    monthly_refunds: float = 0
     pending_unlock_requests: list[UnlockRequest]
     pending_withdrawals_count: int
     system_health: SystemHealth

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { apiClient } from "@/lib/api";
-import { Loader2, RefreshCw } from "lucide-react";
+import { Loader2, RefreshCw, FileText } from "lucide-react";
 
 interface RefundRecord {
   id: string;
@@ -31,6 +31,8 @@ export default function DisbursementHistory({
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
+  const [popupBlocked, setPopupBlocked] = useState(false);
+  const [previewError, setPreviewError] = useState(false);
   const limit = 20;
 
   const t = {
@@ -43,11 +45,14 @@ export default function DisbursementHistory({
       notes: "ملاحظات",
       loading: "جاري التحميل...",
       noData: "لا توجد سجلات صرف",
+      previewVoucher: "عرض السند",
       showing: "عرض",
       of: "من",
       prev: "السابق",
       next: "التالي",
       refresh: "تحديث",
+      popupBlocked: "تم حظر النافذة المنبثقة، يرجى السماح بها",
+      previewError: "فشل في تحميل السند",
     },
     en: {
       title: "Disbursement History",
@@ -56,6 +61,7 @@ export default function DisbursementHistory({
       amount: "Amount",
       dateTime: "Date/Time",
       notes: "Notes",
+      previewVoucher: "Preview Voucher",
       loading: "Loading...",
       noData: "No disbursement records",
       showing: "Showing",
@@ -63,6 +69,8 @@ export default function DisbursementHistory({
       prev: "Previous",
       next: "Next",
       refresh: "Refresh",
+      popupBlocked: "Popup blocked, please allow popups",
+      previewError: "Failed to load voucher",
     },
   }[locale === "en" ? "en" : "ar"];
 
@@ -113,6 +121,16 @@ export default function DisbursementHistory({
           <RefreshCw size={14} />
         </button>
       </div>
+      {popupBlocked && (
+        <div className="px-4 py-2 bg-amber-50 border-b border-amber-200 text-xs text-amber-700">
+          {t.popupBlocked}
+        </div>
+      )}
+      {previewError && (
+        <div className="px-4 py-2 bg-red-50 border-b border-red-200 text-xs text-red-700">
+          {t.previewError}
+        </div>
+      )}
 
       {loading ? (
         <div className="flex items-center justify-center h-32">
@@ -123,7 +141,7 @@ export default function DisbursementHistory({
       ) : (
         <>
           <div className="overflow-x-auto">
-            <table className="data-table">
+              <table className="data-table">
               <thead>
                 <tr>
                   <th>{t.receiptNumber}</th>
@@ -131,6 +149,7 @@ export default function DisbursementHistory({
                   <th>{t.amount}</th>
                   <th>{t.dateTime}</th>
                   <th>{t.notes}</th>
+                  <th>{t.previewVoucher}</th>
                 </tr>
               </thead>
               <tbody>
@@ -157,6 +176,29 @@ export default function DisbursementHistory({
                     </td>
                     <td className="text-xs text-slate-500 max-w-[200px] truncate">
                       {r.notes || "—"}
+                    </td>
+                    <td>
+                      <button
+                        onClick={async () => {
+                          try {
+                            const res = await apiClient.get(`/lms/cashier/refunds/${r.pending_refund_id}/preview`, { responseType: "text" });
+                            const htmlContent = res.data as string;
+                            const win = window.open("", "_blank");
+                            if (!win) {
+                              setPopupBlocked(true);
+                              return;
+                            }
+                            win.document.write(htmlContent);
+                            win.document.close();
+                          } catch {
+                            setPreviewError(true);
+                          }
+                        }}
+                        className="btn-icon text-indigo-600"
+                        title={t.previewVoucher}
+                      >
+                        <FileText size={15} />
+                      </button>
                     </td>
                   </tr>
                 ))}

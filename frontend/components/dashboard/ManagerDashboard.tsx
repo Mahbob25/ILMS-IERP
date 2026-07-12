@@ -12,6 +12,7 @@ import {
   AlertCircle,
   CheckCircle,
   Clock,
+  RotateCcw,
 } from "lucide-react";
 import {
   BarChart,
@@ -48,6 +49,7 @@ interface ManagerDashboardData {
   total_teachers: number;
   monthly_revenue: number;
   monthly_expenses: number;
+  monthly_refunds: number;
   pending_unlock_requests: UnlockRequest[];
   pending_withdrawals_count: number;
   recent_activity_count: number;
@@ -61,6 +63,7 @@ export default function ManagerDashboard() {
   const [data, setData] = useState<ManagerDashboardData | null>(null);
   const [amendments, setAmendments] = useState<PendingAmendment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(false);
   const [confirmAmendment, setConfirmAmendment] = useState<{
     id: string;
     action: "approve" | "reject";
@@ -72,7 +75,7 @@ export default function ManagerDashboard() {
 
   useEffect(() => {
     Promise.all([
-      apiClient.get<ManagerDashboardData>("/dashboard/manager").then((res) => setData(res.data)).catch(() => {}),
+      apiClient.get<ManagerDashboardData>("/dashboard/manager").then((res) => setData(res.data)).catch(() => setFetchError(true)),
       apiClient.get<PendingAmendment[]>("/lms/amendments/pending").then((res) => setAmendments(res.data)).catch(() => {}),
     ]).finally(() => setLoading(false));
   }, []);
@@ -83,6 +86,7 @@ export default function ManagerDashboard() {
       courses: "المقررات النشطة",
       revenue: "الإيرادات الشهرية",
       expenses: "المصروفات الشهرية",
+      refunds: "المردودات الشهرية",
       pendingApprovals: "طلبات الموافقة",
       unlockRequests: "طلب فتح إغلاق",
       withdrawals: "سحوبات معلقة",
@@ -104,6 +108,7 @@ export default function ManagerDashboard() {
       courses: "Active Courses",
       revenue: "Monthly Revenue",
       expenses: "Monthly Expenses",
+      refunds: "Monthly Refunds",
       pendingApprovals: "Pending Approvals",
       unlockRequests: "Unlock Requests",
       withdrawals: "Pending Withdrawals",
@@ -150,11 +155,12 @@ export default function ManagerDashboard() {
   const chartData = [
     { name: locale === "ar" ? "الإيرادات" : "Revenue", value: data.monthly_revenue },
     { name: locale === "ar" ? "المصروفات" : "Expenses", value: data.monthly_expenses },
+    { name: locale === "ar" ? "المردودات" : "Refunds", value: data.monthly_refunds },
   ];
 
   return (
     <><div className="space-y-6 max-w-6xl mx-auto animate-fade-in">
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <div className="card p-5 flex items-center gap-4">
           <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
             <Users size={24} />
@@ -188,6 +194,15 @@ export default function ManagerDashboard() {
             {locale === "ar" ? "عرض التفاصيل ←" : "View Details →"}
           </span>
         </button>
+        <div className="card p-5 flex items-center gap-4">
+          <div className="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+            <RotateCcw size={24} />
+          </div>
+          <div>
+            <p className="text-2xl font-bold text-slate-900">{data.monthly_refunds.toFixed(2)} {currencySymbol}</p>
+            <p className="text-xs text-slate-500">{t.refunds}</p>
+          </div>
+        </div>
         <div className="card p-5 flex items-center gap-4">
           <div className="w-12 h-12 rounded-xl bg-red-50 text-red-600 flex items-center justify-center shrink-0">
             <Wallet size={24} />

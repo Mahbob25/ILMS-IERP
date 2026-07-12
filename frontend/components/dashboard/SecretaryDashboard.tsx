@@ -12,6 +12,7 @@ import {
   UserPlus,
   FileText,
   AlertCircle,
+  RotateCcw,
 } from "lucide-react";
 
 interface DailyTransaction {
@@ -28,6 +29,8 @@ interface SecretaryDashboardData {
   today_payments_total: number;
   today_expenses_count: number;
   today_expenses_total: number;
+  today_refunds_count: number;
+  today_refunds_total: number;
   pending_students: number;
   daily_closure_status: string;
   recent_enrollments_count: number;
@@ -41,12 +44,13 @@ export default function SecretaryDashboard() {
   const currencySymbol = locale === "ar" ? "ريال" : "YER";
   const [data, setData] = useState<SecretaryDashboardData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(false);
 
   useEffect(() => {
     apiClient
       .get<SecretaryDashboardData>("/dashboard/secretary")
       .then((res) => setData(res.data))
-      .catch(() => {})
+      .catch(() => setFetchError(true))
       .finally(() => setLoading(false));
   }, []);
 
@@ -54,6 +58,7 @@ export default function SecretaryDashboard() {
     ar: {
       payments: "المدفوعات",
       expenses: "المصروفات",
+      refunds: "المردودات",
       pending: "طلاب بدون تسجيل",
       closure: "الإغلاق اليومي",
       open: "مفتوح",
@@ -72,6 +77,7 @@ export default function SecretaryDashboard() {
     en: {
       payments: "Payments",
       expenses: "Expenses",
+      refunds: "Refunds",
       pending: "Students w/o Enrollment",
       closure: "Daily Closure",
       open: "Open",
@@ -128,7 +134,7 @@ export default function SecretaryDashboard() {
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto animate-fade-in">
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <div className="card p-5 flex items-center gap-4">
           <div className="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
             <DollarSign size={24} />
@@ -145,6 +151,15 @@ export default function SecretaryDashboard() {
           <div>
             <p className="text-2xl font-bold text-slate-900">{data.today_expenses_total.toFixed(2)} {currencySymbol}</p>
             <p className="text-xs text-slate-500">{t.expenses} ({data.today_expenses_count})</p>
+          </div>
+        </div>
+        <div className="card p-5 flex items-center gap-4">
+          <div className="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+            <RotateCcw size={24} />
+          </div>
+          <div>
+            <p className="text-2xl font-bold text-slate-900">{data.today_refunds_total.toFixed(2)} {currencySymbol}</p>
+            <p className="text-xs text-slate-500">{t.refunds} ({data.today_refunds_count})</p>
           </div>
         </div>
         <div className="card p-5 flex items-center gap-4">
@@ -212,13 +227,13 @@ export default function SecretaryDashboard() {
                 <div key={tx.id} className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-slate-50 border border-transparent hover:border-slate-100 transition-all">
                   <div className="flex items-center gap-3">
                     <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-                      tx.type === "payment" ? "bg-emerald-50 text-emerald-600" : "bg-red-50 text-red-600"
+                      tx.type === "payment" ? "bg-emerald-50 text-emerald-600" : tx.type === "refund" ? "bg-amber-50 text-amber-600" : "bg-red-50 text-red-600"
                     }`}>
-                      {tx.type === "payment" ? <DollarSign size={16} /> : <Wallet size={16} />}
+                      {tx.type === "payment" ? <DollarSign size={16} /> : tx.type === "refund" ? <RotateCcw size={16} /> : <Wallet size={16} />}
                     </div>
                     <div>
                       <p className="text-sm font-medium text-slate-900">{tx.description}</p>
-                      <p className="text-xs text-slate-400">{tx.type === "payment" ? t.payment : t.expense}</p>
+                      <p className="text-xs text-slate-400">{tx.type === "payment" ? t.payment : tx.type === "refund" ? t.refunds : t.expense}</p>
                     </div>
                   </div>
                   <span className={`text-sm font-semibold ${

@@ -1,3 +1,4 @@
+import asyncio
 from decimal import Decimal
 import uuid
 from datetime import date, datetime, timedelta, timezone
@@ -10,13 +11,15 @@ from sqlalchemy import func, text
 from sqlalchemy.orm import joinedload
 
 from app.modules.lms.models import (
-    Payment, TeacherWallet, Expense, DailyClosure,
+    Payment, TeacherWallet, Expense,
     LedgerEntryType, CompensationModel,
 )
+from app.modules.lms.closure_service import is_date_closed
 from app.modules.lms.ledger_service import record as ledger_record, get_or_create_wallet
-from app.modules.academic.models import Course, CourseSection, Enrollment, Student
+from app.modules.academic.models import (
+    Course, CourseSection, Enrollment, Student, Refund, PendingRefund,
+)
 from app.modules.identity.models import Employee, EmployeeType, User
-from app.core.templates import template_engine
 from app.core.error_messages import get_error_detail
 
 
@@ -534,271 +537,69 @@ async def get_expense(db: AsyncSession, expense_id: uuid.UUID) -> Optional[dict]
     }
 
 
-# ─────────────────────────────────────────────
-# Daily Closures
-# ─────────────────────────────────────────────
-async def close_day(db: AsyncSession, closure_date: date, manager_id: uuid.UUID) -> Optional[DailyClosure]:
-    result = await db.execute(select(DailyClosure).where(DailyClosure.date == closure_date))
-    closure = result.scalar_one_or_none()
-    if closure:
-        if closure.status == "closed":
-            return None
-        closure.status = "closed"
-        closure.closed_by_manager_id = manager_id
-    else:
-        closure = DailyClosure(
-            date=closure_date,
-            status="closed",
-            closed_by_manager_id=manager_id,
-        )
-        db.add(closure)
-    await db.flush()
-    return closure
-
-
-async def request_unlock(db: AsyncSession, closure_date: date) -> Optional[DailyClosure]:
-    result = await db.execute(select(DailyClosure).where(DailyClosure.date == closure_date))
-    closure = result.scalar_one_or_none()
-    if not closure or closure.status != "closed":
-        return None
-    closure.status = "unlock_requested"
-    await db.flush()
-    return closure
-
-
-async def approve_unlock(db: AsyncSession, closure_date: date) -> Optional[DailyClosure]:
-    result = await db.execute(select(DailyClosure).where(DailyClosure.date == closure_date))
-    closure = result.scalar_one_or_none()
-    if not closure or closure.status != "unlock_requested":
-        return None
-    closure.status = "pending"
-    await db.flush()
-    return closure
-
-
-async def list_closures(
-    db: AsyncSession,
-    date_from: Optional[date] = None,
-    date_to: Optional[date] = None,
-) -> list[dict]:
-    payments_dates = select(Payment.date.distinct().label("date")).subquery()
-    expenses_dates = select(Expense.date.distinct().label("date")).subquery()
-    union_query = select(payments_dates.c.date).union(
-        select(expenses_dates.c.date),
-        select(DailyClosure.date),
-    ).subquery()
-
-    query = select(
-        union_query.c.date,
-        func.coalesce(
-            select(func.sum(Payment.amount))
-            .where(Payment.date == union_query.c.date)
-            .correlate(union_query)
-            .scalar_subquery(), 0
-        ).label("total_payments_in"),
-        func.coalesce(
-            select(func.sum(Expense.amount))
-            .where(Expense.date == union_query.c.date)
-            .correlate(union_query)
-            .scalar_subquery(), 0
-        ).label("total_expenses_out"),
-        select(DailyClosure.status)
-        .where(DailyClosure.date == union_query.c.date)
-        .correlate(union_query)
-        .scalar_subquery().label("status"),
-        select(DailyClosure.closed_by_manager_id)
-        .where(DailyClosure.date == union_query.c.date)
-        .correlate(union_query)
-        .scalar_subquery().label("closed_by_manager_id"),
-    ).order_by(union_query.c.date.desc())
-
-    if date_from:
-        query = query.where(union_query.c.date >= date_from)
-    if date_to:
-        query = query.where(union_query.c.date <= date_to)
-
-    result = await db.execute(query)
-    rows = result.fetchall()
-
-    return [
-        {
-            "date": row.date,
-            "status": row.status or "pending",
-            "closed_by_manager_id": row.closed_by_manager_id,
-            "total_payments_in": float(row.total_payments_in or 0),
-            "total_expenses_out": float(row.total_expenses_out or 0),
-            "net_cash_flow": float((row.total_payments_in or 0) - (row.total_expenses_out or 0)),
-        }
-        for row in rows
-    ]
-
-
-async def get_daily_ledger(db: AsyncSession, ledger_date: date) -> dict:
-    payments_in_result = await db.execute(
-        select(func.coalesce(func.sum(Payment.amount), 0))
-        .where(Payment.date == ledger_date)
-    )
-    total_payments_in = float(payments_in_result.scalar() or 0)
-
-    expenses_out_result = await db.execute(
-        select(func.coalesce(func.sum(Expense.amount), 0))
-        .where(Expense.date == ledger_date)
-    )
-    total_expenses_out = float(expenses_out_result.scalar() or 0)
-
-    payments_detail_result = await db.execute(
-        select(
-            Payment.id,
-            Payment.amount,
-            Payment.receipt_number,
-            Payment.payment_method,
-            Payment.transaction_number,
-            Payment.enrollment_id,
-            Payment.created_by,
-            Enrollment.student_id,
-            Student.full_name,
-            Course.name,
-            Employee.full_name,
-        )
-        .join(Enrollment, Payment.enrollment_id == Enrollment.id)
-        .join(Student, Enrollment.student_id == Student.id)
-        .join(CourseSection, Enrollment.section_id == CourseSection.id)
-        .join(Course, CourseSection.course_id == Course.id)
-        .outerjoin(User, Payment.created_by == User.id)
-        .outerjoin(Employee, User.employee_id == Employee.id)
-        .where(Payment.date == ledger_date)
-        .order_by(Payment.receipt_number)
-    )
-    payments_detail = [
-        {
-            "id": row[0],
-            "amount": float(row[1]),
-            "receipt_number": row[2],
-            "payment_method": row[3] if isinstance(row[3], str) else row[3].value if hasattr(row[3], 'value') else str(row[3]),
-            "transaction_number": row[4],
-            "enrollment_id": row[5],
-            "created_by": row[6],
-            "student_id": row[7],
-            "student_name": row[8],
-            "course_name": row[9],
-            "created_by_name": row[10] or "",
-        }
-        for row in payments_detail_result.fetchall()
-    ]
-
-    expenses_detail_result = await db.execute(
-        select(
-            Expense.id,
-            Expense.amount,
-            Expense.receipt_number,
-            Expense.type,
-            Expense.recipient_name,
-            Expense.description,
-            Expense.recipient_id,
-            Expense.created_by,
-            Employee.full_name,
-        )
-        .outerjoin(User, Expense.created_by == User.id)
-        .outerjoin(Employee, User.employee_id == Employee.id)
-        .where(Expense.date == ledger_date)
-        .order_by(Expense.receipt_number)
-    )
-    expenses_detail = [
-        {
-            "id": row[0],
-            "amount": float(row[1]),
-            "receipt_number": row[2],
-            "type": row[3],
-            "recipient_name": row[4],
-            "description": row[5],
-            "recipient_id": row[6],
-            "created_by": row[7],
-            "created_by_name": row[8] or "",
-        }
-        for row in expenses_detail_result.fetchall()
-    ]
-
-    prev_date = ledger_date - timedelta(days=1)
-    next_date = ledger_date + timedelta(days=1)
-
-    closure_result = await db.execute(select(DailyClosure).where(DailyClosure.date == ledger_date))
-    closure = closure_result.scalar_one_or_none()
-
-    return {
-        "date": ledger_date,
-        "total_payments_in": total_payments_in,
-        "total_expenses_out": total_expenses_out,
-        "net_cash_flow": total_payments_in - total_expenses_out,
-        "status": closure.status if closure else "pending",
-        "closed_by_manager_id": closure.closed_by_manager_id if closure else None,
-        "payments": payments_detail,
-        "expenses": expenses_detail,
-        "prev_date": prev_date,
-        "next_date": next_date,
-    }
-
 
 # ─────────────────────────────────────────────
 # Revenue Overview
 # ─────────────────────────────────────────────
-async def get_revenue_overview(
-    db: AsyncSession,
-    start_date: Optional[date] = None,
-    end_date: Optional[date] = None,
-) -> dict:
-    if end_date is None:
-        end_date = get_today()
-    if start_date is None:
-        start_date = end_date.replace(day=1)
-
-    period_start = start_date
-    period_end = end_date
-
-    prev_end = period_start - timedelta(days=1)
-    prev_start = prev_end.replace(day=1)
-
-    # total revenue & count for current period
+async def _get_period_totals(db: AsyncSession, start: date, end: date) -> dict:
     rev_result = await db.execute(
         select(
             func.coalesce(func.sum(Payment.amount), 0),
             func.count(Payment.id),
-        ).where(Payment.date >= period_start, Payment.date <= period_end)
+        ).where(Payment.date >= start, Payment.date <= end)
     )
     total_revenue, transaction_count = rev_result.one()
     total_revenue = float(total_revenue)
     transaction_count = int(transaction_count or 0)
 
-    # total expenses
     exp_result = await db.execute(
         select(func.coalesce(func.sum(Expense.amount), 0))
-        .where(Expense.date >= period_start, Expense.date <= period_end)
+        .where(Expense.date >= start, Expense.date <= end)
     )
     total_expenses = float(exp_result.scalar() or 0)
 
-    net_revenue = total_revenue - total_expenses
+    ref_result = await db.execute(
+        select(func.coalesce(func.sum(Refund.amount), 0))
+        .where(func.date(Refund.disbursed_at) >= start,
+               func.date(Refund.disbursed_at) <= end)
+    )
+    total_refunds = float(ref_result.scalar() or 0)
 
-    # unique students with payments
-    student_count_result = await db.execute(
+    return {
+        "total_revenue": total_revenue,
+        "total_expenses": total_expenses,
+        "total_refunds": total_refunds,
+        "transaction_count": transaction_count,
+    }
+
+
+async def _get_student_metrics(db: AsyncSession, start: date, end: date, total_revenue: float) -> dict:
+    result = await db.execute(
         select(func.count(func.distinct(Enrollment.student_id)))
         .join(Payment, Payment.enrollment_id == Enrollment.id)
-        .where(Payment.date >= period_start, Payment.date <= period_end)
+        .where(Payment.date >= start, Payment.date <= end)
     )
-    unique_students = int(student_count_result.scalar() or 0)
-    avg_per_student = round(total_revenue / unique_students, 2) if unique_students > 0 else 0
+    unique_students = int(result.scalar() or 0)
+    return {
+        "unique_students": unique_students,
+        "avg_per_student": round(total_revenue / unique_students, 2) if unique_students > 0 else 0,
+    }
 
-    # comparison with previous period
-    prev_rev_result = await db.execute(
+
+async def _get_period_comparison(db: AsyncSession, period_start: date) -> dict:
+    prev_end = period_start - timedelta(days=1)
+    prev_start = prev_end.replace(day=1)
+    result = await db.execute(
         select(func.coalesce(func.sum(Payment.amount), 0))
         .where(Payment.date >= prev_start, Payment.date <= prev_end)
     )
-    prev_revenue = float(prev_rev_result.scalar() or 0)
-    change_pct = round(
-        ((total_revenue - prev_revenue) / prev_revenue * 100) if prev_revenue > 0 else 0, 2
-    )
+    prev_revenue = float(result.scalar() or 0)
+    return {"prev_revenue": prev_revenue, "prev_start": prev_start, "prev_end": prev_end}
 
-    # monthly trend (current year + previous year for context)
+
+async def _get_monthly_trend(db: AsyncSession, period_start: date, period_end: date) -> list:
     trend_start = period_start.replace(month=1, day=1)
-    trend_result = await db.execute(
+    result = await db.execute(
         text("""
             WITH monthly_revenue AS (
                 SELECT to_char(date, 'YYYY-MM') AS month,
@@ -813,23 +614,33 @@ async def get_revenue_overview(
                 FROM expenses
                 WHERE date >= :start AND date <= :end
                 GROUP BY month
+            ),
+            monthly_refunds AS (
+                SELECT to_char(disbursed_at::date, 'YYYY-MM') AS month,
+                       COALESCE(SUM(amount), 0) AS refunds
+                FROM refunds
+                WHERE disbursed_at::date >= :start AND disbursed_at::date <= :end
+                GROUP BY month
             )
-            SELECT COALESCE(r.month, e.month) AS month,
+            SELECT COALESCE(r.month, e.month, rf.month) AS month,
                    COALESCE(r.revenue, 0) AS revenue,
-                   COALESCE(e.expenses, 0) AS expenses
+                   COALESCE(e.expenses, 0) AS expenses,
+                   COALESCE(rf.refunds, 0) AS refunds
             FROM monthly_revenue r
             FULL OUTER JOIN monthly_expenses e ON e.month = r.month
+            FULL OUTER JOIN monthly_refunds rf ON rf.month = COALESCE(r.month, e.month)
             ORDER BY month
         """),
         {"start": trend_start, "end": period_end}
     )
-    monthly_trend = [
-        {"month": row[0], "revenue": float(row[1]), "expenses": float(row[2])}
-        for row in trend_result.fetchall()
+    return [
+        {"month": row[0], "revenue": float(row[1]), "expenses": float(row[2]), "refunds": float(row[3])}
+        for row in result.fetchall()
     ]
 
-    # revenue by course
-    by_course_result = await db.execute(
+
+async def _get_revenue_by_course(db: AsyncSession, start: date, end: date, total_revenue: float) -> list:
+    result = await db.execute(
         text("""
             SELECT c.name AS course_name, SUM(p.amount) AS revenue
             FROM payments p
@@ -840,20 +651,20 @@ async def get_revenue_overview(
             GROUP BY c.name
             ORDER BY revenue DESC
         """),
-        {"start": period_start, "end": period_end}
+        {"start": start, "end": end}
     )
-    by_course_rows = by_course_result.fetchall()
-    by_course = [
+    return [
         {
             "course_name": row[0],
             "revenue": float(row[1]),
             "pct": round(float(row[1]) / total_revenue * 100, 2) if total_revenue > 0 else 0,
         }
-        for row in by_course_rows
+        for row in result.fetchall()
     ]
 
-    # revenue by teacher
-    by_teacher_result = await db.execute(
+
+async def _get_revenue_by_teacher(db: AsyncSession, start: date, end: date, total_revenue: float) -> list:
+    result = await db.execute(
         text("""
             SELECT emp.full_name AS teacher_name, SUM(p.amount) AS revenue
             FROM payments p
@@ -864,20 +675,20 @@ async def get_revenue_overview(
             GROUP BY emp.full_name
             ORDER BY revenue DESC
         """),
-        {"start": period_start, "end": period_end}
+        {"start": start, "end": end}
     )
-    by_teacher_rows = by_teacher_result.fetchall()
-    by_teacher = [
+    return [
         {
             "teacher_name": row[0],
             "revenue": float(row[1]),
             "pct": round(float(row[1]) / total_revenue * 100, 2) if total_revenue > 0 else 0,
         }
-        for row in by_teacher_rows
+        for row in result.fetchall()
     ]
 
-    # daily breakdown
-    daily_result = await db.execute(
+
+async def _get_daily_breakdown(db: AsyncSession, start: date, end: date) -> list:
+    result = await db.execute(
         text("""
             WITH daily_revenue AS (
                 SELECT date, COALESCE(SUM(amount), 0) AS revenue
@@ -890,27 +701,69 @@ async def get_revenue_overview(
                 FROM expenses
                 WHERE date >= :start AND date <= :end
                 GROUP BY date
+            ),
+            daily_refunds AS (
+                SELECT disbursed_at::date AS date, COALESCE(SUM(amount), 0) AS refunds
+                FROM refunds
+                WHERE disbursed_at::date >= :start AND disbursed_at::date <= :end
+                GROUP BY disbursed_at::date
             )
-            SELECT COALESCE(r.date::text, e.date::text) AS date,
+            SELECT COALESCE(r.date::text, e.date::text, rf.date::text) AS date,
                    COALESCE(r.revenue, 0) AS revenue,
-                   COALESCE(e.expenses, 0) AS expenses
+                   COALESCE(e.expenses, 0) AS expenses,
+                   COALESCE(rf.refunds, 0) AS refunds
             FROM daily_revenue r
             FULL OUTER JOIN daily_expenses e ON e.date = r.date
+            FULL OUTER JOIN daily_refunds rf ON rf.date = COALESCE(r.date, e.date)
             ORDER BY date
         """),
-        {"start": period_start, "end": period_end}
+        {"start": start, "end": end}
     )
-    daily_breakdown = [
-        {"date": row[0], "revenue": float(row[1]), "expenses": float(row[2])}
-        for row in daily_result.fetchall()
+    return [
+        {"date": row[0], "revenue": float(row[1]), "expenses": float(row[2]), "refunds": float(row[3])}
+        for row in result.fetchall()
     ]
+
+
+async def get_revenue_overview(
+    db: AsyncSession,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+) -> dict:
+    if end_date is None:
+        end_date = get_today()
+    if start_date is None:
+        start_date = end_date.replace(day=1)
+
+    period_start = start_date
+    period_end = end_date
+
+    totals = await _get_period_totals(db, period_start, period_end)
+    total_revenue = totals["total_revenue"]
+
+    student_metrics = await _get_student_metrics(db, period_start, period_end, total_revenue)
+    comparison = await _get_period_comparison(db, period_start)
+    prev_revenue = comparison["prev_revenue"]
+    change_pct = round(
+        ((total_revenue - prev_revenue) / prev_revenue * 100) if prev_revenue > 0 else 0, 2
+    )
+
+    monthly_trend, by_course, by_teacher, daily_breakdown = await asyncio.gather(
+        _get_monthly_trend(db, period_start, period_end),
+        _get_revenue_by_course(db, period_start, period_end, total_revenue),
+        _get_revenue_by_teacher(db, period_start, period_end, total_revenue),
+        _get_daily_breakdown(db, period_start, period_end),
+    )
+
+    net_revenue = total_revenue - totals["total_expenses"] - totals["total_refunds"]
 
     return {
         "total_revenue": total_revenue,
-        "total_expenses": total_expenses,
+        "total_expenses": totals["total_expenses"],
+        "total_refunds": totals["total_refunds"],
         "net_revenue": net_revenue,
-        "transaction_count": transaction_count,
-        "avg_per_student": avg_per_student,
+        "transaction_count": totals["transaction_count"],
+        "avg_per_student": student_metrics["avg_per_student"],
         "comparison": {
             "current_period": total_revenue,
             "previous_period": prev_revenue,
@@ -921,14 +774,6 @@ async def get_revenue_overview(
         "by_teacher": by_teacher,
         "daily_breakdown": daily_breakdown,
     }
-
-
-async def is_date_closed(db: AsyncSession, check_date: date) -> bool:
-    result = await db.execute(select(DailyClosure).where(DailyClosure.date == check_date))
-    closure = result.scalar_one_or_none()
-    if not closure:
-        return False
-    return closure.status in ("closed", "unlock_requested")
 
 
 async def get_student_payment_summary(
@@ -964,192 +809,3 @@ async def get_student_payment_summary(
     }
 
 
-# ─────────────────────────────────────────────
-RECEIPT_HTML_EN = {
-    "cash": "Cash",
-    "online": "Bank Transfer",
-}
-
-RECEIPT_HTML_AR = {
-    "cash": "نقداً",
-    "online": "تحويل بنكي",
-}
-
-EXPENSE_TYPE_LABELS_EN = {
-    "general_expense": "General Expense",
-    "teacher_withdrawal": "Teacher Withdrawal",
-    "secretary_advance": "Secretary Advance",
-    "salary_payment": "Salary Payment",
-}
-
-EXPENSE_TYPE_LABELS_AR = {
-    "general_expense": "مصروف عام",
-    "teacher_withdrawal": "سحب معلم",
-    "secretary_advance": "سلفة سكرتير",
-    "salary_payment": "صرف راتب",
-}
-
-EXPENSE_TYPE_BADGE = {
-    "general_expense": "badge-general",
-    "teacher_withdrawal": "badge-teacher",
-    "secretary_advance": "badge-secretary",
-    "salary_payment": "badge-salary",
-}
-
-
-def _generate_receipt_html(
-    receipt_number: str,
-    date_str: str,
-    amount: float,
-    student_name: str = "",
-    course_name: str = "",
-    payment_method: str = "cash",
-    transaction_number: Optional[str] = None,
-    agreed_price: Optional[float] = None,
-    admin_discount: Optional[float] = None,
-    total_paid: Optional[float] = None,
-    balance_remaining: Optional[float] = None,
-    locale: str = "ar",
-    institute_name: str = "Al-Drasat ERP",
-    cashier_name: str = "",
-    currency: str = "YER",
-) -> str:
-    labels = RECEIPT_HTML_AR if locale == "ar" else RECEIPT_HTML_EN
-    method_label = labels["online"] if payment_method == "online" else labels["cash"]
-    amount_str = f"{amount:.2f} {currency}"
-
-    agreed_str = f"{agreed_price:.2f} {currency}" if agreed_price is not None else ""
-    discount_str = f"{admin_discount:.2f} {currency}" if admin_discount and admin_discount > 0 else ""
-    balance_str = f"{balance_remaining:.2f} {currency}" if balance_remaining is not None else ""
-
-    if discount_str:
-        discount_en = f'Discount: <span class="fill-in" style="min-width:80px;">-{discount_str}</span><br>'
-        discount_ar = f'الخصم: <span class="fill-in" style="min-width:80px;">-{discount_str}</span><br>'
-    else:
-        discount_en = ""
-        discount_ar = ""
-
-    variables = {
-        "receipt_title_ar": "إيصال دفع",
-        "receipt_title_en": "Payment Receipt",
-        "receipt_number": receipt_number,
-        "date": date_str,
-        "student_name": student_name,
-        "course_name": course_name,
-        "payment_method": method_label,
-        "agreed_price": agreed_str,
-        "discount_en": discount_en,
-        "discount_ar": discount_ar,
-        "paid_amount": amount_str,
-        "balance": balance_str,
-        "cashier_name": cashier_name,
-    }
-    return template_engine.render_receipt(variables)
-
-
-def _generate_voucher_html(
-    receipt_number: str,
-    date_str: str,
-    amount: float,
-    expense_type: str = "general_expense",
-    recipient_name: str = "",
-    description: Optional[str] = None,
-    locale: str = "ar",
-    institute_name: str = "Al-Drasat ERP",
-    cashier_name: str = "",
-    currency: str = "YER",
-) -> str:
-    type_labels = EXPENSE_TYPE_LABELS_AR if locale == "ar" else EXPENSE_TYPE_LABELS_EN
-    type_label = type_labels.get(expense_type, expense_type)
-    amount_str = f"{amount:.2f} {currency}"
-
-    variables = {
-        "voucher_title_ar": "سند صرف",
-        "voucher_title_en": "Payment Voucher",
-        "voucher_number": receipt_number,
-        "date": date_str,
-        "expense_type": type_label,
-        "recipient_name": recipient_name,
-        "description": description or "",
-        "amount": amount_str,
-        "cashier_name": cashier_name,
-    }
-    return template_engine.render_voucher(variables)
-
-
-async def get_receipt_html_content(db: AsyncSession, payment_id: uuid.UUID, locale: str = "ar") -> Optional[str]:
-    result = await db.execute(
-        select(Payment)
-        .options(
-            joinedload(Payment.enrollment)
-            .joinedload(Enrollment.student),
-            joinedload(Payment.enrollment)
-            .joinedload(Enrollment.section)
-            .joinedload(CourseSection.course),
-            joinedload(Payment.created_by_user).joinedload(User.employee),
-        )
-        .where(Payment.id == payment_id)
-    )
-    payment = result.scalar_one_or_none()
-    if not payment:
-        return None
-
-    enrollment = payment.enrollment
-    student = enrollment.student
-    section = enrollment.section
-    course = section.course
-
-    total_paid_result = await db.execute(
-        select(func.coalesce(func.sum(Payment.amount), 0))
-        .where(Payment.enrollment_id == enrollment.id)
-    )
-    total_paid = Decimal(str(total_paid_result.scalar() or 0))
-    agreed_price = enrollment.agreed_price or 0
-    discount_pct = enrollment.admin_discount or 0
-    discount_amount = agreed_price * discount_pct / 100
-    net_price = agreed_price - discount_amount
-    if net_price <= 0:
-        net_price = max(agreed_price, 1)
-    balance_remaining = net_price - total_paid
-
-    cashier_name = (payment.created_by_user.full_name or "") if payment.created_by_user else ""
-
-    return _generate_receipt_html(
-        receipt_number=payment.receipt_number,
-        date_str=payment.date.isoformat(),
-        amount=payment.amount,
-        student_name=student.full_name if student else "",
-        course_name=course.name if course else "",
-        payment_method=payment.payment_method,
-        transaction_number=payment.transaction_number,
-        agreed_price=agreed_price if agreed_price > 0 else None,
-        admin_discount=discount_amount if discount_amount > 0 else None,
-        total_paid=total_paid,
-        balance_remaining=balance_remaining,
-        locale=locale,
-        cashier_name=cashier_name,
-    )
-
-
-async def get_voucher_html_content(db: AsyncSession, expense_id: uuid.UUID, locale: str = "ar") -> Optional[str]:
-    result = await db.execute(
-        select(Expense)
-        .options(joinedload(Expense.created_by_user).joinedload(User.employee))
-        .where(Expense.id == expense_id)
-    )
-    expense = result.scalar_one_or_none()
-    if not expense:
-        return None
-
-    cashier_name = (expense.created_by_user.full_name or "") if expense.created_by_user else ""
-
-    return _generate_voucher_html(
-        receipt_number=expense.receipt_number,
-        date_str=expense.date.isoformat(),
-        amount=expense.amount,
-        expense_type=expense.type,
-        recipient_name=expense.recipient_name,
-        description=expense.description,
-        locale=locale,
-        cashier_name=cashier_name,
-    )

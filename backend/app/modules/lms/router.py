@@ -42,9 +42,12 @@ from app.modules.lms.schemas import (
     AmendmentRejectRequest,
     AmendmentPendingItem,
     WalletDetailResponse,
+    RefundDetailItem,
 )
 from app.modules.lms import service as lms_service
 from app.modules.lms import financial_service
+from app.modules.lms import voucher_service
+from app.modules.lms import closure_service
 from app.modules.lms import ledger_service as lms_ledger
 from app.modules.lms import compensation_service
 from app.modules.lms import cashier_service
@@ -170,7 +173,8 @@ async def create_payment(
     db: AsyncSession = Depends(get_db),
 ):
     payment_date = date.fromisoformat(data.date) if data.date else date.today()
-    if await financial_service.is_date_closed(db, payment_date):
+    if await closure_service.is_date_closed(db, payment_date):
+
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=get_error_detail("date_is_closed", locale),
@@ -243,7 +247,7 @@ async def preview_receipt(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    html = await financial_service.get_receipt_html_content(db, payment_id, locale)
+    html = await voucher_service.get_receipt_html_content(db, payment_id, locale)
     if not html:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Receipt not found"
@@ -333,7 +337,7 @@ async def create_expense(
     db: AsyncSession = Depends(get_db),
 ):
     expense_date = date.fromisoformat(data.date) if data.date else date.today()
-    if await financial_service.is_date_closed(db, expense_date):
+    if await closure_service.is_date_closed(db, expense_date):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=get_error_detail("date_is_closed", locale),
@@ -400,7 +404,7 @@ async def preview_voucher(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    html = await financial_service.get_voucher_html_content(db, expense_id, locale)
+    html = await voucher_service.get_voucher_html_content(db, expense_id, locale)
     if not html:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Voucher not found"
@@ -420,7 +424,7 @@ async def close_day(
     current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager"])),
     db: AsyncSession = Depends(get_db),
 ):
-    closure = await financial_service.close_day(db, closure_date, current_user.id)
+    closure = await closure_service.close_day(db, closure_date, current_user.id)
     if not closure:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -440,7 +444,7 @@ async def request_unlock(
     ),
     db: AsyncSession = Depends(get_db),
 ):
-    closure = await financial_service.request_unlock(db, closure_date)
+    closure = await closure_service.request_unlock(db, closure_date)
     if not closure:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -458,7 +462,7 @@ async def approve_unlock(
     current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager"])),
     db: AsyncSession = Depends(get_db),
 ):
-    closure = await financial_service.approve_unlock(db, closure_date)
+    closure = await closure_service.approve_unlock(db, closure_date)
     if not closure:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -476,7 +480,7 @@ async def list_closures(
     ),
     db: AsyncSession = Depends(get_db),
 ):
-    return await financial_service.list_closures(
+    return await closure_service.list_closures(
         db, date_from=date_from, date_to=date_to
     )
 
@@ -491,7 +495,7 @@ async def get_daily_ledger(
     ),
     db: AsyncSession = Depends(get_db),
 ):
-    return await financial_service.get_daily_ledger(db, closure_date)
+    return await closure_service.get_daily_ledger(db, closure_date)
 
 
 # --- Section Contracts ---
@@ -1109,3 +1113,23 @@ async def list_admin_refunds(
         page=page,
         per_page=per_page,
     )
+
+
+# --- Refund Voucher Preview ---
+@lms_router.get("/cashier/refunds/{refund_id}/preview")
+async def preview_refund_voucher(
+    refund_id: uuid.UUID,
+    locale: str = Query("ar", regex="^(ar|en)$"),
+    current_user: User = Depends(
+        RoleChecker(allowed_roles=["superadmin", "manager", "accountant"])
+    ),
+    db: AsyncSession = Depends(get_db),
+):
+    html = await voucher_service.get_refund_voucher_html_content(db, refund_id, locale=locale)
+    if not html:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Refund not found"
+        )
+    from fastapi.responses import HTMLResponse
+
+    return HTMLResponse(content=html)

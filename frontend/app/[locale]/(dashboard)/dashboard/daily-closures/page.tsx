@@ -13,6 +13,7 @@ interface DailyClosure {
   closed_by_manager_id: string | null;
   total_payments_in: number;
   total_expenses_out: number;
+  total_refunds_out: number;
   net_cash_flow: number;
 }
 
@@ -31,6 +32,7 @@ export default function DailyClosuresPage() {
       status: "الحالة",
       paymentsIn: "المدفوعات",
       expensesOut: "المصروفات",
+      refundsOut: "المردودات",
       netCash: "صافي التدفق",
       actions: "الإجراءات",
       close: "إقفال",
@@ -66,6 +68,7 @@ export default function DailyClosuresPage() {
       status: "Status",
       paymentsIn: "Payments In",
       expensesOut: "Expenses Out",
+      refundsOut: "Refunds Out",
       netCash: "Net Cash Flow",
       actions: "Actions",
       close: "Close",
@@ -218,6 +221,7 @@ export default function DailyClosuresPage() {
                 <th>{t.status}</th>
                 <th>{t.paymentsIn}</th>
                 <th>{t.expensesOut}</th>
+                <th>{t.refundsOut}</th>
                 <th>{t.netCash}</th>
                 <th>{t.actions}</th>
               </tr>
@@ -229,6 +233,7 @@ export default function DailyClosuresPage() {
                   <td>{statusBadge(closure.status)}</td>
                   <td className="font-semibold text-emerald-600">{closure.total_payments_in.toFixed(2)} {t.sar}</td>
                   <td className="font-semibold text-red-600">{closure.total_expenses_out.toFixed(2)} {t.sar}</td>
+                  <td className="font-semibold text-amber-600">{closure.total_refunds_out.toFixed(2)} {t.sar}</td>
                   <td className={`font-semibold ${closure.net_cash_flow >= 0 ? "text-emerald-600" : "text-red-600"}`}>
                     {closure.net_cash_flow.toFixed(2)} {t.sar}
                   </td>

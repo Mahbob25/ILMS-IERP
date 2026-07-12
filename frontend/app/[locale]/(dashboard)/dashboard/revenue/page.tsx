@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { apiClient } from "@/lib/api";
-import { Loader2, RefreshCw, TrendingUp, DollarSign, Target, Users } from "lucide-react";
+import { Loader2, RefreshCw, TrendingUp, DollarSign, Target, Users, RotateCcw } from "lucide-react";
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, PieChart, Pie, Cell, Legend,
@@ -13,6 +13,7 @@ interface MonthlyTrend {
   month: string;
   revenue: number;
   expenses: number;
+  refunds: number;
 }
 
 interface CourseRevenue {
@@ -31,6 +32,7 @@ interface DailyRevenue {
   date: string;
   revenue: number;
   expenses: number;
+  refunds: number;
 }
 
 interface RevenueComparison {
@@ -42,6 +44,7 @@ interface RevenueComparison {
 interface RevenueData {
   total_revenue: number;
   total_expenses: number;
+  total_refunds: number;
   net_revenue: number;
   transaction_count: number;
   avg_per_student: number;
@@ -65,6 +68,7 @@ export default function RevenuePage() {
       subtitle: "تحليل مفصل للإيرادات والمصروفات",
       totalRevenue: "إجمالي الإيرادات",
       totalExpenses: "إجمالي المصروفات",
+      totalRefunds: "إجمالي المردودات",
       netRevenue: "صافي الإيرادات",
       avgPerStudent: "متوسط الإيراد لكل طالب",
       transactionCount: "عدد المعاملات",
@@ -96,6 +100,7 @@ export default function RevenuePage() {
       subtitle: "Detailed revenue and expense analysis",
       totalRevenue: "Total Revenue",
       totalExpenses: "Total Expenses",
+      totalRefunds: "Total Refunds",
       netRevenue: "Net Revenue",
       avgPerStudent: "Avg Revenue per Student",
       transactionCount: "Transactions",
@@ -282,7 +287,7 @@ export default function RevenuePage() {
       ) : (
         <>
           {/* Summary Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
             <div className="card p-5 flex items-center gap-4">
               <div className="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
                 <DollarSign size={24} />
@@ -304,6 +309,17 @@ export default function RevenuePage() {
                   {data.total_expenses.toFixed(2)} {t.sar}
                 </p>
                 <p className="text-xs text-slate-500">{t.totalExpenses}</p>
+              </div>
+            </div>
+            <div className="card p-5 flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+                <RotateCcw size={24} />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-slate-900">
+                  {data.total_refunds.toFixed(2)} {t.sar}
+                </p>
+                <p className="text-xs text-slate-500">{t.totalRefunds}</p>
               </div>
             </div>
             <div className="card p-5 flex items-center gap-4">
@@ -349,6 +365,7 @@ export default function RevenuePage() {
                   <Tooltip content={<CustomTooltip />} />
                   <Line type="monotone" dataKey="revenue" stroke="#10b981" strokeWidth={2} name={t.revenue} dot={{ r: 3 }} />
                   <Line type="monotone" dataKey="expenses" stroke="#ef4444" strokeWidth={2} name={t.expenses} dot={{ r: 3 }} />
+                  <Line type="monotone" dataKey="refunds" stroke="#f59e0b" strokeWidth={2} name={t.totalRefunds} dot={{ r: 3 }} strokeDasharray="4 2" />
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -413,6 +430,7 @@ export default function RevenuePage() {
                     <Tooltip content={<CustomTooltip />} />
                     <Bar dataKey="revenue" fill="#10b981" radius={[4, 4, 0, 0]} name={t.revenue} />
                     <Bar dataKey="expenses" fill="#ef4444" radius={[4, 4, 0, 0]} name={t.expenses} />
+                    <Bar dataKey="refunds" fill="#f59e0b" radius={[4, 4, 0, 0]} name={t.totalRefunds} />
                   </BarChart>
                 </ResponsiveContainer>
               )}

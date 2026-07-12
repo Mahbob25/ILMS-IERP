@@ -3,7 +3,7 @@
 **Date:** 2026-07-11
 **Status:** Draft for Review
 **Author:** Technical Team
-**Estimate:** 1.0 day
+**Estimate:** 2.0 days
 **Dependencies:** Cancellation backend (Phase 4 — `cancellation_service.py`, `cashier_service.py`, ledger reversal flow exists)
 
 ---
@@ -349,6 +349,124 @@ if expense_type == "teacher_withdrawal" and recipient_id:
 - Negative balance (teacher in debt) → blocked entirely
 - Zero balance → blocked
 
+### 4.7 Frontend: Update CancelSectionModal to Show Wallet Info + Force Toggle
+
+File: `frontend/components/sections/CancelSectionModal.tsx`
+
+Extend `CancelPreview` interface with wallet fields:
+
+```typescript
+interface CancelPreview {
+  section_id: string;
+  teacher_reversal_amount: number;
+  teacher_wallet_balance: number;    // NEW
+  shortfall: number;                 // NEW
+  enrolled_count: number;
+  payments_collected: number;
+  has_attendance_records: boolean;
+  has_final_grades: boolean;
+  has_certificates: boolean;
+  warnings: string[];
+}
+```
+
+**Step 1 (Preview) — Add wallet info cards:**
+Below the existing 3-card grid, add a 2-card row when `shortfall` is provided:
+
+```tsx
+{preview.shortfall !== undefined && (
+  <div className="grid grid-cols-2 gap-4">
+    <div className="bg-slate-50 rounded-lg p-3">
+      <p className="text-xs text-slate-500">{t.teacherWalletBalance}</p>
+      <p className="text-lg font-bold text-slate-900">
+        {preview.teacher_wallet_balance.toFixed(2)}
+      </p>
+    </div>
+    {preview.shortfall > 0 && (
+      <div className="bg-red-50 rounded-lg p-3">
+        <p className="text-xs text-red-500">{t.shortfallLabel}</p>
+        <p className="text-lg font-bold text-red-700">
+          {preview.shortfall.toFixed(2)}
+        </p>
+      </div>
+    )}
+  </div>
+)}
+```
+
+**Step 1 — Add insufficient balance warning + checkbox (shown only when shortfall > 0):**
+
+```tsx
+{preview.shortfall > 0 && (
+  <div className="space-y-3">
+    <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+      <p className="text-xs text-amber-700 flex items-center gap-1">
+        <AlertTriangle size={12} />
+        {t.insufficientBalanceWarning}
+      </p>
+    </div>
+    <label className="flex items-start gap-3 p-3 border border-amber-200 rounded-lg cursor-pointer has-[:checked]:border-amber-500 has-[:checked]:bg-amber-50">
+      <input
+        type="checkbox"
+        checked={forceCancellation}
+        onChange={(e) => setForceCancellation(e.target.checked)}
+        className="mt-0.5"
+      />
+      <div>
+        <p className="text-sm font-medium text-slate-900">{t.forceCancellationLabel}</p>
+        <p className="text-xs text-slate-500">{t.forceCancellationHint}</p>
+      </div>
+    </label>
+  </div>
+)}
+```
+
+**New state variable:**
+
+```typescript
+const [forceCancellation, setForceCancellation] = useState(false);
+```
+
+Reset `forceCancellation` to `false` when modal opens (inside the existing `useEffect`).
+
+**Update `handleConfirm()` — pass `force_cancellation` in POST body:**
+
+```typescript
+await apiClient.post(`/academic/course-sections/${sectionId}/cancel`, {
+  reason: reason.trim(),
+  refund_policy: refundPolicy,
+  force_cancellation: forceCancellation,   // NEW
+});
+```
+
+**Edge cases:**
+- Preview returns `shortfall: 0` → no warning, no checkbox, cancel proceeds as before
+- Preview returns `shortfall > 0` + checkbox unchecked + confirm clicked → API returns 409; display the error message from the API detail
+- Preview returns `shortfall > 0` + checkbox checked → sends `force_cancellation: true`, wallet goes negative
+- User navigates back/forward through steps → checkbox state persists until modal closes
+
+### 4.8 Frontend: Add Translation Keys
+
+File: `frontend/components/sections/CancelSectionModal.tsx`
+
+Add to the inline translation objects:
+
+```typescript
+// Arabic
+teacherWalletBalance: "رصيد محفظة المعلم",
+shortfallLabel: "العجز المالي",
+insufficientBalanceWarning: "رصيد محفظة المعلم غير كافٍ. سيؤدي الإلغاء إلى إنشاء ذمّة مالية مستحقة على المؤسسة.",
+forceCancellationLabel: "فرض الإلغاء وإنشاء ذمّة مالية",
+forceCancellationHint: "سيستمر إلغاء الشعبة وسيتم إنشاء رصيد سلبي في محفظة المعلم",
+
+// English
+teacherWalletBalance: "Teacher Wallet Balance",
+shortfallLabel: "Shortfall",
+insufficientBalanceWarning: "Teacher wallet has insufficient funds. Cancelling will create an institutional receivable.",
+forceCancellationLabel: "Force cancellation and create receivable",
+forceCancellationHint: "Section cancellation will proceed and a negative balance will be created in the teacher's wallet",
+```
+
 ---
 
 ## 5. UX Flow
@@ -415,6 +533,7 @@ ORDER BY tw.balance ASC;
 | `backend/app/modules/academic/cancellation_service.py` | **EDIT** — `cancel_section()` accepts `force_cancellation`; preview returns wallet fields; `ImpactPreview` extended |
 | `backend/app/modules/lms/financial_service.py` | **EDIT** — `record_expense()` gains row lock on wallet load + withdrawal guard |
 | `backend/app/modules/academic/router.py` | **EDIT** — cancel endpoint accepts `force_cancellation` body field; preview returns wallet fields |
+| `frontend/components/sections/CancelSectionModal.tsx` | **EDIT** — `CancelPreview` interface extended with wallet fields; Step 1 adds wallet balance/shortfall cards, insufficient balance warning, and force cancellation checkbox; `handleConfirm()` sends `force_cancellation` in POST body |
 
 ---
 
@@ -444,3 +563,10 @@ ORDER BY tw.balance ASC;
 - [ ] `record_expense()` uses `with_for_update()` when loading wallet for withdrawal (no TOCTOU)
 - [ ] Concurrent cancellation and withdrawal on same wallet serializes correctly — withdrawal re-reads updated balance
 - [ ] `get_or_create_wallet(lock=True)` acquires row lock; newly created wallet is locked on second fetch
+- [ ] Frontend preview shows `teacher_wallet_balance` and `shortfall` when shortfall > 0
+- [ ] Frontend preview hides wallet cards when API does not return wallet fields (backward compatible)
+- [ ] Insufficient balance warning and checkbox appear only when `shortfall > 0`
+- [ ] Checkbox unchecked + confirm → API 409 error displayed to manager
+- [ ] Checkbox checked → POST body includes `force_cancellation: true`
+- [ ] Shortfall = 0 → no checkbox shown, cancellation proceeds as before (no regression)
+- [ ] forceCancellation state resets when modal re-opens

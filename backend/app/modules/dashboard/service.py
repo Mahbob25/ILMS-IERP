@@ -7,7 +7,7 @@ from sqlalchemy.future import select
 from sqlalchemy.orm import joinedload
 from sqlalchemy import func
 from sqlalchemy.orm import selectinload
-from app.modules.academic.models import Course, CourseSection, Student, Enrollment
+from app.modules.academic.models import Course, CourseSection, Student, Enrollment, Refund, PendingRefund
 from app.modules.lms.models import (
     Payment, Expense, TeacherWallet, DailyClosure,
     AttendanceSession, Assignment, Submission, Grade
@@ -143,6 +143,12 @@ async def get_secretary_dashboard(db: AsyncSession) -> dict:
     )
     exp_count, exp_total = expenses_result.one()
 
+    refunds_result = await db.execute(
+        select(func.count(), func.coalesce(func.sum(Refund.amount), 0))
+        .where(func.date(Refund.disbursed_at) == today)
+    )
+    ref_count, ref_total = refunds_result.one()
+
     students_result = await db.execute(
         select(Student).order_by(Student.full_name)
     )
@@ -185,6 +191,7 @@ async def get_secretary_dashboard(db: AsyncSession) -> dict:
             amount=p.amount,
             date=p.date,
             time="",
+            direction="in",
         ))
 
     recent_exp_result = await db.execute(
@@ -198,6 +205,32 @@ async def get_secretary_dashboard(db: AsyncSession) -> dict:
             amount=-e.amount,
             date=e.date,
             time="",
+            direction="out",
+        ))
+
+    recent_ref_result = await db.execute(
+        select(Refund)
+        .options(
+            joinedload(Refund.pending_refund)
+            .joinedload(PendingRefund.enrollment)
+            .joinedload(Enrollment.student),
+        )
+        .where(func.date(Refund.disbursed_at) == today)
+        .order_by(Refund.disbursed_at.desc())
+        .limit(5)
+    )
+    for r in recent_ref_result.scalars().all():
+        student_name = ""
+        if r.pending_refund and r.pending_refund.enrollment and r.pending_refund.enrollment.student:
+            student_name = r.pending_refund.enrollment.student.full_name
+        today_transactions.append(DailyTransaction(
+            id=r.id,
+            type="refund",
+            description=f"Refund - {student_name}" if student_name else f"Refund - {r.receipt_number}",
+            amount=-r.amount,
+            date=today,
+            time="",
+            direction="out",
         ))
 
     today_transactions.sort(key=lambda t: str(t.date), reverse=True)
@@ -207,6 +240,8 @@ async def get_secretary_dashboard(db: AsyncSession) -> dict:
         "today_payments_total": float(pay_total),
         "today_expenses_count": exp_count,
         "today_expenses_total": float(exp_total),
+        "today_refunds_count": ref_count,
+        "today_refunds_total": float(ref_total),
         "pending_students": pending_students,
         "daily_closure_status": closure_status,
         "recent_enrollments_count": recent_enrollments_count,
@@ -245,6 +280,12 @@ async def get_manager_dashboard(db: AsyncSession) -> dict:
     )
     monthly_expenses = float(expenses_result.scalar() or 0)
 
+    refunds_result = await db.execute(
+        select(func.coalesce(func.sum(Refund.amount), 0))
+        .where(func.date(Refund.disbursed_at) >= first_of_month)
+    )
+    monthly_refunds = float(refunds_result.scalar() or 0)
+
     unlocks_result = await db.execute(
         select(DailyClosure).where(DailyClosure.status == "unlock_requested")
     )
@@ -278,6 +319,7 @@ async def get_manager_dashboard(db: AsyncSession) -> dict:
         "total_teachers": total_teachers,
         "monthly_revenue": monthly_revenue,
         "monthly_expenses": monthly_expenses,
+        "monthly_refunds": monthly_refunds,
         "pending_unlock_requests": unlock_requests,
         "pending_withdrawals_count": pending_withdrawals,
         "recent_activity_count": recent_activity_count,

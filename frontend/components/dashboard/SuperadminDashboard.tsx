@@ -14,6 +14,7 @@ import {
   DollarSign,
   Wallet,
   AlertCircle,
+  RotateCcw,
 } from "lucide-react";
 
 interface AuditLogEntry {
@@ -29,6 +30,7 @@ interface SuperadminDashboardData {
   total_teachers: number;
   monthly_revenue: number;
   monthly_expenses: number;
+  monthly_refunds: number;
   pending_unlock_requests: { date: string; requested_by: string | null }[];
   pending_withdrawals_count: number;
   system_health: { db_status: string; api_uptime: string };
@@ -42,12 +44,13 @@ export default function SuperadminDashboard() {
   const currencySymbol = locale === "ar" ? "ريال" : "YER";
   const [data, setData] = useState<SuperadminDashboardData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(false);
 
   useEffect(() => {
     apiClient
       .get<SuperadminDashboardData>("/dashboard/superadmin")
       .then((res) => setData(res.data))
-      .catch(() => {})
+      .catch(() => setFetchError(true))
       .finally(() => setLoading(false));
   }, []);
 
@@ -64,6 +67,7 @@ export default function SuperadminDashboard() {
       teachers: "المعلمين",
       revenue: "الإيرادات الشهرية",
       expenses: "المصروفات الشهرية",
+      refunds: "المردودات الشهرية",
       auditLogs: "سجل التدقيق",
       user: "المستخدم",
       action: "الإجراء",
@@ -82,6 +86,7 @@ export default function SuperadminDashboard() {
       teachers: "Teachers",
       revenue: "Monthly Revenue",
       expenses: "Monthly Expenses",
+      refunds: "Monthly Refunds",
       auditLogs: "Audit Log",
       user: "User",
       action: "Action",
@@ -161,7 +166,7 @@ export default function SuperadminDashboard() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
         <div className="card p-4 flex items-center gap-3">
           <div className="w-10 h-10 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
             <Users size={20} />
@@ -196,6 +201,15 @@ export default function SuperadminDashboard() {
           <div>
             <p className="text-xl font-bold text-slate-900">{data.monthly_revenue.toFixed(2)} {currencySymbol}</p>
             <p className="text-xs text-slate-500">{t.revenue}</p>
+          </div>
+        </div>
+        <div className="card p-4 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+            <RotateCcw size={20} />
+          </div>
+          <div>
+            <p className="text-xl font-bold text-slate-900">{data.monthly_refunds.toFixed(2)} {currencySymbol}</p>
+            <p className="text-xs text-slate-500">{t.refunds}</p>
           </div>
         </div>
         <div className="card p-4 flex items-center gap-3">
