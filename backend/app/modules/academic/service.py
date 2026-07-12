@@ -258,7 +258,7 @@ async def complete_section(
     section = await get_course_section(db, section_id)
     if not section:
         return None
-    if section.status != "active":
+    if section.status not in ("active", "ready_for_completion"):
         return None
 
     # Daily closure check
@@ -330,13 +330,23 @@ async def complete_section(
             unpaid_students=[s["student_name"] for s in (unpaid_students or [])],
         ))
 
-    # Ledger settle
-    if (
-        section.contract
-        and section.contract.status == ContractStatus.GRADES_SUBMITTED
-        and current_user.id
-    ):
-        await ledger_settle_contract(db, section.contract.id, settled_by=current_user.id)
+    # Chain contract through required lifecycle
+    if section.contract and current_user.id:
+        try:
+            if section.contract.status == ContractStatus.ASSIGNED:
+                await ledger_activate_contract(
+                    db, section.contract.id, activated_by=current_user.id
+                )
+
+            if section.contract.status == ContractStatus.ACTIVE:
+                await ledger_finalize_grades(db, section_id=section.id)
+
+            if section.contract.status == ContractStatus.GRADES_SUBMITTED:
+                await ledger_settle_contract(
+                    db, section.contract.id, settled_by=current_user.id
+                )
+        except ValueError:
+            pass
 
     section.status = "completed"
 

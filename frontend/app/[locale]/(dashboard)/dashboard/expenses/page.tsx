@@ -470,6 +470,11 @@ export default function ExpensesPage() {
             <div>
               <label className="block text-xs font-medium text-slate-700 mb-1">
                 {t.enterRecipient}
+                {form.type === "teacher_withdrawal" && (
+                  <span className="text-emerald-600 text-[10px] ms-2">
+                    ({t.availableBalance})
+                  </span>
+                )}
                 {(form.type === "secretary_advance" ||
                   form.type === "salary_payment") && (
                   <span className="text-emerald-600 text-[10px] ms-2">
@@ -493,7 +498,7 @@ export default function ExpensesPage() {
                     onChange={handleRecipientSelect}
                     options={eligibleRecipients.map((r) => ({
                       value: r.id,
-                      label: `${r.full_name}${form.type === "secretary_advance" || form.type === "salary_payment" ? ` (${r.available_limit.toFixed(2)} ${t.sar})` : ""} | ${r.is_eligible ? t.eligible : t.notEligible}`,
+                      label: `${r.full_name} | ${r.is_eligible ? t.eligible : t.notEligible}`,
                     }))}
                     placeholder={t.selectRecipient}
                   />
@@ -502,12 +507,13 @@ export default function ExpensesPage() {
                       ⚠ {t.ineligibleRecipientWarning}
                     </p>
                   )}
-                  {(form.type === "secretary_advance" ||
+                  {(form.type === "teacher_withdrawal" ||
+                    form.type === "secretary_advance" ||
                     form.type === "salary_payment") &&
                     selectedRecipientEligible === true &&
                     availableLimit !== null && (
                       <p className="text-xs text-slate-500">
-                        {t.limitLabel}:{" "}
+                        {form.type === "teacher_withdrawal" ? t.availableBalance : t.limitLabel}:{" "}
                         <span className="font-semibold text-slate-800">
                           {availableLimit.toFixed(2)} {t.sar}
                         </span>

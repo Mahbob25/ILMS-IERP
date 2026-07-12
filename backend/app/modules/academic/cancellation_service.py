@@ -12,7 +12,7 @@ from app.modules.academic.models import (
     Enrollment,
 )
 from app.modules.lms.models import Payment, LedgerEntry
-from app.modules.lms.ledger_service import cancel_contract as ledger_cancel_contract
+from app.modules.lms.ledger_service import cancel_contract as ledger_cancel_contract, get_or_create_wallet
 
 
 @dataclass
@@ -30,6 +30,10 @@ class ImpactPreview:
     course_name: str
     teacher_name: str
     teacher_wallet_reversal_amount: Decimal
+    teacher_wallet_balance: Decimal
+    teacher_wallet_frozen_balance: Decimal
+    teacher_wallet_available_balance: Decimal
+    shortfall: Decimal
     enrolled_count: int
     payments_collected: Decimal
     has_attendance_records: bool
@@ -93,6 +97,8 @@ async def preview_cancellation_impact(
     teacher_name = section.teacher_employee.full_name if section.teacher_employee else ""
 
     teacher_wallet_reversal_amount = Decimal("0")
+    teacher_wallet_balance = Decimal("0")
+    shortfall = Decimal("0")
     if section.contract and section.contract.teacher_id:
         agg_result = await db.execute(
             select(
@@ -106,6 +112,13 @@ async def preview_cancellation_impact(
         net_frozen = Decimal(str(row[1] or 0))
         if net_available > 0 or net_frozen > 0:
             teacher_wallet_reversal_amount = abs(net_available) + abs(net_frozen)
+
+        wallet = await get_or_create_wallet(db, section.contract.teacher_id)
+        teacher_wallet_balance = Decimal(str(wallet.balance or 0))
+        teacher_wallet_frozen_balance = Decimal(str(wallet.frozen_balance or 0))
+        teacher_wallet_available_balance = teacher_wallet_balance - teacher_wallet_frozen_balance
+        if teacher_wallet_reversal_amount > teacher_wallet_available_balance:
+            shortfall = teacher_wallet_reversal_amount - teacher_wallet_available_balance
 
     enrolled_count = len(section.enrollments)
 
@@ -123,6 +136,10 @@ async def preview_cancellation_impact(
         course_name=course_name,
         teacher_name=teacher_name,
         teacher_wallet_reversal_amount=teacher_wallet_reversal_amount,
+        teacher_wallet_balance=teacher_wallet_balance,
+        teacher_wallet_frozen_balance=teacher_wallet_frozen_balance,
+        teacher_wallet_available_balance=teacher_wallet_available_balance,
+        shortfall=shortfall,
         enrolled_count=enrolled_count,
         payments_collected=payments_collected,
         has_attendance_records=bool(section.attendance_sessions),
@@ -137,6 +154,7 @@ async def cancel_section(
     cancelled_by: uuid.UUID,
     reason: str,
     refund_policy: str,
+    force_cancellation: bool = False,
 ) -> SectionCancellation:
     result = await db.execute(
         select(CourseSection)
@@ -185,6 +203,7 @@ async def cancel_section(
             contract_id=section.contract.id,
             cancelled_by=cancelled_by,
             reason=f"Section cancellation: {reason}",
+            force=force_cancellation,
         )
 
     if enrolled_count > 0:

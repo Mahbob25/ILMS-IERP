@@ -280,6 +280,8 @@ function AdminWalletOverview({ locale }: { locale: string }) {
       teachersWithWallet: "معلم لديهم محفظة",
       teacher: "المعلم",
       balance: "الرصيد",
+      availableBalance: "الرصيد المتاح",
+      frozenBalance: "الرصيد المجمد",
       sections: "الشعب",
       lastUpdated: "آخر تحديث",
       actions: "إجراءات",
@@ -312,6 +314,8 @@ function AdminWalletOverview({ locale }: { locale: string }) {
       teachersWithWallet: "Teachers with Wallet",
       teacher: "Teacher",
       balance: "Balance",
+      availableBalance: "Available Balance",
+      frozenBalance: "Frozen Balance",
       sections: "Sections",
       lastUpdated: "Last Updated",
       actions: "Actions",
@@ -344,13 +348,14 @@ function AdminWalletOverview({ locale }: { locale: string }) {
   const [expandedWithdrawals, setExpandedWithdrawals] = useState<Expense[]>([]);
   const [loadingWithdrawals, setLoadingWithdrawals] = useState(false);
   const [modalTeacher, setModalTeacher] = useState<TeacherWithWallet | null>(null);
+  const [modalWalletDetail, setModalWalletDetail] = useState<WalletDetail | null>(null);
   const [modalAmount, setModalAmount] = useState("");
   const [modalDesc, setModalDesc] = useState("");
   const [modalDate, setModalDate] = useState(getLocalDateString());
   const [modalError, setModalError] = useState("");
   const [modalSubmitting, setModalSubmitting] = useState(false);
   const [modalSuccess, setModalSuccess] = useState(false);
-  const [modalPreviewBalance, setModalPreviewBalance] = useState<number | null>(null);
+  const [modalPreviewAvailable, setModalPreviewAvailable] = useState<number | null>(null);
 
   const fetchAll = useCallback(async () => {
     try {
@@ -393,24 +398,32 @@ function AdminWalletOverview({ locale }: { locale: string }) {
     setLoadingWithdrawals(false);
   };
 
-  const openWithdrawModal = (teacher: TeacherWithWallet) => {
+  const openWithdrawModal = async (teacher: TeacherWithWallet) => {
     setModalTeacher(teacher);
     setModalAmount("");
     setModalDesc("");
     setModalDate(getLocalDateString());
     setModalError("");
     setModalSuccess(false);
-    setModalPreviewBalance(null);
+    setModalPreviewAvailable(null);
+    setModalWalletDetail(null);
+    try {
+      const res = await apiClient.get<WalletDetail>(`/lms/teacher-wallets/${teacher.id}/detail`);
+      if (res.status === 200) setModalWalletDetail(res.data);
+    } catch {
+      setModalWalletDetail(null);
+    }
   };
 
   const closeWithdrawModal = () => {
     setModalTeacher(null);
+    setModalWalletDetail(null);
     setModalAmount("");
     setModalDesc("");
     setModalDate(getLocalDateString());
     setModalError("");
     setModalSuccess(false);
-    setModalPreviewBalance(null);
+    setModalPreviewAvailable(null);
   };
 
   const handleSubmitWithdrawal = async () => {
@@ -420,7 +433,8 @@ function AdminWalletOverview({ locale }: { locale: string }) {
       setModalError("Invalid amount");
       return;
     }
-    if (amount > modalTeacher.wallet_balance) {
+    const maxAvailable = modalWalletDetail ? modalWalletDetail.total_available : modalTeacher.wallet_balance;
+    if (amount > maxAvailable) {
       setModalError(t.insufficientBalance);
       return;
     }
@@ -615,6 +629,23 @@ function AdminWalletOverview({ locale }: { locale: string }) {
           <div className="space-y-4">
             <p className="text-xs text-slate-500">{modalTeacher?.full_name}</p>
 
+            {modalWalletDetail && (
+              <div className="grid grid-cols-3 gap-2">
+                <div className="bg-slate-50 rounded-lg p-2.5 text-center">
+                  <p className="text-[10px] text-slate-500">{t.balance}</p>
+                  <p className="text-sm font-bold text-slate-900">{formatCurrency(modalWalletDetail.total_balance)}</p>
+                </div>
+                <div className="bg-amber-50 rounded-lg p-2.5 text-center">
+                  <p className="text-[10px] text-amber-600">{t.frozenBalance}</p>
+                  <p className="text-sm font-bold text-amber-700">{formatCurrency(modalWalletDetail.total_frozen)}</p>
+                </div>
+                <div className="bg-emerald-50 rounded-lg p-2.5 text-center">
+                  <p className="text-[10px] text-emerald-600">{t.availableBalance}</p>
+                  <p className="text-sm font-bold text-emerald-700">{formatCurrency(modalWalletDetail.total_available)}</p>
+                </div>
+              </div>
+            )}
+
             <form
               onSubmit={(e) => { e.preventDefault(); handleSubmitWithdrawal(); }}
               className="space-y-4"
@@ -625,12 +656,13 @@ function AdminWalletOverview({ locale }: { locale: string }) {
                   type="number"
                   step="0.01"
                   min="0.01"
-                  max={modalTeacher?.wallet_balance}
+                  max={modalWalletDetail ? modalWalletDetail.total_available : modalTeacher?.wallet_balance}
                   value={modalAmount}
                   onChange={(e) => {
                     setModalAmount(e.target.value);
                     const v = parseFloat(e.target.value);
-                    setModalPreviewBalance(isNaN(v) ? null : (modalTeacher ? modalTeacher.wallet_balance - v : null));
+                    const avail = modalWalletDetail ? modalWalletDetail.total_available : (modalTeacher?.wallet_balance ?? 0);
+                    setModalPreviewAvailable(isNaN(v) ? null : (avail - v));
                   }}
                   className="input-field"
                   placeholder="0.00"
@@ -638,11 +670,11 @@ function AdminWalletOverview({ locale }: { locale: string }) {
                 />
                 <div className="flex items-center justify-between mt-1.5">
                   <p className="text-xs text-slate-400">
-                    {t.balance}: {modalTeacher ? `${formatCurrency(modalTeacher.wallet_balance)} ${t.sar}` : ""}
+                    {t.availableBalance}: {modalWalletDetail ? `${formatCurrency(modalWalletDetail.total_available)} ${t.sar}` : modalTeacher ? `${formatCurrency(modalTeacher.wallet_balance)} ${t.sar}` : ""}
                   </p>
-                  {modalPreviewBalance !== null && modalPreviewBalance >= 0 && (
+                  {modalPreviewAvailable !== null && modalPreviewAvailable >= 0 && (
                     <p className="text-xs text-slate-500">
-                      {t.balanceAfter}: {formatCurrency(modalPreviewBalance)} {t.sar}
+                      {t.balanceAfter}: {formatCurrency(modalPreviewAvailable)} {t.sar}
                     </p>
                   )}
                 </div>

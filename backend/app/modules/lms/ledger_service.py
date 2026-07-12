@@ -25,6 +25,7 @@ async def record(
     reference_id: Optional[uuid.UUID],
     narrative: Optional[str],
     created_by: uuid.UUID,
+    force: bool = False,
 ) -> LedgerEntry:
     entry = LedgerEntry(
         wallet_id=wallet_id,
@@ -41,7 +42,9 @@ async def record(
     db.add(entry)
 
     wallet_result = await db.execute(
-        select(TeacherWallet).where(TeacherWallet.id == wallet_id)
+        select(TeacherWallet)
+        .where(TeacherWallet.id == wallet_id)
+        .with_for_update()
     )
     wallet = wallet_result.scalar_one_or_none()
     if not wallet:
@@ -54,7 +57,7 @@ async def record(
         raise ValueError(
             f"Invariant violation: frozen_balance ({wallet.frozen_balance}) cannot be negative"
         )
-    if wallet.frozen_balance > wallet.balance:
+    if not force and wallet.frozen_balance > wallet.balance:
         raise ValueError(
             f"Invariant violation: frozen_balance ({wallet.frozen_balance}) exceeds balance ({wallet.balance})"
         )
@@ -132,11 +135,12 @@ async def get_wallet_summary(
 
 
 async def get_or_create_wallet(
-    db: AsyncSession, teacher_id: uuid.UUID
+    db: AsyncSession, teacher_id: uuid.UUID, lock: bool = False
 ) -> TeacherWallet:
-    result = await db.execute(
-        select(TeacherWallet).where(TeacherWallet.teacher_id == teacher_id)
-    )
+    query = select(TeacherWallet).where(TeacherWallet.teacher_id == teacher_id)
+    if lock:
+        query = query.with_for_update()
+    result = await db.execute(query)
     wallet = result.scalar_one_or_none()
     if not wallet:
         wallet = TeacherWallet(
@@ -146,6 +150,13 @@ async def get_or_create_wallet(
         )
         db.add(wallet)
         await db.flush()
+        if lock:
+            result = await db.execute(
+                select(TeacherWallet)
+                .where(TeacherWallet.id == wallet.id)
+                .with_for_update()
+            )
+            wallet = result.scalar_one_or_none()
     return wallet
 
 
@@ -375,6 +386,7 @@ async def cancel_contract(
     contract_id: uuid.UUID,
     cancelled_by: uuid.UUID,
     reason: Optional[str] = None,
+    force: bool = False,
 ) -> SectionContract:
     result = await db.execute(
         select(SectionContract).where(SectionContract.id == contract_id)
@@ -390,7 +402,7 @@ async def cancel_contract(
         await db.flush()
         return contract
 
-    wallet = await get_or_create_wallet(db, contract.teacher_id)
+    wallet = await get_or_create_wallet(db, contract.teacher_id, lock=True)
 
     agg_result = await db.execute(
         select(
@@ -408,6 +420,21 @@ async def cancel_contract(
     total_to_reverse = abs(net_available) + abs(net_frozen)
 
     if total_to_reverse > 0:
+        wallet_balance = Decimal(str(wallet.balance or 0))
+        frozen_balance = Decimal(str(wallet.frozen_balance or 0))
+        available_balance = wallet_balance - frozen_balance
+        if net_available > 0 and available_balance < net_available and not force:
+            shortfall = net_available - available_balance
+            raise ValueError(
+                f"Cannot cancel: teacher wallet has insufficient available balance. "
+                f"Net available to reverse: {net_available}, "
+                f"Wallet total balance: {wallet_balance}, "
+                f"Frozen balance: {frozen_balance}, "
+                f"Available balance: {available_balance}, "
+                f"Shortfall: {shortfall}. "
+                f"Use force_cancellation=true to proceed and create a receivable."
+            )
+
         await record(
             db=db,
             wallet_id=wallet.id,
@@ -420,6 +447,7 @@ async def cancel_contract(
             reference_id=None,
             narrative=reason or f"Cancellation reversal for contract {contract_id}",
             created_by=cancelled_by,
+            force=force,
         )
 
     contract.status = ContractStatus.CANCELLED
@@ -461,9 +489,15 @@ async def deactivate_contract(
 
     if total_to_reverse > 0:
         wallet_balance = Decimal(str(wallet.balance or 0))
-        if wallet_balance < total_to_reverse:
+        frozen_balance = Decimal(str(wallet.frozen_balance or 0))
+        available_balance = wallet_balance - frozen_balance
+        if net_available > 0 and available_balance < net_available:
             raise ValueError(
-                "Cannot deactivate: teacher has withdrawn funds. "
+                "Cannot deactivate: teacher has withdrawn funds or has insufficient available balance. "
+                f"Net available to reverse: {net_available}, "
+                f"Wallet total balance: {wallet_balance}, "
+                f"Frozen balance: {frozen_balance}, "
+                f"Available balance: {available_balance}. "
                 "Activation credit cannot be recovered from wallet."
             )
 

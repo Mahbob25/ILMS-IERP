@@ -249,6 +249,7 @@ export default function SectionStudentsPage() {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [showDeactivateModal, setShowDeactivateModal] = useState(false);
   const [showCompleteOverride, setShowCompleteOverride] = useState(false);
@@ -322,6 +323,29 @@ export default function SectionStudentsPage() {
       setLoading(false);
     }
   }, [sectionId]);
+
+  const handleCompleteClick = async () => {
+    setError(null);
+    setSuccessMsg(null);
+    try {
+      await apiClient.post(`/academic/course-sections/${sectionId}/complete`, {});
+      setSuccessMsg(t.completeSuccess);
+      fetchData();
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { detail?: any } } };
+      const detailRaw = err?.response?.data?.detail;
+      const detail = typeof detailRaw === "string" ? detailRaw : detailRaw?.message || "";
+      if (typeof detail === "string" && (detail.includes("missing") || detail.includes("grades") || detail.includes("payment") || detail.includes("unpaid") || detail.includes("ungraded"))) {
+        setOverrideData({
+          ungraded: (detailRaw?.ungraded_students || []).map((name: string) => ({ student_name: name })),
+          unpaid: (detailRaw?.unpaid_students || []).map((s: any) => ({ student_name: s.student_name, amount: s.balance })),
+        });
+        setShowCompleteOverride(true);
+      } else {
+        setError(detail || t.completionFailed);
+      }
+    }
+  };
 
   useEffect(() => {
     fetchData();
@@ -468,18 +492,7 @@ export default function SectionStudentsPage() {
                 {(section.status === "active" ||
                   section.status === "ready_for_completion") && (
                   <button
-                    onClick={() => {
-                      setError(null);
-                      setOverrideData({
-                        ungraded: students
-                          .filter((s) => s.final_score == null)
-                          .map((s) => ({ student_name: s.student_name, student_code: s.student_code })),
-                        unpaid: students
-                          .filter((s) => (s.balance_remaining || 0) > 0)
-                          .map((s) => ({ student_name: s.student_name, student_code: s.student_code, amount: s.balance_remaining })),
-                      });
-                      setShowCompleteOverride(true);
-                    }}
+                    onClick={handleCompleteClick}
                     className="btn-primary px-3 py-1.5 text-xs flex items-center gap-1 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <CheckCircle2 size={12} />
@@ -549,7 +562,7 @@ export default function SectionStudentsPage() {
           const diffDays = Math.floor(
             (now.getTime() - endDate.getTime()) / (1000 * 60 * 60 * 24),
           );
-          if (section.status === "cancelled") return null;
+          if (section.status === "cancelled" || section.status === "completed") return null;
           if (diffDays > 0) {
             return (
               <SectionWarningBanner
@@ -590,6 +603,18 @@ export default function SectionStudentsPage() {
           isRtl={isRtl}
           locale={locale}
         />
+      )}
+
+      {successMsg && (
+        <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-3 rounded-md text-sm flex items-center justify-between">
+          <span>{successMsg}</span>
+          <button
+            onClick={() => setSuccessMsg(null)}
+            className="text-emerald-500 hover:text-emerald-700 font-bold ms-2"
+          >
+            &times;
+          </button>
+        </div>
       )}
 
       {(error || activationError) && (
@@ -734,7 +759,7 @@ export default function SectionStudentsPage() {
         unpaidStudents={overrideData.unpaid}
         isRtl={isRtl}
         locale={locale}
-        onSuccess={() => { setError(null); fetchData(); }}
+        onSuccess={() => { setError(null); setShowCompleteOverride(false); setOverrideData({ ungraded: [], unpaid: [] }); setSuccessMsg(t.completeSuccess); fetchData(); }}
       />
     </div>
   );

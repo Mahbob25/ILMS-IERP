@@ -548,6 +548,10 @@ async def get_cancel_preview(
     return {
         "section_id": str(preview.section_id),
         "teacher_reversal_amount": float(preview.teacher_wallet_reversal_amount),
+        "teacher_wallet_balance": float(preview.teacher_wallet_balance),
+        "teacher_wallet_frozen_balance": float(preview.teacher_wallet_frozen_balance),
+        "teacher_wallet_available_balance": float(preview.teacher_wallet_available_balance),
+        "shortfall": float(preview.shortfall),
         "enrolled_count": preview.enrolled_count,
         "payments_collected": float(preview.payments_collected),
         "has_attendance_records": preview.has_attendance_records,
@@ -566,6 +570,7 @@ async def cancel_section_endpoint(
 ):
     reason = body.get("reason")
     refund_policy = body.get("refund_policy")
+    force_cancellation = body.get("force_cancellation", False)
 
     if not reason or not reason.strip():
         raise HTTPException(
@@ -584,6 +589,7 @@ async def cancel_section_endpoint(
             cancelled_by=current_user.id,
             reason=reason.strip(),
             refund_policy=refund_policy,
+            force_cancellation=force_cancellation,
         )
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))

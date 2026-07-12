@@ -156,7 +156,24 @@ export default function SectionsTable({
                     <span className="text-xs text-slate-500 whitespace-nowrap">{enrolled}/{minReq}</span>
                   </div>
                 </td>
-                <td className="text-slate-600">{section.teacher_id ? t.assigned : "—"}</td>
+                <td className="text-slate-600">
+                  {section.teacher_id ? (
+                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
+                      section.contract_status === "settled" ? "bg-emerald-100 text-emerald-700" :
+                      section.contract_status === "active" ? "bg-blue-100 text-blue-700" :
+                      section.contract_status === "grades_submitted" ? "bg-amber-100 text-amber-700" :
+                      section.contract_status === "cancelled" ? "bg-red-100 text-red-700" :
+                      "bg-slate-100 text-slate-600"
+                    }`}>
+                      {section.contract_status === "settled" ? t.contractSettled :
+                       section.contract_status === "active" ? t.contractActive :
+                       section.contract_status === "grades_submitted" ? t.contractGraded :
+                       section.contract_status === "cancelled" ? t.contractCancelled :
+                       section.contract_status === "draft" ? t.contractDraft :
+                       t.assigned}
+                    </span>
+                  ) : "—"}
+                </td>
                 <td className="text-slate-600">{section.price != null ? `${section.price}` : "—"}</td>
                 <td className="text-xs text-slate-500">
                   {section.start_date || section.class_time || section.classroom ? (

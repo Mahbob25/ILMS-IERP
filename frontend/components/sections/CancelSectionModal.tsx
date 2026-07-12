@@ -8,6 +8,10 @@ import { Loader2, AlertTriangle, DollarSign, Users, Ban, FileText } from "lucide
 interface CancelPreview {
   section_id: string;
   teacher_reversal_amount: number;
+  teacher_wallet_balance: number;
+  teacher_wallet_frozen_balance: number;
+  teacher_wallet_available_balance: number;
+  shortfall: number;
   enrolled_count: number;
   payments_collected: number;
   has_attendance_records: boolean;
@@ -41,12 +45,18 @@ export default function CancelSectionModal({
   const [error, setError] = useState<string | null>(null);
   const [refundPolicy, setRefundPolicy] = useState<"authorize_refunds" | "no_refund">("authorize_refunds");
   const [reason, setReason] = useState("");
+  const [forceCancellation, setForceCancellation] = useState(false);
 
   const t = {
     ar: {
       title: "إلغاء الشعبة",
       step1Title: "معاينة تأثير الإلغاء",
       teacherReversal: "مبلغ استرداد المعلم",
+      teacherWalletBalance: "رصيد محفظة المعلم",
+      shortfallLabel: "العجز المالي",
+      insufficientBalanceWarning: "الرصيد المتاح للمعلم غير كافٍ. مبلغ الاسترداد يتجاوز الرصيد المتاح بعد الأرصدة المجمدة. سيؤدي الإلغاء إلى إنشاء ذمّة مالية مستحقة على المؤسسة.",
+      forceCancellationLabel: "فرض الإلغاء وإنشاء ذمّة مالية",
+      forceCancellationHint: "سيستمر إلغاء الشعبة وسيتم إنشاء رصيد سلبي في محفظة المعلم",
       enrolledCount: "عدد الطلاب المسجلين",
       paymentsCollected: "المدفوعات المحصلة",
       attendWarning: "توجد سجلات حضور",
@@ -73,6 +83,11 @@ export default function CancelSectionModal({
       title: "Cancel Section",
       step1Title: "Cancellation Impact Preview",
       teacherReversal: "Teacher Reversal Amount",
+      teacherWalletBalance: "Teacher Wallet Balance",
+      shortfallLabel: "Shortfall",
+      insufficientBalanceWarning: "Teacher's available balance is insufficient. The reversal amount exceeds what's available after frozen funds. Cancelling will create an institutional receivable.",
+      forceCancellationLabel: "Force cancellation and create receivable",
+      forceCancellationHint: "Section cancellation will proceed and a negative balance will be created in the teacher's wallet",
       enrolledCount: "Enrolled Students",
       paymentsCollected: "Payments Collected",
       attendWarning: "Attendance records exist",
@@ -102,6 +117,7 @@ export default function CancelSectionModal({
       setStep(1);
       setReason("");
       setRefundPolicy("authorize_refunds");
+      setForceCancellation(false);
       setError(null);
       setPreview(null);
       loadPreview();
@@ -131,6 +147,7 @@ export default function CancelSectionModal({
       await apiClient.post(`/academic/course-sections/${sectionId}/cancel`, {
         reason: reason.trim(),
         refund_policy: refundPolicy,
+        force_cancellation: forceCancellation,
       });
       onSuccess();
       onClose();
@@ -195,6 +212,60 @@ export default function CancelSectionModal({
                   </p>
                 </div>
               </div>
+              {preview.shortfall !== undefined && (
+                <div className="space-y-2">
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="bg-slate-50 rounded-lg p-3">
+                      <p className="text-xs text-slate-500">{t.teacherWalletBalance}</p>
+                      <p className="text-lg font-bold text-slate-900">
+                        {preview.teacher_wallet_balance.toFixed(2)}
+                      </p>
+                    </div>
+                    <div className="bg-slate-50 rounded-lg p-3">
+                      <p className="text-xs text-slate-500">{isRtl ? "الرصيد المجمد" : "Frozen Balance"}</p>
+                      <p className="text-lg font-bold text-slate-900">
+                        {preview.teacher_wallet_frozen_balance.toFixed(2)}
+                      </p>
+                    </div>
+                    <div className="bg-slate-50 rounded-lg p-3">
+                      <p className="text-xs text-slate-500">{isRtl ? "الرصيد المتاح" : "Available Balance"}</p>
+                      <p className="text-lg font-bold text-slate-900">
+                        {preview.teacher_wallet_available_balance.toFixed(2)}
+                      </p>
+                    </div>
+                  </div>
+                  {preview.shortfall > 0 && (
+                    <div className="bg-red-50 rounded-lg p-3">
+                      <p className="text-xs text-red-500">{t.shortfallLabel}</p>
+                      <p className="text-lg font-bold text-red-700">
+                        {preview.shortfall.toFixed(2)}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+              {preview.shortfall > 0 && (
+                <div className="space-y-3">
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                    <p className="text-xs text-amber-700 flex items-center gap-1">
+                      <AlertTriangle size={12} />
+                      {t.insufficientBalanceWarning}
+                    </p>
+                  </div>
+                  <label className="flex items-start gap-3 p-3 border border-amber-200 rounded-lg cursor-pointer has-[:checked]:border-amber-500 has-[:checked]:bg-amber-50">
+                    <input
+                      type="checkbox"
+                      checked={forceCancellation}
+                      onChange={(e) => setForceCancellation(e.target.checked)}
+                      className="mt-0.5"
+                    />
+                    <div>
+                      <p className="text-sm font-medium text-slate-900">{t.forceCancellationLabel}</p>
+                      <p className="text-xs text-slate-500">{t.forceCancellationHint}</p>
+                    </div>
+                  </label>
+                </div>
+              )}
               {(preview.has_attendance_records || preview.has_final_grades || preview.has_certificates) && (
                 <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 space-y-1">
                   <p className="text-xs font-semibold text-amber-700 flex items-center gap-1">

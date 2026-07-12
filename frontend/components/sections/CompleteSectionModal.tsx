@@ -78,8 +78,8 @@ export default function CompleteSectionModal({
     setError(null);
     try {
       await apiClient.post(`/academic/course-sections/${sectionId}/complete`, {
-        force: true,
-        reason: reason.trim(),
+        force: hasBypassItems,
+        ...(hasBypassItems && reason.trim() ? { reason: reason.trim() } : {}),
       });
       onSuccess();
       onClose();
@@ -129,7 +129,7 @@ export default function CompleteSectionModal({
 
         <div>
           <label className="block text-xs font-medium text-slate-700 mb-1">
-            {t.reasonLabel} <span className="text-red-500">*</span>
+            {t.reasonLabel}{hasBypassItems && <span className="text-red-500"> *</span>}
           </label>
           <textarea
             value={reason}
@@ -153,7 +153,7 @@ export default function CompleteSectionModal({
         <div className="flex gap-3 pt-2">
           <button
             onClick={handleConfirm}
-            disabled={loading || !reason.trim()}
+            disabled={loading || (hasBypassItems && !reason.trim())}
             className="bg-emerald-500 text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-emerald-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
             {loading && <Loader2 size={14} className="animate-spin" />}

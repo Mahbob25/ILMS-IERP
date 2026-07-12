@@ -96,6 +96,12 @@ export function getSectionsTranslations(locale: string) {
       deactivateConfirmMsg: "هل تريد إلغاء تنشيط هذه الشعبة؟",
       cancelSuccess: "تم إلغاء الشعبة بنجاح",
       deactivateSuccess: "تم إلغاء تنشيط الشعبة بنجاح",
+      contractAssigned: "معيّن",
+      contractActive: "نشط",
+      contractGraded: "تم التقييم",
+      contractSettled: "تم التسوية",
+      contractCancelled: "ملغى",
+      contractDraft: "مسودة",
     },
     en: {
       title: "Course Sections",
@@ -193,6 +199,12 @@ export function getSectionsTranslations(locale: string) {
       deactivateConfirmMsg: "Do you want to deactivate this section?",
       cancelSuccess: "Section cancelled successfully",
       deactivateSuccess: "Section deactivated successfully",
+      contractAssigned: "Assigned",
+      contractActive: "Active",
+      contractGraded: "Graded",
+      contractSettled: "Settled",
+      contractCancelled: "Cancelled",
+      contractDraft: "Draft",
     },
   }[locale === "en" ? "en" : "ar"];
 }

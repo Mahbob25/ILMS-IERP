@@ -3,6 +3,7 @@ import uuid
 from decimal import Decimal
 from typing import Optional
 
+from sqlalchemy import func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import joinedload
@@ -148,7 +149,7 @@ def _generate_refund_voucher_html(
         "amount": amount_str,
         "cashier_name": html.escape(cashier_name),
     }
-    return template_engine.render_voucher(variables)
+    return template_engine.render_refund_voucher(variables)
 
 
 async def get_receipt_html_content(db: AsyncSession, payment_id: uuid.UUID, locale: str = "ar") -> Optional[str]:

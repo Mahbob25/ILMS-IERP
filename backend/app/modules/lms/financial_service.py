@@ -410,13 +410,14 @@ async def create_expense(
         recipient_name = employee.full_name
 
         if expense_type == "teacher_withdrawal":
-            wallet_result = await db.execute(
-                select(TeacherWallet).where(TeacherWallet.teacher_id == employee.id)
-            )
-            wallet = wallet_result.scalar_one_or_none()
-            available_balance = (wallet.balance - wallet.frozen_balance) if wallet else 0
+            wallet = await get_or_create_wallet(db, employee.id, lock=True)
+            available_balance = wallet.balance - wallet.frozen_balance
             if not wallet or available_balance < amount:
-                raise ValueError("Insufficient wallet balance")
+                raise ValueError(
+                    f"Cannot withdraw: insufficient wallet balance. "
+                    f"Requested: {amount}, Available: {available_balance}. "
+                    f"Outstanding receivable must be cleared before further withdrawals."
+                )
 
         elif expense_type in ("secretary_advance", "salary_payment"):
             monthly_limit = employee.default_salary or 0
@@ -452,7 +453,6 @@ async def create_expense(
 
     # Record withdrawal via ledger for teacher withdrawal
     if expense_type == "teacher_withdrawal" and recipient_id:
-        wallet = await get_or_create_wallet(db, recipient_id)
         await ledger_record(
             db=db,
             wallet_id=wallet.id,

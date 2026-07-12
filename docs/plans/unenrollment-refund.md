@@ -87,7 +87,7 @@ The financial impact depends on the student's payment state:
    - Remaining section balance (agreed_price - admin_discount - total_paid)
 2. Reverse teacher `PAYMENT_SHARE` entries for this student's payments
    - Create `REVERSAL` ledger entries matching the total teacher share
-   - **Constraint:** Teacher wallet must have sufficient balance to reverse. If the teacher has already withdrawn the funds, the reversal is blocked — manager must resolve manually.
+   - Teacher wallet may go negative — no balance check required
 3. Create `PendingRefund` for the full amount paid (or partial, as authorized)
 4. Set `enrollment.deleted_at = now()`
 5. Decrement `section.enrolled_count`
@@ -113,9 +113,7 @@ WHERE p.enrollment_id = :enrollment_id
   AND le.type = 'PAYMENT_SHARE';
 ```
 
-**Reversal constraint:** Teacher wallet balance must be >= total reversal amount. If the teacher has already withdrawn, the system blocks with a clear error message and the manager must:
-- Either manually resolve the shortfall (deposit from teacher)
-- Or override with a reason (creating an `UnenrollmentOverride` audit record of the policy exception)
+**Reversal constraint:** None. Teacher wallets may go negative after reversal. This is expected — the teacher received funds for a student who later left, and negative tracking ensures the ledger reflects the true liability. Teacher wallets should be reconciled periodically (e.g., at settlement or term-end) rather than blocking individual unenrollments.
 
 ### 3.4 `REFUND_DISBURSEMENT` Ledger Entry
 
@@ -171,7 +169,7 @@ CREATE TABLE unenrollment_overrides (
     unenrollment_record_id UUID NOT NULL REFERENCES unenrollment_records(id),
     overridden_by UUID NOT NULL REFERENCES users(id),
     overridden_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
-    override_type VARCHAR(50) NOT NULL,  -- 'teacher_shortfall', 'force_unenroll_with_grades'
+    override_type VARCHAR(50) NOT NULL,  -- 'force_unenroll_with_grades'
     reason TEXT NOT NULL,
     teacher_wallet_balance_before NUMERIC(12, 2) NOT NULL,
     reversal_amount NUMERIC(12, 2) NOT NULL
@@ -267,10 +265,10 @@ Secretary/Manager clicks "Unenroll"
    ○ No refund — student handled manually
          │
          ▼
-   [Teacher Wallet Check]
+   [Teacher Wallet Reversal]
    - Teacher share from this student: 1,200 EGP
    - Teacher wallet balance: 5,000 EGP
-   - Sufficient ✓ / Insufficient ⚠ (block or override)
+   - Reversal entries created (balance may go negative)
          │
          ▼
    [Reason & Confirm]
@@ -313,7 +311,7 @@ async def unenroll_student(
     reason: str,
     refund_policy: Literal["authorize_refund", "no_refund"],
     refund_amount: Decimal | None = None,  # Full amount if None, partial if specified
-    force: bool = False,
+    force: bool = False,  # Allows unenrollment when grades exist
     force_reason: str | None = None,
 ) -> UnenrollmentRecord:
 ```
@@ -323,7 +321,6 @@ async def unenroll_student(
 2. Section is `active` or `pending` (cannot unenroll from `completed` or `cancelled`)
 3. No certificates issued for this enrollment
 4. If `force=False` and grades exist → warn (force to proceed)
-5. If `force=False` and teacher wallet insufficient → block (force with reason to proceed)
 
 **Transaction Flow (single DB transaction with row-level locking):**
 
@@ -335,23 +332,7 @@ async with db.begin_nested():
     total_paid = sum(p.amount for p in payments)
     teacher_share = await calculate_reversal_amount(db, enrollment_id)
 
-    # 2. Lock teacher wallet row and check sufficiency
-    # SELECT ... FOR UPDATE prevents concurrent withdrawals from
-    # changing the balance between our check and the reversal.
-    wallet = await db.execute(
-        select(TeacherWallet)
-        .join(SectionContract, SectionContract.teacher_id == TeacherWallet.teacher_id)
-        .where(SectionContract.section_id == enrollment.section_id)
-        .with_for_update()  # ← Row-level lock
-    )
-    wallet = wallet.scalar_one_or_none()
-    if wallet and wallet.balance < teacher_share:
-        raise InsufficientTeacherBalance(
-            f"Teacher wallet balance ({wallet.balance}) is less than "
-            f"reversal amount ({teacher_share}). Cannot unenroll."
-        )
-
-    # 3. Reverse teacher wallet (now safe under lock)
+    # 2. Reverse teacher wallet (no balance check — wallets may go negative)
     if teacher_share > 0:
         await ledger_service.reverse_teacher_shares(
             db,
@@ -360,7 +341,7 @@ async with db.begin_nested():
             reversed_by=unenrolled_by,
         )
 
-    # 4. Create PendingRefund (if authorized)
+    # 3. Create PendingRefund (if authorized)
     if refund_policy == "authorize_refund":
         actual_refund = refund_amount or total_paid
         pending_refund = PendingRefund(
@@ -371,12 +352,12 @@ async with db.begin_nested():
         )
         db.add(pending_refund)
 
-    # 5. Soft-delete enrollment
+    # 4. Soft-delete enrollment
     enrollment.deleted_at = func.now()
     section = await db.get(CourseSection, enrollment.section_id)
     section.enrolled_count = func.greatest(section.enrolled_count - 1, 0)
 
-    # 6. Audit
+    # 5. Audit
     record = UnenrollmentRecord(
         enrollment_id=enrollment_id,
         section_id=enrollment.section_id,
@@ -393,7 +374,7 @@ async with db.begin_nested():
     db.add(record)
 ```
 
-**Note on `with_for_update()`:** This locks the `TeacherWallet` row for the duration of the transaction. Any concurrent request (e.g., a teacher withdrawal) that tries to read or write the same wallet row will block until this transaction commits or rolls back. This eliminates the race condition entirely.
+**Note on concurrency:** No `SELECT ... FOR UPDATE` or balance check is needed. The reversal always creates `REVERSAL` ledger entries regardless of the current wallet balance. A concurrent teacher withdrawal during unenrollment is harmless — both operations succeed and the negative balance (if any) is tracked by the ledger as an institutional receivable.
 
 ### 6.2 Ledger Service Changes
 
@@ -413,11 +394,9 @@ async def reverse_teacher_shares(
     Creates REVERSAL entries that mirror the original PAYMENT_SHARE
     entries with negative deltas.
 
-    Uses SELECT ... FOR UPDATE on the teacher wallet row to prevent
-    a race condition where a concurrent withdrawal could change the
-    balance between the sufficiency check and the reversal.
+    No balance check — teacher wallets may go negative. Negative
+    balances are reconciled periodically (e.g., at settlement or term-end).
 
-    Pre-condition: teacher_wallet.balance >= amount (checked inside FOR UPDATE lock)
     Pre-condition: enrollment has payments
     """
 ```
@@ -487,12 +466,11 @@ The cashier dashboard filter should show both sources.
 - Financial impact summary:
   - Total paid by student: 3,000 EGP
   - Teacher share to reverse: 1,200 EGP
-  - Teacher wallet balance: 5,000 EGP (sufficient ✓)
+  - Teacher wallet balance: 5,000 EGP (will decrease by 1,200 EGP)
   - Refund to authorize: 3,000 EGP
 - Warnings:
   - ⚠ Student has attendance records
   - ⚠ Student has entered grades
-- Teacher balance warning (if insufficient): ⚠ Teacher wallet balance (2,000 EGP) is less than reversal amount (2,500 EGP). Contact manager to resolve.
 
 **Step 3 — Refund Decision:**
 - ○ Full refund (3,000 EGP) [default]
@@ -502,7 +480,7 @@ The cashier dashboard filter should show both sources.
 **Step 4 — Reason & Confirm:**
 - Reason text (required)
 - Notes (optional)
-- Force override checkbox (if teacher shortfall or grades exist)
+- Force override checkbox (if grades exist)
 - Force reason text (required if force checked)
 - Confirm/Cancel buttons
 
@@ -604,14 +582,13 @@ The existing cashier dashboard already handles `PendingRefund` records regardles
 | Task | Estimate |
 |------|----------|
 | Block unenrollment if certificates issued for this enrollment | 0.25 day |
-| Handle teacher wallet shortfall — override path | 0.25 day |
 | Handle unenrollment on a closed financial day (daily closure check) | 0.5 day |
 | Idempotency guard: prevent double-unenrollment of same enrollment | 0.25 day |
 | Handle partial refund: remaining balance vs total paid logic | 0.5 day |
 | Ensure `unenroll_student()` is within a single DB transaction | 0.25 day |
 | Verify partial unique index allows clean re-enrollment after unenrollment | 0.25 day |
 | Update `enrolled_count` consistency check (cron or startup check) | 0.5 day |
-| **Subtotal** | **3 days** |
+| **Subtotal** | **2.5 days** |
 
 ### Phase 7: Testing
 
@@ -623,8 +600,7 @@ The existing cashier dashboard already handles `PendingRefund` records regardles
 | Unit tests: `unenroll_student()` — no payments case | 0.25 day |
 | Unit tests: `unenroll_student()` — with payments, refund authorized | 0.5 day |
 | Unit tests: `unenroll_student()` — with payments, no refund | 0.25 day |
-| Unit tests: `unenroll_student()` — teacher shortfall blocked | 0.25 day |
-| Unit tests: `unenroll_student()` — force override bypass | 0.25 day |
+| Unit tests: `unenroll_student()` — force override with grades | 0.25 day |
 | Unit tests: `REFUND_DISBURSEMENT` ledger entry on disbursement | 0.25 day |
 | Integration tests: full unenrollment flow (enroll → pay → unenroll → verify teacher reversal + PendingRefund) | 1 day |
 | Integration tests: cashier disburses unenrollment refund → verify receipt + ledger entry | 0.5 day |
@@ -632,7 +608,7 @@ The existing cashier dashboard already handles `PendingRefund` records regardles
 | Integration tests: closed day blocks unenrollment with refund | 0.5 day |
 | E2E tests: unenrollment modal flow (steps 1-4) | 0.5 day |
 | E2E tests: cashier dashboard shows unenrollment refunds | 0.25 day |
-| **Subtotal** | **5.75 days** |
+| **Subtotal** | **5.5 days** |
 
 ---
 
@@ -645,9 +621,9 @@ The existing cashier dashboard already handles `PendingRefund` records regardles
 | Phase 3: Backend — API Endpoints | 2.35 |
 | Phase 4: Frontend — Unenroll Modal | 2.5 |
 | Phase 5: Frontend — Pages & Components | 2.5 |
-| Phase 6: Edge Cases & Reconciliation | 2.75 |
-| Phase 7: Testing | 5.75 |
-| **Total** | **~20.5 days** |
+| Phase 6: Edge Cases & Reconciliation | 2.5 |
+| Phase 7: Testing | 5.5 |
+| **Total** | **~20.0 days** |
 
 ---
 
@@ -655,7 +631,7 @@ The existing cashier dashboard already handles `PendingRefund` records regardles
 
 | Risk | Severity | Mitigation |
 |------|----------|------------|
-| Teacher wallet insufficient to reverse PAYMENT_SHARE | HIGH | Pre-check balance before reversal. Block with clear error. Manager override available with audit trail. |
+| Teacher wallet goes negative after PAYMENT_SHARE reversal | LOW | Expected behavior — negative balance represents an institutional receivable. Reconciled periodically at settlement or term-end. |
 | Unenrollment on closed financial day | MEDIUM | Check `is_date_closed()` before processing. Block refund authorization if the payment date falls on a closed day. |
 | Partial refund miscalculation | MEDIUM | Clear validation: refund amount must be > 0 and <= total_paid. No negative or zero refunds. |
 | Double-unenrollment of same enrollment | MEDIUM | Pre-check `deleted_at IS NULL`. Idempotency guard raises clear error. |
@@ -690,8 +666,8 @@ The existing cashier dashboard already handles `PendingRefund` records regardles
 | **`source` column on `PendingRefund`** | Distinguishes unenrollment from cancellation refunds for reporting without separate tables. |
 | **Full refund default, partial optional** | Simplifies the common case. Most unenrollment refunds are for the full amount paid. Partial is available as an explicit choice. |
 | **Teacher reversal is separate from student refund** | The teacher's share and the student's payment are distinct concepts. Teacher wallet reversal removes unearned compensation. Student refund returns the student's money. They happen in the same operation but are independent values. |
-| **`SELECT ... FOR UPDATE` on teacher wallet** | Prevents a TOCTOU race condition where a concurrent teacher withdrawal could change the wallet balance between the sufficiency check and the `REVERSAL` entry creation. The lock is held for the duration of the transaction. |
-| **`force=true` with audit override for teacher shortfall** | Strict enforcement (block if teacher can't repay) protects the institute's financial integrity. Force exists for legitimate cases (manager has alternative recovery plan) with full traceability. |
+| **No balance check on teacher wallet reversal** | Teacher wallets may go negative. The negative balance is an institutional receivable tracked by the ledger. No `SELECT ... FOR UPDATE` or sufficiency check needed — the reversal is always permitted. Periodic reconciliation at settlement or term-end resolves negative balances. |
+| **`force=true` retained for grades override only** | The `force` parameter is kept exclusively for the case where the student has entered grades. Teacher shortfall is no longer a blocking condition, so no force override is needed for it. |
 | **Block if certificates exist** | Certificate is a legal/educational record. Cannot auto-revoke. Manager must handle manually first (revoke certificate, then unenroll). |
 | **No pro-rata refund calculation** | Unenrollment is student-initiated or secretary-initiated. Pro-rata for partial attendance is a business policy decision, not a technical one. The system supports full or partial fixed amounts. Pro-rata can be added as a calculation rule later. |
 | **Partial unique index for re-enrollment** | Replaces the standard unique constraint with `CREATE UNIQUE INDEX ... WHERE deleted_at IS NULL`. Eliminates the need for a workaround table — the database naturally allows multiple soft-deleted records while enforcing one active enrollment. |
@@ -705,7 +681,7 @@ The existing cashier dashboard already handles `PendingRefund` records regardles
 | **Unenroll Student** | Remove a single student from a section with financial handling (teacher reversal, optional refund). Individual-level operation. |
 | **Cancel Section** | Stop an entire section. All students removed. Full financial handling at section level. |
 | **UnenrollmentRecord** | Audit trail for a single unenrollment event — who, when, why, financial snapshot. |
-| **UnenrollmentOverride** | Audit record when a `force=true` override is used to bypass a safety guard (e.g., teacher shortfall). |
+| **UnenrollmentOverride** | Audit record when a `force=true` override is used to bypass a safety guard (e.g., grades exist on the enrollment). |
 | **Teacher Share Reversal** | `REVERSAL` ledger entries that negate the `PAYMENT_SHARE` entries created for a now-unenrolled student's payments. |
 | **PendingRefund (source: unenrollment)** | An authorized-but-undisbursed refund liability created during unenrollment. Uses the same cashier disbursement pipeline as cancellation refunds. |
 | **Partial Unique Index** | `CREATE UNIQUE INDEX uq_active_enrollment ON enrollments (student_id, section_id) WHERE deleted_at IS NULL`. Allows unlimited soft-deleted records while enforcing one active enrollment per student per section. |
