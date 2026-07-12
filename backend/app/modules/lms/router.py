@@ -1002,13 +1002,14 @@ async def list_pending_refunds(
     page: int = 1,
     per_page: int = 20,
     search: Optional[str] = Query(None),
+    source: Optional[str] = Query(None),
     current_user: User = Depends(
         RoleChecker(allowed_roles=["superadmin", "manager", "accountant"])
     ),
     db: AsyncSession = Depends(get_db),
 ):
     return await cashier_service.get_pending_refunds_queue(
-        db, status=status, page=page, per_page=per_page, search=search
+        db, status=status, page=page, per_page=per_page, search=search, source=source
     )
 
 
@@ -1034,8 +1035,10 @@ async def get_student_refunds(
             "id": r.id,
             "enrollment_id": r.enrollment_id,
             "section_cancellation_id": r.section_cancellation_id,
+            "unenrollment_record_id": r.unenrollment_record_id,
             "amount": float(r.amount),
             "status": r.status,
+            "source": r.source,
             "created_at": r.created_at,
             "expires_at": r.expires_at,
         }

@@ -159,7 +159,7 @@ export default function CancelSectionModal({
   };
 
   return (
-    <Modal open={open} onClose={onClose} title={t.title} size="2xl" isRtl={isRtl}>
+    <Modal open={open} onClose={onClose} title={t.title} size="xl" isRtl={isRtl}>
       {loading && !preview && step === 1 ? (
         <div className="flex items-center justify-center h-32">
           <Loader2 className="animate-spin text-slate-400" size={24} />

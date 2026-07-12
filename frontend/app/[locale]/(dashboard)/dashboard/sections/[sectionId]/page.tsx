@@ -15,6 +15,9 @@ import {
   Clock,
   XCircle,
   Ban,
+  UserX,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import SectionWarningBanner from "@/components/sections/SectionWarningBanner";
 import SectionStatusBadge from "@/components/sections/SectionStatusBadge";
@@ -22,6 +25,8 @@ import FinancialSummary from "@/components/sections/FinancialSummary";
 import CancelSectionModal from "@/components/sections/CancelSectionModal";
 import DeactivateSectionModal from "@/components/sections/DeactivateSectionModal";
 import CompleteSectionModal from "@/components/sections/CompleteSectionModal";
+import ContractStatusBadge from "@/components/sections/ContractStatusBadge";
+import UnenrollModal from "@/components/students/UnenrollModal";
 import { useSectionActivation } from "@/components/sections/useSectionActivation";
 
 interface SectionEnrollmentDetail {
@@ -163,6 +168,19 @@ export default function SectionStudentsPage() {
       missingGradesCount: (n: number, t: number) => `${n} من ${t} طالب مكتمل`,
       outstandingPayments: (n: number, a: number) =>
         `${n} طالب عليهم ${a.toFixed(2)}`,
+      unenroll: "إلغاء تسجيل",
+      unenrollHistory: "سجل إلغاء التسجيل",
+      unenrollSuccess: "تم إلغاء التسجيل بنجاح",
+      showHistory: "عرض السجل",
+      hideHistory: "إخفاء السجل",
+      noUnenrollHistory: "لا توجد سجلات إلغاء تسجيل",
+      unenrolledAt: "تاريخ الإلغاء",
+      unenrolledBy: "تم بواسطة",
+      reason: "السبب",
+      refundPolicy: "سياسة الاسترداد",
+      refundAmountLabel: "قيمة الاسترداد",
+      refundAuthorizeRefund: "استرداد كامل",
+      refundNoRefund: "بدون استرداد",
     },
     en: {
       title: "Section Students",
@@ -238,6 +256,19 @@ export default function SectionStudentsPage() {
       missingGradesCount: (n: number, t: number) => `${n}/${t} students graded`,
       outstandingPayments: (n: number, a: number) =>
         `${n} students owe ${a.toFixed(2)}`,
+      unenroll: "Unenroll",
+      unenrollHistory: "Unenrollment History",
+      unenrollSuccess: "Unenrolled successfully",
+      showHistory: "Show History",
+      hideHistory: "Hide History",
+      noUnenrollHistory: "No unenrollment records",
+      unenrolledAt: "Unenrolled At",
+      unenrolledBy: "By",
+      reason: "Reason",
+      refundPolicy: "Refund Policy",
+      refundAmountLabel: "Refund Amount",
+      refundAuthorizeRefund: "Full Refund",
+      refundNoRefund: "No Refund",
     },
   }[locale === "en" ? "en" : "ar"];
 
@@ -257,6 +288,10 @@ export default function SectionStudentsPage() {
     ungraded: any[];
     unpaid: any[];
   }>({ ungraded: [], unpaid: [] });
+  const [unenrollTarget, setUnenrollTarget] = useState<SectionEnrollmentDetail | null>(null);
+  const [unenrollHistory, setUnenrollHistory] = useState<any[]>([]);
+  const [showUnenrollHistory, setShowUnenrollHistory] = useState(false);
+  const [loadingUnenrollHistory, setLoadingUnenrollHistory] = useState(false);
 
   const { activate, activating, error: activationError, setError: setActivationError } = useSectionActivation({
     sectionId,
@@ -347,6 +382,19 @@ export default function SectionStudentsPage() {
     }
   };
 
+  const loadUnenrollHistory = async () => {
+    setLoadingUnenrollHistory(true);
+    try {
+      const res = await apiClient.get<{ items: any[]; total: number }>(
+        `/academic/sections/${sectionId}/unenrollment-history?per_page=50`
+      );
+      setUnenrollHistory(res.data.items);
+    } catch { /* */ }
+    finally { setLoadingUnenrollHistory(false); }
+  };
+
+  const canUnenroll = section && (section.status === "active" || section.status === "pending");
+
   useEffect(() => {
     fetchData();
   }, [fetchData]);
@@ -374,27 +422,6 @@ export default function SectionStudentsPage() {
     courses.find((c) => c.id === courseId)?.name || courseId;
   const getTeacherName = (teacherId: string) =>
     teachers.find((u) => u.id === teacherId)?.full_name || teacherId;
-
-  const contractStatusBadge = (status: string) => {
-    const colors: Record<string, string> = {
-      active: "bg-emerald-50 text-emerald-600 border-emerald-200",
-      assigned: "bg-blue-50 text-blue-600 border-blue-200",
-      grades_submitted: "bg-purple-50 text-purple-600 border-purple-200",
-      settled: "bg-slate-100 text-slate-500 border-slate-200",
-    };
-    const labels: Record<string, string> = {
-      assigned: t.contractAssigned,
-      active: t.contractActive,
-      grades_submitted: t.contractGraded,
-      settled: t.contractSettled,
-      cancelled: t.contractCancelled,
-    };
-    return (
-      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${colors[status] || "bg-slate-50 text-slate-400 border-slate-200"}`}>
-        {labels[status] || status}
-      </span>
-    );
-  };
 
   if (loading) {
     return (
@@ -463,7 +490,17 @@ export default function SectionStudentsPage() {
               isRtl={isRtl}
             />
             {contract && (
-              contractStatusBadge(contract.status)
+              <ContractStatusBadge
+                status={contract.status}
+                isRtl={isRtl}
+                labels={{
+                  assigned: t.contractAssigned,
+                  active: t.contractActive,
+                  grades_submitted: t.contractGraded,
+                  settled: t.contractSettled,
+                  cancelled: t.contractCancelled,
+                }}
+              />
             )}
           </div>
           {(section.status === "pending" ||
@@ -662,6 +699,7 @@ export default function SectionStudentsPage() {
                   <th>{t.balance}</th>
                   <th className="hidden md:table-cell">{t.finalScore}</th>
                   <th className="hidden md:table-cell">{t.grade}</th>
+                  {canUnenroll && canActivate && <th>{isRtl ? "إجراء" : "Actions"}</th>}
                 </tr>
               </thead>
               <tbody>
@@ -720,6 +758,17 @@ export default function SectionStudentsPage() {
                         <span className="badge badge-success">{enr.grade_label}</span>
                       ) : "—"}
                     </td>
+                    {canUnenroll && canActivate && (
+                      <td>
+                        <button
+                          onClick={() => setUnenrollTarget(enr)}
+                          className="btn-icon text-amber-600"
+                          title={t.unenroll}
+                        >
+                          <UserX size={14} />
+                        </button>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
@@ -760,6 +809,64 @@ export default function SectionStudentsPage() {
         isRtl={isRtl}
         locale={locale}
         onSuccess={() => { setError(null); setShowCompleteOverride(false); setOverrideData({ ungraded: [], unpaid: [] }); setSuccessMsg(t.completeSuccess); fetchData(); }}
+      />
+
+      {/* Unenrollment History Section */}
+      <div className="card overflow-hidden">
+        <button
+          onClick={() => { setShowUnenrollHistory(!showUnenrollHistory); if (!showUnenrollHistory && unenrollHistory.length === 0) loadUnenrollHistory(); }}
+          className="w-full px-4 py-3 border-b border-slate-200 flex items-center gap-2 text-sm font-bold text-slate-900 hover:bg-slate-50 transition-colors"
+        >
+          <Users size={16} className="text-slate-400" />
+          <span>{t.unenrollHistory}</span>
+          <span className="text-xs text-slate-400 font-normal ms-1">({unenrollHistory.length})</span>
+          <div className="flex-1" />
+          {showUnenrollHistory ? <ChevronUp size={16} className="text-slate-400" /> : <ChevronDown size={16} className="text-slate-400" />}
+        </button>
+        {showUnenrollHistory && (
+          <div className="p-4">
+            {loadingUnenrollHistory ? (
+              <div className="flex items-center justify-center h-16">
+                <Loader2 className="animate-spin text-slate-400" size={20} />
+              </div>
+            ) : unenrollHistory.length === 0 ? (
+              <p className="text-sm text-slate-500 text-center py-4">{t.noUnenrollHistory}</p>
+            ) : (
+              <div className="space-y-3 max-h-80 overflow-y-auto">
+                {unenrollHistory.map((rec: any) => (
+                  <div key={rec.id} className="border border-slate-200 rounded-lg p-3 text-sm">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-medium text-slate-900">{rec.student_name}</span>
+                      <span className="text-xs text-slate-500">
+                        {rec.unenrolled_at ? new Date(rec.unenrolled_at).toLocaleDateString(locale === "ar" ? "ar-SA" : "en-US", { year: "numeric", month: "short", day: "numeric" }) : ""}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-slate-600">
+                      <span>{isRtl ? "السبب" : "Reason"}: {rec.reason}</span>
+                      <span>{isRtl ? "تم بواسطة" : "By"}: {rec.unenrolled_by_name || rec.unenrolled_by}</span>
+                      <span>{isRtl ? "المدفوع" : "Paid"}: {rec.total_paid.toFixed(2)}</span>
+                      <span>{isRtl ? "السياسة" : "Policy"}: {rec.refund_policy === "authorize_refund" ? t.refundAuthorizeRefund : t.refundNoRefund}</span>
+                      {rec.refund_authorized_amount > 0 && (
+                        <span className="text-amber-600">{isRtl ? "قيمة الاسترداد" : "Refund"}: {rec.refund_authorized_amount.toFixed(2)}</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      <UnenrollModal
+        open={unenrollTarget !== null}
+        enrollmentId={unenrollTarget?.id || ""}
+        studentName={unenrollTarget?.student_name || ""}
+        sectionName={unenrollTarget ? getCourseName(section?.course_id || "") : ""}
+        isRtl={isRtl}
+        locale={locale}
+        onSuccess={() => { setUnenrollTarget(null); setSuccessMsg(t.unenrollSuccess); fetchData(); }}
+        onClose={() => setUnenrollTarget(null)}
       />
     </div>
   );

@@ -1,13 +1,14 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { apiClient } from "@/lib/api";
 import { useAuth } from "@/components/AuthContext";
 import ConfirmModal from "@/components/ConfirmModal";
 import Modal from "@/components/Modal";
 import Select from "@/components/ui/Select";
-import { Plus, Trash2, Loader2, RefreshCw } from "lucide-react";
+import UnenrollModal from "@/components/students/UnenrollModal";
+import { Plus, Trash2, Loader2, RefreshCw, UserX } from "lucide-react";
 
 interface Enrollment {
   id: string;
@@ -19,7 +20,7 @@ interface Enrollment {
 }
 
 interface Student { id: string; student_code: string; full_name: string; }
-interface CourseSection { id: string; course_id: string; }
+interface CourseSection { id: string; course_id: string; status: string; }
 interface Course { id: string; name: string; code: string; }
 
 export default function EnrollmentsPage() {
@@ -27,6 +28,7 @@ export default function EnrollmentsPage() {
   const { user } = useAuth();
   const locale = (params?.locale as string) || "ar";
   const isRtl = locale === "ar";
+  const router = useRouter();
 
   const t = {
     ar: {
@@ -40,6 +42,10 @@ export default function EnrollmentsPage() {
       actions: "الإجراءات",
       add: "تسجيل طالب",
       delete: "حذف",
+      unenroll: "إلغاء تسجيل",
+      unenrollConfirmTitle: "إلغاء تسجيل طالب",
+      unenrollConfirmMsg: "هل أنت متأكد من إلغاء تسجيل هذا الطالب؟",
+      unenrollSuccess: "تم إلغاء التسجيل بنجاح",
       save: "حفظ",
       cancel: "إلغاء",
       loading: "جاري التحميل...",
@@ -78,6 +84,10 @@ export default function EnrollmentsPage() {
       actions: "Actions",
       add: "Enroll Student",
       delete: "Delete",
+      unenroll: "Unenroll",
+      unenrollConfirmTitle: "Unenroll Student",
+      unenrollConfirmMsg: "Are you sure you want to unenroll this student?",
+      unenrollSuccess: "Unenrolled successfully",
       save: "Save",
       cancel: "Cancel",
       loading: "Loading...",
@@ -119,6 +129,7 @@ export default function EnrollmentsPage() {
   const [studentSearch, setStudentSearch] = useState("");
   const [showStudentDropdown, setShowStudentDropdown] = useState(false);
   const [studentSearchResults, setStudentSearchResults] = useState<Student[]>([]);
+  const [unenrollTarget, setUnenrollTarget] = useState<Enrollment | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Enrollment | null>(null);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [search, setSearch] = useState("");
@@ -182,6 +193,12 @@ export default function EnrollmentsPage() {
     if (!sect) return sectionId;
     const course = courses.find((c) => c.id === sect.course_id);
     return course ? `${course.name} (${course.code})` : sectionId;
+  };
+  const getSectionName = (sectionId: string) => {
+    const sect = sections.find((s) => s.id === sectionId);
+    if (!sect) return sectionId;
+    const course = courses.find((c) => c.id === sect.course_id);
+    return course ? course.name : sectionId;
   };
 
   useEffect(() => {
@@ -355,7 +372,7 @@ export default function EnrollmentsPage() {
                       <button
                         key={s.id}
                         type="button"
-                        onClick={() => {
+                        onMouseDown={() => {
                           setForm({ ...form, student_id: s.id });
                           setStudentSearch(`${s.full_name} (${s.student_code})`);
                           setShowStudentDropdown(false);
@@ -386,7 +403,7 @@ export default function EnrollmentsPage() {
               <Select
                 value={form.section_id}
                 onChange={(value) => setForm({ ...form, section_id: value })}
-                options={sections.map((s) => ({ value: s.id, label: getSectionCourse(s.id) }))}
+                options={sections.filter((s) => s.status !== "completed" && s.status !== "cancelled").map((s) => ({ value: s.id, label: getSectionCourse(s.id) }))}
                 placeholder="—"
               />
             </div>
@@ -451,10 +468,22 @@ export default function EnrollmentsPage() {
               {enrollments.map((enrollment) => (
                 <tr key={enrollment.id}>
                   <td className="font-medium text-slate-900">
-                    {getStudentName(enrollment.student_id)}
+                    <button
+                      onClick={() => router.push(`/${locale}/dashboard/students/${enrollment.student_id}`)}
+                      className="text-blue-600 hover:underline text-start"
+                    >
+                      {getStudentName(enrollment.student_id)}
+                    </button>
                     <span className="text-xs text-slate-400 ms-1">({getStudentCode(enrollment.student_id)})</span>
                   </td>
-                  <td className="text-slate-600">{getSectionCourse(enrollment.section_id)}</td>
+                  <td className="text-slate-600">
+                    <button
+                      onClick={() => router.push(`/${locale}/dashboard/sections/${enrollment.section_id}`)}
+                      className="text-blue-600 hover:underline text-start"
+                    >
+                      {getSectionCourse(enrollment.section_id)}
+                    </button>
+                  </td>
                   <td className="text-slate-600">{enrollment.agreed_price != null ? `${enrollment.agreed_price}` : "—"}</td>
                   <td className="text-slate-600">{enrollment.admin_discount != null ? `${enrollment.admin_discount}%` : "—"}</td>
                   <td className="text-slate-500 text-xs">
@@ -462,9 +491,20 @@ export default function EnrollmentsPage() {
                   </td>
                   {canEdit && (
                     <td>
-                      <button onClick={() => setDeleteTarget(enrollment)} className="btn-icon text-red-500" title={t.delete}>
-                        <Trash2 size={14} />
-                      </button>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => setUnenrollTarget(enrollment)}
+                          className="btn-icon text-amber-600"
+                          title={t.unenroll}
+                        >
+                          <UserX size={14} />
+                        </button>
+                        {user?.role?.name === "superadmin" && (
+                          <button onClick={() => setDeleteTarget(enrollment)} className="btn-icon text-red-500" title={t.delete}>
+                            <Trash2 size={14} />
+                          </button>
+                        )}
+                      </div>
                     </td>
                   )}
                 </tr>
@@ -488,6 +528,17 @@ export default function EnrollmentsPage() {
           </div>
         </div>
       )}
+
+      <UnenrollModal
+        open={unenrollTarget !== null}
+        enrollmentId={unenrollTarget?.id || ""}
+        studentName={unenrollTarget ? getStudentName(unenrollTarget.student_id) : ""}
+        sectionName={unenrollTarget ? getSectionName(unenrollTarget.section_id) : ""}
+        isRtl={isRtl}
+        locale={locale}
+        onSuccess={() => { setUnenrollTarget(null); setMessage({ type: "success", text: t.unenrollSuccess }); fetchEnrollments(search, page); }}
+        onClose={() => setUnenrollTarget(null)}
+      />
 
       <ConfirmModal
         open={deleteTarget !== null}

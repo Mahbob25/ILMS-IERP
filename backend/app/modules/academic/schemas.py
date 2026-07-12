@@ -226,6 +226,58 @@ class FinalGradeResponse(BaseModel):
 
 
 # --- Certificate ---
+# --- Unenrollment ---
+class UnenrollmentPreviewResponse(BaseModel):
+    enrollment_id: uuid.UUID
+    student_name: str
+    student_code: str
+    section_name: str
+    course_name: str
+    agreed_price: Optional[float] = None
+    admin_discount: Optional[float] = None
+    net_price: Optional[float] = None
+    total_paid: float = 0
+    remaining_balance: Optional[float] = None
+    teacher_share_reversal_amount: float = 0
+    teacher_wallet_balance: float = 0
+    teacher_wallet_available_balance: float = 0
+    teacher_name: Optional[str] = None
+    has_attendance_records: bool = False
+    has_grades: bool = False
+    has_certificates: bool = False
+    can_unenroll: bool = True
+    warnings: list[str] = []
+
+
+class UnenrollRequest(BaseModel):
+    reason: str
+    refund_policy: str  # 'authorize_refund' or 'no_refund'
+    refund_amount: Optional[float] = None
+    force: bool = False
+    force_reason: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class UnenrollmentRecordResponse(BaseModel):
+    id: uuid.UUID
+    enrollment_id: uuid.UUID
+    section_id: uuid.UUID
+    student_id: uuid.UUID
+    unenrolled_by: uuid.UUID
+    unenrolled_at: datetime
+    reason: str
+    refund_policy: str
+    total_paid: float
+    teacher_share_reversed: float
+    refund_authorized_amount: float
+    has_attendance_records: bool
+    has_grades: bool
+    notes: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
 class CertificateResponse(BaseModel):
     id: uuid.UUID
     student_id: uuid.UUID

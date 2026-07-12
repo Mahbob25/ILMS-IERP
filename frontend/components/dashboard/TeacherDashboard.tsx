@@ -27,15 +27,6 @@ interface TodaySession {
   date: string;
 }
 
-interface RecentPayment {
-  id: string;
-  student_name: string;
-  course_name: string;
-  amount: number;
-  date: string;
-  receipt_number: string;
-}
-
 interface TeacherDashboardData {
   sections_count: number;
   sections: SectionInfo[];
@@ -43,7 +34,6 @@ interface TeacherDashboardData {
   today_sessions: TodaySession[];
   pending_grading: number;
   wallet_balance: number;
-  recent_payments: RecentPayment[];
 }
 
 export default function TeacherDashboard() {
@@ -69,12 +59,6 @@ export default function TeacherDashboard() {
       pendingGrading: "بانتظار التصحيح",
       wallet: "محفظتي",
       noSessions: "لا توجد جلسات اليوم",
-      noPayments: "لا توجد مدفوعات حديثة",
-      student: "طالب",
-      course: "مقرر",
-      amount: "المبلغ",
-      receipt: "رقم السند",
-      recentPayments: "آخر المدفوعات",
       mySections: "شعبي الدراسية",
     },
     en: {
@@ -83,12 +67,6 @@ export default function TeacherDashboard() {
       pendingGrading: "Pending Grading",
       wallet: "My Wallet",
       noSessions: "No sessions today",
-      noPayments: "No recent payments",
-      student: "Student",
-      course: "Course",
-      amount: "Amount",
-      receipt: "Receipt",
-      recentPayments: "Recent Payments",
       mySections: "My Sections",
     },
   }[locale === "en" ? "en" : "ar"];
@@ -205,33 +183,6 @@ export default function TeacherDashboard() {
         </div>
       </div>
 
-      <div className="card p-5">
-        <h3 className="text-sm font-bold text-slate-900 mb-4">{t.recentPayments}</h3>
-        {data.recent_payments.length === 0 ? (
-          <p className="text-sm text-slate-400 py-6 text-center">{t.noPayments}</p>
-        ) : (
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>{t.student}</th>
-                <th>{t.course}</th>
-                <th>{t.amount}</th>
-                <th>{t.receipt}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.recent_payments.map((p) => (
-                <tr key={p.id}>
-                  <td className="font-medium text-slate-900">{p.student_name}</td>
-                  <td className="text-slate-600">{p.course_name}</td>
-                  <td className="font-semibold text-emerald-600">{p.amount.toFixed(2)} {currencySymbol}</td>
-                  <td className="text-slate-500 text-xs font-mono">{p.receipt_number}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
     </div>
   );
 }

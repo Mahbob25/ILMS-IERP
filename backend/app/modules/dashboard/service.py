@@ -14,7 +14,7 @@ from app.modules.lms.models import (
 )
 from app.modules.identity.models import User, Employee, AuditLog
 from app.modules.dashboard.schemas import (
-    SectionInfo, TodaySession, RecentPayment,
+    SectionInfo, TodaySession,
     DailyTransaction, UnlockRequest, AuditLogEntry,
 )
 
@@ -91,32 +91,6 @@ async def get_teacher_dashboard(db: AsyncSession, employee_id: uuid.UUID) -> dic
     wallet = wallet_result.scalar_one_or_none()
     wallet_balance = wallet.balance if wallet else 0.0
 
-    payments_result = await db.execute(
-        select(Payment)
-        .options(
-            joinedload(Payment.enrollment).joinedload(Enrollment.student),
-            joinedload(Payment.enrollment).joinedload(Enrollment.section).joinedload(CourseSection.course),
-        )
-        .join(Enrollment, Payment.enrollment_id == Enrollment.id)
-        .join(CourseSection, Enrollment.section_id == CourseSection.id)
-        .where(CourseSection.teacher_id == employee_id)
-        .order_by(Payment.date.desc())
-        .limit(5)
-    )
-    payments = payments_result.unique().scalars().all()
-
-    recent_payments = [
-        RecentPayment(
-            id=p.id,
-            student_name=p.enrollment.student.full_name if p.enrollment and p.enrollment.student else "Unknown",
-            course_name=p.enrollment.section.course.name if p.enrollment and p.enrollment.section and p.enrollment.section.course else "Unknown",
-            amount=p.amount,
-            date=p.date,
-            receipt_number=p.receipt_number,
-        )
-        for p in payments
-    ]
-
     return {
         "sections_count": len(sections),
         "sections": sections_info,
@@ -124,7 +98,6 @@ async def get_teacher_dashboard(db: AsyncSession, employee_id: uuid.UUID) -> dic
         "today_sessions": today_sessions_data,
         "pending_grading": pending_grading,
         "wallet_balance": wallet_balance,
-        "recent_payments": recent_payments,
     }
 
 

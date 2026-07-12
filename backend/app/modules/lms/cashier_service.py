@@ -7,7 +7,7 @@ from sqlalchemy import select, func
 from sqlalchemy.orm import joinedload
 from app.core.timezone import get_today
 from app.modules.academic.models import (
-    PendingRefund, Refund, SectionCancellation, Enrollment, Student, CourseSection,
+    PendingRefund, Refund, SectionCancellation, Enrollment, Student, CourseSection, UnenrollmentRecord,
 )
 from app.modules.lms.closure_service import is_date_closed
 
@@ -18,6 +18,7 @@ async def get_pending_refunds_queue(
     page: int = 1,
     per_page: int = 20,
     search: Optional[str] = None,
+    source: Optional[str] = None,
 ) -> dict:
     query = (
         select(PendingRefund)
@@ -26,6 +27,9 @@ async def get_pending_refunds_queue(
             joinedload(PendingRefund.section_cancellation)
             .joinedload(SectionCancellation.section)
             .joinedload(CourseSection.course),
+            joinedload(PendingRefund.unenrollment_record)
+            .joinedload(UnenrollmentRecord.section)
+            .joinedload(CourseSection.course),
         )
         .where(PendingRefund.status == status)
     )
@@ -33,6 +37,10 @@ async def get_pending_refunds_queue(
         select(func.count(PendingRefund.id))
         .where(PendingRefund.status == status)
     )
+
+    if source:
+        query = query.where(PendingRefund.source == source)
+        count_query = count_query.where(PendingRefund.source == source)
 
     if search:
         pattern = f"%{search}%"
@@ -55,13 +63,19 @@ async def get_pending_refunds_queue(
     data = []
     for pr in items:
         student = pr.enrollment.student if pr.enrollment else None
-        section = pr.section_cancellation.section if pr.section_cancellation else None
+        section = None
+        if pr.section_cancellation and pr.section_cancellation.section:
+            section = pr.section_cancellation.section
+        elif pr.unenrollment_record and pr.unenrollment_record.section:
+            section = pr.unenrollment_record.section
         data.append({
             "id": str(pr.id),
             "enrollment_id": str(pr.enrollment_id),
-            "section_cancellation_id": str(pr.section_cancellation_id),
+            "section_cancellation_id": str(pr.section_cancellation_id) if pr.section_cancellation_id else None,
+            "unenrollment_record_id": str(pr.unenrollment_record_id) if pr.unenrollment_record_id else None,
             "amount": float(pr.amount),
             "status": pr.status,
+            "source": pr.source,
             "created_at": pr.created_at.isoformat() if pr.created_at else None,
             "expires_at": pr.expires_at.isoformat() if pr.expires_at else None,
             "student_name": student.full_name if student else None,

@@ -98,6 +98,8 @@ async def preview_cancellation_impact(
 
     teacher_wallet_reversal_amount = Decimal("0")
     teacher_wallet_balance = Decimal("0")
+    teacher_wallet_frozen_balance = Decimal("0")
+    teacher_wallet_available_balance = Decimal("0")
     shortfall = Decimal("0")
     if section.contract and section.contract.teacher_id:
         agg_result = await db.execute(

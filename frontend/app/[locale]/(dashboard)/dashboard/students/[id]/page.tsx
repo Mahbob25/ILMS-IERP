@@ -7,7 +7,7 @@ import { useAuth } from "@/components/AuthContext";
 import RefreshButton from "@/components/RefreshButton";
 import Modal from "@/components/Modal";
 import Select from "@/components/ui/Select";
-import { Loader2, ArrowLeft, Wallet, DollarSign, Plus, X, Award, Eye, FileDown, Check, Clock, AlertCircle } from "lucide-react";
+import { Loader2, ArrowLeft, Wallet, DollarSign, Plus, X, Award, Eye, FileDown, Check, Clock, AlertCircle, UserX, ChevronDown, ChevronUp } from "lucide-react";
 import CertificatePreview from "@/components/CertificatePreview";
 import PendingRefundBadge from "@/components/students/PendingRefundBadge";
 
@@ -27,6 +27,9 @@ interface Course {
 interface CourseSection {
   id: string;
   course_id: string;
+  status: string;
+  cancelled_at: string | null;
+  cancellation_reason: string | null;
 }
 
 interface Enrollment {
@@ -120,6 +123,23 @@ export default function StudentDetailPage() {
       late: "متأخر",
       excused: "معذور",
       sessions: "جلسة",
+      unenrollHistory: "سجل إلغاء التسجيل",
+      noUnenrollHistory: "لا توجد سجلات إلغاء تسجيل",
+      unenrolledAt: "تاريخ الإلغاء",
+      unenrolledBy: "تم بواسطة",
+      sectionName: "الشعبة",
+      reason: "السبب",
+      refundPolicy: "سياسة الاسترداد",
+      statusPending: "قيد الانتظار",
+      statusActive: "نشط",
+      statusCompleted: "مكتمل",
+      statusCancelled: "ملغي",
+      cancelled: "ملغاة",
+      cancelledDate: "تاريخ الإلغاء",
+      cancelReason: "سبب الإلغاء",
+      unenrolled: "غير مسجل",
+      unenrolledDate: "تاريخ إلغاء التسجيل",
+      refundAmount: "قيمة الاسترداد",
     },
     en: {
       title: "Student",
@@ -165,6 +185,23 @@ export default function StudentDetailPage() {
       late: "Late",
       excused: "Excused",
       sessions: "sessions",
+      unenrollHistory: "Unenrollment History",
+      noUnenrollHistory: "No unenrollment records",
+      unenrolledAt: "Unenrolled At",
+      unenrolledBy: "By",
+      sectionName: "Section",
+      reason: "Reason",
+      refundPolicy: "Refund Policy",
+      statusPending: "Pending",
+      statusActive: "Active",
+      statusCompleted: "Completed",
+      statusCancelled: "Cancelled",
+      cancelled: "Cancelled",
+      cancelledDate: "Cancelled At",
+      cancelReason: "Reason",
+      unenrolled: "Unenrolled",
+      unenrolledDate: "Unenrolled At",
+      refundAmount: "Refund",
     },
   }[locale === "en" ? "en" : "ar"];
 
@@ -184,11 +221,15 @@ export default function StudentDetailPage() {
   const [quickEnrollSectionId, setQuickEnrollSectionId] = useState("");
   const [quickEnrollDiscount, setQuickEnrollDiscount] = useState("");
   const [quickEnrollMsg, setQuickEnrollMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [unenrollHistory, setUnenrollHistory] = useState<any[]>([]);
+  const [unenrollMap, setUnenrollMap] = useState<Record<string, any>>({});
+  const [showUnenrollHistory, setShowUnenrollHistory] = useState(false);
+  const [loadingUnenrollHistory, setLoadingUnenrollHistory] = useState(false);
 
   const fetchStudent = useCallback(async () => {
     if (!studentId) return;
     try {
-      const [studRes, enrollRes, sectRes, courseRes, payRes, certRes, attRes, gradeRes] = await Promise.all([
+      const [studRes, enrollRes, sectRes, courseRes, payRes, certRes, attRes, gradeRes, unenrollRes] = await Promise.all([
         apiClient.get<{ items: Student[]; total: number }>("/academic/students?limit=1000"),
         apiClient.get<{ items: Enrollment[]; total: number }>(`/academic/enrollments?student_id=${studentId}&limit=1000`),
         apiClient.get<{ items: CourseSection[]; total: number }>("/academic/course-sections?limit=1000"),
@@ -197,6 +238,7 @@ export default function StudentDetailPage() {
         apiClient.get<{ items: any[]; total: number }>(`/academic/students/${studentId}/certificates?limit=100`),
         apiClient.get<AttendanceSummary[]>(`/lms/attendance/students/${studentId}/summary`).then(r => r.data).catch(() => [] as AttendanceSummary[]),
         apiClient.get<GradeSummary[]>(`/academic/students/${studentId}/final-grades`).then(r => r.data).catch(() => [] as GradeSummary[]),
+        apiClient.get<{ items: any[]; total: number }>(`/academic/students/${studentId}/unenrollment-history?per_page=500`).then(r => r.data).catch(() => ({ items: [] })),
       ]);
 
       const found = studRes.data.items.find((s) => s.id === studentId) || null;
@@ -209,6 +251,13 @@ export default function StudentDetailPage() {
       setCertificates(certRes.data.items);
       setAttendanceSummary(attRes);
       setGradeSummaries(gradeRes);
+      const items = unenrollRes?.items || [];
+      setUnenrollHistory(items);
+      const map: Record<string, any> = {};
+      for (const rec of items) {
+        if (rec.enrollment_id) map[rec.enrollment_id] = rec;
+      }
+      setUnenrollMap(map);
       setLoading(false);
 
       const summaryMap: Record<string, PaymentSummary> = {};
@@ -254,9 +303,16 @@ export default function StudentDetailPage() {
 
   const getSectionCourse = (sectionId: string) => {
     const sect = sections.find((s) => s.id === sectionId);
-    if (!sect) return { name: sectionId, courseId: "" };
+    if (!sect) return { name: sectionId, courseId: "", status: "", cancelled_at: null, cancellation_reason: null, section: null };
     const course = courses.find((c) => c.id === sect.course_id);
-    return { name: course ? course.name : sectionId, courseId: sect.course_id };
+    return {
+      name: course ? course.name : sectionId,
+      courseId: sect.course_id,
+      status: sect.status,
+      cancelled_at: sect.cancelled_at,
+      cancellation_reason: sect.cancellation_reason,
+      section: sect,
+    };
   };
 
   const attendanceIcon = (status: string) => {
@@ -338,9 +394,54 @@ export default function StudentDetailPage() {
                 const cert = certificates.find((c: any) => c.section_id === enr.section_id);
                 const grade = gradeSummaries.find((g) => g.section_id === enr.section_id);
                 const att = attendanceSummary.find((a) => a.section_id === enr.section_id);
+                const unenrollRec = unenrollMap[enr.id];
+                const isCancelled = sectionInfo.status === "cancelled";
+                const isUnenrolled = !!unenrollRec;
+
+                const borderClass = isCancelled
+                  ? "border-red-300"
+                  : isUnenrolled
+                    ? "border-amber-300"
+                    : "border-slate-200";
+
+                const statusBadge = (() => {
+                  const cls = isCancelled
+                    ? "bg-red-100 text-red-700"
+                    : sectionInfo.status === "active"
+                      ? "bg-emerald-100 text-emerald-700"
+                      : sectionInfo.status === "completed"
+                        ? "bg-blue-100 text-blue-700"
+                        : "bg-slate-100 text-slate-600";
+                  const label = isCancelled
+                    ? t.statusCancelled
+                    : sectionInfo.status === "active"
+                      ? t.statusActive
+                      : sectionInfo.status === "completed"
+                        ? t.statusCompleted
+                        : t.statusPending;
+                  return (
+                    <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${cls}`}>
+                      {label}
+                    </span>
+                  );
+                })();
+
+                const formatDateTime = (d: string | null) => {
+                  if (!d) return "—";
+                  try {
+                    return new Date(d).toLocaleDateString(
+                      locale === "ar" ? "ar-SA" : "en-US",
+                      { year: "numeric", month: "short", day: "numeric" }
+                    );
+                  } catch { return d; }
+                };
+
                 return (
-                  <div key={enr.id} className="border border-slate-200 rounded-xl p-4 space-y-3">
-                    <p className="font-medium text-slate-900 text-sm">{sectionInfo.name}</p>
+                  <div key={enr.id} className={`border rounded-xl p-4 space-y-3 ${borderClass}`}>
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="font-medium text-slate-900 text-sm truncate">{sectionInfo.name}</p>
+                      {statusBadge}
+                    </div>
                     <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
                       <div>
                         <span className="text-slate-500">{t.agreedPrice}: </span>
@@ -395,6 +496,55 @@ export default function StudentDetailPage() {
                         </div>
                       )}
                     </div>
+
+                    {isCancelled && (
+                      <div className="bg-red-50 rounded-lg p-3 space-y-1.5 text-xs border border-red-100">
+                        <p className="font-semibold text-red-700 flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-red-400 inline-block" />
+                          {t.cancelled}
+                        </p>
+                        <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-slate-600">
+                          <span>{t.cancelledDate}</span>
+                          <span className="text-slate-800 text-end">{formatDateTime(sectionInfo.cancelled_at)}</span>
+                          {sectionInfo.cancellation_reason && (
+                            <>
+                              <span>{t.cancelReason}</span>
+                              <span className="text-slate-800 text-end">{sectionInfo.cancellation_reason}</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {isUnenrolled && (
+                      <div className="bg-amber-50 rounded-lg p-3 space-y-1.5 text-xs border border-amber-200">
+                        <p className="font-semibold text-amber-700 flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block" />
+                          {t.unenrolled}
+                        </p>
+                        <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-slate-600">
+                          <span>{t.unenrolledDate}</span>
+                          <span className="text-slate-800 text-end">{formatDateTime(unenrollRec.unenrolled_at)}</span>
+                          {unenrollRec.reason && (
+                            <>
+                              <span>{t.reason}</span>
+                              <span className="text-slate-800 text-end">{unenrollRec.reason}</span>
+                            </>
+                          )}
+                          <span>{t.refundPolicy}</span>
+                          <span className="text-slate-800 text-end">{unenrollRec.refund_policy}</span>
+                          {unenrollRec.refund_authorized_amount > 0 && (
+                            <>
+                              <span>{t.refundAmount}</span>
+                              <span className="text-amber-700 font-semibold text-end">
+                                {unenrollRec.refund_authorized_amount.toFixed(2)} {t.sar}
+                              </span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
                     {att && att.total_sessions > 0 && (
                       <div className="flex items-center gap-3 text-xs pt-1 border-t border-slate-100">
                         <span className="text-slate-500 font-medium">{t.attendance}:</span>
@@ -573,6 +723,52 @@ export default function StudentDetailPage() {
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+      </div>
+
+      {/* Unenrollment History */}
+      <div className="card overflow-hidden">
+        <button
+          onClick={() => { setShowUnenrollHistory(!showUnenrollHistory); if (!showUnenrollHistory && unenrollHistory.length === 0) { setLoadingUnenrollHistory(true); apiClient.get<{ items: any[]; total: number }>(`/academic/students/${studentId}/unenrollment-history?per_page=50`).then(r => setUnenrollHistory(r.data.items)).catch(() => {}).finally(() => setLoadingUnenrollHistory(false)); } }}
+          className="w-full px-4 py-3 flex items-center gap-2 text-sm font-bold text-slate-900 hover:bg-slate-50 transition-colors"
+        >
+          <UserX size={16} className="text-slate-400" />
+          <span>{t.unenrollHistory}</span>
+          <span className="text-xs text-slate-400 font-normal ms-1">({unenrollHistory.length})</span>
+          <div className="flex-1" />
+          {showUnenrollHistory ? <ChevronUp size={16} className="text-slate-400" /> : <ChevronDown size={16} className="text-slate-400" />}
+        </button>
+        {showUnenrollHistory && (
+          <div className="p-4 border-t border-slate-200">
+            {loadingUnenrollHistory ? (
+              <div className="flex items-center justify-center h-16">
+                <Loader2 className="animate-spin text-slate-400" size={20} />
+              </div>
+            ) : unenrollHistory.length === 0 ? (
+              <p className="text-sm text-slate-500 text-center py-4">{t.noUnenrollHistory}</p>
+            ) : (
+              <div className="space-y-3 max-h-80 overflow-y-auto">
+                {unenrollHistory.map((rec: any) => (
+                  <div key={rec.id} className="border border-slate-200 rounded-lg p-3 text-sm">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-medium text-slate-900">{rec.section_name || rec.course_name}</span>
+                      <span className="text-xs text-slate-500">
+                        {rec.unenrolled_at ? new Date(rec.unenrolled_at).toLocaleDateString(locale === "ar" ? "ar-SA" : "en-US", { year: "numeric", month: "short", day: "numeric" }) : ""}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-slate-600">
+                      <span>{t.reason}: {rec.reason}</span>
+                      <span>{t.unenrolledBy}: {rec.unenrolled_by_name || rec.unenrolled_by}</span>
+                      <span>{t.refundPolicy}: {rec.refund_policy}</span>
+                      {rec.refund_authorized_amount > 0 && (
+                        <span className="text-amber-600">{isRtl ? "قيمة الاسترداد" : "Refund"}: {rec.refund_authorized_amount.toFixed(2)}</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>

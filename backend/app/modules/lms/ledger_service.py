@@ -456,6 +456,53 @@ async def cancel_contract(
     return contract
 
 
+async def reverse_teacher_shares(
+    db: AsyncSession,
+    enrollment_id: uuid.UUID,
+    amount: Decimal,
+    reversed_by: uuid.UUID,
+    contract_id: uuid.UUID,
+    teacher_id: uuid.UUID,
+    student_name: str = "",
+) -> list[LedgerEntry]:
+    wallet = await get_or_create_wallet(db, teacher_id, lock=True)
+
+    agg_result = await db.execute(
+        select(
+            sa_func.coalesce(sa_func.sum(LedgerEntry.available_delta), 0),
+            sa_func.coalesce(sa_func.sum(LedgerEntry.frozen_delta), 0),
+        )
+        .where(
+            LedgerEntry.contract_id == contract_id,
+            LedgerEntry.wallet_id == wallet.id,
+        )
+    )
+    row = agg_result.one()
+    net_available = Decimal(str(row[0] or 0))
+    net_frozen = Decimal(str(row[1] or 0))
+    total_to_reverse = abs(net_available) + abs(net_frozen)
+
+    entries = []
+    if total_to_reverse > 0:
+        entry = await record(
+            db=db,
+            wallet_id=wallet.id,
+            contract_id=contract_id,
+            entry_type=LedgerEntryType.REVERSAL,
+            total_amount=total_to_reverse,
+            available_delta=-abs(net_available),
+            frozen_delta=-abs(net_frozen),
+            reference_type="enrollment",
+            reference_id=enrollment_id,
+            narrative=f"Teacher share reversal for unenrolled student {student_name}: {total_to_reverse}",
+            created_by=reversed_by,
+            force=True,
+        )
+        entries.append(entry)
+
+    return entries
+
+
 async def deactivate_contract(
     db: AsyncSession,
     contract: SectionContract,

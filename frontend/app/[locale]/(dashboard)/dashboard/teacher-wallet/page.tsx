@@ -10,6 +10,7 @@ import {
   DollarSign, Users, X, Plus,
 } from "lucide-react";
 import { getLocalDateString, formatDisplayDate, formatDisplayDateTime } from "@/lib/dates";
+import ContractStatusBadge from "@/components/sections/ContractStatusBadge";
 
 // ─── Shared Types ───────────────────────────────────────────────────────────
 
@@ -79,6 +80,13 @@ function TeacherWalletView({ locale, employeeId }: { locale: string; employeeId:
       sar: "ريال",
       receiptNumber: "رقم السند",
       date: "التاريخ",
+      course: "المادة",
+      contract: "العقد",
+      model: "النموذج",
+      credited: "المدين",
+      statusActive: "نشط",
+      statusAssigned: "مسند",
+      statusSettled: "مسوى",
     },
     en: {
       title: "Teacher Wallet",
@@ -98,6 +106,13 @@ function TeacherWalletView({ locale, employeeId }: { locale: string; employeeId:
       sar: "YER",
       receiptNumber: "Voucher No.",
       date: "Date",
+      course: "Course",
+      contract: "Contract",
+      model: "Model",
+      credited: "Credited",
+      statusActive: "Active",
+      statusAssigned: "Assigned",
+      statusSettled: "Settled",
     },
   }[locale === "en" ? "en" : "ar"];
 
@@ -202,11 +217,11 @@ function TeacherWalletView({ locale, employeeId }: { locale: string; employeeId:
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th>Course</th>
-                    <th>Contract</th>
-                    <th>Model</th>
-                    <th>Credited</th>
-                    <th>Available</th>
+                    <th>{t.course}</th>
+                    <th>{t.contract}</th>
+                    <th>{t.model}</th>
+                    <th>{t.credited}</th>
+                    <th>{t.availableBalance}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -214,12 +229,15 @@ function TeacherWalletView({ locale, employeeId }: { locale: string; employeeId:
                     <tr key={sec.contract_id}>
                       <td className="font-medium text-slate-900">{sec.course_name || sec.section_name}</td>
                       <td>
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${
-                          sec.status === "active" ? "bg-emerald-50 text-emerald-600 border-emerald-200" :
-                          sec.status === "assigned" ? "bg-blue-50 text-blue-600 border-blue-200" :
-                          sec.status === "settled" ? "bg-slate-100 text-slate-500 border-slate-200" :
-                          "bg-slate-50 text-slate-400 border-slate-200"
-                        }`}>{sec.status}</span>
+                        <ContractStatusBadge
+                          status={sec.status || ""}
+                          isRtl={isRtl}
+                          labels={{
+                            assigned: t.statusAssigned,
+                            active: t.statusActive,
+                            settled: t.statusSettled,
+                          }}
+                        />
                       </td>
                       <td className="text-slate-600">{sec.model || "—"}</td>
                       <td className="font-semibold text-emerald-600">{sec.credited.toFixed(2)} {t.sar}</td>

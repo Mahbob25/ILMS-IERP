@@ -18,6 +18,7 @@ import SectionStatusBadge from "@/components/sections/SectionStatusBadge";
 import CancelSectionModal from "@/components/sections/CancelSectionModal";
 import DeactivateSectionModal from "@/components/sections/DeactivateSectionModal";
 import CompleteSectionModal from "@/components/sections/CompleteSectionModal";
+import ContractStatusBadge from "@/components/sections/ContractStatusBadge";
 
 interface CourseSection {
   id: string;
@@ -122,7 +123,7 @@ export default function SectionsTable({
             {user?.role?.name !== "teacher" && <th>{t.teacher}</th>}
             <th>{t.status}</th>
             <th>{t.quota}</th>
-            <th>{t.comp || "Comp"}</th>
+            <th>{t.contract || "Contract"}</th>
             <th>{t.price}</th>
             <th>{t.schedule}</th>
             <th>{t.actions}</th>
@@ -156,22 +157,20 @@ export default function SectionsTable({
                     <span className="text-xs text-slate-500 whitespace-nowrap">{enrolled}/{minReq}</span>
                   </div>
                 </td>
-                <td className="text-slate-600">
+                <td>
                   {section.teacher_id ? (
-                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
-                      section.contract_status === "settled" ? "bg-emerald-100 text-emerald-700" :
-                      section.contract_status === "active" ? "bg-blue-100 text-blue-700" :
-                      section.contract_status === "grades_submitted" ? "bg-amber-100 text-amber-700" :
-                      section.contract_status === "cancelled" ? "bg-red-100 text-red-700" :
-                      "bg-slate-100 text-slate-600"
-                    }`}>
-                      {section.contract_status === "settled" ? t.contractSettled :
-                       section.contract_status === "active" ? t.contractActive :
-                       section.contract_status === "grades_submitted" ? t.contractGraded :
-                       section.contract_status === "cancelled" ? t.contractCancelled :
-                       section.contract_status === "draft" ? t.contractDraft :
-                       t.assigned}
-                    </span>
+                    <ContractStatusBadge
+                      status={section.contract_status || ""}
+                      isRtl={false}
+                      labels={{
+                        assigned: t.assigned,
+                        active: t.contractActive,
+                        grades_submitted: t.contractGraded,
+                        settled: t.contractSettled,
+                        cancelled: t.contractCancelled,
+                        draft: t.contractDraft,
+                      }}
+                    />
                   ) : "—"}
                 </td>
                 <td className="text-slate-600">{section.price != null ? `${section.price}` : "—"}</td>

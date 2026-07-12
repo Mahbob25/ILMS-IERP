@@ -14,11 +14,13 @@ from app.modules.academic.schemas import (
     EnrollmentCreate, EnrollmentCreateWithStudent, EnrollmentResponse, EnrollmentDetailResponse,
     FinalGradeCreate, FinalGradeBulkCreate, FinalGradeResponse, StudentGradeSummary,
     CertificateResponse, DeactivateRequest,
+    UnenrollmentPreviewResponse, UnenrollRequest, UnenrollmentRecordResponse,
     PaginatedResponse,
 )
 from app.modules.academic import service as academic_service
 from app.modules.academic import certificate_service
 from app.modules.academic import cancellation_service
+from app.modules.academic import unenrollment_service
 from app.modules.academic import reconciliation_service
 from app.modules.academic.models import (
     CourseSection, SectionCancellation, SectionCompletionOverride,
@@ -510,9 +512,12 @@ async def create_enrollment_with_student(
 @academic_router.delete("/enrollments/{enrollment_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_enrollment(
     enrollment_id: uuid.UUID,
-    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])),
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin"])),
     db: AsyncSession = Depends(get_db)
 ):
+    """DEPRECATED: Use POST /enrollments/{id}/unenroll instead.
+    This soft-deletes the enrollment without financial handling.
+    Kept for backward compatibility; restricted to superadmin only."""
     deleted = await academic_service.delete_enrollment(db, enrollment_id)
     if not deleted:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Enrollment not found")
@@ -643,6 +648,220 @@ async def deactivate_section_endpoint(
     return {
         "success": True,
         "message": f"Section {section_id} deactivated to pending status",
+    }
+
+
+# --- Unenrollment Management ---
+@academic_router.get("/enrollments/{enrollment_id}/unenroll-preview", response_model=UnenrollmentPreviewResponse)
+async def get_unenroll_preview(
+    enrollment_id: uuid.UUID,
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])),
+    db: AsyncSession = Depends(get_db)
+):
+    try:
+        preview = await unenrollment_service.preview_unenrollment_impact(db, enrollment_id)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+
+    return UnenrollmentPreviewResponse(
+        enrollment_id=preview.enrollment_id,
+        student_name=preview.student_name,
+        student_code=preview.student_code,
+        section_name=preview.section_name,
+        course_name=preview.course_name,
+        agreed_price=float(preview.agreed_price) if preview.agreed_price else None,
+        admin_discount=float(preview.admin_discount) if preview.admin_discount else None,
+        net_price=float(preview.net_price) if preview.net_price else None,
+        total_paid=float(preview.total_paid),
+        remaining_balance=float(preview.remaining_balance) if preview.remaining_balance else None,
+        teacher_share_reversal_amount=float(preview.teacher_share_reversal_amount),
+        teacher_wallet_balance=float(preview.teacher_wallet_balance),
+        teacher_wallet_available_balance=float(preview.teacher_wallet_available_balance),
+        teacher_name=preview.teacher_name,
+        has_attendance_records=preview.has_attendance_records,
+        has_grades=preview.has_grades,
+        has_certificates=preview.has_certificates,
+        can_unenroll=preview.can_unenroll,
+        warnings=preview.warnings,
+    )
+
+
+@academic_router.post("/enrollments/{enrollment_id}/unenroll")
+async def execute_unenroll(
+    enrollment_id: uuid.UUID,
+    body: UnenrollRequest,
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])),
+    db: AsyncSession = Depends(get_db)
+):
+    if not body.reason or not body.reason.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="reason is required"
+        )
+    if body.refund_policy not in ("authorize_refund", "no_refund"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="refund_policy must be 'authorize_refund' or 'no_refund'"
+        )
+
+    if body.force and not body.force_reason:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="force_reason is required when force=true"
+        )
+
+    try:
+        from decimal import Decimal
+        refund_amount = Decimal(str(body.refund_amount)) if body.refund_amount is not None else None
+
+        record = await unenrollment_service.unenroll_student(
+            db,
+            enrollment_id=enrollment_id,
+            unenrolled_by=current_user.id,
+            reason=body.reason.strip(),
+            refund_policy=body.refund_policy,
+            refund_amount=refund_amount,
+            force=body.force,
+            force_reason=body.force_reason,
+            notes=body.notes,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+
+    return {
+        "success": True,
+        "unenrollment_id": str(record.id),
+        "refund_authorized": body.refund_policy == "authorize_refund",
+        "teacher_share_reversed": float(record.teacher_share_reversed),
+    }
+
+
+def _serialize_unenrollment_records(items: list) -> list[dict]:
+    data = []
+    for r in items:
+        section = r.section
+        course_name = section.course.name if section and section.course else ""
+        section_name = section.name if section and hasattr(section, "name") else (course_name or str(r.section_id)[:8])
+        student_name = r.student.full_name if r.student else ""
+        unenrolled_by_name = r.unenrolled_by_user.full_name if r.unenrolled_by_user else ""
+        data.append({
+            "id": str(r.id),
+            "enrollment_id": str(r.enrollment_id),
+            "section_id": str(r.section_id),
+            "student_id": str(r.student_id),
+            "unenrolled_by": str(r.unenrolled_by),
+            "unenrolled_at": r.unenrolled_at.isoformat() if r.unenrolled_at else None,
+            "reason": r.reason,
+            "refund_policy": r.refund_policy,
+            "total_paid": float(r.total_paid),
+            "teacher_share_reversed": float(r.teacher_share_reversed),
+            "refund_authorized_amount": float(r.refund_authorized_amount),
+            "has_attendance_records": r.has_attendance_records,
+            "has_grades": r.has_grades,
+            "notes": r.notes,
+            "student_name": student_name,
+            "section_name": section_name,
+            "course_name": course_name,
+            "unenrolled_by_name": unenrolled_by_name,
+        })
+    return data
+
+
+@academic_router.get("/enrollments/unenrollment-history")
+async def list_unenrollment_history(
+    page: int = Query(1, ge=1),
+    per_page: int = Query(20, ge=1, le=100),
+    student_id: Optional[uuid.UUID] = Query(None),
+    section_id: Optional[uuid.UUID] = Query(None),
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])),
+    db: AsyncSession = Depends(get_db)
+):
+    result = await unenrollment_service.get_unenrollment_history(
+        db, page=page, per_page=per_page, student_id=student_id, section_id=section_id
+    )
+    return {
+        "items": _serialize_unenrollment_records(result["items"]),
+        "total": result["total"],
+    }
+
+
+@academic_router.get("/students/{student_id}/unenrollment-history")
+async def get_student_unenrollment_history(
+    student_id: uuid.UUID,
+    page: int = Query(1, ge=1),
+    per_page: int = Query(20, ge=1, le=100),
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])),
+    db: AsyncSession = Depends(get_db)
+):
+    result = await unenrollment_service.get_unenrollment_history(
+        db, page=page, per_page=per_page, student_id=student_id
+    )
+    return {
+        "items": _serialize_unenrollment_records(result["items"]),
+        "total": result["total"],
+    }
+
+
+@academic_router.get("/sections/{section_id}/unenrollment-history")
+async def get_section_unenrollment_history(
+    section_id: uuid.UUID,
+    page: int = Query(1, ge=1),
+    per_page: int = Query(20, ge=1, le=100),
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])),
+    db: AsyncSession = Depends(get_db)
+):
+    result = await unenrollment_service.get_unenrollment_history(
+        db, page=page, per_page=per_page, section_id=section_id
+    )
+    return {
+        "items": _serialize_unenrollment_records(result["items"]),
+        "total": result["total"],
+    }
+
+
+@academic_router.get("/unenrollments/{unenrollment_id}")
+async def get_unenrollment_detail(
+    unenrollment_id: uuid.UUID,
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])),
+    db: AsyncSession = Depends(get_db)
+):
+    record = await unenrollment_service.get_unenrollment_detail(db, unenrollment_id)
+    if not record:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Unenrollment record not found")
+
+    return {
+        "id": str(record.id),
+        "enrollment_id": str(record.enrollment_id),
+        "section_id": str(record.section_id),
+        "student_id": str(record.student_id),
+        "unenrolled_by": str(record.unenrolled_by),
+        "unenrolled_at": record.unenrolled_at.isoformat() if record.unenrolled_at else None,
+        "reason": record.reason,
+        "refund_policy": record.refund_policy,
+        "total_paid": float(record.total_paid),
+        "teacher_share_reversed": float(record.teacher_share_reversed),
+        "refund_authorized_amount": float(record.refund_authorized_amount),
+        "has_attendance_records": record.has_attendance_records,
+        "has_grades": record.has_grades,
+        "notes": record.notes,
+        "overrides": [
+            {
+                "id": str(o.id),
+                "override_type": o.override_type,
+                "reason": o.reason,
+                "overridden_by": str(o.overridden_by),
+                "overridden_at": o.overridden_at.isoformat(),
+            }
+            for o in (record.overrides or [])
+        ],
+        "pending_refunds": [
+            {
+                "id": str(pr.id),
+                "amount": float(pr.amount),
+                "status": pr.status,
+            }
+            for pr in (record.pending_refunds or [])
+        ],
     }
 
 

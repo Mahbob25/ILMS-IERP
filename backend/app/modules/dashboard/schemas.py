@@ -17,14 +17,6 @@ class TodaySession(BaseModel):
     course_name: str
     date: date
 
-class RecentPayment(BaseModel):
-    id: uuid.UUID
-    student_name: str
-    course_name: str
-    amount: float
-    date: date
-    receipt_number: str
-
 class TeacherDashboardResponse(BaseModel):
     sections_count: int
     sections: list[SectionInfo]
@@ -32,7 +24,6 @@ class TeacherDashboardResponse(BaseModel):
     today_sessions: list[TodaySession]
     pending_grading: int
     wallet_balance: float
-    recent_payments: list[RecentPayment]
 
     class Config:
         from_attributes = True

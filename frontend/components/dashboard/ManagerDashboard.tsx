@@ -13,6 +13,9 @@ import {
   CheckCircle,
   Clock,
   RotateCcw,
+  UserX,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import {
   BarChart,
@@ -64,6 +67,8 @@ export default function ManagerDashboard() {
   const [amendments, setAmendments] = useState<PendingAmendment[]>([]);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState(false);
+  const [recentUnenrollments, setRecentUnenrollments] = useState<any[]>([]);
+  const [showUnenrollments, setShowUnenrollments] = useState(false);
   const [confirmAmendment, setConfirmAmendment] = useState<{
     id: string;
     action: "approve" | "reject";
@@ -77,6 +82,7 @@ export default function ManagerDashboard() {
     Promise.all([
       apiClient.get<ManagerDashboardData>("/dashboard/manager").then((res) => setData(res.data)).catch(() => setFetchError(true)),
       apiClient.get<PendingAmendment[]>("/lms/amendments/pending").then((res) => setAmendments(res.data)).catch(() => {}),
+      apiClient.get<{ items: any[]; total: number }>("/academic/enrollments/unenrollment-history?per_page=5").then((res) => setRecentUnenrollments(res.data.items)).catch(() => {}),
     ]).finally(() => setLoading(false));
   }, []);
 
@@ -102,6 +108,13 @@ export default function ManagerDashboard() {
       approveSuccess: "تمت الموافقة على طلب الزيادة",
       rejectSuccess: "تم رفض طلب الزيادة",
       requestError: "فشل في تنفيذ العملية",
+      recentUnenrollments: "آخر عمليات إلغاء التسجيل",
+      noUnenrollments: "لا توجد عمليات إلغاء تسجيل حديثة",
+      student: "الطالب",
+      section: "الشعبة",
+      unenrolledBy: "بواسطة",
+      showMore: "عرض المزيد",
+      refund: "استرداد",
     },
     en: {
       students: "Total Students",
@@ -124,6 +137,13 @@ export default function ManagerDashboard() {
       approveSuccess: "Increase request approved",
       rejectSuccess: "Increase request rejected",
       requestError: "Failed to process request",
+      recentUnenrollments: "Recent Unenrollments",
+      noUnenrollments: "No recent unenrollments",
+      student: "Student",
+      section: "Section",
+      unenrolledBy: "By",
+      showMore: "Show More",
+      refund: "Refund",
     },
   }[locale === "en" ? "en" : "ar"];
 
@@ -325,6 +345,56 @@ export default function ManagerDashboard() {
             <p className="text-xs text-slate-500">{t.recentActivity}</p>
           </div>
         </div>
+      </div>
+
+      {/* Recent Unenrollments */}
+      <div className="card overflow-hidden">
+        <button
+          onClick={() => setShowUnenrollments(!showUnenrollments)}
+          className="w-full p-5 flex items-center gap-3 text-start hover:bg-slate-50 transition-colors"
+        >
+          <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+            <UserX size={20} />
+          </div>
+          <div className="flex-1">
+            <p className="text-sm font-bold text-slate-900">{t.recentUnenrollments}</p>
+            <p className="text-xs text-slate-500">{recentUnenrollments.length} {locale === "ar" ? "عملية" : "records"}</p>
+          </div>
+          {showUnenrollments ? <ChevronUp size={16} className="text-slate-400" /> : <ChevronDown size={16} className="text-slate-400" />}
+        </button>
+        {showUnenrollments && (
+          <div className="px-5 pb-5 border-t border-slate-200 pt-4">
+            {recentUnenrollments.length === 0 ? (
+              <p className="text-sm text-slate-500 text-center py-4">{t.noUnenrollments}</p>
+            ) : (
+              <div className="space-y-3">
+                {recentUnenrollments.map((rec: any) => (
+                  <div key={rec.id} className="flex items-center justify-between py-2 px-3 rounded-lg bg-slate-50">
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-slate-900">{rec.student_name}</p>
+                      <p className="text-xs text-slate-500">
+                        {rec.section_name || rec.course_name}
+                        <span className="mx-1">·</span>
+                        {t.unenrolledBy} {rec.unenrolled_by_name || rec.unenrolled_by?.slice(0, 8)}
+                      </p>
+                    </div>
+                    {rec.refund_authorized_amount > 0 && (
+                      <span className="text-xs font-semibold text-amber-600">
+                        {rec.refund_authorized_amount.toFixed(2)}
+                      </span>
+                    )}
+                  </div>
+                ))}
+                <button
+                  onClick={() => router.push(`/${locale}/dashboard/enrollments`)}
+                  className="text-xs text-brand-600 hover:text-brand-700 font-medium"
+                >
+                  {t.showMore} →
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
 

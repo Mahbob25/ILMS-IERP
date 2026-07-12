@@ -165,9 +165,8 @@ class Student(Base):
 
 class Enrollment(Base):
     __tablename__ = "enrollments"
-    __table_args__ = (
-        UniqueConstraint("student_id", "section_id", name="uq_enrollments_student_section"),
-    )
+    # Unique constraint uq_enrollments_student_section replaced by
+    # partial unique index uq_active_enrollment in migration
 
     id: Mapped[uuid.UUID] = mapped_column(
         PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4,
@@ -192,6 +191,7 @@ class Enrollment(Base):
     payments: Mapped[list["Payment"]] = relationship(back_populates="enrollment")
     certificates: Mapped[list["Certificate"]] = relationship(back_populates="enrollment", cascade="all, delete-orphan")
     pending_refunds: Mapped[list["PendingRefund"]] = relationship(back_populates="enrollment", cascade="all, delete-orphan")
+    unenrollment_records: Mapped[list["UnenrollmentRecord"]] = relationship(back_populates="enrollment", cascade="all, delete-orphan")
 
 
 class SectionCancellation(Base):
@@ -226,6 +226,75 @@ class SectionCancellation(Base):
     pending_refunds: Mapped[list["PendingRefund"]] = relationship(back_populates="section_cancellation", cascade="all, delete-orphan")
 
 
+class UnenrollmentRecord(Base):
+    __tablename__ = "unenrollment_records"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4,
+        server_default="gen_random_uuid()"
+    )
+    enrollment_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("enrollments.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    section_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("course_sections.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    student_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("students.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    unenrolled_by: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
+    )
+    unenrolled_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False,
+        server_default="timezone('utc'::text, now())"
+    )
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    refund_policy: Mapped[str] = mapped_column(
+        SAEnum("authorize_refund", "no_refund", name="unenrollment_refund_policy"),
+        nullable=False
+    )
+    total_paid: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False, default=0, server_default="0")
+    teacher_share_reversed: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False, default=0, server_default="0")
+    refund_authorized_amount: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False, default=0, server_default="0")
+    has_attendance_records: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
+    has_grades: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    enrollment: Mapped["Enrollment"] = relationship(back_populates="unenrollment_records")
+    section: Mapped["CourseSection"] = relationship()
+    student: Mapped["Student"] = relationship()
+    unenrolled_by_user: Mapped["User"] = relationship()
+    overrides: Mapped[list["UnenrollmentOverride"]] = relationship(back_populates="unenrollment_record", cascade="all, delete-orphan")
+    pending_refunds: Mapped[list["PendingRefund"]] = relationship(back_populates="unenrollment_record", cascade="all, delete-orphan")
+
+
+class UnenrollmentOverride(Base):
+    __tablename__ = "unenrollment_overrides"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4,
+        server_default="gen_random_uuid()"
+    )
+    unenrollment_record_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("unenrollment_records.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    overridden_by: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
+    )
+    overridden_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False,
+        server_default="timezone('utc'::text, now())"
+    )
+    override_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    teacher_wallet_balance_before: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
+    reversal_amount: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
+
+    unenrollment_record: Mapped["UnenrollmentRecord"] = relationship(back_populates="overrides")
+    overridden_by_user: Mapped["User"] = relationship()
+
+
 class PendingRefund(Base):
     __tablename__ = "pending_refunds"
 
@@ -236,14 +305,18 @@ class PendingRefund(Base):
     enrollment_id: Mapped[uuid.UUID] = mapped_column(
         PG_UUID(as_uuid=True), ForeignKey("enrollments.id", ondelete="RESTRICT"), nullable=False, index=True
     )
-    section_cancellation_id: Mapped[uuid.UUID] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("section_cancellations.id", ondelete="RESTRICT"), nullable=False, index=True
+    section_cancellation_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("section_cancellations.id", ondelete="RESTRICT"), nullable=True, index=True
+    )
+    unenrollment_record_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("unenrollment_records.id", ondelete="RESTRICT"), nullable=True, index=True
     )
     amount: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
     status: Mapped[str] = mapped_column(
         SAEnum("UNCLAIMED", "CLAIMED", "FORFEITED", name="pending_refund_status"),
         nullable=False, default="UNCLAIMED", server_default="UNCLAIMED"
     )
+    source: Mapped[str] = mapped_column(String(20), nullable=False, default="cancellation", server_default="cancellation")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False,
         server_default="timezone('utc'::text, now())"
@@ -251,7 +324,8 @@ class PendingRefund(Base):
     expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     enrollment: Mapped["Enrollment"] = relationship(back_populates="pending_refunds")
-    section_cancellation: Mapped["SectionCancellation"] = relationship(back_populates="pending_refunds")
+    section_cancellation: Mapped[Optional["SectionCancellation"]] = relationship(back_populates="pending_refunds")
+    unenrollment_record: Mapped[Optional["UnenrollmentRecord"]] = relationship(back_populates="pending_refunds")
     refund: Mapped[Optional["Refund"]] = relationship(back_populates="pending_refund", uselist=False, cascade="all, delete-orphan")
 
 
