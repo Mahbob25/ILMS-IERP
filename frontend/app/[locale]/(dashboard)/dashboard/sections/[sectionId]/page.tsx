@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { apiClient } from "@/lib/api";
 import { useAuth } from "@/components/AuthContext";
 import RefreshButton from "@/components/RefreshButton";
+import { sanitizeInput, escapeLikeWildcards } from "@/lib/utils/input";
 import {
   Loader2,
   ArrowLeft,
@@ -18,6 +19,7 @@ import {
   UserX,
   ChevronDown,
   ChevronUp,
+  AlertCircle,
 } from "lucide-react";
 import SectionWarningBanner from "@/components/sections/SectionWarningBanner";
 import SectionStatusBadge from "@/components/sections/SectionStatusBadge";
@@ -278,6 +280,8 @@ export default function SectionStudentsPage() {
   const [teachers, setTeachers] = useState<any[]>([]);
   const [contract, setContract] = useState<ContractInfo | null>(null);
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -352,7 +356,7 @@ export default function SectionStudentsPage() {
         setNotFound(true);
       }
     } catch (e) {
-      console.error(e);
+      setFetchError(t.loading || "Failed to load section data");
       setNotFound(true);
     } finally {
       setLoading(false);
@@ -360,8 +364,10 @@ export default function SectionStudentsPage() {
   }, [sectionId]);
 
   const handleCompleteClick = async () => {
+    if (submitting) return;
     setError(null);
     setSuccessMsg(null);
+    setSubmitting(true);
     try {
       await apiClient.post(`/academic/course-sections/${sectionId}/complete`, {});
       setSuccessMsg(t.completeSuccess);
@@ -379,6 +385,8 @@ export default function SectionStudentsPage() {
       } else {
         setError(detail || t.completionFailed);
       }
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -530,10 +538,11 @@ export default function SectionStudentsPage() {
                   section.status === "ready_for_completion") && (
                   <button
                     onClick={handleCompleteClick}
+                    disabled={submitting}
                     className="btn-primary px-3 py-1.5 text-xs flex items-center gap-1 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <CheckCircle2 size={12} />
-                    {t.completeSection || "Complete"}
+                    {submitting ? "..." : t.completeSection || "Complete"}
                   </button>
                 )}
                 {(user?.is_superadmin || user?.role?.name === "manager") &&
@@ -640,6 +649,19 @@ export default function SectionStudentsPage() {
           isRtl={isRtl}
           locale={locale}
         />
+      )}
+
+      {fetchError && (
+        <div className="flex items-center gap-2 px-4 py-3 rounded-md text-sm bg-red-50 border border-red-200 text-red-700">
+          <AlertCircle size={16} />
+          <span>{fetchError}</span>
+          <button
+            onClick={() => setFetchError(null)}
+            className="ms-auto font-bold"
+          >
+            &times;
+          </button>
+        </div>
       )}
 
       {successMsg && (

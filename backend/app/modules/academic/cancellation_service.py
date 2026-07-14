@@ -246,7 +246,6 @@ async def cancel_section(
         has_certificates=precondition.has_certificates,
     )
     db.add(cancellation)
-    await db.flush()
 
     if refund_policy == "authorize_refunds":
         for enrollment in section.enrollments:
@@ -297,7 +296,7 @@ async def expire_stale_pending_refunds(db: AsyncSession, days: int = 180):
         )
         .values(status="FORFEITED")
     )
-    await db.commit()
+    await db.flush()
 
 
 async def get_cancellation_detail(

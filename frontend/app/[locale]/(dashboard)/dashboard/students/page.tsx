@@ -7,7 +7,8 @@ import { useAuth } from "@/components/AuthContext";
 import RefreshButton from "@/components/RefreshButton";
 import ConfirmModal from "@/components/ConfirmModal";
 import Modal from "@/components/Modal";
-import { Plus, Pencil, Trash2, Loader2, Eye } from "lucide-react";
+import { Plus, Pencil, Trash2, Loader2, Eye, AlertCircle } from "lucide-react";
+import { sanitizeInput, validateName } from "@/lib/utils/input";
 
 interface Student {
   id: string;
@@ -44,6 +45,7 @@ export default function StudentsPage() {
       of: "من",
       prev: "السابق",
       next: "التالي",
+      nameInvalid: "الاسم يحتوي على أحرف غير صالحة",
       deleted: "تم حذف الطالب بنجاح",
       deleteFailed: "لا يمكن حذف الطالب لوجود تسجيلات مرتبطة به",
       confirmDelete: "هل أنت متأكد من حذف هذا الطالب؟",
@@ -70,6 +72,7 @@ export default function StudentsPage() {
       of: "of",
       prev: "Previous",
       next: "Next",
+      nameInvalid: "Name contains invalid characters",
       deleted: "Student deleted successfully",
       deleteFailed: "Cannot delete student with existing enrollments",
       confirmDelete: "Are you sure you want to delete this student?",
@@ -88,18 +91,21 @@ export default function StudentsPage() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
   const limit = 15;
 
   const fetchStudents = useCallback(async (searchTerm = "", pageNum = 1) => {
     setMessage(null);
+    setFetchError(null);
     try {
       const skip = (pageNum - 1) * limit;
       const params = `?search=${encodeURIComponent(searchTerm)}&skip=${skip}&limit=${limit}&sort_by=full_name&sort_order=asc`;
       const res = await apiClient.get<{ items: Student[]; total: number }>(`/academic/students${params}`);
       setStudents(res.data.items);
       setTotalCount(res.data.total);
-    } catch (e) {
-      console.error(e);
+    } catch (e: any) {
+      setFetchError(e.message || "Failed to load students");
     } finally {
       setLoading(false);
     }
@@ -112,9 +118,13 @@ export default function StudentsPage() {
     if (searchTimeout) clearTimeout(searchTimeout);
     setSearchTimeout(setTimeout(() => {
       setPage(1);
-      fetchStudents(value, 1);
+      fetchStudents(escapeLikeWildcards(value), 1);
     }, 400));
   };
+
+  function escapeLikeWildcards(value: string): string {
+    return value.replace(/[%_]/g, "\\$&");
+  }
 
   useEffect(() => {
     setLoading(true);
@@ -149,8 +159,17 @@ export default function StudentsPage() {
   };
 
   const handleSave = async () => {
+    if (!validateName(form.full_name, locale as "ar" | "en")) {
+      setMessage({ type: "error", text: t.nameInvalid });
+      return;
+    }
+    setSubmitting(true);
     try {
-      const payload: Record<string, unknown> = { ...form };
+      const payload: Record<string, unknown> = {
+        student_code: sanitizeInput(form.student_code),
+        full_name: sanitizeInput(form.full_name),
+        email: form.email ? sanitizeInput(form.email) : undefined,
+      };
       if (!payload.email) delete payload.email;
       if (editingId) {
         const cleaned: Record<string, unknown> = {};
@@ -162,8 +181,10 @@ export default function StudentsPage() {
       setShowForm(false);
       setEditingId(null);
       fetchStudents(search, page);
-    } catch (e) {
-      console.error(e);
+    } catch (e: any) {
+      setMessage({ type: "error", text: e.message || "Failed to save student" });
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -226,6 +247,13 @@ export default function StudentsPage() {
         )}
       </div>
 
+      {fetchError && (
+        <div className="px-4 py-3 rounded-lg text-sm font-medium bg-red-50 text-red-700 border border-red-200 flex items-center gap-2">
+          <AlertCircle size={14} />
+          <span>{fetchError}</span>
+        </div>
+      )}
+
       {message && (
         <div className={`px-4 py-3 rounded-lg text-sm font-medium ${
           message.type === "success" ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-red-50 text-red-700 border border-red-200"
@@ -254,7 +282,7 @@ export default function StudentsPage() {
             </div>
           </div>
           <div className="flex gap-3 pt-2">
-            <button onClick={handleSave} className="btn-primary">{t.save}</button>
+            <button onClick={handleSave} disabled={submitting} className="btn-primary">{submitting ? "..." : t.save}</button>
             <button onClick={() => setShowForm(false)} className="btn-secondary">{t.cancel}</button>
           </div>
         </div>

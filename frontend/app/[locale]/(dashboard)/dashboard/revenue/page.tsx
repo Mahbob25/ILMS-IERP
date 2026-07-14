@@ -3,7 +3,9 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { apiClient } from "@/lib/api";
-import { Loader2, RefreshCw, TrendingUp, DollarSign, Target, Users, RotateCcw } from "lucide-react";
+import { sanitizeInput } from "@/lib/utils/input";
+import EmptyState from "@/components/EmptyState";
+import { Loader2, RefreshCw, TrendingUp, DollarSign, Target, Users, RotateCcw, AlertCircle } from "lucide-react";
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, PieChart, Pie, Cell, Legend,
@@ -136,6 +138,8 @@ export default function RevenuePage() {
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
   const [fetchKey, setFetchKey] = useState(0);
+  const [submitting, setSubmitting] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   const getDateRange = useCallback(() => {
     const now = new Date();
@@ -163,14 +167,17 @@ export default function RevenuePage() {
 
   const fetchData = useCallback(async () => {
     const range = getDateRange();
+    setFetchError(null);
     try {
       const res = await apiClient.get<RevenueData>("/lms/revenue", { params: range });
       setData(res.data);
     } catch {
       setData(null);
+      setFetchError("Failed to fetch revenue data");
     } finally {
       setLoading(false);
       setRefreshing(false);
+      setSubmitting(false);
     }
   }, [getDateRange]);
 
@@ -180,6 +187,8 @@ export default function RevenuePage() {
   }, [fetchKey]);
 
   const handleRefresh = () => {
+    if (submitting) return;
+    setSubmitting(true);
     setRefreshing(true);
     fetchData();
   };
@@ -234,7 +243,7 @@ export default function RevenuePage() {
         </div>
         <button
           onClick={handleRefresh}
-          disabled={refreshing}
+          disabled={submitting}
           className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white border border-slate-200 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
         >
           <RefreshCw size={15} className={refreshing ? "animate-spin" : ""} />
@@ -247,7 +256,8 @@ export default function RevenuePage() {
         {periodButtons.map((btn) => (
           <button
             key={btn.key}
-            onClick={() => { setPeriod(btn.key); setFetchKey((k) => k + 1); }}
+            disabled={submitting}
+            onClick={() => { if (!submitting) { setPeriod(btn.key); setFetchKey((k) => k + 1); } }}
             className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all border ${
               period === btn.key
                 ? "bg-brand-50 text-brand-600 border-brand-200"
@@ -262,18 +272,19 @@ export default function RevenuePage() {
             <input
               type="date"
               value={customFrom}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCustomFrom(e.target.value)}
+               onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCustomFrom(sanitizeInput(e.target.value))}
               className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs"
             />
             <span className="text-xs text-slate-500">{t.to}</span>
             <input
               type="date"
               value={customTo}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCustomTo(e.target.value)}
+               onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCustomTo(sanitizeInput(e.target.value))}
               className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs"
             />
             <button
-              onClick={() => setFetchKey((k) => k + 1)}
+              onClick={() => { if (!submitting) { setSubmitting(true); setFetchKey((k) => k + 1); } }}
+              disabled={submitting}
               className="px-3 py-1.5 rounded-lg bg-brand-50 text-brand-600 text-xs font-semibold border border-brand-200"
             >
               {t.apply}
@@ -282,8 +293,16 @@ export default function RevenuePage() {
         )}
       </div>
 
+      {fetchError && (
+        <div className="flex items-center gap-2 p-4 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
+          <AlertCircle size={16} />
+          <span>{fetchError}</span>
+          <button onClick={() => setFetchError(null)} className="ms-auto text-red-400 hover:text-red-600">&times;</button>
+        </div>
+      )}
+
       {!data ? (
-        <div className="card p-10 text-center text-slate-400 text-sm">{t.noData}</div>
+        <EmptyState title={t.noData} message="" />
       ) : (
         <>
           {/* Summary Cards */}

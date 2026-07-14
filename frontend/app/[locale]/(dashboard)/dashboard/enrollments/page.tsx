@@ -8,7 +8,8 @@ import ConfirmModal from "@/components/ConfirmModal";
 import Modal from "@/components/Modal";
 import Select from "@/components/ui/Select";
 import UnenrollModal from "@/components/students/UnenrollModal";
-import { Plus, Trash2, Loader2, RefreshCw, UserX } from "lucide-react";
+import { Plus, Trash2, Loader2, RefreshCw, UserX, AlertCircle } from "lucide-react";
+import { sanitizeInput, escapeLikeWildcards, validateName } from "@/lib/utils/input";
 
 interface Enrollment {
   id: string;
@@ -72,6 +73,7 @@ export default function EnrollmentsPage() {
       emailLabel: "البريد الإلكتروني",
       noResults: "لا توجد نتائج",
       createStudentTitle: "إضافة طالب جديد",
+      nameInvalid: "الاسم يحتوي على أحرف غير صالحة",
     },
     en: {
       title: "Enrollments",
@@ -114,6 +116,7 @@ export default function EnrollmentsPage() {
       emailLabel: "Email",
       noResults: "No results",
       createStudentTitle: "Add New Student",
+      nameInvalid: "Name contains invalid characters",
     },
   }[locale === "en" ? "en" : "ar"];
 
@@ -126,12 +129,15 @@ export default function EnrollmentsPage() {
   const [showCreateStudentModal, setShowCreateStudentModal] = useState(false);
   const [form, setForm] = useState({ student_id: "", section_id: "", admin_discount: "" });
   const [createStudentForm, setCreateStudentForm] = useState({ student_code: "", full_name: "", email: "" });
+  const [nameError, setNameError] = useState("");
   const [studentSearch, setStudentSearch] = useState("");
   const [showStudentDropdown, setShowStudentDropdown] = useState(false);
   const [studentSearchResults, setStudentSearchResults] = useState<Student[]>([]);
   const [unenrollTarget, setUnenrollTarget] = useState<Enrollment | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Enrollment | null>(null);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
@@ -150,14 +156,16 @@ export default function EnrollmentsPage() {
 
   const fetchEnrollments = useCallback(async (searchTerm = "", pageNum = 1) => {
     setMessage(null);
+    setFetchError(null);
     try {
       const skip = (pageNum - 1) * limit;
-      const params = `?search=${encodeURIComponent(searchTerm)}&skip=${skip}&limit=${limit}&sort_by=enrolled_at&sort_order=desc`;
+      const safeSearch = escapeLikeWildcards(searchTerm);
+      const params = `?search=${encodeURIComponent(safeSearch)}&skip=${skip}&limit=${limit}&sort_by=enrolled_at&sort_order=desc`;
       const res = await apiClient.get<{ items: Enrollment[]; total: number }>(`/academic/enrollments${params}`);
       setEnrollments(res.data.items);
       setTotalCount(res.data.total);
     } catch (e) {
-      console.error(e);
+      setFetchError("Failed to load enrollments");
     } finally {
       setLoading(false);
     }
@@ -228,7 +236,7 @@ export default function EnrollmentsPage() {
     searchTimeoutRef.current = setTimeout(async () => {
       try {
         const res = await apiClient.get<{ items: Student[]; total: number }>(
-          `/academic/students?search=${encodeURIComponent(query)}&limit=20`
+          `/academic/students?search=${encodeURIComponent(escapeLikeWildcards(query))}&limit=20`
         );
         setStudentSearchResults(res.data.items);
       } catch {
@@ -238,11 +246,12 @@ export default function EnrollmentsPage() {
   };
 
   const handleSave = async () => {
-    if (!form.section_id || !form.student_id) return;
+    if (!form.section_id || !form.student_id || submitting) return;
+    setSubmitting(true);
     try {
       const payload: Record<string, unknown> = {
-        student_id: form.student_id,
-        section_id: form.section_id,
+        student_id: sanitizeInput(form.student_id),
+        section_id: sanitizeInput(form.section_id),
       };
       if (form.admin_discount) payload.admin_discount = parseFloat(form.admin_discount);
       await apiClient.post("/academic/enrollments", payload);
@@ -252,17 +261,25 @@ export default function EnrollmentsPage() {
     } catch (e: any) {
       const detail = e?.response?.data?.detail || e?.message || "Failed to save enrollment";
       setMessage({ type: "error", text: detail });
+    } finally {
+      setSubmitting(false);
     }
   };
 
   const handleCreateStudent = async () => {
-    if (!createStudentForm.student_code || !createStudentForm.full_name) return;
+    if (!createStudentForm.student_code || !createStudentForm.full_name || submitting) return;
+    setNameError("");
+    if (!validateName(createStudentForm.full_name, locale as "ar" | "en")) {
+      setNameError(t.nameInvalid);
+      return;
+    }
+    setSubmitting(true);
     try {
       const payload: Record<string, unknown> = {
-        student_code: createStudentForm.student_code,
-        full_name: createStudentForm.full_name,
+        student_code: sanitizeInput(createStudentForm.student_code),
+        full_name: sanitizeInput(createStudentForm.full_name),
       };
-      if (createStudentForm.email) payload.email = createStudentForm.email;
+      if (createStudentForm.email) payload.email = sanitizeInput(createStudentForm.email);
       const res = await apiClient.post<Student>("/academic/students", payload);
       const newStud = res.data;
       setStudents(prev => [...prev, newStud]);
@@ -273,6 +290,8 @@ export default function EnrollmentsPage() {
     } catch (e: any) {
       const detail = e?.response?.data?.detail || e?.message || "Failed to create student";
       setMessage({ type: "error", text: detail });
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -337,6 +356,13 @@ export default function EnrollmentsPage() {
         )}
       </div>
 
+      {fetchError && (
+        <div className="flex items-center gap-2 px-4 py-3 rounded-lg text-sm font-medium bg-red-50 text-red-700 border border-red-200">
+          <AlertCircle size={16} />
+          {fetchError}
+        </div>
+      )}
+
       {message && (
         <div className={`px-4 py-3 rounded-lg text-sm font-medium ${
           message.type === "success" ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-red-50 text-red-700 border border-red-200"
@@ -391,6 +417,7 @@ export default function EnrollmentsPage() {
                 onClick={() => {
                   setShowStudentDropdown(false);
                   setCreateStudentForm({ student_code: "", full_name: "", email: "" });
+                  setNameError("");
                   setShowCreateStudentModal(true);
                 }}
                 className="mt-1 text-xs text-brand-600 hover:text-brand-700 font-medium"
@@ -416,8 +443,11 @@ export default function EnrollmentsPage() {
             )}
           </div>
           <div className="flex gap-3 pt-2">
-            <button onClick={handleSave} className="btn-primary">{t.save}</button>
-            <button onClick={() => setShowEnrollModal(false)} className="btn-secondary">{t.cancel}</button>
+            <button onClick={handleSave} disabled={submitting} className="btn-primary">
+              {submitting ? <Loader2 size={16} className="animate-spin" /> : null}
+              {t.save}
+            </button>
+            <button onClick={() => setShowEnrollModal(false)} disabled={submitting} className="btn-secondary">{t.cancel}</button>
           </div>
         </div>
       </Modal>
@@ -433,8 +463,9 @@ export default function EnrollmentsPage() {
             </div>
             <div>
               <label className="block text-xs font-medium text-slate-700 mb-1">{t.fullNameLabel}</label>
-              <input type="text" value={createStudentForm.full_name} onChange={(e) => setCreateStudentForm({ ...createStudentForm, full_name: e.target.value })}
+              <input type="text" value={createStudentForm.full_name} onChange={(e) => { setNameError(""); setCreateStudentForm({ ...createStudentForm, full_name: e.target.value }); }}
                 className="input-field" />
+              {nameError && <p className="text-xs text-red-500 mt-1">{nameError}</p>}
             </div>
             <div className="md:col-span-2">
               <label className="block text-xs font-medium text-slate-700 mb-1">{t.emailLabel}</label>
@@ -443,8 +474,11 @@ export default function EnrollmentsPage() {
             </div>
           </div>
           <div className="flex gap-3 pt-2">
-            <button onClick={handleCreateStudent} className="btn-primary">{t.save}</button>
-            <button onClick={() => setShowCreateStudentModal(false)} className="btn-secondary">{t.cancel}</button>
+            <button onClick={handleCreateStudent} disabled={submitting} className="btn-primary">
+              {submitting ? <Loader2 size={16} className="animate-spin" /> : null}
+              {t.save}
+            </button>
+            <button onClick={() => setShowCreateStudentModal(false)} disabled={submitting} className="btn-secondary">{t.cancel}</button>
           </div>
         </div>
       </Modal>

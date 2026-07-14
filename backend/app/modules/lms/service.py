@@ -1,11 +1,15 @@
+import logging
 import uuid
 from datetime import date, datetime, timezone
 from typing import Optional
+from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import joinedload
 from app.modules.lms.models import AttendanceSession, AttendanceRecord
 from app.modules.academic.models import CourseSection
+
+logger = logging.getLogger(__name__)
 
 
 # --- Attendance Sessions ---
@@ -31,13 +35,18 @@ async def list_attendance_sessions(db: AsyncSession, section_id: Optional[uuid.U
 
 # --- Attendance Records ---
 async def set_attendance_records(db: AsyncSession, session_id: uuid.UUID, records: list[dict]) -> list[AttendanceRecord]:
-    created = []
-    for r in records:
-        rec = AttendanceRecord(session_id=session_id, student_id=r["student_id"], status=r["status"])
-        db.add(rec)
-        created.append(rec)
-    await db.flush()
-    return created
+    try:
+        created = []
+        for r in records:
+            rec = AttendanceRecord(session_id=session_id, student_id=r["student_id"], status=r["status"])
+            db.add(rec)
+            created.append(rec)
+        await db.flush()
+        return created
+    except Exception as e:
+        logger.error("Attendance batch save failed for session %s: %s", session_id, str(e))
+        await db.rollback()
+        raise HTTPException(status_code=500, detail="Attendance save failed. Please retry.")
 
 
 # --- Student Attendance Summary ---

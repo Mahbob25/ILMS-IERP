@@ -20,6 +20,7 @@
     "test:e2e:browser:mobile": "playwright test --config=playwright.config.browser.ts --project=mobile-chrome"
   },
   "dependencies": {
+    "@sentry/nextjs": "^8.0.0",
     "axios": "^1.7.2",
     "html2canvas": "^1.4.1",
     "html2pdf.js": "^0.14.0",

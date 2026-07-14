@@ -1,5 +1,6 @@
 import uuid
 from typing import Optional, Dict, Any
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import joinedload
@@ -364,10 +365,6 @@ async def grant_user_access(
     if not employee:
         raise ValueError("Employee not found")
 
-    existing = await db.execute(select(User).where(User.email == email))
-    if existing.scalar_one_or_none():
-        raise ValueError("Email already registered")
-
     hashed_password = get_password_hash(password)
     new_user = User(
         email=email,
@@ -377,7 +374,12 @@ async def grant_user_access(
         locale_pref="ar",
     )
     db.add(new_user)
-    await db.flush()
+    try:
+        await db.flush()
+    except IntegrityError as e:
+        if "users_email_key" in str(e):
+            raise ValueError("Email already registered")
+        raise
 
     result = await db.execute(
         select(User).options(joinedload(User.role), joinedload(User.employee)).where(User.id == new_user.id)

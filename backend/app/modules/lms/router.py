@@ -2,7 +2,7 @@ from decimal import Decimal
 import uuid
 from datetime import date
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import joinedload
@@ -52,6 +52,7 @@ from app.modules.lms import ledger_service as lms_ledger
 from app.modules.lms import compensation_service
 from app.modules.lms import cashier_service
 from app.core.error_messages import get_error_detail
+from app.core.rate_limit import limiter
 
 lms_router = APIRouter(prefix="/lms", tags=["lms"])
 
@@ -164,7 +165,9 @@ async def get_student_attendance_summary(
 @lms_router.post(
     "/payments", response_model=PaymentResponse, status_code=status.HTTP_201_CREATED
 )
+@limiter.limit("10/minute")
 async def create_payment(
+    request: Request,
     data: PaymentCreate,
     locale: str = "ar",
     current_user: User = Depends(
@@ -328,7 +331,9 @@ async def list_eligible_recipients(
 @lms_router.post(
     "/expenses", response_model=ExpenseResponse, status_code=status.HTTP_201_CREATED
 )
+@limiter.limit("10/minute")
 async def create_expense(
+    request: Request,
     data: ExpenseCreate,
     locale: str = "ar",
     current_user: User = Depends(
@@ -418,7 +423,9 @@ async def preview_voucher(
 @lms_router.post(
     "/daily-closures/{closure_date}/close", response_model=DailyClosureResponse
 )
+@limiter.limit("10/minute")
 async def close_day(
+    request: Request,
     closure_date: date,
     locale: str = "ar",
     current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager"])),
@@ -436,7 +443,9 @@ async def close_day(
 @lms_router.post(
     "/daily-closures/{closure_date}/unlock-request", response_model=DailyClosureResponse
 )
+@limiter.limit("10/minute")
 async def request_unlock(
+    request: Request,
     closure_date: date,
     locale: str = "ar",
     current_user: User = Depends(
@@ -456,13 +465,15 @@ async def request_unlock(
 @lms_router.post(
     "/daily-closures/{closure_date}/approve-unlock", response_model=DailyClosureResponse
 )
+@limiter.limit("10/minute")
 async def approve_unlock(
+    request: Request,
     closure_date: date,
     locale: str = "ar",
     current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager"])),
     db: AsyncSession = Depends(get_db),
 ):
-    closure = await closure_service.approve_unlock(db, closure_date)
+    closure = await closure_service.approve_unlock(db, closure_date, current_user.id)
     if not closure:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -546,7 +557,9 @@ async def get_section_contract(
 @lms_router.put(
     "/sections/{section_id}/contract/assign", response_model=SectionContractResponse
 )
+@limiter.limit("10/minute")
 async def assign_section_contract(
+    request: Request,
     section_id: uuid.UUID,
     data: ContractAssignRequest,
     current_user: User = Depends(
@@ -622,7 +635,9 @@ async def assign_section_contract(
 @lms_router.post(
     "/sections/{section_id}/contract/activate", response_model=SectionContractResponse
 )
+@limiter.limit("10/minute")
 async def activate_section_contract(
+    request: Request,
     section_id: uuid.UUID,
     current_user: User = Depends(
         RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])
@@ -670,7 +685,9 @@ async def activate_section_contract(
 @lms_router.post(
     "/sections/{section_id}/contract/complete", response_model=SectionContractResponse
 )
+@limiter.limit("10/minute")
 async def complete_section_contract(
+    request: Request,
     section_id: uuid.UUID,
     current_user: User = Depends(
         RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])
@@ -722,7 +739,9 @@ async def complete_section_contract(
 @lms_router.post(
     "/sections/{section_id}/contract/amend", response_model=AmendmentResponse
 )
+@limiter.limit("10/minute")
 async def create_amendment(
+    request: Request,
     section_id: uuid.UUID,
     data: AmendmentCreateRequest,
     current_user: User = Depends(
@@ -874,7 +893,9 @@ async def list_pending_amendments(
 
 
 @lms_router.put("/amendments/{amendment_id}/approve", response_model=AmendmentResponse)
+@limiter.limit("10/minute")
 async def approve_amendment(
+    request: Request,
     amendment_id: uuid.UUID,
     data: AmendmentApproveRequest = AmendmentApproveRequest(),
     current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager"])),
@@ -920,7 +941,9 @@ async def approve_amendment(
 
 
 @lms_router.put("/amendments/{amendment_id}/reject", response_model=AmendmentResponse)
+@limiter.limit("10/minute")
 async def reject_amendment(
+    request: Request,
     amendment_id: uuid.UUID,
     data: AmendmentRejectRequest = AmendmentRejectRequest(),
     current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager"])),
@@ -1047,7 +1070,9 @@ async def get_student_refunds(
 
 
 @lms_router.post("/cashier/pending-refunds/{pending_refund_id}/disburse")
+@limiter.limit("10/minute")
 async def disburse_refund(
+    request: Request,
     pending_refund_id: uuid.UUID,
     body: dict,
     current_user: User = Depends(

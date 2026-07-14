@@ -9,9 +9,10 @@ import ConfirmModal from "@/components/ConfirmModal";
 import Modal from "@/components/Modal";
 import Select from "@/components/ui/Select";
 import {
-  Plus, Pencil, Trash2, Loader2, Eye, Search, Users, X,
+  Plus, Pencil, Trash2, Loader2, Eye, Search, Users, X, AlertCircle,
   UserCheck, UserX, Shield,
 } from "lucide-react";
+import { sanitizeInput, escapeLikeWildcards, validateName } from "@/lib/utils/input";
 
 interface Employee {
   id: string;
@@ -82,6 +83,7 @@ export default function EmployeesPage() {
       defaultPct: "النسبة الافتراضية (%)",
       compensationSalary: "الراتب",
       manualPaymentHint: "يتم صرف الراتب يدويًا عبر المصروفات",
+      invalidName: "الاسم يحتوي على أحرف غير صالحة",
     },
     en: {
       title: "Employee Management", subtitle: "Manage employee records (HR data)",
@@ -108,6 +110,7 @@ export default function EmployeesPage() {
       defaultPct: "Default Percentage (%)",
       compensationSalary: "Stipend",
       manualPaymentHint: "Salary is disbursed manually via Expenses",
+      invalidName: "Name contains invalid characters",
     },
   }[locale === "en" ? "en" : "ar"];
 
@@ -127,16 +130,20 @@ export default function EmployeesPage() {
   const [deleteTarget, setDeleteTarget] = useState<Employee | null>(null);
   const [grantTarget, setGrantTarget] = useState<Employee | null>(null);
   const [revokeTarget, setRevokeTarget] = useState<Employee | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [grantSubmitting, setGrantSubmitting] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [grantForm, setGrantForm] = useState({ email: "", password: "", role_id: "" });
   const [grantError, setGrantError] = useState<string | null>(null);
 
   const fetchEmployees = useCallback(async () => {
     setMessage(null);
+    setFetchError(null);
     try {
       const params: Record<string, string> = {};
       if (typeFilter !== "all") params.employee_type = typeFilter;
-      if (searchQuery) params.search = searchQuery;
+      if (searchQuery) params.search = escapeLikeWildcards(searchQuery);
       const [empRes, rolesRes] = await Promise.all([
         apiClient.get<Employee[]>("/employees", { params }),
         apiClient.get<RoleInfo[]>("/users/roles"),
@@ -144,7 +151,7 @@ export default function EmployeesPage() {
       setEmployees(empRes.data);
       setRoles(rolesRes.data);
     } catch (e) {
-      console.error(e);
+      setFetchError("Failed to load employees");
     } finally {
       setLoading(false);
     }
@@ -206,12 +213,17 @@ export default function EmployeesPage() {
   };
 
   const handleSave = async () => {
+    if (!validateName(form.full_name, locale as "ar" | "en")) {
+      setMessage({ type: "error", text: t.invalidName });
+      return;
+    }
+    setSubmitting(true);
     try {
       const payload: Record<string, any> = {
-        full_name: form.full_name,
+        full_name: sanitizeInput(form.full_name),
         employee_type: form.employee_type,
       };
-      if (form.phone_number) payload.phone_number = form.phone_number;
+      if (form.phone_number) payload.phone_number = sanitizeInput(form.phone_number);
       if (form.employee_type === "teacher") {
         if (form.salary && form.compensation_type !== "percentage") payload.default_salary = parseFloat(form.salary);
         if (form.default_percentage && form.compensation_type !== "salary") payload.default_percentage = parseFloat(form.default_percentage);
@@ -220,7 +232,7 @@ export default function EmployeesPage() {
       }
       if (form.hire_date) payload.hire_date = form.hire_date;
       if (form.contract_end_date) payload.contract_end_date = form.contract_end_date;
-      if (form.address) payload.address = form.address;
+      if (form.address) payload.address = sanitizeInput(form.address);
 
       if (editingId) {
         await apiClient.put(`/employees/${editingId}`, payload);
@@ -229,8 +241,10 @@ export default function EmployeesPage() {
       }
       setShowForm(false);
       setEditingId(null);
+      setSubmitting(false);
       fetchEmployees();
     } catch (e: any) {
+      setSubmitting(false);
       const detail = e?.response?.data?.detail;
       const text = Array.isArray(detail) ? detail.map((d: any) => d.msg).join("; ") : (detail || "Error");
       setMessage({ type: "error", text });
@@ -253,13 +267,20 @@ export default function EmployeesPage() {
 
   const handleGrantAccess = async () => {
     if (!grantTarget) return;
+    setGrantSubmitting(true);
     try {
-      await apiClient.post(`/employees/${grantTarget.id}/grant-access`, grantForm);
+      await apiClient.post(`/employees/${grantTarget.id}/grant-access`, {
+        email: sanitizeInput(grantForm.email),
+        password: grantForm.password,
+        role_id: grantForm.role_id,
+      });
       setGrantTarget(null);
       setGrantForm({ email: "", password: "", role_id: "" });
       setMessage({ type: "success", text: t.userCreated });
+      setGrantSubmitting(false);
       fetchEmployees();
     } catch (e: any) {
+      setGrantSubmitting(false);
       const detail = e?.response?.data?.detail;
       let text = Array.isArray(detail) ? detail.map((d: any) => d.msg).join("; ") : (detail || "Error");
       if (locale === "ar") {
@@ -347,6 +368,13 @@ export default function EmployeesPage() {
         </div>
       )}
 
+      {fetchError && (
+        <div className="px-4 py-3 rounded-lg text-sm font-medium bg-red-50 text-red-700 border border-red-200 flex items-center gap-2">
+          <AlertCircle size={16} />
+          {fetchError}
+        </div>
+      )}
+
       <Modal open={showForm} onClose={() => setShowForm(false)} title={editingId ? t.editTitle : t.createTitle} size="xl">
         <div className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -428,7 +456,7 @@ export default function EmployeesPage() {
             </div>
           </div>
           <div className="flex gap-3 pt-2">
-            <button onClick={handleSave} className="btn-primary">{t.save}</button>
+            <button onClick={handleSave} disabled={submitting} className="btn-primary">{submitting ? <Loader2 size={16} className="animate-spin" /> : t.save}</button>
             <button onClick={() => setShowForm(false)} className="btn-secondary">{t.cancel}</button>
           </div>
         </div>
@@ -575,7 +603,7 @@ export default function EmployeesPage() {
             />
           </div>
           <div className="flex gap-3 pt-1">
-            <button onClick={handleGrantAccess} className="btn-primary">{t.save}</button>
+            <button onClick={handleGrantAccess} disabled={grantSubmitting} className="btn-primary">{grantSubmitting ? <Loader2 size={16} className="animate-spin" /> : t.save}</button>
             <button onClick={() => { setGrantTarget(null); setGrantError(null); }} className="btn-secondary">{t.cancel}</button>
           </div>
         </div>

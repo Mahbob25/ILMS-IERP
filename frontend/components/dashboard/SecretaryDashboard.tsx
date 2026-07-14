@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { apiClient } from "@/lib/api";
 import {
@@ -46,13 +46,17 @@ export default function SecretaryDashboard() {
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState(false);
 
-  useEffect(() => {
+  const fetchDashboardData = useCallback(() => {
     apiClient
       .get<SecretaryDashboardData>("/dashboard/secretary")
       .then((res) => setData(res.data))
       .catch(() => setFetchError(true))
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, [fetchDashboardData]);
 
   const t = {
     ar: {

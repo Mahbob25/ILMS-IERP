@@ -1,0 +1,54 @@
+name: CI/CD
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: lims_test
+          POSTGRES_USER: lims
+          POSTGRES_PASSWORD: lims_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install backend dependencies
+        run: |
+          pip install -r backend/requirements.txt
+          pip install pytest pytest-cov httpx
+      - name: Run alembic migrations
+        run: alembic upgrade head
+        working-directory: backend
+        env:
+          DATABASE_URL: postgresql+asyncpg://lims:lims_test@localhost:5432/lims_test
+      - name: Run backend tests
+        run: pytest -v --cov=app --cov-report=term-missing
+        working-directory: backend
+        env:
+          DATABASE_URL: postgresql+asyncpg://lims:lims_test@localhost:5432/lims_test
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install frontend dependencies
+        run: npm ci
+        working-directory: frontend
+      - name: Run frontend lint
+        run: npm run lint
+        working-directory: frontend
+      - name: Build frontend
+        run: npm run build
+        working-directory: frontend
+        env:
+          NEXT_PUBLIC_SENTRY_DSN: ""

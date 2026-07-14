@@ -3,7 +3,7 @@ import uuid
 from typing import Optional
 from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func as sa_func
+from sqlalchemy import select, func as sa_func, update
 from sqlalchemy.orm import joinedload
 
 from app.modules.lms.models import (
@@ -137,26 +137,20 @@ async def get_wallet_summary(
 async def get_or_create_wallet(
     db: AsyncSession, teacher_id: uuid.UUID, lock: bool = False
 ) -> TeacherWallet:
+    from sqlalchemy.dialects.postgresql import insert as pg_insert
+
+    stmt = pg_insert(TeacherWallet).values(
+        teacher_id=teacher_id,
+        balance=Decimal("0"),
+        frozen_balance=Decimal("0"),
+    ).on_conflict_do_nothing(index_elements=['teacher_id'])
+    await db.execute(stmt)
+
     query = select(TeacherWallet).where(TeacherWallet.teacher_id == teacher_id)
     if lock:
         query = query.with_for_update()
     result = await db.execute(query)
     wallet = result.scalar_one_or_none()
-    if not wallet:
-        wallet = TeacherWallet(
-            teacher_id=teacher_id,
-            balance=Decimal("0"),
-            frozen_balance=Decimal("0"),
-        )
-        db.add(wallet)
-        await db.flush()
-        if lock:
-            result = await db.execute(
-                select(TeacherWallet)
-                .where(TeacherWallet.id == wallet.id)
-                .with_for_update()
-            )
-            wallet = result.scalar_one_or_none()
     return wallet
 
 
@@ -228,7 +222,9 @@ async def activate_contract(
     activated_by: uuid.UUID,
 ) -> SectionContract:
     result = await db.execute(
-        select(SectionContract).where(SectionContract.id == contract_id)
+        select(SectionContract)
+        .where(SectionContract.id == contract_id)
+        .with_for_update()
     )
     contract = result.scalar_one_or_none()
     if not contract:
@@ -276,12 +272,26 @@ async def activate_contract(
             created_by=activated_by,
         )
 
-    contract.status = ContractStatus.ACTIVE
-    contract.updated_at = datetime.now(timezone.utc)
+    result = await db.execute(
+        update(SectionContract)
+        .where(
+            SectionContract.id == contract_id,
+            SectionContract.status == ContractStatus.ASSIGNED,
+        )
+        .values(
+            status=ContractStatus.ACTIVE,
+            updated_at=datetime.now(timezone.utc),
+        )
+        .returning(SectionContract)
+    )
+    updated_contract = result.scalar_one_or_none()
+    if not updated_contract:
+        raise ValueError("Contract not in ASSIGNED status or already active")
+
     section.status = "active"
 
     await db.flush()
-    return contract
+    return updated_contract
 
 
 async def finalize_grades_for_section(
@@ -367,8 +377,21 @@ async def settle_contract(
             created_by=settled_by,
         )
 
-    contract.status = ContractStatus.SETTLED
-    contract.updated_at = datetime.now(timezone.utc)
+    result = await db.execute(
+        update(SectionContract)
+        .where(
+            SectionContract.id == contract_id,
+            SectionContract.status == ContractStatus.GRADES_SUBMITTED,
+        )
+        .values(
+            status=ContractStatus.SETTLED,
+            updated_at=datetime.now(timezone.utc),
+        )
+        .returning(SectionContract)
+    )
+    updated_contract = result.scalar_one_or_none()
+    if not updated_contract:
+        raise ValueError("Contract not in GRADES_SUBMITTED status or already settled")
 
     section_result = await db.execute(
         select(CourseSection).where(CourseSection.id == contract.section_id)
@@ -378,7 +401,7 @@ async def settle_contract(
         section.status = "completed"
 
     await db.flush()
-    return contract
+    return updated_contract
 
 
 async def cancel_contract(
@@ -397,10 +420,27 @@ async def cancel_contract(
     if contract.status == ContractStatus.SETTLED:
         raise ValueError("Cannot cancel a SETTLED contract")
     if not contract.teacher_id:
-        contract.status = ContractStatus.CANCELLED
-        contract.updated_at = datetime.now(timezone.utc)
+        result = await db.execute(
+            update(SectionContract)
+            .where(
+                SectionContract.id == contract_id,
+                SectionContract.status.in_([
+                    ContractStatus.ASSIGNED,
+                    ContractStatus.ACTIVE,
+                    ContractStatus.GRADES_SUBMITTED,
+                ]),
+            )
+            .values(
+                status=ContractStatus.CANCELLED,
+                updated_at=datetime.now(timezone.utc),
+            )
+            .returning(SectionContract)
+        )
+        updated_contract = result.scalar_one_or_none()
+        if not updated_contract:
+            raise ValueError("Contract not in a cancellable status")
         await db.flush()
-        return contract
+        return updated_contract
 
     wallet = await get_or_create_wallet(db, contract.teacher_id, lock=True)
 
@@ -450,10 +490,23 @@ async def cancel_contract(
             force=force,
         )
 
-    contract.status = ContractStatus.CANCELLED
-    contract.updated_at = datetime.now(timezone.utc)
+    result = await db.execute(
+        update(SectionContract)
+        .where(
+            SectionContract.id == contract_id,
+            SectionContract.status == ContractStatus.ACTIVE,
+        )
+        .values(
+            status=ContractStatus.CANCELLED,
+            updated_at=datetime.now(timezone.utc),
+        )
+        .returning(SectionContract)
+    )
+    updated_contract = result.scalar_one_or_none()
+    if not updated_contract:
+        raise ValueError("Contract not in ACTIVE status or already cancelled")
     await db.flush()
-    return contract
+    return updated_contract
 
 
 async def reverse_teacher_shares(

@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { apiClient } from "@/lib/api";
+import { sanitizeInput } from "@/lib/utils/input";
 import Modal from "@/components/Modal";
 import { Loader2, DollarSign, User } from "lucide-react";
 
@@ -86,7 +87,7 @@ export default function DisburseRefundModal({
     setError(null);
     try {
       const body: Record<string, string> = {};
-      if (notes.trim()) body.notes = notes.trim();
+      if (notes.trim()) body.notes = sanitizeInput(notes.trim());
       const res = await apiClient.post<{
         success: boolean;
         receipt_number: string;

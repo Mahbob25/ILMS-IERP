@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { apiClient } from "@/lib/api";
 import ConfirmModal from "@/components/ConfirmModal";
@@ -78,13 +78,17 @@ export default function ManagerDashboard() {
     text: string;
   } | null>(null);
 
-  useEffect(() => {
+  const fetchDashboardData = useCallback(() => {
     Promise.all([
       apiClient.get<ManagerDashboardData>("/dashboard/manager").then((res) => setData(res.data)).catch(() => setFetchError(true)),
       apiClient.get<PendingAmendment[]>("/lms/amendments/pending").then((res) => setAmendments(res.data)).catch(() => {}),
       apiClient.get<{ items: any[]; total: number }>("/academic/enrollments/unenrollment-history?per_page=5").then((res) => setRecentUnenrollments(res.data.items)).catch(() => {}),
     ]).finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, [fetchDashboardData]);
 
   const t = {
     ar: {
@@ -421,6 +425,7 @@ export default function ManagerDashboard() {
         try {
           await apiClient.put(`/lms/amendments/${id}/${action}`);
           setAmendments((prev) => prev.filter((a) => a.id !== id));
+          fetchDashboardData();
           setMessage({
             type: "success",
             text: action === "approve" ? t.approveSuccess : t.rejectSuccess,

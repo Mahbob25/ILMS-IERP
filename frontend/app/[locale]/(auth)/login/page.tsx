@@ -3,7 +3,8 @@
 import React, { useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useAuth } from "@/components/AuthContext";
-import { LogIn, Globe, ShieldAlert, CheckCircle } from "lucide-react";
+import { LogIn, Globe, ShieldAlert } from "lucide-react";
+import { sanitizeInput } from "@/lib/utils/input";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -14,7 +15,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   // Simple translations dictionary for login page
   const t = {
@@ -62,13 +63,11 @@ export default function LoginPage() {
       return;
     }
 
-    setLoading(true);
+    setSubmitting(true);
     try {
-      await login(email, password);
-      // On success, redirect to dashboard
-      router.push(`/${locale}/dashboard`);
+      await login(sanitizeInput(email), password);
+      router.replace(`/${locale}/dashboard`);
     } catch (err: any) {
-      console.error(err);
       const detail = err.response?.data?.detail;
       if (err.response?.status === 401) {
         setError(t.errorFallback);
@@ -78,7 +77,7 @@ export default function LoginPage() {
         setError(detail || t.errorFallback);
       }
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   };
 
@@ -161,10 +160,10 @@ export default function LoginPage() {
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={submitting}
             className="w-full py-2.5 px-4 text-sm font-semibold rounded-lg text-white bg-brand-500 hover:bg-brand-600 disabled:bg-brand-500/50 disabled:cursor-not-allowed shadow-lg shadow-brand-500/25 transition-all duration-150 flex items-center justify-center gap-2 hover:shadow-brand-500/35 active:scale-[0.98]"
           >
-            {loading ? (
+            {submitting ? (
               <>
                 <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />

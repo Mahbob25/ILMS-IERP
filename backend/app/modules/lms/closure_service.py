@@ -2,9 +2,10 @@ import uuid
 from datetime import date, timedelta
 from typing import Optional
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import func
+from sqlalchemy import func, text, update
 
 from app.modules.lms.models import Payment, Expense, DailyClosure
 from app.modules.academic.models import Enrollment, Student, CourseSection, Course, Refund, PendingRefund
@@ -12,22 +13,39 @@ from app.modules.identity.models import User, Employee
 
 
 async def close_day(db: AsyncSession, closure_date: date, manager_id: uuid.UUID) -> Optional[DailyClosure]:
-    result = await db.execute(select(DailyClosure).where(DailyClosure.date == closure_date))
+    await db.execute(
+        text("SELECT pg_advisory_xact_lock(hashtext('daily_closure:' || :date))"),
+        {"date": str(closure_date)},
+    )
+
+    result = await db.execute(
+        update(DailyClosure)
+        .where(
+            DailyClosure.date == closure_date,
+            DailyClosure.status != "closed",
+        )
+        .values(
+            status="closed",
+            closed_by_manager_id=manager_id,
+        )
+        .returning(DailyClosure)
+    )
     closure = result.scalar_one_or_none()
     if closure:
-        if closure.status == "closed":
-            return None
-        closure.status = "closed"
-        closure.closed_by_manager_id = manager_id
-    else:
+        await db.flush()
+        return closure
+
+    try:
         closure = DailyClosure(
             date=closure_date,
             status="closed",
             closed_by_manager_id=manager_id,
         )
         db.add(closure)
-    await db.flush()
-    return closure
+        await db.flush()
+        return closure
+    except IntegrityError:
+        return None
 
 
 async def request_unlock(db: AsyncSession, closure_date: date) -> Optional[DailyClosure]:
@@ -40,12 +58,19 @@ async def request_unlock(db: AsyncSession, closure_date: date) -> Optional[Daily
     return closure
 
 
-async def approve_unlock(db: AsyncSession, closure_date: date) -> Optional[DailyClosure]:
-    result = await db.execute(select(DailyClosure).where(DailyClosure.date == closure_date))
+async def approve_unlock(
+    db: AsyncSession, closure_date: date, manager_id: uuid.UUID
+) -> Optional[DailyClosure]:
+    result = await db.execute(
+        select(DailyClosure)
+        .where(DailyClosure.date == closure_date)
+        .with_for_update()
+    )
     closure = result.scalar_one_or_none()
     if not closure or closure.status != "unlock_requested":
         return None
     closure.status = "pending"
+    closure.closed_by_manager_id = manager_id
     await db.flush()
     return closure
 

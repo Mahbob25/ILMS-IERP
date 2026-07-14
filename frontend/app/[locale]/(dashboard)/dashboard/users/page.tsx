@@ -9,9 +9,10 @@ import ConfirmModal from "@/components/ConfirmModal";
 import Modal from "@/components/Modal";
 import Select from "@/components/ui/Select";
 import {
-  Plus, Pencil, Trash2, Loader2, Search, Shield,
+  Plus, Pencil, Trash2, Loader2, Search, Shield, AlertCircle,
   UserCog, UserCheck, User, Users as UsersIcon,
 } from "lucide-react";
+import { sanitizeInput } from "@/lib/utils/input";
 
 interface RoleInfo {
   id: string;
@@ -155,6 +156,8 @@ export default function UsersPage() {
   const [toggleTarget, setToggleTarget] = useState<AppUser | null>(null);
   const [toggleAction, setToggleAction] = useState<"deactivate" | "reactivate">("deactivate");
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
 
   const extractApiError = (e: any): string => {
@@ -185,6 +188,7 @@ export default function UsersPage() {
 
   const fetchUsers = useCallback(async () => {
     setMessage(null);
+    setFetchError(null);
     try {
       const [usersRes, rolesRes] = await Promise.all([
         apiClient.get<AppUser[]>("/users"),
@@ -193,7 +197,7 @@ export default function UsersPage() {
       setUsers(usersRes.data);
       setRoles(rolesRes.data);
     } catch (e) {
-      console.error(e);
+      setFetchError("Failed to load users");
     } finally {
       setLoading(false);
     }
@@ -261,17 +265,18 @@ export default function UsersPage() {
   };
 
   const handleSave = async () => {
+    setSubmitting(true);
     try {
       if (editingId) {
         const payload: Record<string, unknown> = {};
-        if (form.email) payload.email = form.email;
+        if (form.email) payload.email = sanitizeInput(form.email);
         if (form.password) payload.password = form.password;
         payload.role_id = form.role_id;
         payload.locale_pref = form.locale_pref;
         await apiClient.put(`/users/${editingId}`, payload);
       } else {
         await apiClient.post("/users", {
-          email: form.email,
+          email: sanitizeInput(form.email),
           password: form.password,
           role_id: form.role_id,
           locale_pref: form.locale_pref,
@@ -280,8 +285,10 @@ export default function UsersPage() {
       }
       setShowForm(false);
       setEditingId(null);
+      setSubmitting(false);
       fetchUsers();
     } catch (e: any) {
+      setSubmitting(false);
       setFormError(extractApiError(e) || t.actionFailed);
     }
   };
@@ -392,6 +399,13 @@ export default function UsersPage() {
         </div>
       )}
 
+      {fetchError && (
+        <div className="px-4 py-3 rounded-lg text-sm font-medium bg-red-50 text-red-700 border border-red-200 flex items-center gap-2">
+          <AlertCircle size={16} />
+          {fetchError}
+        </div>
+      )}
+
       <Modal open={showForm} onClose={() => { setShowForm(false); setFormError(null); }} title={editingId ? t.editTitle : t.createTitle} size="xl">
         <div className="space-y-6">
           {formError && (
@@ -466,7 +480,7 @@ export default function UsersPage() {
             </div>
           </div>
           <div className="flex gap-3 pt-2">
-            <button onClick={handleSave} className="btn-primary">{t.save}</button>
+            <button onClick={handleSave} disabled={submitting} className="btn-primary">{submitting ? <Loader2 size={16} className="animate-spin" /> : t.save}</button>
             <button onClick={() => setShowForm(false)} className="btn-secondary">{t.cancel}</button>
           </div>
         </div>

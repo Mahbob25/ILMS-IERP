@@ -6,7 +6,8 @@ import { apiClient } from "@/lib/api";
 import { useAuth } from "@/components/AuthContext";
 import Modal from "@/components/Modal";
 import Select from "@/components/ui/Select";
-import { Plus, Loader2, RefreshCw, Eye, Search, X } from "lucide-react";
+import { Plus, Loader2, RefreshCw, Eye, Search, X, AlertCircle } from "lucide-react";
+import { sanitizeInput, escapeLikeWildcards } from "@/lib/utils/input";
 import ReceiptModal, { ReceiptData } from "@/components/ReceiptModal";
 import { getLocalDateString, formatDisplayDate } from "@/lib/dates";
 
@@ -161,6 +162,8 @@ export default function PaymentsPage() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [summary, setSummary] = useState<PaymentSummary | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [formError, setFormError] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [showReceipt, setShowReceipt] = useState<Payment | null>(null);
@@ -196,11 +199,11 @@ export default function PaymentsPage() {
   const fetchPayments = useCallback(async () => {
     try {
       const params: Record<string, string> = {};
-      if (debouncedSearch) params.receipt_number = debouncedSearch;
+      if (debouncedSearch) params.receipt_number = escapeLikeWildcards(debouncedSearch);
       const res = await apiClient.get<Payment[]>("/lms/payments", { params });
       setPayments(res.data);
     } catch (e) {
-      console.error(e);
+      setFetchError("Failed to load payments");
     }
   }, [debouncedSearch]);
 
@@ -226,7 +229,7 @@ export default function PaymentsPage() {
       setSections(sectionsRes.data.items);
       setEnrollments(enrollmentsRes.data.items);
     } catch (e) {
-      console.error(e);
+      setFetchError("Failed to load reference data");
     }
   }, []);
 
@@ -289,21 +292,23 @@ export default function PaymentsPage() {
   };
 
   const handleSave = async () => {
-    if (!form.enrollment_id || !form.amount) return;
+    if (!form.enrollment_id || !form.amount || submitting) return;
+    setSubmitting(true);
     const parsedAmount = parseFloat(form.amount);
     if (parsedAmount <= 0) {
       setFormError(t.positiveAmount);
+      setSubmitting(false);
       return;
     }
     try {
       const payload: Record<string, unknown> = {
-        enrollment_id: form.enrollment_id,
+        enrollment_id: sanitizeInput(form.enrollment_id),
         amount: parsedAmount,
-        payment_method: form.payment_method,
+        payment_method: sanitizeInput(form.payment_method),
       };
-      if (form.date) payload.date = form.date;
+      if (form.date) payload.date = sanitizeInput(form.date);
       if (form.payment_method === "online") {
-        payload.transaction_number = form.transaction_number;
+        payload.transaction_number = sanitizeInput(form.transaction_number);
       }
       const res = await apiClient.post("/lms/payments", payload);
       setShowForm(false);
@@ -324,6 +329,8 @@ export default function PaymentsPage() {
       } else {
         setFormError(detail || t.paymentFailed);
       }
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -388,6 +395,13 @@ export default function PaymentsPage() {
           )}
         </div>
       </div>
+
+      {fetchError && (
+        <div className="flex items-center gap-2 px-4 py-3 rounded-lg text-sm font-medium bg-red-50 text-red-700 border border-red-200">
+          <AlertCircle size={16} />
+          {fetchError}
+        </div>
+      )}
 
       <Modal
         open={showForm}
@@ -566,11 +580,13 @@ export default function PaymentsPage() {
             </div>
           )}
           <div className="flex gap-3 pt-2">
-            <button onClick={handleSave} className="btn-primary">
+            <button onClick={handleSave} disabled={submitting} className="btn-primary">
+              {submitting ? <Loader2 size={16} className="animate-spin" /> : null}
               {t.save}
             </button>
             <button
               onClick={() => setShowForm(false)}
+              disabled={submitting}
               className="btn-secondary"
             >
               {t.cancel}

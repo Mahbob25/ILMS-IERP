@@ -9,7 +9,9 @@
 }
 
 aldrasat.edu {
-    tls internal               # Self-signed local certificate via Internal CA
+    tls {
+        issuer acme
+    }
     encode gzip
 
     # API proxy — point to host for local dev
@@ -18,4 +20,15 @@ aldrasat.edu {
 
     # Frontend fallback
     reverse_proxy * {env.FRONTEND_URL}
+
+    # Security headers
+    header {
+        Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self' https://api.example.com; form-action 'self'"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        Permissions-Policy "camera=(), microphone=(), geolocation=()"
+        X-XSS-Protection "0"
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+    }
 }

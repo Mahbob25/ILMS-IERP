@@ -2,8 +2,11 @@ import asyncio
 from decimal import Decimal
 import uuid
 from datetime import date, datetime, timedelta, timezone
+import logging
 from app.core.timezone import get_today
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
@@ -70,6 +73,11 @@ async def create_payment(
             detail="Transaction number is required for online payments"
         )
 
+    await db.execute(
+        text("SELECT pg_advisory_xact_lock(hashtext('daily_closure:' || :date))"),
+        {"date": str(payment_date)},
+    )
+
     enrollment_result = await db.execute(
         select(Enrollment)
         .options(
@@ -80,14 +88,17 @@ async def create_payment(
         )
         .options(joinedload(Enrollment.student))
         .where(Enrollment.id == enrollment_id)
+        .with_for_update()
     )
     enrollment = enrollment_result.scalar_one_or_none()
     if not enrollment:
-        return None
+        logger.warning("Payment attempted for non-existent enrollment %s", enrollment_id)
+        raise ValueError("Enrollment not found")
 
     total_paid_result = await db.execute(
         select(func.coalesce(func.sum(Payment.amount), 0))
         .where(Payment.enrollment_id == enrollment_id)
+        .with_for_update()
     )
     total_paid_before = Decimal(str(total_paid_result.scalar() or 0))
     agreed_price = enrollment.agreed_price or (enrollment.section.price if enrollment.section else 0) or 0

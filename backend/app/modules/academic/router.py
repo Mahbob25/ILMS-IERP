@@ -1,7 +1,7 @@
 import uuid
 from datetime import date, timedelta
 from typing import Optional
-from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, status, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from app.db.session import get_db
@@ -27,6 +27,7 @@ from app.modules.academic.models import (
     PendingRefund, Refund, DailyJobsLog,
 )
 from app.core.timezone import get_today
+from app.core.rate_limit import limiter
 
 academic_router = APIRouter(prefix="/academic", tags=["academic"])
 
@@ -130,7 +131,9 @@ async def delete_course_section(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course section not found")
 
 @academic_router.post("/course-sections/{section_id}/activate", response_model=CourseSectionResponse)
+@limiter.limit("20/minute")
 async def activate_section(
+    request: Request,
     section_id: uuid.UUID,
     data: SectionActivate,
     current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])),
@@ -167,7 +170,9 @@ async def activate_section(
     return section
 
 @academic_router.post("/course-sections/{section_id}/complete", response_model=CourseSectionResponse)
+@limiter.limit("20/minute")
 async def complete_section_endpoint(
+    request: Request,
     section_id: uuid.UUID,
     force: bool = Body(False),
     reason: str = Body(None),
@@ -343,7 +348,9 @@ async def delete_certificate(
 
 # --- Final Grades ---
 @academic_router.put("/sections/{section_id}/final-grades", response_model=list[FinalGradeResponse])
+@limiter.limit("20/minute")
 async def set_section_final_grades(
+    request: Request,
     section_id: uuid.UUID,
     data: FinalGradeBulkCreate,
     current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary", "teacher"])),
@@ -465,7 +472,9 @@ async def list_enrollments(
     )
 
 @academic_router.post("/enrollments", response_model=EnrollmentResponse, status_code=status.HTTP_201_CREATED)
+@limiter.limit("20/minute")
 async def create_enrollment(
+    request: Request,
     data: EnrollmentCreate,
     current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])),
     db: AsyncSession = Depends(get_db)
@@ -484,7 +493,9 @@ async def create_enrollment(
     return enrollment
 
 @academic_router.post("/enrollments/with-student", response_model=EnrollmentResponse, status_code=status.HTTP_201_CREATED)
+@limiter.limit("20/minute")
 async def create_enrollment_with_student(
+    request: Request,
     data: EnrollmentCreateWithStudent,
     current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])),
     db: AsyncSession = Depends(get_db)
@@ -567,7 +578,9 @@ async def get_cancel_preview(
 
 
 @academic_router.post("/course-sections/{section_id}/cancel")
+@limiter.limit("20/minute")
 async def cancel_section_endpoint(
+    request: Request,
     section_id: uuid.UUID,
     body: dict,
     current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager"])),
@@ -636,7 +649,9 @@ async def get_cancellation_detail(
 
 # --- Deactivation ---
 @academic_router.post("/course-sections/{section_id}/deactivate")
+@limiter.limit("20/minute")
 async def deactivate_section_endpoint(
+    request: Request,
     section_id: uuid.UUID,
     body: DeactivateRequest = Body(...),
     current_user: User = Depends(RoleChecker(allowed_roles=["superadmin"])),
@@ -687,7 +702,9 @@ async def get_unenroll_preview(
 
 
 @academic_router.post("/enrollments/{enrollment_id}/unenroll")
+@limiter.limit("20/minute")
 async def execute_unenroll(
+    request: Request,
     enrollment_id: uuid.UUID,
     body: UnenrollRequest,
     current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])),

@@ -3,7 +3,7 @@ import uuid
 from typing import Optional
 from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, update
 
 from app.modules.lms.models import (
     SectionContract, CompensationAmendmentRequest, AmendmentStatus, ContractStatus,
@@ -70,16 +70,32 @@ async def approve_amendment(
     request_id: uuid.UUID,
     reviewer_id: uuid.UUID,
 ) -> CompensationAmendmentRequest:
+    now = datetime.now(timezone.utc)
+
     result = await db.execute(
-        select(CompensationAmendmentRequest)
-        .where(CompensationAmendmentRequest.id == request_id)
+        update(CompensationAmendmentRequest)
+        .where(
+            CompensationAmendmentRequest.id == request_id,
+            CompensationAmendmentRequest.status == AmendmentStatus.PENDING,
+        )
+        .values(
+            status=AmendmentStatus.APPROVED,
+            reviewed_by=reviewer_id,
+            reviewed_at=now,
+        )
+        .returning(CompensationAmendmentRequest)
     )
     amendment = result.scalar_one_or_none()
     if not amendment:
-        raise ValueError(f"Amendment request {request_id} not found")
-    if amendment.status != AmendmentStatus.PENDING:
+        pre_check = await db.execute(
+            select(CompensationAmendmentRequest)
+            .where(CompensationAmendmentRequest.id == request_id)
+        )
+        existing = pre_check.scalar_one_or_none()
+        if not existing:
+            raise ValueError(f"Amendment request {request_id} not found")
         raise ValueError(
-            f"Only PENDING amendments can be approved, current: {amendment.status.value}"
+            f"Only PENDING amendments can be approved, current: {existing.status.value}"
         )
 
     contract_result = await db.execute(
@@ -95,25 +111,30 @@ async def approve_amendment(
         old_val = Decimal(str(contract.fixed_amount or 0))
         new_val = Decimal(str(amendment.requested_fixed_amount or 0))
         delta = new_val - old_val
-        contract.fixed_amount = amendment.requested_fixed_amount
+        await db.execute(
+            update(SectionContract)
+            .where(SectionContract.id == contract.id)
+            .values(fixed_amount=amendment.requested_fixed_amount)
+        )
     elif contract.compensation_model == CompensationModel.PERCENTAGE:
         old_val = Decimal(str(contract.percentage or 0))
         new_val = Decimal(str(amendment.requested_percentage or 0))
         delta = new_val - old_val
-        contract.percentage = amendment.requested_percentage
+        await db.execute(
+            update(SectionContract)
+            .where(SectionContract.id == contract.id)
+            .values(percentage=amendment.requested_percentage)
+        )
     else:
         delta = Decimal("0")
-
-    now = datetime.now(timezone.utc)
-    amendment.status = AmendmentStatus.APPROVED
-    amendment.reviewed_by = reviewer_id
-    amendment.reviewed_at = now
 
     if contract.status == ContractStatus.ACTIVE and delta != 0:
         available_delta = delta * (Decimal("1") - holdback)
         frozen_delta = delta * holdback
         wallet_result = await db.execute(
-            select(TeacherWallet).where(TeacherWallet.teacher_id == contract.teacher_id)
+            select(TeacherWallet)
+            .where(TeacherWallet.teacher_id == contract.teacher_id)
+            .with_for_update()
         )
         wallet = wallet_result.scalar_one_or_none()
         if not wallet:

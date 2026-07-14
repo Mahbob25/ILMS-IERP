@@ -1,3 +1,4 @@
+import logging
 from decimal import Decimal
 import uuid
 from datetime import date, datetime, timezone
@@ -7,6 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import joinedload
 from sqlalchemy import exists, func, or_, and_
+
+logger = logging.getLogger(__name__)
 from app.modules.academic.models import (
     Course,
     CourseSection,
@@ -20,6 +23,7 @@ from app.modules.academic.models import (
 from app.modules.academic.certificate_service import create_certificate, get_grade_label
 from app.modules.identity.models import User
 from app.modules.lms.models import Payment, ContractStatus, SectionContract
+from app.modules.lms.financial_service import create_payment as lms_create_payment
 from app.modules.lms.ledger_service import (
     activate_contract as ledger_activate_contract,
     settle_contract as ledger_settle_contract,
@@ -332,21 +336,18 @@ async def complete_section(
 
     # Chain contract through required lifecycle
     if section.contract and current_user.id:
-        try:
-            if section.contract.status == ContractStatus.ASSIGNED:
-                await ledger_activate_contract(
-                    db, section.contract.id, activated_by=current_user.id
-                )
+        if section.contract.status == ContractStatus.ASSIGNED:
+            await ledger_activate_contract(
+                db, section.contract.id, activated_by=current_user.id
+            )
 
-            if section.contract.status == ContractStatus.ACTIVE:
-                await ledger_finalize_grades(db, section_id=section.id)
+        if section.contract.status == ContractStatus.ACTIVE:
+            await ledger_finalize_grades(db, section_id=section.id)
 
-            if section.contract.status == ContractStatus.GRADES_SUBMITTED:
-                await ledger_settle_contract(
-                    db, section.contract.id, settled_by=current_user.id
-                )
-        except ValueError:
-            pass
+        if section.contract.status == ContractStatus.GRADES_SUBMITTED:
+            await ledger_settle_contract(
+                db, section.contract.id, settled_by=current_user.id
+            )
 
     section.status = "completed"
 
@@ -362,8 +363,10 @@ async def complete_section(
     for enrollment in enrollments_result.scalars().all():
         try:
             await create_certificate(db, enrollment, user_id=current_user.id)
-        except Exception:
-            continue
+        except Exception as e:
+            logger.error("Certificate creation failed for student %s in section %s: %s",
+                         enrollment.student_id, section_id, str(e))
+            raise
 
     await db.flush()
     return section
@@ -411,7 +414,7 @@ async def deactivate_section(
         )
 
     section.status = "pending"
-    await db.commit()
+    await db.flush()
     await db.refresh(section)
     return section
 
@@ -519,7 +522,12 @@ async def create_enrollment(
             student_id = student.id
     if not student_id:
         return None
-    section = await get_course_section(db, section_id)
+    section_result = await db.execute(
+        select(CourseSection)
+        .where(CourseSection.id == section_id)
+        .with_for_update()
+    )
+    section = section_result.scalar_one_or_none()
     if not section:
         return None
     if section.enrolled_count >= section.capacity:
@@ -764,8 +772,12 @@ async def set_final_grades_bulk(
     if enrolled_count > 0 and graded_count >= enrolled_count:
         try:
             await ledger_finalize_grades(db, section_id=section_id)
-        except ValueError:
-            pass
+        except ValueError as e:
+            logger.error(
+                "Failed to finalize grades for section %s: %s",
+                section_id, e,
+            )
+            raise
 
     return results
 
@@ -914,3 +926,45 @@ async def _is_date_closed(db: AsyncSession, check_date: date) -> bool:
         )
     )
     return result is not None
+
+
+async def create_enrollment_with_payment(
+    db: AsyncSession,
+    section_id: uuid.UUID,
+    amount: float,
+    created_by: uuid.UUID,
+    student_id: Optional[uuid.UUID] = None,
+    admin_discount: Optional[float] = None,
+    student_data: Optional[dict] = None,
+    payment_date: Optional[date] = None,
+    payment_method: str = "cash",
+    transaction_number: Optional[str] = None,
+    locale: str = "ar",
+) -> tuple[Enrollment, Payment]:
+    enrollment = await create_enrollment(
+        db,
+        section_id=section_id,
+        student_id=student_id,
+        admin_discount=admin_discount,
+        student_data=student_data,
+    )
+    if not enrollment:
+        section = await get_course_section(db, section_id)
+        if not section:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Section not found")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Section is full or enrollment already exists")
+
+    payment = await lms_create_payment(
+        db,
+        enrollment_id=enrollment.id,
+        amount=amount,
+        created_by=created_by,
+        payment_date=payment_date,
+        payment_method=payment_method,
+        transaction_number=transaction_number,
+        locale=locale,
+    )
+    if not payment:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Payment creation failed")
+
+    return enrollment, payment

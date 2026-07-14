@@ -6,7 +6,8 @@ import { apiClient } from "@/lib/api";
 import { useAuth } from "@/components/AuthContext";
 import Modal from "@/components/Modal";
 import Select from "@/components/ui/Select";
-import { Plus, Loader2, RefreshCw, Eye, X, Search } from "lucide-react";
+import { Plus, Loader2, RefreshCw, Eye, X, Search, AlertCircle } from "lucide-react";
+import { sanitizeInput, escapeLikeWildcards } from "@/lib/utils/input";
 import ReceiptModal, { ReceiptData } from "@/components/ReceiptModal";
 import { getLocalDateString, formatDisplayDate } from "@/lib/dates";
 
@@ -164,6 +165,8 @@ export default function ExpensesPage() {
     type: "success" | "error";
     text: string;
   } | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [formError, setFormError] = useState("");
   const [closedDates, setClosedDates] = useState<Set<string>>(new Set());
   const [form, setForm] = useState({
@@ -184,11 +187,11 @@ export default function ExpensesPage() {
     try {
       const params: Record<string, string> = {};
       if (filterType) params.type = filterType;
-      if (debouncedSearch) params.receipt_number = debouncedSearch;
+      if (debouncedSearch) params.receipt_number = escapeLikeWildcards(debouncedSearch);
       const res = await apiClient.get<Expense[]>("/lms/expenses", { params });
       setExpenses(res.data);
     } catch (e) {
-      console.error(e);
+      setFetchError("Failed to load expenses");
     }
   }, [filterType, debouncedSearch]);
 
@@ -220,7 +223,7 @@ export default function ExpensesPage() {
       );
       setEligibleRecipients(res.data);
     } catch (e) {
-      console.error(e);
+      setFetchError("Failed to load recipients");
       setEligibleRecipients([]);
     }
   }, []);
@@ -235,7 +238,7 @@ export default function ExpensesPage() {
       );
       setClosedDates(closed);
     } catch (e) {
-      console.error(e);
+      setFetchError("Failed to load closure dates");
     }
   }, []);
 
@@ -328,7 +331,7 @@ export default function ExpensesPage() {
   };
 
   const handleSave = async () => {
-    if (!form.amount) return;
+    if (!form.amount || submitting) return;
     if (form.type === "general_expense" && !form.recipient_name) return;
     if (
       (form.type === "teacher_withdrawal" ||
@@ -341,20 +344,22 @@ export default function ExpensesPage() {
       setMessage({ type: "error", text: t.recipientNotEligible });
       return;
     }
+    setSubmitting(true);
     const amount = parseFloat(form.amount);
     if (availableLimit !== null && amount > availableLimit) {
       setMessage({ type: "error", text: t.amountExceedsBalance });
+      setSubmitting(false);
       return;
     }
     try {
       const payload: Record<string, unknown> = {
         amount,
-        recipient_name: form.recipient_name,
-        type: form.type,
+        recipient_name: sanitizeInput(form.recipient_name),
+        type: sanitizeInput(form.type),
       };
-      if (form.recipient_id) payload.recipient_id = form.recipient_id;
-      if (form.description) payload.description = form.description;
-      if (form.date) payload.date = form.date;
+      if (form.recipient_id) payload.recipient_id = sanitizeInput(form.recipient_id);
+      if (form.description) payload.description = sanitizeInput(form.description);
+      if (form.date) payload.date = sanitizeInput(form.date);
       const res = await apiClient.post("/lms/expenses", payload);
       setShowForm(false);
       setShowVoucher(res.data);
@@ -366,6 +371,8 @@ export default function ExpensesPage() {
       } else {
         setFormError(detail || t.expenseError);
       }
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -439,6 +446,13 @@ export default function ExpensesPage() {
           )}
         </div>
       </div>
+
+      {fetchError && (
+        <div className="flex items-center gap-2 px-4 py-3 rounded-lg text-sm font-medium bg-red-50 text-red-700 border border-red-200">
+          <AlertCircle size={16} />
+          {fetchError}
+        </div>
+      )}
 
       <Modal
         open={showForm}
@@ -572,7 +586,8 @@ export default function ExpensesPage() {
             </div>
           )}
           <div className="flex gap-3 pt-2">
-            <button onClick={handleSave} className="btn-primary">
+            <button onClick={handleSave} disabled={submitting} className="btn-primary">
+              {submitting ? <Loader2 size={16} className="animate-spin" /> : null}
               {t.save}
             </button>
             <button
@@ -581,6 +596,7 @@ export default function ExpensesPage() {
                 setFormError("");
                 setSelectedRecipientEligible(null);
               }}
+              disabled={submitting}
               className="btn-secondary"
             >
               {t.cancel}

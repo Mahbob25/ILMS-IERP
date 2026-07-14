@@ -8,9 +8,11 @@ import RefreshButton from "@/components/RefreshButton";
 import ConfirmModal from "@/components/ConfirmModal";
 import Modal from "@/components/Modal";
 import Select from "@/components/ui/Select";
+import { sanitizeInput, escapeLikeWildcards } from "@/lib/utils/input";
 import {
   Plus,
   Loader2,
+  AlertCircle,
 } from "lucide-react";
 import CancelSectionModal from "@/components/sections/CancelSectionModal";
 import DeactivateSectionModal from "@/components/sections/DeactivateSectionModal";
@@ -71,6 +73,9 @@ export default function SectionsPage() {
   const [teachers, setTeachers] = useState<any[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [registering, setRegistering] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState({
@@ -152,7 +157,8 @@ export default function SectionsPage() {
       setActionMessage(null);
       try {
         const skip = (pageNum - 1) * limit;
-        let url = `/academic/course-sections?search=${encodeURIComponent(searchTerm)}&skip=${skip}&limit=${limit}&sort_by=id&sort_order=asc`;
+        const escapedSearch = escapeLikeWildcards(searchTerm);
+        let url = `/academic/course-sections?search=${encodeURIComponent(escapedSearch)}&skip=${skip}&limit=${limit}&sort_by=id&sort_order=asc`;
         if (statusVal) url += `&status=${statusVal}`;
         const res = await apiClient.get<{
           items: CourseSection[];
@@ -171,7 +177,7 @@ export default function SectionsPage() {
         setSections(sorted);
         setTotalCount(res.data.total);
       } catch (e) {
-        console.error(e);
+        setFetchError(t.errorGeneric || "Failed to load sections");
       } finally {
         setLoading(false);
       }
@@ -293,13 +299,15 @@ export default function SectionsPage() {
   };
 
   const handleSave = async () => {
+    if (submitting) return;
     if (!form.course_id) {
       setMessage({ type: "error", text: t.validationSelectCourse });
       return;
     }
+    setSubmitting(true);
     try {
       const payload: Record<string, unknown> = {
-        course_id: form.course_id,
+        course_id: sanitizeInput(form.course_id),
         teacher_id: form.teacher_id || null,
         capacity: form.capacity,
       };
@@ -310,8 +318,10 @@ export default function SectionsPage() {
       if (form.class_time) payload.class_time = form.class_time;
       if (form.class_duration_minutes > 0)
         payload.class_duration_minutes = form.class_duration_minutes;
-      if (form.classroom) payload.classroom = form.classroom;
+      if (form.classroom) payload.classroom = sanitizeInput(form.classroom);
       if (form.price) payload.price = parseFloat(form.price);
+
+      const isNewRecord = !editingId;
       let sectionId = editingId;
       if (editingId) {
         const cleaned: Record<string, unknown> = {};
@@ -341,9 +351,13 @@ export default function SectionsPage() {
           contractAssign,
         );
       }
-      setShowForm(false);
-      setEditingId(null);
-      fetchSections(search, statusFilter, page);
+      if (isNewRecord && sectionId) {
+        router.replace(`/${locale}/dashboard/sections/${sectionId}`);
+      } else {
+        setShowForm(false);
+        setEditingId(null);
+        fetchSections(search, statusFilter, page);
+      }
     } catch (e: unknown) {
       const err = e as {
         response?: {
@@ -360,6 +374,8 @@ export default function SectionsPage() {
       } else {
         setMessage({ type: "error", text: detail || t.errorGeneric });
       }
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -434,8 +450,10 @@ export default function SectionsPage() {
   };
 
   const handleRegister = async () => {
+    if (registering) return;
     if (!registerForm.student_id) return;
     if (!showRegister) return;
+    setRegistering(true);
     try {
       await apiClient.post("/academic/enrollments", {
         student_id: registerForm.student_id,
@@ -454,6 +472,8 @@ export default function SectionsPage() {
         type: "error",
         text: err?.response?.data?.detail || t.registrationFailed,
       });
+    } finally {
+      setRegistering(false);
     }
   };
 
@@ -540,6 +560,19 @@ export default function SectionsPage() {
         )}
       </div>
 
+      {fetchError && (
+        <div className="flex items-center gap-2 px-4 py-3 rounded-lg text-sm font-medium bg-red-50 text-red-700 border border-red-200">
+          <AlertCircle size={16} />
+          <span>{fetchError}</span>
+          <button
+            onClick={() => setFetchError(null)}
+            className="ms-auto float-end"
+          >
+            &times;
+          </button>
+        </div>
+      )}
+
       {actionMessage && (
         <div
           className={`px-4 py-3 rounded-lg text-sm font-medium ${
@@ -573,6 +606,7 @@ export default function SectionsPage() {
         message={message}
         onMessageClear={() => setMessage(null)}
         onShowMessage={(msg) => setMessage(msg)}
+        submitting={submitting}
       />
 
       <SectionsTable
@@ -662,8 +696,8 @@ export default function SectionsPage() {
             ) : null;
           })()}
           <div className="flex gap-3 pt-2">
-            <button onClick={handleRegister} className="btn-primary">
-              {t.register}
+            <button onClick={handleRegister} disabled={registering} className="btn-primary">
+              {registering ? "..." : t.register}
             </button>
             <button
               onClick={() => {

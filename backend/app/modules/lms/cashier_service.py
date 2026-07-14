@@ -3,13 +3,15 @@ from datetime import date
 from decimal import Decimal
 from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select, func, update
 from sqlalchemy.orm import joinedload
 from app.core.timezone import get_today
 from app.modules.academic.models import (
     PendingRefund, Refund, SectionCancellation, Enrollment, Student, CourseSection, UnenrollmentRecord,
 )
 from app.modules.lms.closure_service import is_date_closed
+from app.modules.lms.models import LedgerEntryType
+from app.modules.lms.ledger_service import record as ledger_record, get_or_create_wallet
 
 
 async def get_pending_refunds_queue(
@@ -95,23 +97,6 @@ async def disburse_pending_refund(
     disbursed_by: uuid.UUID,
     notes: Optional[str] = None,
 ) -> Refund:
-    result = await db.execute(
-        select(PendingRefund)
-        .options(
-            joinedload(PendingRefund.enrollment).joinedload(Enrollment.student),
-            joinedload(PendingRefund.section_cancellation),
-        )
-        .where(PendingRefund.id == pending_refund_id)
-    )
-    pending_refund = result.scalar_one_or_none()
-    if not pending_refund:
-        raise ValueError("Pending refund not found")
-
-    if pending_refund.status != "UNCLAIMED":
-        raise ValueError(
-            f"Cannot disburse: pending refund is already {pending_refund.status}"
-        )
-
     today = get_today()
     if await is_date_closed(db, today):
         raise ValueError(
@@ -119,6 +104,19 @@ async def disburse_pending_refund(
         )
 
     receipt_number = await _generate_receipt_number(db, today)
+
+    result = await db.execute(
+        update(PendingRefund)
+        .where(
+            PendingRefund.id == pending_refund_id,
+            PendingRefund.status == "UNCLAIMED",
+        )
+        .values(status="CLAIMED")
+        .returning(PendingRefund)
+    )
+    pending_refund = result.scalar_one_or_none()
+    if not pending_refund:
+        raise ValueError("Pending refund not found or already claimed")
 
     refund = Refund(
         pending_refund_id=pending_refund.id,
@@ -128,8 +126,6 @@ async def disburse_pending_refund(
         notes=notes,
     )
     db.add(refund)
-
-    pending_refund.status = "CLAIMED"
 
     await db.flush()
     return refund

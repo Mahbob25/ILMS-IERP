@@ -6,6 +6,17 @@ from fastapi import UploadFile
 
 UPLOAD_DIR = Path(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))) / "uploads"
 
+MIN_DISK_SPACE_MB = 100
+
+
+def check_disk_space(path: str | Path, required_mb: int = MIN_DISK_SPACE_MB) -> None:
+    usage = shutil.disk_usage(path)
+    available_mb = usage.free / (1024 * 1024)
+    if available_mb < required_mb:
+        raise IOError(
+            f"Insufficient disk space: {available_mb:.0f}MB available, {required_mb}MB required"
+        )
+
 
 def ensure_upload_dir(subdir: str = "") -> Path:
     target = UPLOAD_DIR / subdir
@@ -14,6 +25,7 @@ def ensure_upload_dir(subdir: str = "") -> Path:
 
 
 async def save_upload(file: UploadFile, subdir: str = "") -> str:
+    check_disk_space(UPLOAD_DIR)
     ext = os.path.splitext(file.filename or "file")[1] if file.filename else ""
     filename = f"{uuid.uuid4().hex}{ext}"
     target_dir = ensure_upload_dir(subdir)

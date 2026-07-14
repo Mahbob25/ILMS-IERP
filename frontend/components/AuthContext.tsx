@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { apiClient } from "@/lib/api";
 
 export interface Role {
@@ -35,6 +35,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [permissions, setPermissions] = useState<string[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const isLoggingOut = useRef(false);
+  const pendingCheckSession = useRef<Promise<User | null> | null>(null);
 
   const refreshPermissions = useCallback(async () => {
     try {
@@ -46,16 +48,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const checkSession = useCallback(async (): Promise<User | null> => {
-    try {
-      const response = await apiClient.get<User>("/users/me");
-      setUser(response.data);
-      return response.data;
-    } catch (error) {
-      setUser(null);
-      return null;
-    } finally {
+    if (isLoggingOut.current) {
       setLoading(false);
+      return null;
     }
+    const pending = pendingCheckSession.current;
+    if (pending) return pending;
+    const promise = (async () => {
+      try {
+        const response = await apiClient.get<User>("/users/me");
+        if (!isLoggingOut.current) {
+          setUser(response.data);
+        }
+        return response.data;
+      } catch {
+        if (!isLoggingOut.current) {
+          setUser(null);
+        }
+        return null;
+      } finally {
+        setLoading(false);
+        pendingCheckSession.current = null;
+      }
+    })();
+    pendingCheckSession.current = promise;
+    return promise;
   }, []);
 
   useEffect(() => {
@@ -83,10 +100,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const logout = useCallback(async (): Promise<void> => {
+    isLoggingOut.current = true;
+    pendingCheckSession.current = null;
     setLoading(true);
     try {
       await apiClient.post("/auth/logout");
-    } catch (error) {
+    } catch {
+      // Intentionally swallow — clear local state even if the API call fails
     } finally {
       setUser(null);
       setPermissions([]);

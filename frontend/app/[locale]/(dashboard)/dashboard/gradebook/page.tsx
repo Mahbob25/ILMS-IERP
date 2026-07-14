@@ -6,7 +6,9 @@ import { apiClient } from "@/lib/api";
 import { useAuth } from "@/components/AuthContext";
 import RefreshButton from "@/components/RefreshButton";
 import Select from "@/components/ui/Select";
-import { Loader2, Save } from "lucide-react";
+import EmptyState from "@/components/EmptyState";
+import { sanitizeInput } from "@/lib/utils/input";
+import { Loader2, Save, AlertCircle } from "lucide-react";
 
 interface CourseSection { id: string; course_id: string; teacher_id: string; status: string; }
 interface Course { id: string; name: string; code: string; }
@@ -83,7 +85,9 @@ export default function GradebookPage() {
   const [grades, setGrades] = useState<Record<string, { score: string; notes: string }>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     try {
@@ -93,7 +97,9 @@ export default function GradebookPage() {
       ]);
       setSections(sectRes.data.items);
       setCourses(courseRes.data.items);
-    } catch { /* */ } finally { setLoading(false); }
+    } catch (e: any) {
+      setFetchError(e?.message || "Failed to load data");
+    } finally { setLoading(false); }
   }, []);
 
   useEffect(() => { fetchData(); }, [fetchData]);
@@ -130,7 +136,9 @@ export default function GradebookPage() {
           };
         }
         setGrades(gradeMap);
-      } catch { /* */ }
+      } catch (e: any) {
+        setFetchError(e?.message || "Failed to load section data");
+      }
     })();
   }, [selectedSectionId]);
 
@@ -161,13 +169,14 @@ export default function GradebookPage() {
         gradesPayload.push({
           student_id: enr.student_id,
           final_score: parseFloat(g.score),
-          notes: g.notes || undefined,
+          notes: g.notes ? sanitizeInput(g.notes) : undefined,
         });
       }
     }
     if (gradesPayload.length === 0) return;
 
     setSaving(true);
+    setSubmitting(true);
     setMessage(null);
     try {
       await apiClient.put(`/academic/sections/${selectedSectionId}/final-grades`, {
@@ -178,6 +187,7 @@ export default function GradebookPage() {
       setMessage({ type: "error", text: t.saveError });
     } finally {
       setSaving(false);
+      setSubmitting(false);
     }
   };
 
@@ -230,11 +240,18 @@ export default function GradebookPage() {
       </div>
 
       {!selectedSectionId && (
-        <div className="card p-8 text-center text-sm text-slate-500">{t.noSection}</div>
+        <EmptyState title={t.noSection} message="" />
       )}
 
       {selectedSectionId && (
         <div className="card overflow-hidden">
+          {fetchError && (
+            <div className="mx-4 mt-4 px-4 py-3 rounded-lg text-sm font-medium bg-red-50 text-red-700 border border-red-200 flex items-center gap-2">
+              <AlertCircle size={16} />
+              {fetchError}
+              <button onClick={() => setFetchError(null)} className="ms-auto">&times;</button>
+            </div>
+          )}
           {message && (
             <div className={`mx-4 mt-4 px-4 py-3 rounded-lg text-sm font-medium ${
               message.type === "success"
@@ -257,7 +274,7 @@ export default function GradebookPage() {
             </thead>
             <tbody>
               {sectionStudents.length === 0 && (
-                <tr><td colSpan={5} className="text-center text-sm text-slate-500 py-8">{t.noStudents}</td></tr>
+                <tr><td colSpan={5}><EmptyState title={t.noStudents} message="" /></td></tr>
               )}
               {sectionStudents.map((enr, idx) => (
                 <tr key={enr.student_id}>
@@ -295,7 +312,7 @@ export default function GradebookPage() {
             <div className="flex justify-end px-4 py-3 border-t border-slate-200">
               <button
                 onClick={handleSaveAll}
-                disabled={saving}
+                disabled={saving || submitting}
                 className="btn-primary flex items-center gap-2"
               >
                 {saving ? (

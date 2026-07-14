@@ -1,23 +1,42 @@
+import os
 from contextlib import asynccontextmanager
 
+import sentry_sdk
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from sentry_sdk.integrations.fastapi import FastApiIntegration
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from app.core.rate_limit import limiter
 
 from app.core.config import settings
+from app.core.logging import setup_logging
+
+sentry_sdk.init(
+    dsn=os.getenv("SENTRY_DSN"),
+    environment=os.getenv("APP_ENV", "development"),
+    traces_sample_rate=0.1,
+    integrations=[FastApiIntegration()],
+)
+
+setup_logging()
+
 from app.db.session import async_session_maker
 from app.modules.academic.section_startup_checks import run_daily_section_checks
 from app.modules.identity.router import auth_router, users_router, employees_router, permissions_router
 from app.modules.academic.router import academic_router
 from app.modules.lms.router import lms_router
+from app.modules.lms.idempotency_service import cleanup_expired_keys
 from app.modules.dashboard.router import dashboard_router
+from app.middleware.idempotency import IdempotencyMiddleware
+from app.middleware.real_ip import RealIPMiddleware
+from app.middleware.csrf import CSRFMiddleware
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     async with async_session_maker() as db:
         await run_daily_section_checks(db)
+        await cleanup_expired_keys(db)
     yield
 
 app = FastAPI(
@@ -40,6 +59,15 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Real IP middleware — parse X-Forwarded-For to get real client IP
+app.add_middleware(RealIPMiddleware)
+
+# CSRF middleware — validate X-CSRF-Token header against csrf_token cookie for mutating requests
+app.add_middleware(CSRFMiddleware)
+
+# Idempotency middleware — caches POST/PATCH/PUT responses by Idempotency-Key header
+app.add_middleware(IdempotencyMiddleware)
 
 # Include routes under /api/v1 prefix
 app.include_router(auth_router, prefix="/api/v1")

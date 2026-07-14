@@ -34,6 +34,7 @@ async def run_daily_section_checks(db: AsyncSession) -> None:
         )
     )
     if result.scalar_one_or_none():
+        logger.info("Section checks already ran for %s, skipping", today)
         return
 
     await _process_overdue_sections(db, today)

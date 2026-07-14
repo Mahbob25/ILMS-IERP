@@ -3,8 +3,9 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useParams } from "next/navigation";
 import { apiClient } from "@/lib/api";
+import { sanitizeInput } from "@/lib/utils/input";
 import { useAuth } from "@/components/AuthContext";
-import { Search, Loader2, RefreshCw, X, Plus, Check } from "lucide-react";
+import { Search, Loader2, RefreshCw, X, Plus, Check, AlertCircle } from "lucide-react";
 import RefreshButton from "@/components/RefreshButton";
 import ReceiptModal, { ReceiptData } from "@/components/ReceiptModal";
 
@@ -175,6 +176,7 @@ export default function POSPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [loadingEnrollments, setLoadingEnrollments] = useState(false);
   const [error, setError] = useState("");
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [showReceipt, setShowReceipt] = useState(false);
   const [receiptData, setReceiptData] = useState<ReceiptData | null>(null);
 
@@ -182,8 +184,8 @@ export default function POSPage() {
     try {
       const res = await apiClient.get<{ items: Student[]; total: number }>("/academic/students?limit=1000");
       setStudents(res.data.items);
-    } catch (e) {
-      console.error(e);
+    } catch {
+      setFetchError("Failed to load students");
     }
   }, []);
 
@@ -191,8 +193,8 @@ export default function POSPage() {
     try {
       const res = await apiClient.get<{ items: Course[]; total: number }>("/academic/courses?limit=1000");
       setCourses(res.data.items);
-    } catch (e) {
-      console.error(e);
+    } catch {
+      setFetchError("Failed to load courses");
     }
   }, []);
 
@@ -200,8 +202,8 @@ export default function POSPage() {
     try {
       const res = await apiClient.get<{ items: CourseSection[]; total: number }>("/academic/course-sections?limit=1000");
       setCourseSections(res.data.items);
-    } catch (e) {
-      console.error(e);
+    } catch {
+      setFetchError("Failed to load course sections");
     }
   }, []);
 
@@ -210,8 +212,8 @@ export default function POSPage() {
     try {
       const res = await apiClient.get<{ items: Enrollment[]; total: number }>(`/academic/enrollments?student_id=${studentId}&limit=1000`);
       setEnrollments(res.data.items);
-    } catch (e) {
-      console.error(e);
+    } catch {
+      setFetchError("Failed to load enrollments");
     } finally {
       setLoadingEnrollments(false);
     }
@@ -262,6 +264,7 @@ export default function POSPage() {
     setSummary(null);
     setResult(null);
     setError("");
+    setFetchError(null);
     setEnrollments([]);
     if (searchRef.current) {
       searchRef.current.focus();
@@ -297,7 +300,7 @@ export default function POSPage() {
         payment_method: paymentMethod,
       };
       if (paymentMethod === "online") {
-        payload.transaction_number = transactionNumber;
+        payload.transaction_number = sanitizeInput(transactionNumber);
       }
       const res = await apiClient.post<PaymentResult>("/lms/payments", payload);
       const updatedSummaryRes = await apiClient.get<PaymentSummary>(`/lms/payments/summary/${selectedEnrollmentId}`);
@@ -634,7 +637,14 @@ export default function POSPage() {
           </div>
         )}
 
-        {/* Error */}
+        {/* Errors */}
+        {fetchError && (
+          <div className="text-sm text-red-600 bg-red-50 p-3 rounded-lg flex items-center gap-2">
+            <AlertCircle size={14} />
+            <span>{fetchError}</span>
+            <button onClick={() => setFetchError(null)} className="ms-auto text-red-400 hover:text-red-600">&times;</button>
+          </div>
+        )}
         {error && (
           <div className="text-sm text-red-600 bg-red-50 p-3 rounded-lg">{error}</div>
         )}

@@ -6,7 +6,8 @@ import { apiClient } from "@/lib/api";
 import { useAuth } from "@/components/AuthContext";
 import ConfirmModal from "@/components/ConfirmModal";
 import Modal from "@/components/Modal";
-import { Plus, Pencil, Trash2, Loader2, RefreshCw } from "lucide-react";
+import { Plus, Pencil, Trash2, Loader2, RefreshCw, AlertCircle } from "lucide-react";
+import { sanitizeInput, escapeLikeWildcards } from "@/lib/utils/input";
 
 interface Course {
   id: string;
@@ -89,20 +90,24 @@ export default function CoursesPage() {
   const [form, setForm] = useState({ name: "", code: "", description: "", credits: 3 });
   const [deleteTarget, setDeleteTarget] = useState<Course | null>(null);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const limit = 15;
 
   const fetchCourses = useCallback(async (searchTerm = "", pageNum = 1) => {
+    setFetchError(null);
     try {
       const skip = (pageNum - 1) * limit;
-      const params = `?search=${encodeURIComponent(searchTerm)}&skip=${skip}&limit=${limit}&sort_by=name&sort_order=asc`;
+      const escapedSearch = escapeLikeWildcards(searchTerm);
+      const params = `?search=${encodeURIComponent(escapedSearch)}&skip=${skip}&limit=${limit}&sort_by=name&sort_order=asc`;
       const res = await apiClient.get<{ items: Course[]; total: number }>(`/academic/courses${params}`);
       setCourses(res.data.items);
       setTotalCount(res.data.total);
     } catch (e) {
-      console.error(e);
+      setFetchError("Failed to load courses");
     }
   }, []);
 
@@ -153,13 +158,14 @@ export default function CoursesPage() {
   };
 
   const handleSave = async () => {
+    setSubmitting(true);
     try {
       const payload: Record<string, unknown> = {
-        name: form.name,
-        code: form.code,
+        name: sanitizeInput(form.name),
+        code: sanitizeInput(form.code),
         credits: form.credits,
       };
-      if (form.description) payload.description = form.description;
+      if (form.description) payload.description = sanitizeInput(form.description);
       if (editingId) {
         const cleaned: Record<string, unknown> = {};
         Object.entries(payload).forEach(([k, v]) => { if (v !== "" && v !== null && v !== undefined) cleaned[k] = v; });
@@ -169,9 +175,11 @@ export default function CoursesPage() {
       }
       setShowForm(false);
       setEditingId(null);
+      setSubmitting(false);
       handleRefresh();
     } catch (e) {
-      console.error(e);
+      setSubmitting(false);
+      setMessage({ type: "error", text: "Failed to save course" });
     }
   };
 
@@ -252,6 +260,13 @@ export default function CoursesPage() {
         </div>
       )}
 
+      {fetchError && (
+        <div className="px-4 py-3 rounded-lg text-sm font-medium bg-red-50 text-red-700 border border-red-200 flex items-center gap-2">
+          <AlertCircle size={16} />
+          {fetchError}
+        </div>
+      )}
+
       <Modal open={showForm} onClose={() => setShowForm(false)} title={editingId ? t.edit : t.add} size="xl">
         <div className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -277,7 +292,7 @@ export default function CoursesPage() {
             </div>
           </div>
           <div className="flex gap-3 pt-2">
-            <button onClick={handleSave} className="btn-primary">{t.save}</button>
+            <button onClick={handleSave} disabled={submitting} className="btn-primary">{submitting ? <Loader2 size={16} className="animate-spin" /> : t.save}</button>
             <button onClick={() => setShowForm(false)} className="btn-secondary">{t.cancel}</button>
           </div>
         </div>

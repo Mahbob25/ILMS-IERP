@@ -3,7 +3,7 @@ import enum
 from datetime import date, datetime
 from typing import Optional, TYPE_CHECKING
 from sqlalchemy import String, Integer, Date, DateTime, ForeignKey, Text, Enum as SAEnum, UniqueConstraint, Numeric
-from sqlalchemy.dialects.postgresql import UUID as PG_UUID
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID, JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
 
@@ -357,4 +357,24 @@ class DailyClosure(Base):
     status: Mapped[str] = mapped_column(SAEnum('closed', 'pending', 'unlock_requested', name='closurystatus'), nullable=False, default="pending", server_default="pending")
     closed_by_manager_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+
+
+class IdempotencyKey(Base):
+    __tablename__ = "idempotency_keys"
+    __table_args__ = (
+        UniqueConstraint("idempotency_key", "endpoint", name="uq_idempotency_keys_key_endpoint"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4,
+        server_default="gen_random_uuid()",
+    )
+    idempotency_key: Mapped[str] = mapped_column(String(255), nullable=False)
+    endpoint: Mapped[str] = mapped_column(String(100), nullable=False)
+    response_status: Mapped[int] = mapped_column(Integer, nullable=False)
+    response_body: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False,
+        server_default="timezone('utc'::text, now())",
     )

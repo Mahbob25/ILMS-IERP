@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { apiClient } from "@/lib/api";
+import { sanitizeInput } from "@/lib/utils/input";
 import Modal from "@/components/Modal";
 import Select from "@/components/ui/Select";
 
@@ -42,6 +43,7 @@ interface SectionFormModalProps {
   message: { type: "success" | "error"; text: string } | null;
   onMessageClear: () => void;
   onShowMessage: (msg: { type: "success" | "error"; text: string }) => void;
+  submitting?: boolean;
 }
 
 export default function SectionFormModal({
@@ -59,13 +61,25 @@ export default function SectionFormModal({
   message,
   onMessageClear,
   onShowMessage,
+  submitting = false,
 }: SectionFormModalProps) {
   const [showIncreaseModal, setShowIncreaseModal] = useState(false);
   const [increaseReason, setIncreaseReason] = useState("");
   const [increaseAmount, setIncreaseAmount] = useState("");
+  const [saving, setSaving] = useState(false);
 
   const updateField = (field: Partial<FormData>) => {
     onFormChange({ ...form, ...field });
+  };
+
+  const handleSave = async () => {
+    if (saving) return;
+    setSaving(true);
+    try {
+      await Promise.resolve(onSave());
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -240,7 +254,7 @@ export default function SectionFormModal({
             </div>
           )}
           <div className="flex gap-3 pt-2">
-            <button onClick={onSave} className="btn-primary">{t.save}</button>
+            <button onClick={handleSave} disabled={submitting || saving} className="btn-primary">{submitting || saving ? "..." : t.save}</button>
             <button onClick={onClose} className="btn-secondary">{t.cancel}</button>
           </div>
         </div>
@@ -292,11 +306,12 @@ export default function SectionFormModal({
               <div className="flex gap-3 pt-2">
                 <button
                   onClick={async () => {
-                    if (!increaseAmount || !increaseReason || !sectionId) return;
+                    if (!increaseAmount || !increaseReason || !sectionId || submitting) return;
+                    setSaving(true);
                     try {
                       await apiClient.post(`/lms/sections/${sectionId}/contract/amend`, {
                         requested_amount: parseFloat(increaseAmount),
-                        reason: increaseReason,
+                        reason: sanitizeInput(increaseReason),
                       });
                       setShowIncreaseModal(false);
                       setIncreaseAmount("");
@@ -305,9 +320,12 @@ export default function SectionFormModal({
                     } catch (e) {
                       const err = e as { response?: { data?: { detail?: string } } };
                       onShowMessage({ type: "error", text: err?.response?.data?.detail || "Failed to submit increase request" });
+                    } finally {
+                      setSaving(false);
                     }
                   }}
                   className="btn-primary"
+                  disabled={submitting || saving}
                 >
                   {t.submit || "Submit"}
                 </button>

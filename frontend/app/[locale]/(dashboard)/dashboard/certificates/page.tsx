@@ -3,10 +3,12 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { apiClient } from "@/lib/api";
+import { sanitizeInput, escapeLikeWildcards } from "@/lib/utils/input";
 import { useAuth } from "@/components/AuthContext";
 import RefreshButton from "@/components/RefreshButton";
 import CertificatePreview from "@/components/CertificatePreview";
-import { Loader2, Search, Trash2, Eye, FileDown } from "lucide-react";
+import EmptyState from "@/components/EmptyState";
+import { Loader2, Search, Trash2, Eye, FileDown, AlertCircle } from "lucide-react";
 
 interface Certificate {
   id: string;
@@ -92,20 +94,24 @@ export default function CertificatesPage() {
   const [page, setPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [previewCert, setPreviewCert] = useState<Certificate | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Certificate | null>(null);
   const limit = 15;
 
   const fetchCertificates = useCallback(async (searchTerm = "", pageNum = 1) => {
     setMessage(null);
+    setFetchError(null);
     try {
       const skip = (pageNum - 1) * limit;
-      let url = `/academic/certificates?search=${encodeURIComponent(searchTerm)}&skip=${skip}&limit=${limit}&sort_by=issued_at&sort_order=desc`;
+      const safeSearch = escapeLikeWildcards(sanitizeInput(searchTerm));
+      let url = `/academic/certificates?search=${encodeURIComponent(safeSearch)}&skip=${skip}&limit=${limit}&sort_by=issued_at&sort_order=desc`;
       const res = await apiClient.get<{ items: Certificate[]; total: number }>(url);
       setCertificates(res.data.items);
       setTotalCount(res.data.total);
     } catch {
-      // handled
+      setFetchError("Failed to fetch certificates");
     } finally {
       setLoading(false);
     }
@@ -129,6 +135,8 @@ export default function CertificatesPage() {
   }, []);
 
   const handleDelete = async (id: string) => {
+    if (submitting) return;
+    setSubmitting(true);
     try {
       await apiClient.delete(`/academic/certificates/${id}`);
       setDeleteTarget(null);
@@ -137,6 +145,8 @@ export default function CertificatesPage() {
     } catch {
       setDeleteTarget(null);
       setMessage({ type: "error", text: "Delete failed" });
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -240,8 +250,16 @@ export default function CertificatesPage() {
         </div>
       )}
 
+      {fetchError && (
+        <div className="flex items-center gap-2 p-4 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
+          <AlertCircle size={16} />
+          <span>{fetchError}</span>
+          <button onClick={() => setFetchError(null)} className="ms-auto text-red-400 hover:text-red-600">&times;</button>
+        </div>
+      )}
+
       {certificates.length === 0 ? (
-        <div className="card p-8 text-center text-sm text-slate-500">{t.empty}</div>
+        <EmptyState title={t.empty} message="" />
       ) : (
         <div className="card overflow-hidden">
               <table className="data-table">
@@ -332,7 +350,7 @@ export default function CertificatesPage() {
             </p>
             <div className="flex gap-3 justify-end">
               <button onClick={() => setDeleteTarget(null)} className="btn-secondary">{t.close}</button>
-              <button onClick={() => handleDelete(deleteTarget.id)} className="btn-primary bg-red-600 hover:bg-red-700">{t.delete}</button>
+              <button onClick={() => handleDelete(deleteTarget.id)} disabled={submitting} className="btn-primary bg-red-600 hover:bg-red-700">{t.delete}</button>
             </div>
           </div>
         </div>

@@ -6,6 +6,8 @@ import { apiClient } from "@/lib/api";
 import { useAuth } from "@/components/AuthContext";
 import RefreshButton from "@/components/RefreshButton";
 import Select from "@/components/ui/Select";
+import EmptyState from "@/components/EmptyState";
+import { sanitizeInput } from "@/lib/utils/input";
 import { Loader2, Check, X, Clock, AlertCircle } from "lucide-react";
 import { getLocalDateString } from "@/lib/dates";
 
@@ -77,7 +79,9 @@ export default function AttendancePage() {
   const [records, setRecords] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [savedMsg, setSavedMsg] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     try {
@@ -87,8 +91,8 @@ export default function AttendancePage() {
       ]);
       setSections(sectRes.data.items);
       setCourses(courseRes.data.items);
-    } catch (e) {
-      console.error(e);
+    } catch (e: any) {
+      setFetchError(e?.message || "Failed to load data");
     } finally {
       setLoading(false);
     }
@@ -125,13 +129,15 @@ export default function AttendancePage() {
           recRes.data.forEach((r) => { recordMap[r.student_id] = r.status; });
           setRecords(recordMap);
         }
-      } catch (e) { console.error(e); }
+      } catch (e: any) { setFetchError(e?.message || "Failed to load attendance data"); }
     })();
   }, [selectedSectionId, sessionDate]);
 
   const handleCreateOrSave = async () => {
     setSaving(true);
+    setSubmitting(true);
     setSavedMsg(false);
+    setFetchError(null);
     try {
       let session = currentSession;
       if (!session) {
@@ -150,10 +156,11 @@ export default function AttendancePage() {
       await apiClient.post(`/lms/attendance/sessions/${session.id}/records`, { records: recordsPayload });
       setSavedMsg(true);
       setTimeout(() => setSavedMsg(false), 3000);
-    } catch (e) {
-      console.error(e);
+    } catch (e: any) {
+      setFetchError(e?.message || "Failed to save attendance");
     } finally {
       setSaving(false);
+      setSubmitting(false);
     }
   };
 
@@ -208,22 +215,29 @@ export default function AttendancePage() {
           </div>
           <div className="flex items-end">
             {selectedSectionId && (
-              <button onClick={handleCreateOrSave} disabled={saving} className="btn-primary flex items-center gap-2">
+              <button onClick={handleCreateOrSave} disabled={saving || submitting} className="btn-primary flex items-center gap-2">
                 {saving ? <Loader2 size={16} className="animate-spin" /> : null}
                 <span>{currentSession ? t.save : t.createSession}</span>
               </button>
             )}
           </div>
         </div>
+        {fetchError && (
+          <div className="flex items-center gap-2 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+            <AlertCircle size={16} />
+            {fetchError}
+            <button onClick={() => setFetchError(null)} className="ms-auto">&times;</button>
+          </div>
+        )}
         {savedMsg && <p className="text-sm text-emerald-600 font-medium">{t.saved} ✓</p>}
       </div>
 
       {!selectedSectionId && (
-        <div className="card p-8 text-center text-sm text-slate-500">{t.noSection}</div>
+        <EmptyState title={t.noSection} message="" />
       )}
 
       {selectedSectionId && enrolledStudents.length === 0 && (
-        <div className="card p-8 text-center text-sm text-slate-500">{t.noStudents}</div>
+        <EmptyState title={t.noStudents} message="" />
       )}
 
       {selectedSectionId && enrolledStudents.length > 0 && (

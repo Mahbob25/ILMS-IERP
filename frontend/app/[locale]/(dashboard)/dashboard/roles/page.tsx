@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { apiClient } from "@/lib/api";
+import { sanitizeInput } from "@/lib/utils/input";
 import { useAuth } from "@/components/AuthContext";
 import RefreshButton from "@/components/RefreshButton";
 import {
@@ -49,6 +50,9 @@ export default function RolesPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+
+  const submitting = saving;
 
   const t = {
     ar: {
@@ -109,7 +113,7 @@ export default function RolesPage() {
       await apiClient.put(`/permissions/roles/${activeRoleId}`, { permission_codenames: codenames });
       setDirty(false);
     } catch {
-      alert(t.saveErr);
+      setFetchError(t.saveErr);
     } finally {
       setSaving(false);
     }
@@ -184,6 +188,14 @@ export default function RolesPage() {
           </button>
         ))}
       </div>
+
+      {fetchError && (
+        <div className="flex items-center gap-2 p-4 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
+          <AlertCircle size={16} />
+          <span>{fetchError}</span>
+          <button onClick={() => setFetchError(null)} className="ms-auto text-red-400 hover:text-red-600">&times;</button>
+        </div>
+      )}
 
       {Object.entries(groupedPerms).map(([group, perms]) => (
         <div key={group} className="card p-5">

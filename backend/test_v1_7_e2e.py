@@ -29,7 +29,17 @@ ok = 0
 fail = 0
 failed_tests = []
 
-DB_URL = "postgresql://lims:lims_secure_pass@localhost:5440/lims"
+# Load .env.test if present
+env_test = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env.test')
+if os.path.isfile(env_test):
+    with open(env_test) as f:
+        for line in f:
+            line = line.strip()
+            if line and not line.startswith('#'):
+                key, _, val = line.partition('=')
+                os.environ.setdefault(key.strip(), val.strip())
+
+DB_URL = os.getenv('TEST_DB_URL', 'postgresql://lims:lims_secure_pass@localhost:5440/lims')
 BASE = 'http://localhost:8000'
 
 EXPECTED_NEW_TABLES = {'payments', 'expenses', 'teacher_wallets', 'daily_closures'}

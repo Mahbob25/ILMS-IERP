@@ -5,9 +5,11 @@ import { useParams } from "next/navigation";
 import { apiClient } from "@/lib/api";
 import { useAuth } from "@/components/AuthContext";
 import Modal from "@/components/Modal";
+import EmptyState from "@/components/EmptyState";
+import { sanitizeInput } from "@/lib/utils/input";
 import {
   Loader2, RefreshCw, Wallet, ChevronDown, ChevronUp,
-  DollarSign, Users, X, Plus,
+  DollarSign, Users, X, Plus, AlertCircle,
 } from "lucide-react";
 import { getLocalDateString, formatDisplayDate, formatDisplayDateTime } from "@/lib/dates";
 import ContractStatusBadge from "@/components/sections/ContractStatusBadge";
@@ -120,6 +122,8 @@ function TeacherWalletView({ locale, employeeId }: { locale: string; employeeId:
   const [withdrawals, setWithdrawals] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   const teacherId = employeeId;
 
@@ -179,8 +183,16 @@ function TeacherWalletView({ locale, employeeId }: { locale: string; employeeId:
         </div>
       </div>
 
+      {fetchError && (
+        <div className="flex items-center gap-2 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+          <AlertCircle size={16} />
+          {fetchError}
+          <button onClick={() => setFetchError(null)} className="ms-auto">&times;</button>
+        </div>
+      )}
+
       {!walletDetail ? (
-        <div className="card p-8 text-center text-sm text-slate-500">{t.noWallet}</div>
+        <EmptyState title={t.noWallet} message="" />
       ) : (
         <>
           <div className="card p-6">
@@ -251,7 +263,7 @@ function TeacherWalletView({ locale, employeeId }: { locale: string; employeeId:
           <div>
             <h3 className="text-sm font-bold text-slate-900 mb-3">{t.history}</h3>
             {withdrawals.length === 0 ? (
-              <div className="card p-6 text-center text-sm text-slate-500">{t.emptyHistory}</div>
+              <EmptyState title={t.emptyHistory} message="" />
             ) : (
               <div className="card overflow-hidden">
                 <table className="data-table">
@@ -374,12 +386,15 @@ function AdminWalletOverview({ locale }: { locale: string }) {
   const [modalSubmitting, setModalSubmitting] = useState(false);
   const [modalSuccess, setModalSuccess] = useState(false);
   const [modalPreviewAvailable, setModalPreviewAvailable] = useState<number | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   const fetchAll = useCallback(async () => {
     try {
       const res = await apiClient.get<TeacherWithWallet[]>("/users/teachers");
       setTeachers(res.data);
-    } catch {
+    } catch (e: any) {
+      setFetchError(e?.message || "Failed to load teachers");
       setTeachers([]);
     }
   }, []);
@@ -464,7 +479,7 @@ function AdminWalletOverview({ locale }: { locale: string }) {
         type: "teacher_withdrawal",
         recipient_id: modalTeacher.id,
         amount,
-        description: modalDesc || null,
+        description: modalDesc ? sanitizeInput(modalDesc) : null,
         date: modalDate,
       });
       setModalSuccess(true);
@@ -513,6 +528,14 @@ function AdminWalletOverview({ locale }: { locale: string }) {
         </button>
       </div>
 
+      {fetchError && (
+        <div className="flex items-center gap-2 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+          <AlertCircle size={16} />
+          {fetchError}
+          <button onClick={() => setFetchError(null)} className="ms-auto">&times;</button>
+        </div>
+      )}
+
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="card p-5">
@@ -541,7 +564,7 @@ function AdminWalletOverview({ locale }: { locale: string }) {
 
       {/* Teacher Wallet Table */}
       {teachers.length === 0 ? (
-        <div className="card p-8 text-center text-sm text-slate-500">{t.noTeachers}</div>
+        <EmptyState title={t.noTeachers} message="" />
       ) : (
         <div className="card overflow-hidden">
           <table className="data-table">
@@ -598,7 +621,7 @@ function AdminWalletOverview({ locale }: { locale: string }) {
                                 <Loader2 className="animate-spin text-slate-400" size={16} />
                               </div>
                             ) : expandedWithdrawals.length === 0 ? (
-                              <p className="text-xs text-slate-400">{t.emptyHistory}</p>
+                              <EmptyState title={t.emptyHistory} message="" />
                             ) : (
                               <table className="data-table text-xs">
                                 <thead>
@@ -726,7 +749,7 @@ function AdminWalletOverview({ locale }: { locale: string }) {
                 </button>
                 <button
                   type="submit"
-                  disabled={modalSubmitting}
+                  disabled={modalSubmitting || submitting}
                   className="btn-primary text-xs px-4 py-2 flex items-center gap-1"
                 >
                   {modalSubmitting && <Loader2 size={12} className="animate-spin" />}

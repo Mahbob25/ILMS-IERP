@@ -14,3 +14,4 @@ cryptography==42.0.8
 tenacity==8.3.0
 pybreaker==1.2.0
 python-multipart==0.0.9
+sentry-sdk==2.5.1

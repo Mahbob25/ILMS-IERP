@@ -2,7 +2,9 @@
 
 import React, { useState } from "react";
 import { useParams } from "next/navigation";
+import { sanitizeInput } from "@/lib/utils/input";
 import { useAuth } from "@/components/AuthContext";
+import { AlertCircle } from "lucide-react";
 import PendingRefundsTable from "@/components/cashier/PendingRefundsTable";
 import DisburseRefundModal from "@/components/cashier/DisburseRefundModal";
 import RefundReceipt from "@/components/cashier/RefundReceipt";
@@ -23,6 +25,8 @@ export default function CashierRefundsPage() {
     amount: number;
   } | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [submitting, setSubmitting] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   const t = {
     ar: {
@@ -78,6 +82,14 @@ export default function CashierRefundsPage() {
           <p className="text-sm text-slate-500 mt-1">{t.subtitle}</p>
         </div>
       </div>
+
+      {fetchError && (
+        <div className="flex items-center gap-2 p-4 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
+          <AlertCircle size={16} />
+          <span>{fetchError}</span>
+          <button onClick={() => setFetchError(null)} className="ms-auto text-red-400 hover:text-red-600">&times;</button>
+        </div>
+      )}
 
       <PendingRefundsTable
         isRtl={isRtl}

@@ -3,6 +3,11 @@ Full Integration Tests for v1.7 ERP — Cross-Phase End-to-End Flows
 
 Run with:  python test_v1_7_full_e2e.py
 
+Requires env vars:
+  TEST_DB_URL — PostgreSQL URL for direct DB queries
+                (default: postgresql://lims:lims_secure_pass@localhost:5440/lims)
+  BASE_URL   — Backend API base URL (default: http://localhost:8000)
+
 Covers:
   1. Full payment flow: create student -> enroll -> pay -> revenue split -> close day -> block retroactive edit
   2. Expense flow: general expense, teacher withdrawal, wallet deduction
@@ -18,11 +23,22 @@ from datetime import date, timedelta
 
 import httpx
 
+# Load .env.test if present
+env_test = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env.test')
+if os.path.isfile(env_test):
+    with open(env_test) as f:
+        for line in f:
+            line = line.strip()
+            if line and not line.startswith('#'):
+                key, _, val = line.partition('=')
+                os.environ.setdefault(key.strip(), val.strip())
+
 ok = 0
 fail = 0
 failed_tests = []
 
-BASE = 'http://localhost:8000'
+BASE = os.getenv('BASE_URL', 'http://localhost:8000')
+DB_URL = os.getenv('TEST_DB_URL', 'postgresql://lims:lims_secure_pass@localhost:5440/lims')
 
 
 def test(name, ok_cond, detail=''):
@@ -95,7 +111,7 @@ def test_full_payment_flow():
 
         # Fetch teacher role ID
         import psycopg
-        conn = psycopg.connect('postgresql://lims:lims_secure_pass@localhost:5440/lims')
+        conn = psycopg.connect(DB_URL)
         with conn.cursor() as cur:
             cur.execute("SELECT id FROM roles WHERE name='teacher'")
             teacher_role_id = str(cur.fetchone()[0])
@@ -237,7 +253,7 @@ def test_expense_flow():
     try:
         # Get teacher ID from DB
         import psycopg
-        conn = psycopg.connect('postgresql://lims:lims_secure_pass@localhost:5440/lims')
+        conn = psycopg.connect(DB_URL)
         with conn.cursor() as cur:
             cur.execute("SELECT id FROM users WHERE email='teacher@aldrasat.com'")
             row = cur.fetchone()
@@ -331,7 +347,7 @@ def test_course_lifecycle():
 
         # Get teacher and create section/students
         import psycopg
-        conn = psycopg.connect('postgresql://lims:lims_secure_pass@localhost:5440/lims')
+        conn = psycopg.connect(DB_URL)
         with conn.cursor() as cur:
             cur.execute("SELECT id FROM users WHERE email='teacher@aldrasat.com'")
             row = cur.fetchone()
