@@ -9,9 +9,7 @@
 }
 
 aldrasat.edu {
-    tls {
-        issuer acme
-    }
+    tls internal
     encode gzip
 
     # API proxy — point to host for local dev

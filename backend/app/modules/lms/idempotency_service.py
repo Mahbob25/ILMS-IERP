@@ -1,10 +1,14 @@
 import json
+import logging
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select, delete
+from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.lms.models import IdempotencyKey
+
+logger = logging.getLogger(__name__)
 
 
 async def check_idempotency_key(
@@ -44,3 +48,14 @@ async def cleanup_expired_keys(db: AsyncSession) -> int:
     result = await db.execute(stmt)
     await db.commit()
     return result.rowcount
+
+
+async def safe_cleanup_expired_keys(db: AsyncSession) -> int:
+    try:
+        return await cleanup_expired_keys(db)
+    except ProgrammingError as e:
+        if "does not exist" in str(e):
+            logger.warning("idempotency_keys table does not exist yet — skipping cleanup (run alembic upgrade head)")
+            await db.rollback()
+            return 0
+        raise

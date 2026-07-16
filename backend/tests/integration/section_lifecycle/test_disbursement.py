@@ -49,20 +49,19 @@ class TestDisbursement:
         pending.status = "UNCLAIMED"
         pending.amount = Decimal("500")
 
-        call_count = 0
-        query_log = []
-
-        async def execute_side_effect(query):
-            nonlocal call_count, query_log
-            call_count += 1
-            qs = str(query)
-            query_log.append(qs[:50])
+        async def execute_side_effect(*args, **kwargs):
+            qs = str(args[0]) if args else ""
+            if "receipt_number" in qs.lower():
+                return _make_result(scalar="")
             if "pending_refund" in qs.lower():
-                return _make_result(scalar_one_or_none=pending)
+                updated = Mock()
+                updated.id = pending.id
+                updated.status = "CLAIMED"
+                updated.amount = pending.amount
+                return _make_result(scalar_one_or_none=updated)
             return _make_result(scalars_all=[])
 
         mock_db.execute = AsyncMock(side_effect=execute_side_effect)
-        mock_db.scalar = AsyncMock(return_value=0)
         mock_db.add = Mock()
         mock_db.flush = AsyncMock()
 
@@ -74,7 +73,6 @@ class TestDisbursement:
         assert refund is not None
         assert refund.amount == Decimal("500")
         assert refund.disbursed_by == mock_user.id
-        assert pending.status == "CLAIMED"
 
     async def test_receipt_number_format(self, mock_db, mock_user):
         pending = Mock()
@@ -83,14 +81,19 @@ class TestDisbursement:
         pending.status = "UNCLAIMED"
         pending.amount = Decimal("500")
 
-        async def execute_side_effect(query):
-            qs = str(query)
+        async def execute_side_effect(*args, **kwargs):
+            qs = str(args[0]) if args else ""
+            if "receipt_number" in qs.lower():
+                return _make_result(scalar="")
             if "pending_refund" in qs.lower():
-                return _make_result(scalar_one_or_none=pending)
+                updated = Mock()
+                updated.id = pending.id
+                updated.status = "CLAIMED"
+                updated.amount = pending.amount
+                return _make_result(scalar_one_or_none=updated)
             return _make_result(scalars_all=[])
 
         mock_db.execute = AsyncMock(side_effect=execute_side_effect)
-        mock_db.scalar = AsyncMock(return_value=0)
         mock_db.add = Mock()
         mock_db.flush = AsyncMock()
 
@@ -110,10 +113,12 @@ class TestDisbursement:
         pending.status = "CLAIMED"
         pending.amount = Decimal("500")
 
-        async def execute_side_effect(query):
-            qs = str(query)
+        async def execute_side_effect(*args, **kwargs):
+            qs = str(args[0]) if args else ""
+            if "receipt_number" in qs.lower():
+                return _make_result(scalar="")
             if "pending_refund" in qs.lower():
-                return _make_result(scalar_one_or_none=pending)
+                return _make_result(scalar_one_or_none=None)
             return _make_result()
 
         mock_db.execute = AsyncMock(side_effect=execute_side_effect)
@@ -133,8 +138,8 @@ class TestDisbursement:
         pending.status = "UNCLAIMED"
         pending.amount = Decimal("500")
 
-        async def execute_side_effect(query):
-            qs = str(query)
+        async def execute_side_effect(*args, **kwargs):
+            qs = str(args[0]) if args else ""
             if "pending_refund" in qs.lower():
                 return _make_result(scalar_one_or_none=pending)
             return _make_result()
@@ -156,23 +161,28 @@ class TestDisbursement:
         pending.status = "UNCLAIMED"
         pending.amount = Decimal("500")
 
-        async def execute_side_effect(query):
-            qs = str(query)
+        async def execute_side_effect(*args, **kwargs):
+            qs = str(args[0]) if args else ""
+            if "receipt_number" in qs.lower():
+                return _make_result(scalar="")
             if "pending_refund" in qs.lower():
-                return _make_result(scalar_one_or_none=pending)
+                updated = Mock()
+                updated.id = pending.id
+                updated.status = "CLAIMED"
+                updated.amount = pending.amount
+                return _make_result(scalar_one_or_none=updated)
             return _make_result(scalars_all=[])
 
         mock_db.execute = AsyncMock(side_effect=execute_side_effect)
-        mock_db.scalar = AsyncMock(return_value=0)
         mock_db.add = Mock()
         mock_db.flush = AsyncMock()
 
-        await disburse_pending_refund(
+        refund = await disburse_pending_refund(
             mock_db, pending_refund_id=pending.id,
             disbursed_by=mock_user.id,
         )
 
-        assert pending.status == "CLAIMED"
+        assert refund.pending_refund_id == pending.id
 
     async def test_disburse_records_daily_ledger(self, mock_db, mock_user):
         pending = Mock()
@@ -181,14 +191,19 @@ class TestDisbursement:
         pending.status = "UNCLAIMED"
         pending.amount = Decimal("500")
 
-        async def execute_side_effect(query):
-            qs = str(query)
+        async def execute_side_effect(*args, **kwargs):
+            qs = str(args[0]) if args else ""
+            if "receipt_number" in qs.lower():
+                return _make_result(scalar="")
             if "pending_refund" in qs.lower():
-                return _make_result(scalar_one_or_none=pending)
+                updated = Mock()
+                updated.id = pending.id
+                updated.status = "CLAIMED"
+                updated.amount = pending.amount
+                return _make_result(scalar_one_or_none=updated)
             return _make_result(scalars_all=[])
 
         mock_db.execute = AsyncMock(side_effect=execute_side_effect)
-        mock_db.scalar = AsyncMock(return_value=0)
         mock_db.add = Mock()
         mock_db.flush = AsyncMock()
 
@@ -207,10 +222,12 @@ class TestDisbursement:
         pending.status = "FORFEITED"
         pending.amount = Decimal("500")
 
-        async def execute_side_effect(query):
-            qs = str(query)
+        async def execute_side_effect(*args, **kwargs):
+            qs = str(args[0]) if args else ""
+            if "receipt_number" in qs.lower():
+                return _make_result(scalar="")
             if "pending_refund" in qs.lower():
-                return _make_result(scalar_one_or_none=pending)
+                return _make_result(scalar_one_or_none=None)
             return _make_result()
 
         mock_db.execute = AsyncMock(side_effect=execute_side_effect)

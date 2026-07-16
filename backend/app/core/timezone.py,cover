@@ -1,0 +1,18 @@
+> from zoneinfo import ZoneInfo
+> from datetime import date, datetime
+> from app.core.config import settings
+  
+  
+> _tz = ZoneInfo(settings.TIMEZONE)
+  
+  
+> def get_today() -> date:
+>     return datetime.now(_tz).date()
+  
+  
+> def utcnow() -> datetime:
+>     return datetime.now(ZoneInfo("UTC"))
+  
+  
+> def localize(dt: datetime) -> datetime:
+!     return dt.astimezone(_tz)

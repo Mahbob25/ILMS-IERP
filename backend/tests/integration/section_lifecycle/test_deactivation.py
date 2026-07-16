@@ -96,7 +96,8 @@ class TestDeactivation:
         aggr.one.return_value = (Decimal("400"), Decimal("100"))
 
         mock_db.execute = AsyncMock(side_effect=[
-            result_mock(scalar_one_or_none=wallet),  # get_or_create_wallet
+            result_mock(),  # get_or_create_wallet INSERT
+            result_mock(scalar_one_or_none=wallet),  # get_or_create_wallet SELECT
             aggr,  # activation credit aggregate
         ])
         mock_db.add = AsyncMock()

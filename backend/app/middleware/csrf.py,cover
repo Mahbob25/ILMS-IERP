@@ -1,0 +1,18 @@
+> from fastapi import Request, HTTPException
+> from starlette.middleware.base import BaseHTTPMiddleware
+  
+  
+> class CSRFMiddleware(BaseHTTPMiddleware):
+>     SAFE_METHODS = {"GET", "HEAD", "OPTIONS", "TRACE"}
+  
+>     async def dispatch(self, request: Request, call_next):
+>         if request.method in self.SAFE_METHODS:
+>             return await call_next(request)
+  
+>         csrf_token = request.headers.get("X-CSRF-Token")
+>         csrf_cookie = request.cookies.get("csrf_token")
+  
+>         if not csrf_token or not csrf_cookie or csrf_token != csrf_cookie:
+>             raise HTTPException(status_code=403, detail="CSRF token mismatch")
+  
+>         return await call_next(request)

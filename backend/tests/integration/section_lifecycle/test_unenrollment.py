@@ -122,11 +122,15 @@ class TestPreviewUnenrollmentImpact:
         )
         enrollment = make_enrollment(section=section, student=mock_student)
 
+        wallet = Mock(balance=Decimal("5000"), frozen_balance=Decimal("500"))
+
         call_count = 0
 
-        def side_effect(query):
+        async def side_effect(*args, **kwargs):
             nonlocal call_count
-            qs = str(query)
+            qs = str(args[0]) if args else ""
+            if "teacher_wallet" in qs.lower() or "teacher_wallets" in qs.lower():
+                return result_mock(scalar_one_or_none=wallet)
             if "enrollments" in qs and "student" in qs.lower():
                 return result_mock(scalar_one_or_none=enrollment)
             if "ledger" in qs.lower() and "available_delta" in qs.lower():
@@ -139,10 +143,6 @@ class TestPreviewUnenrollmentImpact:
             return result_mock()
 
         mock_db.execute = AsyncMock(side_effect=side_effect)
-
-        mock_db.get = AsyncMock()
-        wallet = Mock(balance=Decimal("5000"), frozen_balance=Decimal("500"))
-        mock_db.get.return_value = wallet
 
         result = await preview_unenrollment_impact(mock_db, enrollment.id)
 

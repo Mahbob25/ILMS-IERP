@@ -17,6 +17,7 @@ sentry_sdk.init(
     environment=os.getenv("APP_ENV", "development"),
     traces_sample_rate=0.1,
     integrations=[FastApiIntegration()],
+
 )
 
 setup_logging()
@@ -26,7 +27,7 @@ from app.modules.academic.section_startup_checks import run_daily_section_checks
 from app.modules.identity.router import auth_router, users_router, employees_router, permissions_router
 from app.modules.academic.router import academic_router
 from app.modules.lms.router import lms_router
-from app.modules.lms.idempotency_service import cleanup_expired_keys
+from app.modules.lms.idempotency_service import cleanup_expired_keys, safe_cleanup_expired_keys
 from app.modules.dashboard.router import dashboard_router
 from app.middleware.idempotency import IdempotencyMiddleware
 from app.middleware.real_ip import RealIPMiddleware
@@ -36,7 +37,7 @@ from app.middleware.csrf import CSRFMiddleware
 async def lifespan(app: FastAPI):
     async with async_session_maker() as db:
         await run_daily_section_checks(db)
-        await cleanup_expired_keys(db)
+        await safe_cleanup_expired_keys(db)
     yield
 
 app = FastAPI(
