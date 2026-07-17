@@ -1581,11 +1581,11 @@ rsync -avz --exclude '.git' --exclude 'node_modules' --exclude '.venv' \
 cat > /opt/lims/.env << 'ENVEOF'
 # ── Database ──────────────────────────────────────────
 POSTGRES_USER=lims
-POSTGRES_PASSWORD=<replace-with-generated-password>
+POSTGRES_PASSWORD=lims_secure_pass
 POSTGRES_DB=lims
 
 # ── JWT Auth ──────────────────────────────────────────
-JWT_SECRET_KEY=<replace-with-64-char-hex-from-openssl-rand-hex-32>
+JWT_SECRET_KEY=R26KSNDzRHt32mLYDUK3PMiNIW80xj4KNO7YTXYjwzs=
 
 # ── Application ───────────────────────────────────────
 ENVIRONMENT=production
@@ -1595,7 +1595,7 @@ BACKEND_URL=backend:8000
 FRONTEND_URL=frontend:3000
 
 # ── Monitoring ────────────────────────────────────────
-SENTRY_DSN=https://<your-key>@o<org>.ingest.sentry.io/<project>
+SENTRY_DSN=https://ca8bd0c3e482d811c1c8d0c91e88384e@o4511742043947008.ingest.de.sentry.io/4511742076649552
 NEXT_PUBLIC_SENTRY_DSN=https://<your-key>@o<org>.ingest.sentry.io/<project>
 ENVEOF
 ```
