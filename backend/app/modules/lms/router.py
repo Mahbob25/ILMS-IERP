@@ -324,7 +324,7 @@ async def list_eligible_recipients(
     ),
     db: AsyncSession = Depends(get_db),
 ):
-    if type not in ("teacher_withdrawal", "secretary_advance", "salary_payment"):
+    if type not in ("teacher_withdrawal", "salary_draw"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid recipient type"
         )

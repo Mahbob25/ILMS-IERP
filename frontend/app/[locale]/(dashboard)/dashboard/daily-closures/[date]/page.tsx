@@ -87,7 +87,7 @@ export default function DailyLedgerPage() {
       description: "الوصف",
       generalExpense: "مصاريف عامة",
       teacherWithdrawal: "سحب معلم",
-      secretaryAdvance: "سلفة سكرتير",
+      salaryDraw: "راتب موظف",
       noPayments: "لا توجد مدفوعات في هذا اليوم",
       noExpenses: "لا توجد مصروفات في هذا اليوم",
       noRefunds: "لا توجد مردودات في هذا اليوم",
@@ -129,7 +129,7 @@ export default function DailyLedgerPage() {
       description: "Description",
       generalExpense: "General Expense",
       teacherWithdrawal: "Teacher Withdrawal",
-      secretaryAdvance: "Secretary Advance",
+      salaryDraw: "Staff Salary",
       noPayments: "No payments on this date",
       noExpenses: "No expenses on this date",
       noRefunds: "No refunds on this date",
@@ -194,12 +194,12 @@ export default function DailyLedgerPage() {
     const colors: Record<string, string> = {
       general_expense: "bg-slate-50 text-slate-600 border-slate-200",
       teacher_withdrawal: "bg-purple-50 text-purple-600 border-purple-200",
-      secretary_advance: "bg-orange-50 text-orange-600 border-orange-200",
+      salary_draw: "bg-cyan-50 text-cyan-600 border-cyan-200",
     };
     const labels: Record<string, string> = {
       general_expense: t.generalExpense,
       teacher_withdrawal: t.teacherWithdrawal,
-      secretary_advance: t.secretaryAdvance,
+      salary_draw: t.salaryDraw,
     };
     return (
       <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${colors[type] || colors.general_expense}`}>

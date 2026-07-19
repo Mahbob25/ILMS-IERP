@@ -27,22 +27,16 @@ RECEIPT_HTML_AR = {
 EXPENSE_TYPE_LABELS_EN = {
     "general_expense": "General Expense",
     "teacher_withdrawal": "Teacher Withdrawal",
-    "secretary_advance": "Secretary Advance",
-    "salary_payment": "Salary Payment",
 }
 
 EXPENSE_TYPE_LABELS_AR = {
     "general_expense": "مصروف عام",
     "teacher_withdrawal": "سحب معلم",
-    "secretary_advance": "سلفة سكرتير",
-    "salary_payment": "صرف راتب",
 }
 
 EXPENSE_TYPE_BADGE = {
     "general_expense": "badge-general",
     "teacher_withdrawal": "badge-teacher",
-    "secretary_advance": "badge-secretary",
-    "salary_payment": "badge-salary",
 }
 
 
@@ -78,7 +72,7 @@ def _generate_receipt_html(
         discount_ar = ""
 
     variables = {
-        "receipt_title_ar": "إيصال دفع",
+        "receipt_title_ar": "سند دفع",
         "receipt_title_en": "Payment Receipt",
         "receipt_number": receipt_number,
         "date": date_str,
@@ -137,15 +131,13 @@ def _generate_refund_voucher_html(
     amount_str = f"{amount:.2f} {currency}"
 
     variables = {
-        "voucher_title_ar": "سند استرداد",
-        "voucher_title_en": "Refund Voucher",
-        "voucher_number": receipt_number,
+        "refund_title_ar": "سند استرداد",
+        "refund_title_en": "Refund Voucher",
+        "refund_number": receipt_number,
         "date": date_str,
-        "expense_type": "استرداد رسوم" if locale == "ar" else "Refund",
-        "recipient_name": html.escape(student_name),
-        "description": html.escape(
-            f"استرداد رسوم عن مقرر: {course_name}" if locale == "ar" else f"Refund for course: {course_name}"
-        ),
+        "student_name": html.escape(student_name),
+        "course_name": html.escape(course_name),
+        "reason": "استرداد رسوم" if locale == "ar" else "Refund",
         "amount": amount_str,
         "cashier_name": html.escape(cashier_name),
     }

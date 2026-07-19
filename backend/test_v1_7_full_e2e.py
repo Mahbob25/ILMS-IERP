@@ -278,14 +278,14 @@ def test_expense_flow():
             expense = r.json()
             test('Expense has voucher number', 'id' in expense)
 
-        # Create a secretary advance
+        # Create a general expense
         r = ac.post('/api/v1/lms/expenses', json={
             'amount': 300.0,
             'description': 'Petty cash advance',
             'recipient_name': 'Secretary',
-            'type': 'secretary_advance',
+            'type': 'general_expense',
         })
-        test('Create secretary advance', r.status_code == 201, f'got {r.status_code}')
+        test('Create general expense', r.status_code == 201, f'got {r.status_code}')
 
         # List expenses with type filter
         r = ac.get('/api/v1/lms/expenses?type=general_expense')

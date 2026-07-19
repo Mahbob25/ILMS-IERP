@@ -891,18 +891,18 @@ def run_phase5():
             test('Expense type is general_expense', exp.get('type') == 'general_expense', f"got {exp.get('type')}")
             test('Expense amount is 150', abs(exp.get('amount', 0) - 150.0) < 0.01)
 
-        # --- Create secretary advance ---
+        # --- Create general expense ---
         print()
-        print('--- Secretary Advance ---')
+        print('--- General Expense ---')
         r = aclient.post('/api/v1/lms/expenses', json={
             'amount': 200.0,
-            'recipient_name': 'Secretary Name',
-            'type': 'secretary_advance',
-            'description': 'Monthly advance for supplies',
+            'recipient_name': 'Office Supplies Vendor',
+            'type': 'general_expense',
+            'description': 'Monthly office supplies',
         })
-        test('Create secretary advance returns 201', r.status_code == 201, f'got {r.status_code}')
+        test('Create general expense returns 201', r.status_code == 201, f'got {r.status_code}')
         if r.status_code == 201:
-            test('Expense type is secretary_advance', r.json().get('type') == 'secretary_advance')
+            test('Expense type is general_expense', r.json().get('type') == 'general_expense')
 
         # --- List expenses ---
         print()
@@ -914,11 +914,11 @@ def run_phase5():
             test('At least 2 expenses', len(expenses) >= 2, f'got {len(expenses)}')
 
         # Filter by type
-        r = aclient.get('/api/v1/lms/expenses?type=secretary_advance')
+        r = aclient.get('/api/v1/lms/expenses?type=general_expense')
         test('Filter by type', r.status_code == 200, f'got {r.status_code}')
         if r.status_code == 200:
             filtered = r.json()
-            all_match = all(e.get('type') == 'secretary_advance' for e in filtered)
+            all_match = all(e.get('type') == 'general_expense' for e in filtered)
             test('All filtered match type', all_match, f'got {len(filtered)}')
 
         # Filter by recipient

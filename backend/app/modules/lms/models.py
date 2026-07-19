@@ -203,7 +203,7 @@ class Expense(Base):
     )
     date: Mapped[date] = mapped_column(Date, nullable=False)
     receipt_number: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True)
-    type: Mapped[str] = mapped_column(SAEnum('general_expense', 'teacher_withdrawal', 'secretary_advance', 'salary_payment', name='expensetype'), nullable=False, default="general_expense", server_default="general_expense")
+    type: Mapped[str] = mapped_column(SAEnum('general_expense', 'teacher_withdrawal', 'salary_draw', name='expensetype'), nullable=False, default="general_expense", server_default="general_expense")
 
     created_by: Mapped[uuid.UUID] = mapped_column(
         PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), nullable=False, index=True

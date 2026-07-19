@@ -72,8 +72,7 @@ export default function ExpensesPage() {
       sar: "ريال",
       generalExpense: "مصروف عام",
       teacherWithdrawal: "سحب معلم",
-      secretaryAdvance: "سلفة سكرتير",
-      salaryPayment: "صرف راتب",
+      salaryDraw: "راتب موظف",
       filterType: "تصفية حسب النوع",
       searchReceipt: "بحث برقم السند",
       all: "الكل",
@@ -122,8 +121,7 @@ export default function ExpensesPage() {
       sar: "YER",
       generalExpense: "General Expense",
       teacherWithdrawal: "Teacher Withdrawal",
-      secretaryAdvance: "Secretary Advance",
-      salaryPayment: "Salary Payment",
+      salaryDraw: "Staff Salary",
       filterType: "Filter by Type",
       searchReceipt: "Search by voucher number",
       all: "All",
@@ -208,8 +206,7 @@ export default function ExpensesPage() {
   const fetchEligibleRecipients = useCallback(async (type: string) => {
     if (
       type !== "teacher_withdrawal" &&
-      type !== "secretary_advance" &&
-      type !== "salary_payment"
+      type !== "salary_draw"
     ) {
       setEligibleRecipients([]);
       setAvailableLimit(null);
@@ -293,14 +290,12 @@ export default function ExpensesPage() {
     const colors: Record<string, string> = {
       general_expense: "bg-slate-100 text-slate-600 border-slate-200",
       teacher_withdrawal: "bg-amber-50 text-amber-600 border-amber-200",
-      secretary_advance: "bg-purple-50 text-purple-600 border-purple-200",
-      salary_payment: "bg-emerald-50 text-emerald-600 border-emerald-200",
+      salary_draw: "bg-cyan-50 text-cyan-600 border-cyan-200",
     };
     const labels: Record<string, string> = {
       general_expense: t.generalExpense,
       teacher_withdrawal: t.teacherWithdrawal,
-      secretary_advance: t.secretaryAdvance,
-      salary_payment: t.salaryPayment,
+      salary_draw: t.salaryDraw,
     };
     return (
       <span
@@ -315,14 +310,12 @@ export default function ExpensesPage() {
     const variantMap: Record<string, string> = {
       general_expense: "general",
       teacher_withdrawal: "teacher",
-      secretary_advance: "secretary",
-      salary_payment: "salary",
+      salary_draw: "salary",
     };
     const labelMap: Record<string, string> = {
       general_expense: t.generalExpense,
       teacher_withdrawal: t.teacherWithdrawal,
-      secretary_advance: t.secretaryAdvance,
-      salary_payment: t.salaryPayment,
+      salary_draw: t.salaryDraw,
     };
     return {
       variant: variantMap[type] || "general",
@@ -335,8 +328,7 @@ export default function ExpensesPage() {
     if (form.type === "general_expense" && !form.recipient_name) return;
     if (
       (form.type === "teacher_withdrawal" ||
-        form.type === "secretary_advance" ||
-        form.type === "salary_payment") &&
+        form.type === "salary_draw") &&
       !form.recipient_id
     )
       return;
@@ -421,8 +413,7 @@ export default function ExpensesPage() {
             options={[
               { value: "general_expense", label: t.generalExpense },
               { value: "teacher_withdrawal", label: t.teacherWithdrawal },
-              { value: "secretary_advance", label: t.secretaryAdvance },
-              { value: "salary_payment", label: t.salaryPayment },
+              { value: "salary_draw", label: t.salaryDraw },
             ]}
             placeholder={t.all}
             className="w-36"
@@ -476,8 +467,7 @@ export default function ExpensesPage() {
                 options={[
                   { value: "general_expense", label: t.generalExpense },
                   { value: "teacher_withdrawal", label: t.teacherWithdrawal },
-                  { value: "secretary_advance", label: t.secretaryAdvance },
-                  { value: "salary_payment", label: t.salaryPayment },
+                  { value: "salary_draw", label: t.salaryDraw },
                 ]}
               />
             </div>
@@ -489,8 +479,7 @@ export default function ExpensesPage() {
                     ({t.availableBalance})
                   </span>
                 )}
-                {(form.type === "secretary_advance" ||
-                  form.type === "salary_payment") && (
+                {(form.type === "salary_draw") && (
                   <span className="text-emerald-600 text-[10px] ms-2">
                     ({t.remainingStipend})
                   </span>
@@ -522,8 +511,7 @@ export default function ExpensesPage() {
                     </p>
                   )}
                   {(form.type === "teacher_withdrawal" ||
-                    form.type === "secretary_advance" ||
-                    form.type === "salary_payment") &&
+                    form.type === "salary_draw") &&
                     selectedRecipientEligible === true &&
                     availableLimit !== null && (
                       <p className="text-xs text-slate-500">

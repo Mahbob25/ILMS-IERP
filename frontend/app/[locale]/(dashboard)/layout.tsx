@@ -78,6 +78,7 @@ export default function DashboardLayout({
         backups: "النسخ الاحتياطي",
         settings: "الإعدادات",
         cashierRefunds: "المبالغ المستردة",
+        staffPayroll: "الرواتب",
       },
       loading: "جاري تحميل بيانات الجلسة...",
       langToggle: "English",
@@ -113,6 +114,7 @@ export default function DashboardLayout({
         backups: "Database Backups",
         settings: "Settings",
         cashierRefunds: "Refunds",
+        staffPayroll: "Staff Payroll",
       },
       loading: "Loading session data...",
       langToggle: "العربية",
@@ -185,15 +187,17 @@ export default function DashboardLayout({
     page_health: ["superadmin"],
     page_backups: ["superadmin"],
     page_settings: ["superadmin", "manager", "secretary", "teacher"],
+    page_staff_payroll: ["superadmin", "manager", "secretary"],
   };
 
   const hasPageAccess = (permissionCodename: string): boolean => {
     if (user?.is_superadmin) return true;
+    const fallbackRoles = PAGE_PERMISSION_MAP[permissionCodename] || [];
+    if (fallbackRoles.includes(user?.role?.name ?? "")) return true;
     if (permissions.length > 0) {
       return permissions.includes(permissionCodename);
     }
-    const fallbackRoles = PAGE_PERMISSION_MAP[permissionCodename] || [];
-    return fallbackRoles.includes(user?.role?.name ?? "");
+    return false;
   };
 
   // Centralized route-level guard — prevents direct URL access bypassing the sidebar
@@ -220,6 +224,7 @@ export default function DashboardLayout({
     "dashboard/health": "page_health",
     "dashboard/backups": "page_backups",
     "dashboard/settings": "page_settings",
+    "dashboard/staff-payroll": "page_staff_payroll",
   };
 
   const routeKey = pathname.split("/").slice(2).join("/").replace(/\/$/, "");
@@ -365,6 +370,12 @@ export default function DashboardLayout({
       href: `/${locale}/dashboard/backups`,
       icon: Database,
       permission: "page_backups",
+    },
+    {
+      name: t.menu.staffPayroll,
+      href: `/${locale}/dashboard/staff-payroll`,
+      icon: Wallet,
+      permission: "page_staff_payroll",
     },
     {
       name: t.menu.settings,

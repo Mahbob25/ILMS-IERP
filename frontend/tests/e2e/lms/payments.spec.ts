@@ -35,7 +35,7 @@ test.describe('LMS: Payments & Expenses', () => {
     expect(expense.type).toBe('general_expense')
   })
 
-  test('should create a secretary advance', async ({ request }) => {
+  test('should create a general expense as secretary', async ({ request }) => {
     const secHeaders = await ensureAuthHeader('secretary')
     // Get secretary employee to use as recipient
     const employeesRes = await request.get(`${BASE_URL}/employees?employee_type=secretary`, { headers: authHeader('superadmin') })
@@ -52,7 +52,7 @@ test.describe('LMS: Payments & Expenses', () => {
         description: 'E2E: Petty cash',
         recipient_name: employees[0].full_name,
         recipient_id: employees[0].id,
-        type: 'secretary_advance',
+        type: 'general_expense',
       },
     })
     // May fail if secretary has insufficient remaining stipend

@@ -31,6 +31,7 @@ from app.modules.academic.section_startup_checks import run_daily_section_checks
 from app.modules.identity.router import auth_router, users_router, employees_router, permissions_router
 from app.modules.academic.router import academic_router
 from app.modules.lms.router import lms_router
+from app.modules.lms.staff_payroll_router import router as staff_payroll_router
 from app.modules.lms.idempotency_service import cleanup_expired_keys, safe_cleanup_expired_keys
 from app.modules.dashboard.router import dashboard_router
 from app.middleware.idempotency import IdempotencyMiddleware
@@ -85,6 +86,7 @@ app.include_router(permissions_router, prefix="/api/v1")
 app.include_router(academic_router, prefix="/api/v1")
 app.include_router(lms_router, prefix="/api/v1")
 app.include_router(dashboard_router, prefix="/api/v1")
+app.include_router(staff_payroll_router, prefix="/api/v1")
 
 @app.get("/api/v1/health", tags=["system"])
 async def health_check():

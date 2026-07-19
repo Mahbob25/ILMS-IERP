@@ -301,65 +301,31 @@ async def get_eligible_recipients(db: AsyncSession, recipient_type: str) -> list
             })
         return result
 
-    elif recipient_type == "secretary_advance":
-        employees_result = await db.execute(
-            select(Employee)
-            .where(Employee.employee_type == EmployeeType.SECRETARY, Employee.is_active)
-        )
-        secretaries = employees_result.scalars().all()
-
-        total_advances_result = await db.execute(
-            select(
-                Expense.recipient_id,
-                func.coalesce(func.sum(Expense.amount), 0)
-            ).where(
-                Expense.type == "secretary_advance",
-                Expense.date >= month_start,
-                Expense.date <= now,
-                Expense.recipient_id.isnot(None),
-            ).group_by(Expense.recipient_id)
-        )
-        advances_map = dict(total_advances_result.fetchall())
-
-        result = []
-        for emp in secretaries:
-            stipend = emp.default_salary or 0
-            total_advances = advances_map.get(emp.id, 0)
-            remaining = stipend - total_advances
-            result.append({
-                "id": str(emp.id),
-                "full_name": emp.full_name,
-                "role": "secretary",
-                "available_limit": remaining if stipend > 0 else 0,
-                "is_eligible": remaining > 0,
-            })
-        return result
-
-    elif recipient_type == "salary_payment":
+    elif recipient_type == "salary_draw":
         employees_result = await db.execute(
             select(Employee)
             .where(Employee.employee_type != EmployeeType.TEACHER, Employee.is_active)
         )
         employees = employees_result.scalars().all()
 
-        total_payments_result = await db.execute(
+        total_draws_result = await db.execute(
             select(
                 Expense.recipient_id,
                 func.coalesce(func.sum(Expense.amount), 0)
             ).where(
-                Expense.type == "salary_payment",
+                Expense.type == "salary_draw",
                 Expense.date >= month_start,
                 Expense.date <= now,
                 Expense.recipient_id.isnot(None),
             ).group_by(Expense.recipient_id)
         )
-        payments_map = dict(total_payments_result.fetchall())
+        draws_map = dict(total_draws_result.fetchall())
 
         result = []
         for emp in employees:
             monthly_salary = emp.default_salary or 0
-            total_paid = payments_map.get(emp.id, 0)
-            remaining = monthly_salary - total_paid
+            total_drawn = draws_map.get(emp.id, 0)
+            remaining = monthly_salary - total_drawn
             result.append({
                 "id": str(emp.id),
                 "full_name": emp.full_name,
@@ -370,6 +336,8 @@ async def get_eligible_recipients(db: AsyncSession, recipient_type: str) -> list
         return result
 
     return []
+
+
 
 
 async def get_next_voucher_number(db: AsyncSession, expense_date: date) -> str:
@@ -401,10 +369,9 @@ async def create_expense(
         expense_date = get_today()
     amount = Decimal(str(amount))
 
-    # Validate and resolve recipient for teacher_withdrawal and secretary_advance
-    if expense_type in ("teacher_withdrawal", "secretary_advance", "salary_payment"):
+    if expense_type == "teacher_withdrawal":
         if not recipient_id:
-            raise ValueError(f"recipient_id is required for {expense_type}")
+            raise ValueError("recipient_id is required for teacher_withdrawal")
 
         employee_result = await db.execute(
             select(Employee).options(joinedload(Employee.user)).where(Employee.id == recipient_id)
@@ -414,46 +381,55 @@ async def create_expense(
             raise ValueError("Recipient not found")
         if not employee.is_active:
             raise ValueError("Recipient is not active")
-        if expense_type == "teacher_withdrawal":
-            expected_type = EmployeeType.TEACHER
-        elif expense_type == "secretary_advance":
-            expected_type = EmployeeType.SECRETARY
-        else:
-            expected_type = None
-        if expected_type and employee.employee_type != expected_type:
-            raise ValueError(f"Recipient must be a {expected_type.value}")
-        if expense_type == "salary_payment" and employee.employee_type == EmployeeType.TEACHER:
-            raise ValueError("Salary payment is not applicable to teachers")
+        if employee.employee_type != EmployeeType.TEACHER:
+            raise ValueError("Recipient must be a teacher")
         recipient_name = employee.full_name
 
-        if expense_type == "teacher_withdrawal":
-            wallet = await get_or_create_wallet(db, employee.id, lock=True)
-            available_balance = wallet.balance - wallet.frozen_balance
-            if not wallet or available_balance < amount:
-                raise ValueError(
-                    f"Cannot withdraw: insufficient wallet balance. "
-                    f"Requested: {amount}, Available: {available_balance}. "
-                    f"Outstanding receivable must be cleared before further withdrawals."
-                )
-
-        elif expense_type in ("secretary_advance", "salary_payment"):
-            monthly_limit = employee.default_salary or 0
-            month_start = expense_date.replace(day=1)
-            total_result = await db.execute(
-                select(func.coalesce(func.sum(Expense.amount), 0))
-                .where(
-                    Expense.type == expense_type,
-                    Expense.recipient_id == recipient_id,
-                    Expense.date >= month_start,
-                    Expense.date <= expense_date,
-                )
+        wallet = await get_or_create_wallet(db, employee.id, lock=True)
+        available_balance = wallet.balance - wallet.frozen_balance
+        if not wallet or available_balance < amount:
+            raise ValueError(
+                f"Cannot withdraw: insufficient wallet balance. "
+                f"Requested: {amount}, Available: {available_balance}. "
+                f"Outstanding receivable must be cleared before further withdrawals."
             )
-            total_paid = total_result.scalar() or 0
-            remaining = monthly_limit - total_paid
-            if remaining < amount:
-                raise ValueError(
-                    f"Insufficient remaining monthly salary. Available: {remaining}, Requested: {amount}"
-                )
+
+    elif expense_type == "salary_draw":
+        if not recipient_id:
+            raise ValueError("recipient_id is required for salary_draw")
+
+        employee_result = await db.execute(
+            select(Employee).where(Employee.id == recipient_id)
+        )
+        employee = employee_result.scalar_one_or_none()
+        if not employee:
+            raise ValueError("Recipient not found")
+        if not employee.is_active:
+            raise ValueError("Recipient is not active")
+        if employee.employee_type == EmployeeType.TEACHER:
+            raise ValueError("Salary draw is not applicable to teachers")
+        if not employee.default_salary or employee.default_salary <= 0:
+            raise ValueError("Employee has no monthly salary configured")
+
+        recipient_name = employee.full_name
+        monthly_limit = float(employee.default_salary)
+        month_start = expense_date.replace(day=1)
+        total_result = await db.execute(
+            select(func.coalesce(func.sum(Expense.amount), 0))
+            .where(
+                Expense.type == "salary_draw",
+                Expense.recipient_id == recipient_id,
+                Expense.date >= month_start,
+                Expense.date <= expense_date,
+            )
+        )
+        total_drawn = float(total_result.scalar() or 0)
+        remaining = monthly_limit - total_drawn
+        if remaining < float(amount):
+            raise ValueError(
+                f"Insufficient remaining monthly salary. "
+                f"Available: {remaining:.2f}, Requested: {float(amount):.2f}"
+            )
 
     receipt_number = await get_next_voucher_number(db, expense_date)
     expense = Expense(
