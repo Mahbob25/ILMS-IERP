@@ -4,13 +4,25 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Course Certificate - Al-Drasat Institute</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        /* PDF and Print Setup (A4 Landscape) */
+        :root {
+            --primary-color: #1a3a2a;
+            --accent-color: #c9a84c;
+            --gray-bg: #f0f2ef;
+            --border-color: #c0b8a8;
+            --text-color: #1e1e1e;
+            --warm-accent: #8b5a3a;
+        }
+
         @page {
             size: A4 landscape;
             margin: 0;
         }
-        
+
         * {
             box-sizing: border-box;
             -webkit-print-color-adjust: exact;
@@ -24,43 +36,41 @@
             justify-content: center;
             align-items: center;
             min-height: 100vh;
-            background-color: #f3f4f6; 
+            background-color: #f3f4f6;
         }
 
-        /* Certificate Container */
         .certificate-frame {
             width: 297mm;
             height: 210mm;
-            background-color: #ffffff;
-            padding: 12mm;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.1); 
+            background-color: #fff;
+            padding: 10mm;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
             position: relative;
-            overflow: hidden; /* Ensures watermark doesn't spill out */
+            overflow: hidden;
         }
 
-        /* Outer Border Design */
         .certificate-border {
-            border: 4px double #000; 
+            border: 2px solid var(--accent-color);
+            outline: 3px solid var(--primary-color);
+            outline-offset: -6px;
             height: 100%;
-            padding: 10mm;
+            padding: 10mm 8mm;
             display: flex;
             flex-direction: column;
             position: relative;
         }
 
-        /* Background Watermark */
-        .watermark {
+        .certificate-border > img:first-of-type {
             position: absolute;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            opacity: 0.1; /* Light transparency for the watermark */
-            width: 450px;
+            opacity: 0.08;
+            width: 400px;
             pointer-events: none;
             z-index: 0;
         }
 
-        /* Header Section */
         .header {
             display: flex;
             justify-content: space-between;
@@ -70,23 +80,23 @@
 
         .header-en {
             width: 33%;
-            font-size: 15px;
+            font-size: 14px;
             text-align: left;
-            line-height: 1.6;
-            font-weight: bold;
-            font-family: 'Times New Roman', Times, serif; /* Headings Font */
-            color: #000;
+            line-height: 1.5;
+            font-weight: 600;
+            font-family: 'Times New Roman', Times, serif;
+            color: var(--text-color);
         }
 
         .header-ar {
             width: 33%;
-            font-size: 18px;
+            font-size: 17px;
             text-align: right;
             direction: rtl;
-            line-height: 1.6;
-            font-weight: bold;
-            font-family: 'Times New Roman', Times, serif; /* Headings Font */
-            color: #000;
+            line-height: 1.5;
+            font-weight: 600;
+            font-family: 'Amiri', 'Traditional Arabic', 'Times New Roman', serif;
+            color: var(--text-color);
         }
 
         .header-center {
@@ -98,40 +108,42 @@
         }
 
         .bismillah {
-            font-family: 'Times New Roman', Times, serif; /* Headings Font */
-            font-size: 22px;
+            font-family: 'Amiri', 'Traditional Arabic', 'Times New Roman', serif;
+            font-size: 20px;
             margin-bottom: 5px;
-            font-weight: bold;
+            font-weight: 700;
+            color: var(--primary-color);
         }
 
-        .logo {
-            width: 120px;
+        .header-center img {
+            width: 100px;
             height: auto;
             margin-top: 5px;
         }
 
-        /* Title Section */
         .cert-title {
             text-align: center;
-            margin: 20px 0 30px 0;
+            margin: 15px 0 20px 0;
             z-index: 1;
         }
 
         .cert-title h2 {
             margin: 0;
-            font-size: 38px;
-            color: #000; 
-            font-family: 'Times New Roman', Times, serif; /* Headings Font */
+            font-size: 34px;
+            color: var(--primary-color);
+            font-family: 'Amiri', 'Traditional Arabic', 'Times New Roman', serif;
+            font-weight: 700;
         }
 
         .cert-title h1 {
-            margin: 5px 0 0 0;
-            font-size: 28px;
-            color: #000; 
-            font-family: 'Times New Roman', Times, serif; /* Headings Font */
+            margin: 3px 0 0 0;
+            font-size: 22px;
+            color: var(--accent-color);
+            font-family: 'Times New Roman', Times, serif;
+            font-weight: 400;
+            letter-spacing: 2px;
         }
 
-        /* Main Body Content */
         .content {
             display: flex;
             justify-content: space-between;
@@ -143,16 +155,15 @@
         .content-en {
             width: 47%;
             text-align: left;
-            font-size: 16px;
-            line-height: 2.4;
-            font-family: Arial, sans-serif; /* Body Font */
-            color: #000;
+            font-size: 15px;
+            line-height: 2.2;
+            font-family: Arial, sans-serif;
+            color: var(--text-color);
         }
 
-        /* The Vertical Separator Line */
         .divider {
             width: 2px;
-            background-color: #000;
+            background: linear-gradient(to bottom, var(--primary-color), var(--accent-color), var(--primary-color));
             margin: 0 3%;
         }
 
@@ -161,59 +172,86 @@
             text-align: right;
             direction: rtl;
             font-size: 18px;
-            line-height: 2.4;
-            font-family: Arial, sans-serif; /* Body Font */
-            color: #000;
+            line-height: 2.2;
+            font-family: 'Amiri', 'Traditional Arabic', 'Times New Roman', serif;
+            color: var(--text-color);
         }
 
-        /* Dynamic Variable Fields */
         .fill-in {
-            border-bottom: 1px dotted #000;
+            border-bottom: 1px solid var(--accent-color);
             display: inline-block;
             text-align: center;
-            color: #000;
-            font-weight: bold;
+            color: var(--primary-color);
+            font-weight: 700;
             padding: 0 10px;
-            font-family: Arial, sans-serif; /* Matches Body Font */
         }
 
-        /* Footer Section */
         .footer {
             display: flex;
             justify-content: space-between;
             align-items: flex-end;
             z-index: 1;
             margin-top: auto;
-            padding-top: 20px;
+            padding-top: 15px;
         }
 
         .signature-block {
             text-align: center;
-            font-size: 16px;
-            font-weight: bold;
-            font-family: 'Times New Roman', Times, serif; /* Headings Font */
+            font-size: 15px;
+            font-weight: 700;
+            font-family: 'Amiri', 'Traditional Arabic', 'Times New Roman', serif;
+            color: var(--primary-color);
         }
 
         .signature-line {
-            border-bottom: 1px solid #000;
+            border-bottom: 2px solid var(--primary-color);
             width: 150px;
-            height: 40px;
-            margin: 10px auto;
+            height: 35px;
+            margin: 8px auto;
         }
 
         .issue-block {
             text-align: right;
             direction: rtl;
-            font-size: 16px;
-            font-family: Arial, sans-serif; /* Body Font */
+            font-size: 15px;
+            font-family: 'Amiri', 'Traditional Arabic', 'Times New Roman', serif;
             line-height: 1.8;
+            color: var(--text-color);
         }
 
         .footer-note {
             text-align: center;
-            font-size: 14px;
-            font-family: 'Times New Roman', Times, serif; /* Headings Font */
-            font-weight: bold;
+            font-size: 12px;
+            font-family: 'Amiri', 'Traditional Arabic', 'Times New Roman', serif;
+            font-weight: 700;
+            color: var(--warm-accent);
+            border-top: 1px solid var(--accent-color);
+            border-bottom: 1px solid var(--accent-color);
+            padding: 2px 10px;
+        }
+
+        @media print {
+            @page {
+                size: A4 landscape;
+                margin: 0;
+            }
+            body {
+                background-color: #fff;
+                margin: 0;
+                padding: 0;
+            }
+            .certificate-frame {
+                box-shadow: none;
+                border: none;
+                width: 297mm;
+                height: 210mm;
+                margin: 0 auto;
+                padding: 10mm;
+            }
+            * {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
         }
     </style>
 </head>

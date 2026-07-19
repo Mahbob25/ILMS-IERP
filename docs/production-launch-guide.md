@@ -1709,6 +1709,13 @@ set -a
 source .env
 set +a
 
+or manually
+set -a && source .env && set +a
+
+
+verfiy: 
+env
+
 # 2. Build Docker images
 docker compose -f docker-compose.prod.yml build --no-cache backend frontend
 

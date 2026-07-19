@@ -181,7 +181,7 @@ export default function DisbursementHistory({
                       <button
                         onClick={async () => {
                           try {
-                            const res = await apiClient.get(`/lms/cashier/refunds/${r.pending_refund_id}/preview`, { responseType: "text" });
+                            const res = await apiClient.get(`/lms/cashier/refunds/${r.id}/preview`, { responseType: "text" });
                             const htmlContent = res.data as string;
                             const win = window.open("", "_blank");
                             if (!win) {
