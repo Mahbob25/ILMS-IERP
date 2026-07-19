@@ -205,7 +205,13 @@ BASE_CSS = '''
             font-family: monospace;
             font-weight: 700;
             font-size: 14px;
-            direction: ltr;
+        }
+
+        .currency-label {
+            font-family: 'Cairo', Tahoma, Arial, sans-serif;
+            font-size: 16px;
+            font-weight: 700;
+            margin-right: 4px;
         }
 
         .fin-highlight {
@@ -371,19 +377,19 @@ receipt_content = '''        <div class="content-grid">
                 
                 <div class="fin-row">
                     <span class="fin-label">سعر الدورة:</span>
-                    <span class="fin-value">{{agreed_price}}</span>
+                    <span class="fin-value">{{agreed_price}} <span class="currency-label">ريال</span></span>
                 </div>
                 
                 {{discount_ar}}
 
                 <div class="fin-row fin-highlight">
                     <span class="fin-label">المبلغ المدفوع:</span>
-                    <span class="fin-value">{{paid_amount}}</span>
+                    <span class="fin-value">{{paid_amount}} <span class="currency-label">ريال</span></span>
                 </div>
 
                 <div class="fin-row">
                     <span class="fin-label">المبلغ المتبقي:</span>
-                    <span class="fin-value">{{balance}}</span>
+                    <span class="fin-value">{{balance}} <span class="currency-label">ريال</span></span>
                 </div>
             </div>
 
@@ -422,7 +428,7 @@ voucher_content = '''        <div class="content-grid">
                 <div class="fin-header">المبلغ</div>
                 
                 <div class="fin-row fin-highlight" style="justify-content: center;">
-                    <span class="fin-value" style="font-size: 22px; direction: ltr;">{{amount}}</span>
+                    <span class="fin-value" style="font-size: 22px;">{{amount}} <span class="currency-label">ريال</span></span>
                 </div>
             </div>
 
@@ -461,7 +467,7 @@ refund_content = '''        <div class="content-grid">
                 <div class="fin-header">المبلغ المسترد</div>
                 
                 <div class="fin-row fin-highlight" style="justify-content: center;">
-                    <span class="fin-value" style="font-size: 22px; direction: ltr;">{{amount}}</span>
+                    <span class="fin-value" style="font-size: 22px;">{{amount}} <span class="currency-label">ريال</span></span>
                 </div>
             </div>
 

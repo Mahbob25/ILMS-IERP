@@ -188,7 +188,13 @@
             font-family: monospace;
             font-weight: 700;
             font-size: 14px;
-            direction: ltr;
+        }
+
+        .currency-label {
+            font-family: 'Cairo', Tahoma, Arial, sans-serif;
+            font-size: 16px;
+            font-weight: 700;
+            margin-right: 4px;
         }
 
         .fin-highlight {
@@ -302,6 +308,7 @@
                     <span class="info-label">طريقة الدفع:</span>
                     <span class="info-value">{{payment_method}}</span>
                 </div>
+                {{transaction_ar}}
                 <div class="info-row" style="margin-top: 20px;">
                     <span class="info-label">ملاحظات:</span>
                     <span class="info-value">.........................................................................</span>
@@ -313,19 +320,19 @@
                 
                 <div class="fin-row">
                     <span class="fin-label">سعر الدورة:</span>
-                    <span class="fin-value">{{agreed_price}}</span>
+                    <span class="fin-value">{{agreed_price}} <span class="currency-label">ريال</span></span>
                 </div>
                 
                 {{discount_ar}}
 
                 <div class="fin-row fin-highlight">
                     <span class="fin-label">المبلغ المدفوع:</span>
-                    <span class="fin-value">{{paid_amount}}</span>
+                    <span class="fin-value">{{paid_amount}} <span class="currency-label">ريال</span></span>
                 </div>
 
                 <div class="fin-row">
                     <span class="fin-label">المبلغ المتبقي:</span>
-                    <span class="fin-value">{{balance}}</span>
+                    <span class="fin-value">{{balance}} <span class="currency-label">ريال</span></span>
                 </div>
             </div>
 

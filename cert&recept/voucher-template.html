@@ -187,8 +187,14 @@
         .fin-value {
             font-family: monospace;
             font-weight: 700;
-            font-size: 14px;
-            direction: ltr;
+            font-size: 13px;
+        }
+
+        .currency-label {
+            font-family: 'Cairo', Tahoma, Arial, sans-serif;
+            font-size: 15px;
+            font-weight: 700;
+            margin-right: 4px;
         }
 
         .fin-highlight {
@@ -312,7 +318,7 @@
                 <div class="fin-header">المبلغ</div>
                 
                 <div class="fin-row fin-highlight" style="justify-content: center;">
-                    <span class="fin-value" style="font-size: 22px; direction: ltr;">{{amount}}</span>
+                    <span class="fin-value" style="font-size: 22px;">{{amount}} <span class="currency-label">ريال</span></span>
                 </div>
             </div>
 

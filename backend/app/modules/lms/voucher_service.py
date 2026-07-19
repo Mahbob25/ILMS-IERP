@@ -54,15 +54,14 @@ def _generate_receipt_html(
     balance_remaining: Optional[float] = None,
     locale: str = "ar",
     cashier_name: str = "",
-    currency: str = "YER",
 ) -> str:
     labels = RECEIPT_HTML_AR if locale == "ar" else RECEIPT_HTML_EN
     method_label = labels["online"] if payment_method == "online" else labels["cash"]
-    amount_str = f"{amount:.2f} {currency}"
+    amount_str = f"{amount:.2f}"
 
-    agreed_str = f"{agreed_price:.2f} {currency}" if agreed_price is not None else ""
-    discount_str = f"{admin_discount:.2f} {currency}" if admin_discount and admin_discount > 0 else ""
-    balance_str = f"{balance_remaining:.2f} {currency}" if balance_remaining is not None else ""
+    agreed_str = f"{agreed_price:.2f}" if agreed_price is not None else ""
+    discount_str = f"{admin_discount:.2f}" if admin_discount and admin_discount > 0 else ""
+    balance_str = f"{balance_remaining:.2f}" if balance_remaining is not None else ""
 
     if discount_str:
         discount_en = f'Discount: <span class="fill-in" style="min-width:80px;">-{discount_str}</span><br>'
@@ -70,6 +69,14 @@ def _generate_receipt_html(
     else:
         discount_en = ""
         discount_ar = ""
+
+    if payment_method == "online" and transaction_number:
+        escaped_txn = html.escape(transaction_number)
+        transaction_ar = f'<div class="info-row"><span class="info-label">رقم العملية:</span><span class="info-value" style="direction:ltr">{escaped_txn}</span></div>'
+        transaction_en = f'Transaction No: <span class="fill-in" style="min-width:80px;">{escaped_txn}</span><br>'
+    else:
+        transaction_ar = ""
+        transaction_en = ""
 
     variables = {
         "receipt_title_ar": "سند دفع",
@@ -82,6 +89,8 @@ def _generate_receipt_html(
         "agreed_price": agreed_str,
         "discount_en": discount_en,
         "discount_ar": discount_ar,
+        "transaction_en": transaction_en,
+        "transaction_ar": transaction_ar,
         "paid_amount": amount_str,
         "balance": balance_str,
         "cashier_name": html.escape(cashier_name),
@@ -98,11 +107,10 @@ def _generate_voucher_html(
     description: Optional[str] = None,
     locale: str = "ar",
     cashier_name: str = "",
-    currency: str = "YER",
 ) -> str:
     type_labels = EXPENSE_TYPE_LABELS_AR if locale == "ar" else EXPENSE_TYPE_LABELS_EN
     type_label = type_labels.get(expense_type, expense_type)
-    amount_str = f"{amount:.2f} {currency}"
+    amount_str = f"{amount:.2f}"
 
     variables = {
         "voucher_title_ar": "سند صرف",
@@ -126,9 +134,8 @@ def _generate_refund_voucher_html(
     course_name: str = "",
     locale: str = "ar",
     cashier_name: str = "",
-    currency: str = "YER",
 ) -> str:
-    amount_str = f"{amount:.2f} {currency}"
+    amount_str = f"{amount:.2f}"
 
     variables = {
         "refund_title_ar": "سند استرداد",
