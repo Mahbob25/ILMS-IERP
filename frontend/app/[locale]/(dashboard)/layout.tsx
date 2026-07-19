@@ -31,7 +31,11 @@ import {
   HandCoins,
 } from "lucide-react";
 
-export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const router = useRouter();
   const params = useParams();
   const pathname = usePathname();
@@ -49,7 +53,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         superadmin: "مدير خارق",
         manager: "مسؤول النظام",
         secretary: "سكرتير",
-        teacher: "معلم"
+        teacher: "معلم",
       },
       menu: {
         dashboard: "لوحة التحكم",
@@ -76,7 +80,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         cashierRefunds: "المبالغ المستردة",
       },
       loading: "جاري تحميل بيانات الجلسة...",
-      langToggle: "English"
+      langToggle: "English",
     },
     en: {
       logout: "Log Out",
@@ -84,7 +88,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         superadmin: "Super Admin",
         manager: "Manager",
         secretary: "Secretary",
-        teacher: "Teacher"
+        teacher: "Teacher",
       },
       menu: {
         dashboard: "Dashboard",
@@ -111,8 +115,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         cashierRefunds: "Refunds",
       },
       loading: "Loading session data...",
-      langToggle: "العربية"
-    }
+      langToggle: "العربية",
+    },
   }[locale === "en" ? "en" : "ar"];
 
   const handleLanguageToggle = () => {
@@ -125,9 +129,24 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center gap-3 p-4">
-        <svg className="animate-spin h-8 w-8 text-brand-500" fill="none" viewBox="0 0 24 24">
-          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+        <svg
+          className="animate-spin h-8 w-8 text-brand-500"
+          fill="none"
+          viewBox="0 0 24 24"
+        >
+          <circle
+            className="opacity-25"
+            cx="12"
+            cy="12"
+            r="10"
+            stroke="currentColor"
+            strokeWidth="4"
+          />
+          <path
+            className="opacity-75"
+            fill="currentColor"
+            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+          />
         </svg>
         <span className="text-sm text-slate-500 font-medium">{t.loading}</span>
       </div>
@@ -144,28 +163,28 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   // Permission to role fallback mapping (when permissions aren't loaded yet)
   const PAGE_PERMISSION_MAP: Record<string, string[]> = {
-    "page_dashboard": ["superadmin", "manager", "secretary", "teacher"],
-    "page_users": ["superadmin"],
-    "page_employees": ["superadmin", "manager"],
-    "page_roles": ["superadmin"],
-    "page_courses": ["superadmin", "manager", "secretary", "teacher"],
-    "page_sections": ["superadmin", "manager", "secretary", "teacher"],
-    "page_certificates": ["superadmin", "manager", "secretary", "teacher"],
-    "page_students": ["superadmin", "manager", "secretary"],
-    "page_enrollments": ["superadmin", "manager", "secretary", "teacher"],
-    "page_attendance": ["superadmin", "manager", "secretary", "teacher"],
-    "page_gradebook": ["superadmin", "manager", "secretary", "teacher"],
-    "page_payments": ["superadmin", "manager", "secretary"],
-    "page_expenses": ["superadmin", "manager", "secretary"],
-    "page_revenue": ["superadmin", "manager"],
-    "page_teacher_wallet": ["superadmin", "manager", "teacher"],
-    "page_daily_closures": ["superadmin", "manager", "secretary"],
-    "page_pos": ["superadmin", "manager", "secretary"],
-    "page_cashier_refunds": ["superadmin", "manager", "accountant"],
-    "page_ingestion": ["superadmin", "teacher"],
-    "page_health": ["superadmin"],
-    "page_backups": ["superadmin"],
-    "page_settings": ["superadmin", "manager", "secretary", "teacher"],
+    page_dashboard: ["superadmin", "manager", "secretary", "teacher"],
+    page_users: ["superadmin"],
+    page_employees: ["superadmin", "manager"],
+    page_roles: ["superadmin"],
+    page_courses: ["superadmin", "manager", "secretary", "teacher"],
+    page_sections: ["superadmin", "manager", "secretary", "teacher"],
+    page_certificates: ["superadmin", "manager", "secretary", "teacher"],
+    page_students: ["superadmin", "manager", "secretary"],
+    page_enrollments: ["superadmin", "manager", "secretary", "teacher"],
+    page_attendance: ["superadmin", "manager", "secretary", "teacher"],
+    page_gradebook: ["superadmin", "manager", "secretary", "teacher"],
+    page_payments: ["superadmin", "manager", "secretary"],
+    page_expenses: ["superadmin", "manager", "secretary"],
+    page_revenue: ["superadmin", "manager"],
+    page_teacher_wallet: ["superadmin", "manager", "teacher"],
+    page_daily_closures: ["superadmin", "manager", "secretary"],
+    page_pos: ["superadmin", "manager", "secretary"],
+    page_cashier_refunds: ["superadmin", "manager", "accountant", "secretary"],
+    page_ingestion: ["superadmin", "teacher"],
+    page_health: ["superadmin"],
+    page_backups: ["superadmin"],
+    page_settings: ["superadmin", "manager", "secretary", "teacher"],
   };
 
   const hasPageAccess = (permissionCodename: string): boolean => {
@@ -179,7 +198,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   // Centralized route-level guard — prevents direct URL access bypassing the sidebar
   const ROUTE_PERMISSION_MAP: Record<string, string> = {
-    "dashboard": "page_dashboard",
+    dashboard: "page_dashboard",
     "dashboard/users": "page_users",
     "dashboard/employees": "page_employees",
     "dashboard/roles": "page_roles",
@@ -206,7 +225,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const routeKey = pathname.split("/").slice(2).join("/").replace(/\/$/, "");
   const matchedRoute = Object.keys(ROUTE_PERMISSION_MAP)
     .sort((a, b) => b.length - a.length)
-    .find(route => routeKey === route || routeKey.startsWith(route + "/"));
+    .find((route) => routeKey === route || routeKey.startsWith(route + "/"));
 
   if (matchedRoute) {
     const requiredPermission = ROUTE_PERMISSION_MAP[matchedRoute];
@@ -221,33 +240,145 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
 
   const navigationItems = [
-    { name: t.menu.dashboard, href: `/${locale}/dashboard`, icon: Activity, permission: "page_dashboard" },
-    { name: t.menu.users, href: `/${locale}/dashboard/users`, icon: Users, permission: "page_users" },
-    { name: t.menu.employees, href: `/${locale}/dashboard/employees`, icon: Users, permission: "page_employees" },
-    { name: t.menu.roles, href: `/${locale}/dashboard/roles`, icon: ShieldCheck, permission: "page_roles" },
-    { name: t.menu.courses, href: `/${locale}/dashboard/courses`, icon: BookOpen, permission: "page_courses" },
-    { name: t.menu.sections, href: `/${locale}/dashboard/sections`, icon: BookMarked, permission: "page_sections" },
-    { name: t.menu.certificates, href: `/${locale}/dashboard/certificates`, icon: Award, permission: "page_certificates" },
-    { name: t.menu.students, href: `/${locale}/dashboard/students`, icon: GraduationCap, permission: "page_students" },
-    { name: t.menu.enrollments, href: `/${locale}/dashboard/enrollments`, icon: ClipboardList, permission: "page_enrollments" },
-    { name: t.menu.attendance, href: `/${locale}/dashboard/attendance`, icon: ClipboardCheck, permission: "page_attendance" },
-    { name: t.menu.gradebook, href: `/${locale}/dashboard/gradebook`, icon: Award, permission: "page_gradebook" },
-    { name: t.menu.payments, href: `/${locale}/dashboard/payments`, icon: DollarSign, permission: "page_payments" },
-    { name: t.menu.expenses, href: `/${locale}/dashboard/expenses`, icon: Wallet, permission: "page_expenses" },
-    { name: t.menu.revenue, href: `/${locale}/dashboard/revenue`, icon: BarChart3, permission: "page_revenue" },
-    { name: t.menu.teacherWallet, href: `/${locale}/dashboard/teacher-wallet`, icon: CreditCard, permission: "page_teacher_wallet" },
-    { name: t.menu.dailyClosures, href: `/${locale}/dashboard/daily-closures`, icon: Calendar, permission: "page_daily_closures" },
-    { name: t.menu.pos, href: `/${locale}/dashboard/pos`, icon: ShoppingCart, permission: "page_pos" },
-    { name: t.menu.cashierRefunds, href: `/${locale}/dashboard/cashier/refunds`, icon: HandCoins, permission: "page_cashier_refunds" },
-    { name: t.menu.ingestion, href: `/${locale}/dashboard/ingestion`, icon: FileText, permission: "page_ingestion" },
-    { name: t.menu.systemHealth, href: `/${locale}/dashboard/health`, icon: Activity, permission: "page_health" },
-    { name: t.menu.backups, href: `/${locale}/dashboard/backups`, icon: Database, permission: "page_backups" },
-    { name: t.menu.settings, href: `/${locale}/dashboard/settings`, icon: Settings, permission: "page_settings" },
-  ].filter(item => hasPageAccess(item.permission));
+    {
+      name: t.menu.dashboard,
+      href: `/${locale}/dashboard`,
+      icon: Activity,
+      permission: "page_dashboard",
+    },
+    {
+      name: t.menu.users,
+      href: `/${locale}/dashboard/users`,
+      icon: Users,
+      permission: "page_users",
+    },
+    {
+      name: t.menu.employees,
+      href: `/${locale}/dashboard/employees`,
+      icon: Users,
+      permission: "page_employees",
+    },
+    {
+      name: t.menu.roles,
+      href: `/${locale}/dashboard/roles`,
+      icon: ShieldCheck,
+      permission: "page_roles",
+    },
+    {
+      name: t.menu.courses,
+      href: `/${locale}/dashboard/courses`,
+      icon: BookOpen,
+      permission: "page_courses",
+    },
+    {
+      name: t.menu.sections,
+      href: `/${locale}/dashboard/sections`,
+      icon: BookMarked,
+      permission: "page_sections",
+    },
+    {
+      name: t.menu.certificates,
+      href: `/${locale}/dashboard/certificates`,
+      icon: Award,
+      permission: "page_certificates",
+    },
+    {
+      name: t.menu.students,
+      href: `/${locale}/dashboard/students`,
+      icon: GraduationCap,
+      permission: "page_students",
+    },
+    {
+      name: t.menu.enrollments,
+      href: `/${locale}/dashboard/enrollments`,
+      icon: ClipboardList,
+      permission: "page_enrollments",
+    },
+    {
+      name: t.menu.attendance,
+      href: `/${locale}/dashboard/attendance`,
+      icon: ClipboardCheck,
+      permission: "page_attendance",
+    },
+    {
+      name: t.menu.gradebook,
+      href: `/${locale}/dashboard/gradebook`,
+      icon: Award,
+      permission: "page_gradebook",
+    },
+    {
+      name: t.menu.payments,
+      href: `/${locale}/dashboard/payments`,
+      icon: DollarSign,
+      permission: "page_payments",
+    },
+    {
+      name: t.menu.expenses,
+      href: `/${locale}/dashboard/expenses`,
+      icon: Wallet,
+      permission: "page_expenses",
+    },
+    {
+      name: t.menu.revenue,
+      href: `/${locale}/dashboard/revenue`,
+      icon: BarChart3,
+      permission: "page_revenue",
+    },
+    {
+      name: t.menu.teacherWallet,
+      href: `/${locale}/dashboard/teacher-wallet`,
+      icon: CreditCard,
+      permission: "page_teacher_wallet",
+    },
+    {
+      name: t.menu.dailyClosures,
+      href: `/${locale}/dashboard/daily-closures`,
+      icon: Calendar,
+      permission: "page_daily_closures",
+    },
+    {
+      name: t.menu.pos,
+      href: `/${locale}/dashboard/pos`,
+      icon: ShoppingCart,
+      permission: "page_pos",
+    },
+    {
+      name: t.menu.cashierRefunds,
+      href: `/${locale}/dashboard/cashier/refunds`,
+      icon: HandCoins,
+      permission: "page_cashier_refunds",
+    },
+    {
+      name: t.menu.ingestion,
+      href: `/${locale}/dashboard/ingestion`,
+      icon: FileText,
+      permission: "page_ingestion",
+    },
+    {
+      name: t.menu.systemHealth,
+      href: `/${locale}/dashboard/health`,
+      icon: Activity,
+      permission: "page_health",
+    },
+    {
+      name: t.menu.backups,
+      href: `/${locale}/dashboard/backups`,
+      icon: Database,
+      permission: "page_backups",
+    },
+    {
+      name: t.menu.settings,
+      href: `/${locale}/dashboard/settings`,
+      icon: Settings,
+      permission: "page_settings",
+    },
+  ].filter((item) => hasPageAccess(item.permission));
 
   const currentRoleLabel = user.is_superadmin
     ? t.roles.superadmin
-    : t.roles[user.role?.name as keyof typeof t.roles] || user.role?.name || "N/A";
+    : t.roles[user.role?.name as keyof typeof t.roles] ||
+      user.role?.name ||
+      "N/A";
 
   return (
     <div className="h-screen flex overflow-hidden bg-slate-50">
@@ -290,7 +421,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <UserIcon size={18} className="text-slate-500" />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-slate-900 truncate">{user.full_name}</p>
+                <p className="text-sm font-semibold text-slate-900 truncate">
+                  {user.full_name}
+                </p>
                 <p className="text-xs text-slate-500 truncate">{user.email}</p>
               </div>
             </div>
@@ -338,25 +471,33 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </header>
 
         {/* Dynamic Route Content */}
-        <main className="flex-1 overflow-y-auto p-4 md:p-6">
-          {children}
-        </main>
+        <main className="flex-1 overflow-y-auto p-4 md:p-6">{children}</main>
       </div>
 
       {/* Mobile Drawer Sidebar */}
       {sidebarOpen && (
         <div className="fixed inset-0 z-50 md:hidden flex">
           {/* Backdrop overlay */}
-          <div className="absolute inset-0 bg-slate-50/80 backdrop-blur-sm" onClick={() => setSidebarOpen(false)} />
+          <div
+            className="absolute inset-0 bg-slate-50/80 backdrop-blur-sm"
+            onClick={() => setSidebarOpen(false)}
+          />
 
           {/* Drawer content panel */}
-          <div className={`relative w-64 max-w-xs bg-white border-slate-200 shadow-xl flex flex-col z-10 h-full ${
-            isRtl ? "mr-0 ml-auto border-l" : "ml-0 mr-auto border-r"
-          } transition-transform duration-300`}>
+          <div
+            className={`relative w-64 max-w-xs bg-white border-slate-200 shadow-xl flex flex-col z-10 h-full ${
+              isRtl ? "mr-0 ml-auto border-l" : "ml-0 mr-auto border-r"
+            } transition-transform duration-300`}
+          >
             {/* Close button */}
             <div className="h-16 flex items-center justify-between px-6 border-b border-slate-200">
-              <span className="text-lg font-bold tracking-tight text-slate-900">Al-Drasat ERP</span>
-              <button onClick={() => setSidebarOpen(false)} className="text-slate-500 hover:text-slate-900">
+              <span className="text-lg font-bold tracking-tight text-slate-900">
+                Al-Drasat ERP
+              </span>
+              <button
+                onClick={() => setSidebarOpen(false)}
+                className="text-slate-500 hover:text-slate-900"
+              >
                 <X size={20} />
               </button>
             </div>
@@ -393,8 +534,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   <UserIcon size={18} className="text-slate-500" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs font-semibold text-slate-900 truncate">{user.full_name}</p>
-                  <p className="text-[10px] text-slate-500 truncate">{user.email}</p>
+                  <p className="text-xs font-semibold text-slate-900 truncate">
+                    {user.full_name}
+                  </p>
+                  <p className="text-[10px] text-slate-500 truncate">
+                    {user.email}
+                  </p>
                 </div>
               </div>
               <button

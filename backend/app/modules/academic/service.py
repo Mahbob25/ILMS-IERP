@@ -307,7 +307,7 @@ async def complete_section(
         if balance > 0:
             student = await db.get(Student, enrollment.student_id)
             unpaid_students.append({
-                "student_id": student.id,
+                "student_id": str(student.id),
                 "student_name": student.full_name,
                 "balance": float(balance),
             })

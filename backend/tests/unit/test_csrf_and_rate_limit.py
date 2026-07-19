@@ -10,12 +10,15 @@ async def test_csrf_rejects_without_token():
     request = MagicMock()
     request.method = "POST"
     request.headers = {}
-    request.cookies = {}
+    request.cookies = {"access_token": "some-token"}
+
+    call_next = AsyncMock()
+    call_next.return_value = MagicMock(status_code=200)
 
     middleware = CSRFMiddleware(lambda r: None)
 
     with pytest.raises(HTTPException) as exc:
-        await middleware.dispatch(request, lambda r: None)
+        await middleware.dispatch(request, call_next)
     assert exc.value.status_code == 403
     assert "CSRF" in exc.value.detail
 
@@ -27,12 +30,15 @@ async def test_csrf_rejects_mismatched_tokens():
     request = MagicMock()
     request.method = "POST"
     request.headers = {"X-CSRF-Token": "token-from-header"}
-    request.cookies = {"csrf_token": "token-from-cookie-different"}
+    request.cookies = {"csrf_token": "token-from-cookie-different", "access_token": "some-token"}
+
+    call_next = AsyncMock()
+    call_next.return_value = MagicMock(status_code=200)
 
     middleware = CSRFMiddleware(lambda r: None)
 
     with pytest.raises(HTTPException) as exc:
-        await middleware.dispatch(request, lambda r: None)
+        await middleware.dispatch(request, call_next)
     assert exc.value.status_code == 403
 
 

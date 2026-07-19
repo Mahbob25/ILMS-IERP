@@ -11,7 +11,7 @@ from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import func, text
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import joinedload, selectinload
 
 from app.modules.lms.models import (
     Payment, TeacherWallet, Expense,
@@ -81,12 +81,12 @@ async def create_payment(
     enrollment_result = await db.execute(
         select(Enrollment)
         .options(
-            joinedload(Enrollment.section)
-            .joinedload(CourseSection.course),
-            joinedload(Enrollment.section)
-            .joinedload(CourseSection.contract),
+            selectinload(Enrollment.section)
+            .selectinload(CourseSection.course),
+            selectinload(Enrollment.section)
+            .selectinload(CourseSection.contract),
         )
-        .options(joinedload(Enrollment.student))
+        .options(selectinload(Enrollment.student))
         .where(Enrollment.id == enrollment_id)
         .with_for_update()
     )
@@ -95,10 +95,16 @@ async def create_payment(
         logger.warning("Payment attempted for non-existent enrollment %s", enrollment_id)
         raise ValueError("Enrollment not found")
 
+    if enrollment.section and enrollment.section.status == "cancelled":
+        logger.warning("Payment attempted for cancelled section %s", enrollment.section.id)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=get_error_detail("section_cancelled", locale),
+        )
+
     total_paid_result = await db.execute(
         select(func.coalesce(func.sum(Payment.amount), 0))
         .where(Payment.enrollment_id == enrollment_id)
-        .with_for_update()
     )
     total_paid_before = Decimal(str(total_paid_result.scalar() or 0))
     agreed_price = enrollment.agreed_price or (enrollment.section.price if enrollment.section else 0) or 0

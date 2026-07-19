@@ -4,6 +4,7 @@ from datetime import date
 from unittest.mock import AsyncMock, Mock, patch
 import asyncio
 import pytest
+from fastapi import HTTPException
 
 from app.modules.lms.financial_service import create_payment
 
@@ -33,6 +34,7 @@ class TestPaymentConcurrency:
         contract.id = uuid.uuid4()
 
         section = Mock()
+        section.status = "active"
         section.contract = contract
         section.price = AGREED_PRICE
         section.teacher_percentage = None
@@ -108,6 +110,7 @@ class TestPaymentConcurrency:
         contract.id = uuid.uuid4()
 
         section = Mock()
+        section.status = "active"
         section.contract = contract
         section.price = Decimal("1000.00")
         section.teacher_percentage = None
@@ -164,8 +167,8 @@ class TestPaymentConcurrency:
                 )
 
         assert seen_for_update, "Enrollment query should use SELECT ... FOR UPDATE"
-        assert seen_payment_for_update, (
-            "Payment sum query should use SELECT ... FOR UPDATE"
+        assert not seen_payment_for_update, (
+            "Payment sum query should NOT use SELECT ... FOR UPDATE (aggregates don't support row locks)"
         )
 
     async def test_remaining_balance_check_blocks_overpayment(self, mock_db, mock_user):
@@ -176,6 +179,7 @@ class TestPaymentConcurrency:
         contract.id = uuid.uuid4()
 
         section = Mock()
+        section.status = "active"
         section.contract = contract
         section.price = Decimal("500.00")
         section.teacher_percentage = None
@@ -228,3 +232,60 @@ class TestPaymentConcurrency:
 
         assert exc_info.value.status_code == 400
         assert "exceeds remaining balance" in str(exc_info.value.detail).lower()
+
+
+    async def test_payment_rejects_cancelled_section(self, mock_db, mock_user):
+        enrollment_id = uuid.uuid4()
+
+        contract = Mock()
+        contract.compensation_model = None
+        contract.id = uuid.uuid4()
+
+        section = Mock()
+        section.status = "cancelled"
+        section.contract = contract
+        section.price = Decimal("1000.00")
+        section.teacher_percentage = None
+        section.teacher_id = None
+
+        enrollment = Mock()
+        enrollment.id = enrollment_id
+        enrollment.section = section
+        enrollment.agreed_price = Decimal("1000.00")
+        enrollment.admin_discount = None
+        enrollment.student = Mock()
+        enrollment.student.id = uuid.uuid4()
+
+        async def execute_side_effect(*args, **kwargs):
+            qs = str(args[0])
+            if "enrollments" in qs.lower() and "enrollments.id" in qs.lower():
+                r = Mock()
+                r.scalar_one_or_none.return_value = enrollment
+                return r
+            if "coalesce" in qs.lower() and "max" in qs.lower():
+                return _result_mock(scalar="")
+            if "pg_advisory" in qs.lower():
+                return _result_mock()
+            return _result_mock()
+
+        mock_db.execute = AsyncMock(side_effect=execute_side_effect)
+        mock_db.add = Mock()
+        mock_db.flush = AsyncMock()
+
+        with patch(
+            "app.modules.lms.financial_service.is_date_closed",
+            AsyncMock(return_value=False),
+        ):
+            with patch(
+                "app.modules.lms.financial_service.get_today",
+                return_value=date(2026, 7, 14),
+            ):
+                with pytest.raises(HTTPException) as exc_info:
+                    await create_payment(
+                        mock_db,
+                        enrollment_id=enrollment_id,
+                        amount=100.0,
+                        created_by=mock_user.id,
+                    )
+
+        assert exc_info.value.status_code == 400

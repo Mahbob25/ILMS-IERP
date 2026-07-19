@@ -119,7 +119,16 @@ export default function SectionFormModal({
                     <label className="block text-xs font-medium text-slate-700 mb-1">{t.compModel || "Compensation"}</label>
                     <Select
                       value={form.comp_model}
-                      onChange={(value) => updateField({ comp_model: value })}
+                      onChange={(value) => {
+                        const def = teacherDefaultMap[form.teacher_id];
+                        const updates: Partial<FormData> = { comp_model: value };
+                        if (value === "percentage" && def?.default_percentage) {
+                          updates.teacher_percentage = def.default_percentage.toString();
+                        } else if (value === "fixed" && def?.default_salary) {
+                          updates.teacher_salary = def.default_salary.toString();
+                        }
+                        updateField(updates);
+                      }}
                       options={[
                         { value: "fixed", label: "Fixed Amount" },
                         { value: "percentage", label: "Percentage" },

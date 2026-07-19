@@ -253,6 +253,11 @@ async def logout(
     return {"status": "success"}
 
 
+@auth_router.get("/csrf")
+async def csrf_token():
+    return {"status": "ok"}
+
+
 @auth_router.get("/me")
 async def auth_me(current_user: User = Depends(get_current_user)):
     return {

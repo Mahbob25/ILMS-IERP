@@ -9,7 +9,10 @@ from sqlalchemy.orm import joinedload
 from app.db.session import get_db
 from app.modules.identity.models import User
 from app.modules.identity.dependencies import get_current_user, RoleChecker
-from app.modules.academic.service import get_course_section, get_student as get_academic_student
+from app.modules.academic.service import (
+    get_course_section,
+    get_student as get_academic_student,
+)
 from app.modules.academic.models import CourseSection as CourseSectionModel
 from app.modules.lms.models import (
     SectionContract,
@@ -491,9 +494,7 @@ async def list_closures(
     ),
     db: AsyncSession = Depends(get_db),
 ):
-    return await closure_service.list_closures(
-        db, date_from=date_from, date_to=date_to
-    )
+    return await closure_service.list_closures(db, date_from=date_from, date_to=date_to)
 
 
 @lms_router.get(
@@ -1027,7 +1028,7 @@ async def list_pending_refunds(
     search: Optional[str] = Query(None),
     source: Optional[str] = Query(None),
     current_user: User = Depends(
-        RoleChecker(allowed_roles=["superadmin", "manager", "accountant"])
+        RoleChecker(allowed_roles=["superadmin", "manager", "secretary", "accountant"])
     ),
     db: AsyncSession = Depends(get_db),
 ):
@@ -1040,7 +1041,7 @@ async def list_pending_refunds(
 async def get_student_refunds(
     student_id: uuid.UUID,
     current_user: User = Depends(
-        RoleChecker(allowed_roles=["superadmin", "manager", "accountant"])
+        RoleChecker(allowed_roles=["superadmin", "manager", "secretary", "accountant"])
     ),
     db: AsyncSession = Depends(get_db),
 ):
@@ -1076,7 +1077,7 @@ async def disburse_refund(
     pending_refund_id: uuid.UUID,
     body: dict,
     current_user: User = Depends(
-        RoleChecker(allowed_roles=["superadmin", "manager", "accountant"])
+        RoleChecker(allowed_roles=["superadmin", "manager", "secretary", "accountant"])
     ),
     db: AsyncSession = Depends(get_db),
 ):
@@ -1109,7 +1110,7 @@ async def get_refund_history(
     page: int = 1,
     per_page: int = 20,
     current_user: User = Depends(
-        RoleChecker(allowed_roles=["superadmin", "manager", "accountant"])
+        RoleChecker(allowed_roles=["superadmin", "manager", "secretary", "accountant"])
     ),
     db: AsyncSession = Depends(get_db),
 ):
@@ -1149,11 +1150,13 @@ async def preview_refund_voucher(
     refund_id: uuid.UUID,
     locale: str = Query("ar", regex="^(ar|en)$"),
     current_user: User = Depends(
-        RoleChecker(allowed_roles=["superadmin", "manager", "accountant"])
+        RoleChecker(allowed_roles=["superadmin", "manager", "secretary", "accountant"])
     ),
     db: AsyncSession = Depends(get_db),
 ):
-    html = await voucher_service.get_refund_voucher_html_content(db, refund_id, locale=locale)
+    html = await voucher_service.get_refund_voucher_html_content(
+        db, refund_id, locale=locale
+    )
     if not html:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Refund not found"

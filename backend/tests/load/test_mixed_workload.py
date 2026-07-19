@@ -53,6 +53,7 @@ class TestMixedWorkloadLoad:
         contract.id = uuid.uuid4()
 
         section_with_contract = Mock()
+        section_with_contract.status = "active"
         section_with_contract.id = section_id
         section_with_contract.contract = contract
         section_with_contract.price = Decimal("1000.00")
@@ -303,6 +304,7 @@ class TestMixedWorkloadLoad:
         contract.id = uuid.uuid4()
 
         section_with_contract = Mock()
+        section_with_contract.status = "active"
         section_with_contract.id = section_id
         section_with_contract.contract = contract
         section_with_contract.price = Decimal("1000.00")

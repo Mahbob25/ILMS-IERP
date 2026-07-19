@@ -1,14 +1,13 @@
 import * as Sentry from "@sentry/nextjs";
-import axios from "axios";
+import axios, { AxiosError } from "axios";
 
-// Setup base API URL. If client-side, relative path works perfectly due to Caddy reverse proxy.
 const API_BASE_URL = typeof window !== "undefined"
   ? "/api/v1"
   : (process.env.NEXT_PUBLIC_API_URL || "http://backend:8000/api/v1");
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
-  withCredentials: true, // Crucial for forwarding HttpOnly cookies
+  withCredentials: true,
   headers: {
     "Content-Type": "application/json",
   },
@@ -17,9 +16,49 @@ export const apiClient = axios.create({
 let isRedirectingToLogin = false;
 let redirectTimer: ReturnType<typeof setTimeout> | null = null;
 
+let isRefreshing = false;
+let refreshSubscribers: Array<{
+  resolve: (value: unknown) => void;
+  reject: (reason: unknown) => void;
+}> = [];
+
 function getCookie(name: string): string | null {
   const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'))
   return match ? decodeURIComponent(match[2]) : null
+}
+
+function onRefreshed() {
+  for (const subscriber of refreshSubscribers) {
+    subscriber.resolve(true)
+  }
+  refreshSubscribers = []
+}
+
+function onRefreshFailed(error: unknown) {
+  for (const subscriber of refreshSubscribers) {
+    subscriber.reject(error)
+  }
+  refreshSubscribers = []
+}
+
+function redirectToLogin() {
+  if (typeof window !== "undefined" && !isRedirectingToLogin) {
+    const locale = window.location.pathname.match(/^\/(en|ar)/)?.[1] || "ar";
+    if (!window.location.pathname.endsWith(`/${locale}/login`)) {
+      isRedirectingToLogin = true;
+      window.location.href = `/${locale}/login`;
+      if (redirectTimer) clearTimeout(redirectTimer);
+      redirectTimer = setTimeout(() => {
+        isRedirectingToLogin = false;
+        redirectTimer = null;
+      }, 10000);
+    }
+  }
+}
+
+function resetRedirectFlag() {
+  isRedirectingToLogin = false;
+  redirectTimer = null;
 }
 
 // Request interceptor to attach CSRF token to mutating requests
@@ -40,16 +79,11 @@ apiClient.interceptors.request.use((config) => {
   return config
 })
 
-function resetRedirectFlag() {
-  isRedirectingToLogin = false;
-  redirectTimer = null;
-}
-
-// Response interceptor to handle global auth failures (e.g. 401 redirects)
+// Response interceptor
 apiClient.interceptors.response.use(
   (response) => response,
-  async (error) => {
-    const originalRequest = error.config;
+  async (error: AxiosError) => {
+    const originalRequest = error.config as any;
 
     const maxRetries = 2;
 
@@ -88,35 +122,73 @@ apiClient.interceptors.response.use(
     }
 
     if (status === 403) {
+      const isCsrfError = (error.response?.data as any)?.detail === "CSRF token mismatch";
+
+      if (isCsrfError && !originalRequest._csrfRetried) {
+        originalRequest._csrfRetried = true;
+
+        try {
+          await axios.get(`${API_BASE_URL}/auth/csrf`, { withCredentials: true });
+          await new Promise((resolve) => setTimeout(resolve, 50));
+          return apiClient(originalRequest);
+        } catch {
+          redirectToLogin();
+          const sessionError = new Error("Session expired. Please log in again.");
+          (sessionError as any).code = "SESSION_EXPIRED";
+          return Promise.reject(sessionError);
+        }
+      }
+
+      if (isCsrfError && originalRequest._csrfRetried) {
+        redirectToLogin();
+      }
+
       const forbiddenError = new Error("You do not have permission to perform this action.");
       (forbiddenError as any).code = "FORBIDDEN";
       return Promise.reject(forbiddenError);
     }
 
-    if (status === 401 && !originalRequest._retry) {
+    if (status === 401) {
       if (originalRequest.url === "/auth/login" || originalRequest.url === "/auth/refresh") {
         return Promise.reject(error);
       }
 
+      if (originalRequest._retry) {
+        redirectToLogin();
+        return Promise.reject(error);
+      }
+
       originalRequest._retry = true;
+
+      if (isRefreshing) {
+        return new Promise((resolve, reject) => {
+          refreshSubscribers.push({ resolve, reject });
+        }).then(() => apiClient(originalRequest)).catch(() => {
+          redirectToLogin();
+          return Promise.reject(error);
+        });
+      }
+
+      isRefreshing = true;
+
       try {
+        const csrfToken = getCookie('csrf_token');
         await axios.post(
           `${API_BASE_URL}/auth/refresh`,
           {},
-          { withCredentials: true }
-        );
-        return apiClient(originalRequest);
-      } catch {
-        if (typeof window !== "undefined" && !isRedirectingToLogin) {
-          const locale = window.location.pathname.match(/^\/(en|ar)/)?.[1] || "ar";
-          if (!window.location.pathname.endsWith(`/${locale}/login`)) {
-            isRedirectingToLogin = true;
-            window.location.href = `/${locale}/login`;
-            if (redirectTimer) clearTimeout(redirectTimer);
-            redirectTimer = setTimeout(resetRedirectFlag, 10000);
+          {
+            withCredentials: true,
+            headers: csrfToken ? { 'X-CSRF-Token': csrfToken } : undefined,
           }
-        }
-        return Promise.reject(error);
+        );
+        onRefreshed();
+        return apiClient(originalRequest);
+      } catch (refreshError) {
+        onRefreshFailed(refreshError as Error);
+        redirectToLogin();
+        return Promise.reject(refreshError);
+      } finally {
+        isRefreshing = false;
       }
     }
 

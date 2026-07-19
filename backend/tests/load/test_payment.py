@@ -40,6 +40,7 @@ class TestPaymentLoad:
         contract.id = uuid.uuid4()
 
         section = Mock()
+        section.status = "active"
         section.contract = contract
         section.price = BALANCE
         section.teacher_percentage = None
@@ -134,6 +135,7 @@ class TestPaymentLoad:
         contract.id = uuid.uuid4()
 
         section = Mock()
+        section.status = "active"
         section.contract = contract
         section.price = BALANCE
         section.teacher_percentage = None

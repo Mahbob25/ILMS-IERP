@@ -39,6 +39,7 @@ class TestIdempotencyE2E:
         contract.id = uuid.uuid4()
 
         section = Mock()
+        section.status = "active"
         section.contract = contract
         section.price = Decimal("1000.00")
         section.teacher_percentage = None
@@ -117,6 +118,7 @@ class TestIdempotencyE2E:
         contract.id = uuid.uuid4()
 
         section = Mock()
+        section.status = "active"
         section.contract = contract
         section.price = Decimal("1000.00")
         section.teacher_percentage = None

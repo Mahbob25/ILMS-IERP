@@ -176,7 +176,7 @@ async def complete_section_endpoint(
     section_id: uuid.UUID,
     force: bool = Body(False),
     reason: str = Body(None),
-    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager"])),
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])),
     db: AsyncSession = Depends(get_db)
 ):
     if force and not reason:

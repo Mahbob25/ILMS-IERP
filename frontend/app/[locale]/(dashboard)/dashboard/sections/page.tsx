@@ -269,7 +269,7 @@ export default function SectionsPage() {
       class_duration_minutes: section.class_duration_minutes || 0,
       classroom: section.classroom || "",
       price: section.price != null ? section.price.toString() : "",
-      teacher_percentage: section.teacher_percentage?.toString() || "",
+      teacher_percentage: section.teacher_percentage?.toString() || def?.default_percentage?.toString() || "",
       comp_model: section.contract_compensation_model || "",
       teacher_salary: def?.default_salary?.toString() || "",
     });
@@ -351,13 +351,9 @@ export default function SectionsPage() {
           contractAssign,
         );
       }
-      if (isNewRecord && sectionId) {
-        router.replace(`/${locale}/dashboard/sections/${sectionId}`);
-      } else {
-        setShowForm(false);
-        setEditingId(null);
-        fetchSections(search, statusFilter, page);
-      }
+      setShowForm(false);
+      setEditingId(null);
+      fetchSections(search, statusFilter, page);
     } catch (e: unknown) {
       const err = e as {
         response?: {

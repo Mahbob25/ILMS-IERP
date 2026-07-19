@@ -23,6 +23,10 @@ ERROR_MESSAGES = {
         "ar": "المبلغ يتجاوز الرصيد المتبقي",
         "en": "Payment amount exceeds remaining balance",
     },
+    "section_cancelled": {
+        "ar": "لا يمكن الدفع لشعبة ملغية",
+        "en": "Cannot pay for a cancelled section",
+    },
 }
 
 

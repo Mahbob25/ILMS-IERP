@@ -30,7 +30,7 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
 
         response = await call_next(request)
 
-        if response.status_code < 500:
+        if response.status_code < 500 and hasattr(response, "body"):
             body = await response.body()
             async with async_session_maker() as db:
                 await store_idempotency_key(

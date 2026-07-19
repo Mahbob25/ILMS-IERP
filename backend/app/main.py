@@ -1,3 +1,4 @@
+import logging
 import os
 from contextlib import asynccontextmanager
 
@@ -7,10 +8,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from sentry_sdk.integrations.fastapi import FastApiIntegration
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
+from sqlalchemy import text
 from app.core.rate_limit import limiter
 
 from app.core.config import settings
 from app.core.logging import setup_logging
+
+logger = logging.getLogger(__name__)
 
 sentry_sdk.init(
     dsn=os.getenv("SENTRY_DSN"),
@@ -35,9 +39,12 @@ from app.middleware.csrf import CSRFMiddleware
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    async with async_session_maker() as db:
-        await run_daily_section_checks(db)
-        await safe_cleanup_expired_keys(db)
+    try:
+        async with async_session_maker() as db:
+            await run_daily_section_checks(db)
+            await safe_cleanup_expired_keys(db)
+    except Exception as e:
+        logger.warning("Database unavailable during startup — skipping daily checks: %s", e)
     yield
 
 app = FastAPI(
@@ -81,5 +88,18 @@ app.include_router(dashboard_router, prefix="/api/v1")
 
 @app.get("/api/v1/health", tags=["system"])
 async def health_check():
-    """Foundational api status health check."""
-    return {"status": "ok", "service": "lims-api-server", "version": "1.7"}
+    """Foundational api status health check with database probe."""
+    db_status = "disconnected"
+    try:
+        async with async_session_maker() as db:
+            await db.execute(text("SELECT 1"))
+            db_status = "connected"
+    except Exception:
+        logger.warning("Health check — database unreachable")
+
+    return {
+        "status": "ok" if db_status == "connected" else "degraded",
+        "service": "lims-api-server",
+        "version": "1.7",
+        "database": db_status,
+    }
