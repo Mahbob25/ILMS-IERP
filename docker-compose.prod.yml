@@ -42,6 +42,8 @@ services:
       SENTRY_DSN: ${SENTRY_DSN:-}
     depends_on:
       database: { condition: service_healthy }
+    volumes:
+      - uploads_data:/app/uploads
     networks:
       - lims-internal
     deploy:
@@ -112,5 +114,6 @@ services:
 
 volumes:
   pgdata:
+  uploads_data:
   caddy_data:
   caddy_config:

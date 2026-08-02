@@ -1,8 +1,8 @@
 # LIMS Production Launch Guide — Step by Step
 
-**Version:** 2.0
-**Date:** 2026-07-14
-**Target:** Local on-premise server deployment (aldrasat.edu)
+**Version:** 2.1
+**Date:** 2026-08-02
+**Target:** Cloud VM deployment (AWS EC2 / GCP) behind Cloudflare Tunnel — see `docs/operations/cloud-deploy.md` for VM provisioning, Docker install, tunnel setup, deploy, and backup steps
 **Current Readiness Score:** 4.3/10
 
 ---
@@ -1621,6 +1621,11 @@ mkdir -p /opt/lims/logs
 
 ## Phase 7b: Infrastructure Server Setup
 
+> **UPDATE (2026-08-02):** Deployment moved to a cloud VM (EC2/GCP) behind Cloudflare Tunnel.
+> Follow `docs/operations/cloud-deploy.md` instead. The steps below (GitHub Actions runner,
+> `tls internal` CA distribution) are obsolete — the tunnel requires no inbound ports and
+> Caddy runs HTTP-only on `:80`.
+
 **Dependency:** Code changes from Phase 7a must be committed and pulled to server
 
 ### 🖥️ 7b.1 Install GitHub Actions Runner
@@ -1698,6 +1703,10 @@ docker exec lims_caddy cat /data/caddy/pki/authorities/local/root.crt > /opt/lim
 ---
 
 ## Phase 11b: Deploy Docker Containers
+
+> **UPDATE (2026-08-02):** Use `scripts/deploy.sh` from `docs/operations/cloud-deploy.md`
+> (build → `alembic upgrade head` → `up -d`). Cloudflare Tunnel is the only ingress;
+> ports 80/443 are not exposed on the host.
 
 ### 🖥️ Deploy Steps
 
