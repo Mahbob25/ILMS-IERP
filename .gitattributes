@@ -1,0 +1,3 @@
+# Shell scripts must stay LF so they run correctly in WSL/containers even when
+# checked out on Windows (where core.autocrlf=true would produce CRLF).
+*.sh text eol=lf
