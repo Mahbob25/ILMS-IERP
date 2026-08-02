@@ -14,13 +14,17 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install psutil dependencies (if any raw dependencies are needed at runtime)
+# curl is needed by the container healthcheck
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq5 \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
-COPY --from=builder /root/.local /root/.local
-ENV PATH=/root/.local/bin:$PATH
+# Install site-packages + binaries into /usr/local so the non-root
+# runtime user (appuser) can execute them (a copy of /root/.local is
+# not traversable by other users).
+COPY --from=builder /root/.local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+COPY --from=builder /root/.local/bin /usr/local/bin
 
 RUN useradd -m -u 1000 appuser
 
@@ -28,8 +32,14 @@ COPY --chown=appuser:appuser . .
 
 EXPOSE 8000
 
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=5 \
   CMD curl -f http://localhost:8000/api/v1/health || exit 1
+
+# Run pending DB migrations before starting the server.
+# The compose file provides DATABASE_URL / JWT_SECRET_KEY via the environment.
+COPY --chown=appuser:appuser docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+ENTRYPOINT ["docker-entrypoint.sh"]
 
 USER appuser
 

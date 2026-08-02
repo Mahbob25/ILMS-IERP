@@ -10,7 +10,7 @@ set -euo pipefail
 
 BACKUP_DIR="${BACKUP_DIR:-/var/backups/lms}"
 STAMP="$(date +%Y%m%d-%H%M%S)"
-COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.prod.yml}"
+COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.yml}"
 
 mkdir -p "$BACKUP_DIR"
 

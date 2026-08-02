@@ -2,8 +2,8 @@
 FROM node:18-alpine AS deps
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
-COPY package.json ./
-RUN npm install
+COPY package.json package-lock.json ./
+RUN npm ci
 
 # Rebuild the source code only when needed
 FROM node:18-alpine AS builder
@@ -41,8 +41,8 @@ USER nextjs
 
 EXPOSE 3000
 
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-  CMD curl -f http://localhost:3000/api/health || exit 1
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+  CMD curl -f http://localhost:3000/ar/login || exit 1
 
 ENV PORT 3000
 # hostname binds to loopback by default, set to 0.0.0.0 for docker

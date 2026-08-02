@@ -37,7 +37,8 @@ frontend/.env
 Thumbs.db
 
 # --- Docker ---
-.dockerignore
+# NOTE: .dockerignore files ARE tracked (backend/.dockerignore keeps
+# backend/.env out of the image build context).
 
 # --- Alembic ---
 alembic/versions/*.pyc

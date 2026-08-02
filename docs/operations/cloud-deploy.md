@@ -2,11 +2,14 @@
 
 **Target:** Cloud VM (AWS EC2 or Google Compute Engine), Ubuntu 24.04 LTS
 **Ingress:** Cloudflare Tunnel only — no public ports on the server
-**Stack:** Docker Compose (`docker-compose.prod.yml`) → Caddy (`:80`) → Next.js & FastAPI → PostgreSQL 16 + pgvector
+**Stack:** Docker Compose (`docker-compose.yml`) — Caddy (`:80`) — Next.js & FastAPI — PostgreSQL 16 + pgvector
 
 ```
 Internet → Cloudflare Edge (SSL, DDoS) → cloudflared container → Caddy :80 → backend:8000 / frontend:3000
 ```
+
+The same `docker-compose.yml` used for local development runs production:
+`docker compose up -d` locally, `./scripts/deploy.sh` on the server. No file changes needed.
 
 ---
 
@@ -48,12 +51,16 @@ Edit `.env`:
 - `POSTGRES_PASSWORD` — strong random password
 - `JWT_SECRET_KEY` — generate: `python3 -c "import secrets; print(secrets.token_urlsafe(48))"`
 - `TUNNEL_TOKEN` — from step 4
+- `ENVIRONMENT=production`
+- `CORS_ORIGINS=https://aldrasat.edu`
 - `SENTRY_DSN` — leave empty if not used
+
+`scripts/deploy.sh` refuses to start if `JWT_SECRET_KEY` or `TUNNEL_TOKEN` are still the insecure defaults.
 
 ## 4. Create the Cloudflare Tunnel
 
-1. Cloudflare dashboard → **Zero Trust** → **Networks** → **Tunnels** → **Create a tunnel**
-2. Choose **Cloudflared**; copy the token into `.env` → `TUNNEL_TOKEN`
+1. Cloudflare dashboard — **Zero Trust** — **Networks** — **Tunnels** — **Create a tunnel**
+2. Choose **Cloudflared**; copy the token into `.env` — `TUNNEL_TOKEN`
 3. Add a **Public Hostname**:
    - Subdomain/domain: `aldrasat.edu`
    - Service type: `HTTP`
@@ -67,17 +74,17 @@ chmod +x scripts/*.sh
 ./scripts/deploy.sh
 ```
 
-This builds images, runs `alembic upgrade head`, starts services, and waits for healthchecks. For subsequent updates: run `./scripts/deploy.sh` again (it pulls, rebuilds, migrates, and recreates containers).
+This pulls the code, builds images, and starts the stack with the `tunnel` profile (cloudflared). **The backend applies pending DB migrations automatically on startup**, so a new feature's migration runs on the next deploy with no manual step. For subsequent updates: run `./scripts/deploy.sh` again (it pulls, rebuilds, and recreates containers).
 
 ## 6. Verify
 
 ```bash
 curl -fsS https://aldrasat.edu/api/v1/health      # backend health
-docker compose -f docker-compose.prod.yml ps      # all containers Up
+docker compose ps                                 # all containers Up
 ```
 
 - Frontend: `https://aldrasat.edu/ar/login`
-- Uploads survive container recreation (named volume `uploads_data` → `/app/uploads`)
+- Uploads survive container recreation (named volume `uploads_data` — `/app/uploads`)
 
 ## 7. Backups
 
@@ -92,12 +99,13 @@ sudo crontab -e
 
 ## 8. Rolling back
 
-- DB: `docker compose -f docker-compose.prod.yml exec -T database pg_restore -U lims -d lims /path/to/backup.sql` (or restore from EBS snapshot)
+- DB: `docker compose exec -T database pg_restore -U lims -d lims /path/to/backup.sql` (or restore from EBS snapshot)
 - Code: `git checkout <previous-tag>` then `./scripts/deploy.sh`
 
 ## 9. Notes & gotchas
 
-- The Caddyfile is HTTP-only (`:80`) on purpose — Cloudflare terminates TLS. Do not re-enable Caddy host ports.
-- `NEXT_PUBLIC_API_URL` is baked into the frontend image at build time as `https://aldrasat.edu/api/v1` — rebuild (`./scripts/deploy.sh`) if it ever changes.
+- The Caddyfile is HTTP-only (`:80`) on purpose — Cloudflare terminates TLS. The host port mapping is harmless behind the firewall.
+- **No `NEXT_PUBLIC_API_URL` is baked into the frontend image.** Browsers call the same origin (`/api/v1` → Caddy → backend); server-side rendering uses the compose-network fallback `http://backend:8000/api/v1`. The image is identical locally and in production — no rebuilds when the domain changes.
+- Migrations run on backend startup (idempotent). To inspect: `docker compose exec backend alembic current`.
 - Real client IPs appear as Cloudflare IPs at the app layer; if needed later, forward `CF-Connecting-IP` via Caddy (see `docs/plans/cloudflare-tunnel-setup.md`).
-- Logs: `docker compose -f docker-compose.prod.yml logs -f <service>`; Sentry captures backend errors if `SENTRY_DSN` is set.
+- Logs: `docker compose logs -f <service>`; Sentry captures backend errors if `SENTRY_DSN` is set.

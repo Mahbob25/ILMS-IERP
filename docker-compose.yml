@@ -1,3 +1,13 @@
+# Unified Docker Compose — works for local development AND production deploy.
+#
+#   Local:  docker compose up -d         (database + backend + frontend + caddy)
+#   Prod:   docker compose --profile tunnel up -d
+#           (adds cloudflared; run from the server with a real .env)
+#
+# Environment variables are interpolated from the repo-root .env file.
+# Every variable has a local-development default, so `docker compose up`
+# works out of the box; production values come from .env on the server.
+
 networks:
   lims-internal:
     driver: bridge
@@ -10,7 +20,7 @@ services:
     ports:
       - "5431:5432"
     environment:
-      TZ: Asia/Riyadh
+      TZ: ${TIMEZONE:-Asia/Riyadh}
       POSTGRES_USER: ${POSTGRES_USER:-lims}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-lims_secure_pass}
       POSTGRES_DB: ${POSTGRES_DB:-lims}
@@ -19,62 +29,78 @@ services:
       - ./infrastructure/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
       - lims-internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-lims}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     deploy:
       resources:
         limits:
           cpus: '2.0'
           memory: 2G
 
-  # ──────────────────────────────────────────────────────────────
-  # Backend and Frontend are commented out for local development.
-  # Run them from the terminal instead:
-  #   Backend:  cd backend && .venv\Scripts\activate && uvicorn app.main:app --host 0.0.0.0 --port 8000
-  #   Frontend: cd frontend && npm run dev
-  # ──────────────────────────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: lims_backend
+    restart: always
+    environment:
+      TZ: ${TIMEZONE:-Asia/Riyadh}
+      TIMEZONE: ${TIMEZONE:-Asia/Riyadh}
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-lims}:${POSTGRES_PASSWORD:-lims_secure_pass}@database:5432/${POSTGRES_DB:-lims}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-local_dev_only_insecure_change_me}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:80,http://localhost:3000,https://aldrasat.edu}
+      SENTRY_DSN: ${SENTRY_DSN:-}
+    depends_on:
+      database:
+        condition: service_healthy
+    volumes:
+      - uploads_data:/app/uploads
+    networks:
+      - lims-internal
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 15s
+      timeout: 5s
+      start_period: 20s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
 
-  # backend:
-  #   build:
-  #     context: ./backend
-  #     dockerfile: Dockerfile
-  #   container_name: lims_backend
-  #   restart: always
-  #   environment:
-  #     TZ: Asia/Riyadh
-  #     TIMEZONE: Asia/Riyadh
-  #     HTTP_PROXY: "${HTTP_PROXY:-}"
-  #     HTTPS_PROXY: "${HTTPS_PROXY:-}"
-  #     NO_PROXY: "${NO_PROXY:-localhost,127.0.0.1,.aldrasat.edu,database}"
-  #     DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-lims}:${POSTGRES_PASSWORD:-lims_secure_pass}@database:5432/${POSTGRES_DB:-lims}
-  #     JWT_SECRET_KEY: ${JWT_SECRET_KEY:-placeholder_secret_key_for_jwt}
-  #     ENVIRONMENT: production
-  #   depends_on:
-  #     - database
-  #   networks:
-  #     - lims-internal
-  #   deploy:
-  #     resources:
-  #       limits:
-  #         cpus: '2.0'
-  #         memory: 2G
-
-  # frontend:
-  #   build:
-  #     context: ./frontend
-  #     dockerfile: Dockerfile
-  #   container_name: lims_frontend
-  #   restart: always
-  #   environment:
-  #     TZ: Asia/Riyadh
-  #     NEXT_PUBLIC_API_URL: https://aldrasat.edu/api/v1
-  #   depends_on:
-  #     - backend
-  #   networks:
-  #     - lims-internal
-  #   deploy:
-  #     resources:
-  #       limits:
-  #         cpus: '1.0'
-  #         memory: 512M
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: lims_frontend
+    restart: always
+    environment:
+      TZ: ${TIMEZONE:-Asia/Riyadh}
+    # No NEXT_PUBLIC_API_URL on purpose:
+    #   - browsers call the same origin (/api/v1) through Caddy
+    #   - server-side rendering falls back to http://backend:8000/api/v1
+    #   => one image works locally and in production, no rebuilds on domain changes.
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - lims-internal
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/ar/login"]
+      interval: 15s
+      timeout: 5s
+      start_period: 30s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
 
   caddy:
     image: caddy:latest
@@ -82,30 +108,45 @@ services:
     restart: always
     ports:
       - "80:80"
-      - "443:443"
     volumes:
       - ./infrastructure/caddy/Caddyfile:/etc/caddy/Caddyfile
       - caddy_data:/data
       - caddy_config:/config
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     environment:
-      TZ: Asia/Riyadh
-      BACKEND_URL: "${BACKEND_URL:-host.docker.internal:8000}"
-      FRONTEND_URL: "${FRONTEND_URL:-host.docker.internal:3000}"
-      HTTP_PROXY: "${HTTP_PROXY:-}"
-      HTTPS_PROXY: "${HTTPS_PROXY:-}"
+      TZ: ${TIMEZONE:-Asia/Riyadh}
+      # Service names — valid inside the compose network everywhere.
+      # Caddy proxies /api/v1, /uploads -> backend and everything else -> frontend.
+      BACKEND_URL: backend:8000
+      FRONTEND_URL: frontend:3000
     networks:
       - lims-internal
     depends_on:
-      - database
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_healthy
     deploy:
       resources:
         limits:
           cpus: '0.5'
           memory: 256M
 
+  # Production only — start with: docker compose --profile tunnel up -d
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: lims_cloudflared
+    profiles: ["tunnel"]
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:-}
+    restart: unless-stopped
+    networks:
+      - lims-internal
+    depends_on:
+      - caddy
+
 volumes:
   pgdata:
+  uploads_data:
   caddy_data:
   caddy_config:
