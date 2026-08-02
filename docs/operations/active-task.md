@@ -1,19 +1,25 @@
-﻿# Active Task: v1.7 Phase 10 — Integration Testing & Sign-Off
+﻿# Active Task: Cloud Deployment
 
 ## Status
-- **v1.7 ERP & Financial System**: Phases 1-9 code complete
-- **Phase 10**: Pending execution
-- **Next**: AI Ingestion Pipeline (after v1.7 sign-off)
 
-## Phase 10 Checklist
+- **v1.7 ERP & Financial System**: shipped — 221/221 backend tests passing (67% coverage), staff payroll module included
+- **Cloud deployment**: in progress — infra changes committed (Cloudflare tunnel, uploads volume, deploy/backup scripts); VM provisioning + tunnel token pending
+- **Next after deploy**: AI Ingestion Pipeline
 
-- [ ] `python backend/test_v1_7_full_e2e.py` — all 5 tests pass
-- [ ] `npm run build` (frontend) — zero type errors
-- [ ] Manual smoke: Secretary POS payment flow end-to-end
+## Cloud Deployment Checklist
+
+- [ ] Provision VM (2 vCPU / 4 GB, Ubuntu 24.04) — see `docs/operations/cloud-deploy.md`
+- [ ] Install Docker Engine + compose plugin
+- [ ] `git clone` repo, create `.env` from `.env.example` with real secrets
+- [ ] Create Cloudflare tunnel, set `TUNNEL_TOKEN`, Public Hostname `aldrasat.edu` → `caddy:80`
+- [ ] `./scripts/deploy.sh` (build → `alembic upgrade head` → up)
+- [ ] Verify `https://aldrasat.edu/ar/login` + `/api/v1/health`
+- [ ] Backup cron: `scripts/backup.sh` daily + EBS snapshots
+- [ ] Firewall: SSH only; ports 80/443 closed (tunnel-only ingress)
 
 ## Next Milestone: AI Ingestion Pipeline
 
-After v1.7 sign-off, resume the AI curriculum pipeline:
+After the deployment is live, resume the AI curriculum pipeline:
 - Document upload & parsing (PDF/DOCX)
 - Gemini embeddings & text generation
 - pgvector semantic search (RAG)

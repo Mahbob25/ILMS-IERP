@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-08-02 — Cloud deployment + docs cleanup
+
+- **Infra:** Cloudflare Tunnel (cloudflared) added to production compose; Caddy switched to HTTP-only `:80` (TLS handled by Cloudflare); Caddy host ports removed — no public ports on the server
+- **Deploy:** `uploads_data` named volume so uploads survive container recreation; `.env.example`; `scripts/deploy.sh` (build → migrate → up) and `scripts/backup.sh` (pg_dump + uploads archive, 14-day retention)
+- **Docs:** cloud deploy guide (`operations/cloud-deploy.md`); completed plans/audits moved to `archive/`; launch guide condensed to a checklist
+
 ## v1.7 ERP & Financial System (July 2026)
 
 Abolished the `terms`/semesters concept. Courses are now independent stateful entities. Added a full financial engine.
@@ -18,13 +24,15 @@ Abolished the `terms`/semesters concept. Courses are now independent stateful en
 | Phase 8 | Role data cleanup: remove `is_superadmin` from responses, use role.name |
 | Phase 9 | POS: student autocomplete, quick-amount buttons, receipt preview |
 
-### Phase 10 — Integration Testing (Pending)
+### QA Remediation + Testing
 
-Run the E2E integration tests + frontend build to sign off v1.7.
+- 221/221 backend tests passing (50 unit, 165 integration, 6 load), 67% coverage
+- QA chaos audit findings (20 CRITICAL + 16 HIGH) remediated: DB check constraints, sequences, idempotency keys, rate limiting, CSRF, security headers
 
-### Next: AI Ingestion Pipeline
+### Extra
 
-After v1.7 sign-off: document upload/parsing (PDF/DOCX), Gemini embeddings, pgvector semantic search, concept map extraction, question generation.
+- Staff payroll module, expense type migration, receipt/voucher templates
+- Transaction number on receipts, currency hardcoded in templates
 
 ---
 
