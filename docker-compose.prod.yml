@@ -81,9 +81,6 @@ services:
     image: caddy:latest
     container_name: lims_caddy
     restart: always
-    ports:
-      - "80:80"
-      - "443:443"
     volumes:
       - ./infrastructure/caddy/Caddyfile:/etc/caddy/Caddyfile
       - caddy_data:/data
@@ -100,6 +97,18 @@ services:
     deploy:
       resources:
         limits: { cpus: '0.5', memory: 256M }
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: lims_cloudflared
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN?err}
+    restart: unless-stopped
+    networks:
+      - lims-internal
+    depends_on:
+      - caddy
 
 volumes:
   pgdata:

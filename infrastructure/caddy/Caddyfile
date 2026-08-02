@@ -1,18 +1,7 @@
-{
-    # Internal CA configuration
-    pki {
-        ca local {
-            name "LIMS Internal CA"
-            root_cn "LIMS Root CA"
-        }
-    }
-}
-
-aldrasat.edu {
-    tls internal
+:80 {
     encode gzip
 
-    # API proxy — point to host for local dev
+    # API proxy — point to backend service
     reverse_proxy /api/v1/* {env.BACKEND_URL}
     reverse_proxy /uploads/* {env.BACKEND_URL}
 
