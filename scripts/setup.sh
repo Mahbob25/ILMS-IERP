@@ -99,7 +99,17 @@ detect_os() {
 docker_install_hint() {
   case "$OS" in
     debian)
-      echo "    sudo apt-get update && sudo apt-get install -y docker.io docker-compose-v2"
+      echo "    # 1. Set up Docker's official repository:"
+      echo "    sudo apt-get update"
+      echo "    sudo apt-get install -y ca-certificates curl"
+      echo "    sudo install -m 0755 -d /etc/apt/keyrings"
+      echo "    sudo curl -fsSL https://download.docker.com/linux/$ID/gpg -o /etc/apt/keyrings/docker.asc"
+      echo "    sudo chmod a+r /etc/apt/keyrings/docker.asc"
+      echo "    echo \"deb [arch=\$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/$ID \\"
+      echo "      \$(. /etc/os-release && echo \"\$VERSION_CODENAME\") stable\" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null"
+      echo "    sudo apt-get update"
+      echo "    # 2. Install the latest Docker packages:"
+      echo "    sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin"
       echo "    sudo systemctl enable --now docker"
       echo "    sudo usermod -aG docker \$USER     # then log out and back in" ;;
     rhel)
@@ -124,7 +134,8 @@ docker_install_hint() {
 
 compose_install_hint() {
   case "$OS" in
-    debian) echo "    sudo apt-get install -y docker-compose-v2" ;;
+    debian) echo "    sudo apt-get install -y docker-compose-plugin"
+            echo "    (requires Docker's official repo — see the docker install steps above)" ;;
     rhel) echo "    sudo dnf install -y docker-compose-plugin" ;;
     arch) echo "    sudo pacman -S docker-compose" ;;
     alpine) echo "    apk add docker-cli-compose" ;;
