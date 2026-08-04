@@ -22,8 +22,12 @@ def upgrade() -> None:
 
     # 1. Drop old FK constraints BEFORE migrating data (otherwise SET would
     #    violate the existing FK that checks against users.id)
-    op.drop_constraint('course_sections_teacher_id_fkey', 'course_sections', type_='foreignkey')
-    op.drop_constraint('teacher_wallets_teacher_id_fkey', 'teacher_wallets', type_='foreignkey')
+    #    (both naming styles: new DBs use the naming-convention names, old DBs
+    #    have the postgres defaults — drop whichever exists)
+    op.execute("ALTER TABLE course_sections DROP CONSTRAINT IF EXISTS fk_course_sections_teacher_id_users")
+    op.execute("ALTER TABLE course_sections DROP CONSTRAINT IF EXISTS course_sections_teacher_id_fkey")
+    op.execute("ALTER TABLE teacher_wallets DROP CONSTRAINT IF EXISTS fk_teacher_wallets_teacher_id_users")
+    op.execute("ALTER TABLE teacher_wallets DROP CONSTRAINT IF EXISTS teacher_wallets_teacher_id_fkey")
 
     # 2. Ensure all teachers referenced in course_sections have employee records
     conn.execute(sa.text("""

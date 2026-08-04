@@ -54,8 +54,12 @@ def upgrade() -> None:
     op.alter_column('payments', 'enrollment_id', nullable=False)
 
     # 6. Drop old payment columns and constraint
-    op.drop_constraint('payments_course_id_fkey', 'payments', type_='foreignkey')
-    op.drop_constraint('payments_student_id_fkey', 'payments', type_='foreignkey')
+    #    (both naming styles: new DBs use the naming-convention names, old DBs
+    #    have the postgres defaults — drop whichever exists)
+    op.execute("ALTER TABLE payments DROP CONSTRAINT IF EXISTS fk_payments_course_id_courses")
+    op.execute("ALTER TABLE payments DROP CONSTRAINT IF EXISTS payments_course_id_fkey")
+    op.execute("ALTER TABLE payments DROP CONSTRAINT IF EXISTS fk_payments_student_id_students")
+    op.execute("ALTER TABLE payments DROP CONSTRAINT IF EXISTS payments_student_id_fkey")
     op.drop_column('payments', 'course_id')
     op.drop_column('payments', 'student_id')
 

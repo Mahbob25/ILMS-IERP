@@ -34,11 +34,13 @@ def upgrade() -> None:
     op.add_column('enrollments', sa.Column('admin_discount', sa.Float(), nullable=True))
 
     # 4. course_sections — drop term_id FK and column
-    op.drop_constraint('course_sections_term_id_fkey', 'course_sections', type_='foreignkey')
-    op.drop_column('course_sections', 'term_id')
+    #    (IF EXISTS: on databases created before this migration chain was
+    #    re-written, the FK/column may already be absent — must stay idempotent)
+    op.execute("ALTER TABLE course_sections DROP CONSTRAINT IF EXISTS course_sections_term_id_fkey")
+    op.execute("ALTER TABLE course_sections DROP COLUMN IF EXISTS term_id")
 
     # 5. Drop terms table
-    op.drop_table('terms')
+    op.execute("DROP TABLE IF EXISTS terms")
 
     # 6. Create payments table
     op.create_table(
