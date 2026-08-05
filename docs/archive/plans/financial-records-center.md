@@ -1,9 +1,36 @@
 # Financial Records Center — Centralized Receipts & Vouchers Archive
 
-**Status:** Approved — ready to implement
+**Status:** ✅ Implemented — 2026-08-06 (commits `d3cc12c`, `308676e`)
 **Date:** 2026-08-05
-**Supersedes:** `docs/plans/documents-center.md` (renamed at kickoff to `financial-records`)
+**Supersedes:** `docs/archive/plans/documents-center.md` (renamed at kickoff to `financial-records`)
 **Constraint (HARD):** Zero database migrations. Read-only projection over existing `payments`, `expenses`, and `refunds` tables. No new tables, no schema changes, no mutation endpoints.
+
+---
+
+## 0. Implementation Record
+
+All phases completed. Verified artifacts (2026-08-06):
+
+**Backend**
+- `backend/app/modules/lms/financial_records_service.py` — `search_financial_records` (line 305) with three typed SELECTs + COUNTs, `merge_records` pure helper (date desc, then receipt_number)
+- `backend/app/modules/lms/schemas.py` — `FinancialRecordItem` (line 324), `FinancialRecordListResponse` (line 342)
+- `backend/app/modules/lms/router.py:224-247` — `GET /financial-records` with `@limiter.limit("60/minute")`, `doc_type` regex, `limit` 1–200, `RoleChecker(["superadmin","manager","secretary"])`
+- `backend/tests/unit/test_financial_records_service.py` — merge/sort/pagination + SQL-shape tests
+- `backend/tests/integration/financial_records/test_financial_records_endpoint.py` + `conftest.py` — endpoint shape, filters, pagination, role gates (TestClient + monkeypatched service)
+- `backend/pytest.ini:3` — `tests/integration/financial_records` added to `testpaths`
+
+**Frontend**
+- `frontend/app/[locale]/(dashboard)/dashboard/financial-records/page.tsx` — filters bar (doc type, date range, debounced search, name), table, pagination, i18n
+- `frontend/app/[locale]/(dashboard)/layout.tsx` — `ROUTE_PERMISSION_MAP` (line 226), `PAGE_PERMISSION_MAP` (line 187), sidebar entry (lines 337-340), `menu.financialRecords` in `ar`/`en` (lines 74/112)
+- `frontend/tests/e2e/browser/features/financial-records.spec.ts` — Playwright smoke spec
+
+**Deviations from plan (minor, no contract change)**
+- Integration test file named `test_financial_records_endpoint.py` (plan said `test_financial_records_center.py`)
+- Route registered at router.py:224 (plan said ~line 205, near `list_payments`)
+- Layout entries landed at lines 187/226/337-340 (plan said ~195/~233)
+- No `__init__.py` in the integration test package; pytest discovery works via `testpaths`
+
+**Zero-migration constraint upheld:** `git status` shows no `alembic/versions/*` changes; endpoint is read-only (GET only).
 
 ---
 

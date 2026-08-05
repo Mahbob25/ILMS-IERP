@@ -1,12 +1,13 @@
 # Current Direction — Roadmap
 
-**Status as of:** 2026-08-02
+**Status as of:** 2026-08-06
 
 ## Done
 
 - **v1.7 ERP & Financial System** shipped — courses without terms, full financial engine (payments, teacher wallets, expenses, daily closures), staff payroll, POS, receipts/vouchers
 - QA chaos remediation complete — 221/221 tests passing, security hardening (idempotency, rate limiting, CSRF)
 - **Reports module (v1.8) shipped** — 12-report catalog, full CSV/print/PDF export, permission gating, 97% coverage on the module (see `archive/plans/reports-module.md`)
+- **Financial Records Center shipped** — centralized read-only archive of receipts/vouchers/refunds with search/filter/reprint (see `archive/plans/financial-records-center.md`; zero-migration constraint upheld)
 - Cloud deployment prep: Cloudflare Tunnel ingress, prod compose ready, deploy/backup scripts
 
 ## Now
