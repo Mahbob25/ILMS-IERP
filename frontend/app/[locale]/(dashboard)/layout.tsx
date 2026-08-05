@@ -29,6 +29,7 @@ import {
   BarChart3,
   AlertCircle,
   HandCoins,
+  FileBarChart2,
 } from "lucide-react";
 
 export default function DashboardLayout({
@@ -79,6 +80,7 @@ export default function DashboardLayout({
         settings: "الإعدادات",
         cashierRefunds: "المبالغ المستردة",
         staffPayroll: "الرواتب",
+        reports: "التقارير",
       },
       loading: "جاري تحميل بيانات الجلسة...",
       langToggle: "English",
@@ -115,6 +117,7 @@ export default function DashboardLayout({
         settings: "Settings",
         cashierRefunds: "Refunds",
         staffPayroll: "Staff Payroll",
+        reports: "Reports",
       },
       loading: "Loading session data...",
       langToggle: "العربية",
@@ -188,6 +191,7 @@ export default function DashboardLayout({
     page_backups: ["superadmin"],
     page_settings: ["superadmin", "manager", "secretary", "teacher"],
     page_staff_payroll: ["superadmin", "manager", "secretary"],
+    page_reports: ["superadmin", "manager", "secretary"],
   };
 
   const hasPageAccess = (permissionCodename: string): boolean => {
@@ -225,6 +229,7 @@ export default function DashboardLayout({
     "dashboard/backups": "page_backups",
     "dashboard/settings": "page_settings",
     "dashboard/staff-payroll": "page_staff_payroll",
+    "dashboard/reports": "page_reports",
   };
 
   const routeKey = pathname.split("/").slice(2).join("/").replace(/\/$/, "");
@@ -376,6 +381,12 @@ export default function DashboardLayout({
       href: `/${locale}/dashboard/staff-payroll`,
       icon: Wallet,
       permission: "page_staff_payroll",
+    },
+    {
+      name: t.menu.reports,
+      href: `/${locale}/dashboard/reports`,
+      icon: FileBarChart2,
+      permission: "page_reports",
     },
     {
       name: t.menu.settings,
