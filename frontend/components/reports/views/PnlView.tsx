@@ -283,8 +283,8 @@ export default function PnlView({ start, end }: { start: string; end: string }) 
               </tbody>
             </table>
           </div>
-        </>
-      )}
+        )}
+      </div>
     </div>
   );
 }

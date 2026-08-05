@@ -154,6 +154,24 @@ class TestFinancialReportEndpoints:
         assert data["total_payments_in"] == 500.0
         assert data["prev_date"] == "2026-07-13"
 
+    def test_manager_gets_closures_shape(self, app_factory, manager_user, monkeypatch):
+        monkeypatch.setattr(
+            reports_service,
+            "get_closures_register",
+            AsyncMock(return_value=CLOSURES_SAMPLE),
+        )
+        app = app_factory(current_user=manager_user)
+        with TestClient(app) as client:
+            response = client.get(
+                "/reports/financial/closures?date_from=2026-07-01&date_to=2026-07-31"
+            )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert isinstance(data, list)
+        assert data[0]["status"] == "closed"
+        assert data[0]["net_cash_flow"] == 400.0
+
     def test_manager_gets_reconciliation_shape(self, app_factory, manager_user, monkeypatch):
         monkeypatch.setattr(
             reports_service,

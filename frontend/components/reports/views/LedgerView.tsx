@@ -157,7 +157,7 @@ export default function LedgerView({ date }: { date: string }) {
       case "amount": return <span className="font-semibold">{fmt(row.amount)}</span>;
       case "method": return methodLabel(row.payment_method);
       case "date": return row.disbursed_at ? formatDisplayDate(row.disbursed_at, locale) : "";
-      default: return (row as unknown as Record<string, unknown>)[key] ?? "";
+      default: return ((row as unknown as Record<string, unknown>)[key] as React.ReactNode) ?? "";
     }
   };
 
