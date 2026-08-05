@@ -4,7 +4,12 @@ import React, { useState, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { apiClient } from "@/lib/api";
 import { sanitizeInput } from "@/lib/utils/input";
+import { getLocalDateString } from "@/lib/dates";
 import EmptyState from "@/components/EmptyState";
+import PnlView from "@/components/reports/views/PnlView";
+import LedgerView from "@/components/reports/views/LedgerView";
+import ClosuresView from "@/components/reports/views/ClosuresView";
+import ReconciliationView from "@/components/reports/views/ReconciliationView";
 import {
   Loader2,
   RefreshCw,
@@ -150,6 +155,31 @@ export default function ReportsPage() {
   const [period, setPeriod] = useState<"7d" | "30d" | "90d" | "year" | "custom">("30d");
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
+  const [singleDate, setSingleDate] = useState(getLocalDateString());
+
+  const getDateRange = useCallback(() => {
+    const now = new Date();
+    const toLocal = (d: Date) => d.toLocaleDateString("sv-SE");
+    const end = toLocal(now);
+    let start: string;
+    switch (period) {
+      case "7d":
+        start = toLocal(new Date(now.getTime() - 7 * 86400000));
+        break;
+      case "30d":
+        start = toLocal(new Date(now.getTime() - 30 * 86400000));
+        break;
+      case "90d":
+        start = toLocal(new Date(now.getTime() - 90 * 86400000));
+        break;
+      case "year":
+        start = `${now.getFullYear()}-01-01`;
+        break;
+      default:
+        start = customFrom || toLocal(new Date(now.getTime() - 30 * 86400000));
+    }
+    return { start_date: start, end_date: customTo || end };
+  }, [period, customFrom, customTo]);
 
   const fetchCatalog = useCallback(async () => {
     setFetchError(null);
@@ -181,7 +211,10 @@ export default function ReportsPage() {
     (catalog?.reports ?? []).filter((r) => r.category === category);
 
   const selectedReport = catalog?.reports.find((r) => r.path === selectedPath) ?? null;
-  const needsDateRange = selectedReport?.inputs.includes("date_range") ?? false;
+  const selectedCode = selectedReport?.code ?? null;
+  const hasDateRange = selectedReport?.inputs.includes("date_range") ?? false;
+  const hasSingleDate = selectedReport?.inputs.includes("single_date") ?? false;
+  const dateRange = getDateRange();
 
   if (loading) {
     return (
@@ -320,10 +353,10 @@ export default function ReportsPage() {
         </>
       )}
 
-      {/* Period Filter — only for reports that need a date range */}
+      {/* Period Filter — for reports that need a date range or a single date */}
       {selectedReport && (
         <div className="card p-4">
-          {needsDateRange ? (
+          {hasDateRange ? (
             <div className="flex items-center gap-2 flex-wrap">
               {periodButtons.map((btn) => (
                 <button
@@ -363,6 +396,20 @@ export default function ReportsPage() {
                 </div>
               )}
             </div>
+          ) : hasSingleDate ? (
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold text-slate-500">
+                {t.inputs.single_date}
+              </span>
+              <input
+                type="date"
+                value={singleDate}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                  setSingleDate(sanitizeInput(e.target.value))
+                }
+                className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs"
+              />
+            </div>
           ) : (
             <p className="text-xs text-slate-500">{t.noPeriodFilter}</p>
           )}
@@ -388,12 +435,22 @@ export default function ReportsPage() {
         </div>
       )}
 
-      {/* Content Area — report views land here in later phases */}
+      {/* Content Area — renders the selected report's view */}
       {selectedReport ? (
-        <div className="card p-10 text-center">
-          <Loader2 size={28} className="mx-auto text-slate-300 mb-3" />
-          <p className="text-sm font-medium text-slate-500">{t.comingSoon}</p>
-        </div>
+        selectedCode === "pnl_summary" ? (
+          <PnlView start={dateRange.start_date} end={dateRange.end_date} />
+        ) : selectedCode === "daily_ledger" ? (
+          <LedgerView date={singleDate} />
+        ) : selectedCode === "closures_register" ? (
+          <ClosuresView dateFrom={dateRange.start_date} dateTo={dateRange.end_date} />
+        ) : selectedCode === "daily_reconciliation" ? (
+          <ReconciliationView date={singleDate} />
+        ) : (
+          <div className="card p-10 text-center">
+            <Loader2 size={28} className="mx-auto text-slate-300 mb-3" />
+            <p className="text-sm font-medium text-slate-500">{t.comingSoon}</p>
+          </div>
+        )
       ) : (
         <EmptyState title={t.selectPrompt} message="" />
       )}
