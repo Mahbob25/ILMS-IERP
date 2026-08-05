@@ -163,7 +163,11 @@ Frontend: Playwright smoke spec `frontend/tests/e2e/browser/features/documents-u
 ## 9. Open Questions
 
 1. **Reprint tracking** — does accounting need who-reprinted-what? Currently NO (would require a table = violates the zero-migration constraint; defer).
+**Developer Answer**: No neeed for Reprint tracking for now.
+
 2. **Teacher access** — should teachers see this archive limited to their own students? Default NO (keep the strictest gate); can be layered later without migrations.
+**Developer Answer**: No.
+
 3. **Bulk print** — print all vouchers for a date range in one PDF? Nice-to-have; out of scope for v1 of this page.
 
 ## 10. Risks
