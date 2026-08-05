@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -41,7 +40,11 @@ class Settings(BaseSettings):
     def templates_dir(self) -> Path:
         if self.TEMPLATES_DIR:
             return Path(self.TEMPLATES_DIR)
-        return Path(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))) / "cert&recept"
+        for parent in Path(__file__).resolve().parents:
+            candidate = parent / "cert&recept"
+            if candidate.is_dir():
+                return candidate
+        raise FileNotFoundError("cert&recept template directory not found")
 
     @property
     def sync_database_url(self) -> str:

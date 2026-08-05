@@ -54,11 +54,13 @@ services:
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-local_dev_only_insecure_change_me}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:80,http://localhost:3000,https://aldrasat.edu}
       SENTRY_DSN: ${SENTRY_DSN:-}
+      TEMPLATES_DIR: /app/cert&recept
     depends_on:
       database:
         condition: service_healthy
     volumes:
       - uploads_data:/app/uploads
+      - ./cert&recept:/app/cert&recept:ro
     networks:
       - lims-internal
     healthcheck:
