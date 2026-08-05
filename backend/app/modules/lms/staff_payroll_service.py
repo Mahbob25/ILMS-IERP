@@ -1,6 +1,6 @@
 import uuid
 from decimal import Decimal
-from datetime import date
+from datetime import date, timedelta
 from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
@@ -12,9 +12,20 @@ from app.modules.lms.financial_service import get_next_voucher_number
 
 async def list_staff_for_payroll(
     db: AsyncSession,
+    month: Optional[date] = None,
 ) -> list[dict]:
-    now = date.today()
-    month_start = now.replace(day=1)
+    if month is None:
+        month = date.today()
+
+    month_start = month.replace(day=1)
+    if month.month == 12:
+        month_end = month.replace(day=31)
+    else:
+        month_end = (month.replace(day=1) + timedelta(days=32)).replace(day=1) - timedelta(days=1)
+    # Never count draws later than today for the current month
+    today = date.today()
+    if month_end > today:
+        month_end = today
 
     employees_result = await db.execute(
         select(Employee)
@@ -40,7 +51,7 @@ async def list_staff_for_payroll(
             Expense.recipient_id.in_(emp_ids),
             Expense.type == "salary_draw",
             Expense.date >= month_start,
-            Expense.date <= now,
+            Expense.date <= month_end,
         )
         .group_by(Expense.recipient_id)
     )

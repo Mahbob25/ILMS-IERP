@@ -1,7 +1,8 @@
 # Documents Center — Centralized Receipts & Vouchers Archive
 
-**Status:** Proposed
+**Status:** Superseded (renamed at kickoff to `financial-records`)
 **Date:** 2026-08-05
+**Superseded by:** `docs/plans/financial-records-center.md`
 **Constraint (HARD):** Zero database migrations. Read-only projection over existing `payments`, `expenses`, and `refunds` tables. No new tables, no schema changes, no mutation endpoints.
 
 ---

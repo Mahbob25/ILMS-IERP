@@ -318,3 +318,27 @@ class WalletDetailResponse(BaseModel):
     total_frozen: float
     total_available: float
     sections: list[WalletSectionDetail]
+
+
+# --- Financial Records Center ---
+class FinancialRecordItem(BaseModel):
+    doc_type: str
+    source_id: uuid.UUID
+    receipt_number: str
+    date: date
+    amount: float
+    counterparty: str
+    created_by_name: str = ""
+    detail: str = ""
+    preview_url: str
+    student_code: Optional[str] = None
+    course_name: Optional[str] = None
+    payment_method: Optional[str] = None
+    transaction_number: Optional[str] = None
+    expense_type: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class FinancialRecordListResponse(BaseModel):
+    items: list[FinancialRecordItem]
+    total: int

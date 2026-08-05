@@ -10,6 +10,14 @@ import PnlView from "@/components/reports/views/PnlView";
 import LedgerView from "@/components/reports/views/LedgerView";
 import ClosuresView from "@/components/reports/views/ClosuresView";
 import ReconciliationView from "@/components/reports/views/ReconciliationView";
+import StudentRegisterView from "@/components/reports/views/StudentRegisterView";
+import EnrollmentSummaryView from "@/components/reports/views/EnrollmentSummaryView";
+import SectionOccupancyView from "@/components/reports/views/SectionOccupancyView";
+import AttendanceSummaryView from "@/components/reports/views/AttendanceSummaryView";
+import TeacherWalletsView from "@/components/reports/views/TeacherWalletsView";
+import TeacherPayoutsView from "@/components/reports/views/TeacherPayoutsView";
+import StaffPayrollView from "@/components/reports/views/StaffPayrollView";
+import GradeSummaryView from "@/components/reports/views/GradeSummaryView";
 import {
   Loader2,
   RefreshCw,
@@ -156,6 +164,7 @@ export default function ReportsPage() {
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
   const [singleDate, setSingleDate] = useState(getLocalDateString());
+  const [singleMonth, setSingleMonth] = useState(getLocalDateString().slice(0, 7));
 
   const getDateRange = useCallback(() => {
     const now = new Date();
@@ -214,6 +223,7 @@ export default function ReportsPage() {
   const selectedCode = selectedReport?.code ?? null;
   const hasDateRange = selectedReport?.inputs.includes("date_range") ?? false;
   const hasSingleDate = selectedReport?.inputs.includes("single_date") ?? false;
+  const hasSingleMonth = selectedReport?.inputs.includes("single_month") ?? false;
   const dateRange = getDateRange();
 
   if (loading) {
@@ -410,6 +420,20 @@ export default function ReportsPage() {
                 className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs"
               />
             </div>
+          ) : hasSingleMonth ? (
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold text-slate-500">
+                {t.inputs.single_month}
+              </span>
+              <input
+                type="month"
+                value={singleMonth}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                  setSingleMonth(sanitizeInput(e.target.value))
+                }
+                className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs"
+              />
+            </div>
           ) : (
             <p className="text-xs text-slate-500">{t.noPeriodFilter}</p>
           )}
@@ -445,6 +469,22 @@ export default function ReportsPage() {
           <ClosuresView dateFrom={dateRange.start_date} dateTo={dateRange.end_date} />
         ) : selectedCode === "daily_reconciliation" ? (
           <ReconciliationView date={singleDate} />
+        ) : selectedCode === "student_register" ? (
+          <StudentRegisterView />
+        ) : selectedCode === "enrollment_summary" ? (
+          <EnrollmentSummaryView start={dateRange.start_date} end={dateRange.end_date} />
+        ) : selectedCode === "section_occupancy" ? (
+          <SectionOccupancyView />
+        ) : selectedCode === "attendance_summary" ? (
+          <AttendanceSummaryView start={dateRange.start_date} end={dateRange.end_date} />
+        ) : selectedCode === "teacher_wallets" ? (
+          <TeacherWalletsView />
+        ) : selectedCode === "teacher_payouts" ? (
+          <TeacherPayoutsView start={dateRange.start_date} end={dateRange.end_date} />
+        ) : selectedCode === "staff_payroll" ? (
+          <StaffPayrollView month={singleMonth} />
+        ) : selectedCode === "grade_summary" ? (
+          <GradeSummaryView />
         ) : (
           <div className="card p-10 text-center">
             <Loader2 size={28} className="mx-auto text-slate-300 mb-3" />

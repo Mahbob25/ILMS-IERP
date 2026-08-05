@@ -1,5 +1,6 @@
 from datetime import date
 from typing import Optional
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,6 +14,14 @@ from app.modules.reports.schemas import (
     LedgerReportResponse,
     ClosuresRegisterItem,
     DailyReconciliationReportResponse,
+    StudentRegisterResponse,
+    EnrollmentSummaryResponse,
+    SectionOccupancyResponse,
+    AttendanceSummaryResponse,
+    TeacherWalletsResponse,
+    TeacherPayoutsResponse,
+    PayrollRegisterResponse,
+    GradeSummaryResponse,
 )
 from app.modules.reports import service as reports_service
 
@@ -70,3 +79,97 @@ async def get_daily_reconciliation_report(
     db: AsyncSession = Depends(get_db),
 ):
     return await reports_service.get_daily_reconciliation_report(db, report_date)
+
+
+# --- B. Operational reports ---
+
+
+@reports_router.get("/students", response_model=StudentRegisterResponse)
+async def get_student_register_report(
+    status: Optional[str] = Query(default=None),
+    current_user: User = Depends(
+        RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])
+    ),
+    db: AsyncSession = Depends(get_db),
+):
+    return await reports_service.get_student_register(db, status=status)
+
+
+@reports_router.get("/enrollments", response_model=EnrollmentSummaryResponse)
+async def get_enrollment_summary_report(
+    start_date: Optional[date] = Query(default=None),
+    end_date: Optional[date] = Query(default=None),
+    current_user: User = Depends(
+        RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])
+    ),
+    db: AsyncSession = Depends(get_db),
+):
+    return await reports_service.get_enrollment_summary(db, start_date, end_date)
+
+
+@reports_router.get("/sections/occupancy", response_model=SectionOccupancyResponse)
+async def get_section_occupancy_report(
+    current_user: User = Depends(
+        RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])
+    ),
+    db: AsyncSession = Depends(get_db),
+):
+    return await reports_service.get_section_occupancy(db)
+
+
+@reports_router.get("/attendance", response_model=AttendanceSummaryResponse)
+async def get_attendance_summary_report(
+    start_date: Optional[date] = Query(default=None),
+    end_date: Optional[date] = Query(default=None),
+    teacher_id: Optional[UUID] = Query(default=None),
+    current_user: User = Depends(
+        RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])
+    ),
+    db: AsyncSession = Depends(get_db),
+):
+    return await reports_service.get_attendance_summary(
+        db, start_date, end_date, teacher_id
+    )
+
+
+# --- C. Teacher / HR reports ---
+
+
+@reports_router.get("/teachers/wallets", response_model=TeacherWalletsResponse)
+async def get_teacher_wallets_report(
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager"])),
+    db: AsyncSession = Depends(get_db),
+):
+    return await reports_service.get_teacher_wallets(db)
+
+
+@reports_router.get("/teachers/payouts", response_model=TeacherPayoutsResponse)
+async def get_teacher_payouts_report(
+    start_date: Optional[date] = Query(default=None),
+    end_date: Optional[date] = Query(default=None),
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager"])),
+    db: AsyncSession = Depends(get_db),
+):
+    return await reports_service.get_teacher_payouts(db, start_date, end_date)
+
+
+@reports_router.get("/payroll", response_model=PayrollRegisterResponse)
+async def get_payroll_register_report(
+    month: Optional[date] = Query(default=None),
+    current_user: User = Depends(
+        RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])
+    ),
+    db: AsyncSession = Depends(get_db),
+):
+    return await reports_service.get_staff_payroll_report(db, month=month)
+
+
+@reports_router.get("/grades", response_model=GradeSummaryResponse)
+async def get_grade_summary_report(
+    section_id: Optional[UUID] = Query(default=None),
+    current_user: User = Depends(
+        RoleChecker(allowed_roles=["superadmin", "manager", "teacher"])
+    ),
+    db: AsyncSession = Depends(get_db),
+):
+    return await reports_service.get_grade_summary(db, section_id=section_id)

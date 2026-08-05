@@ -45,7 +45,7 @@ from app.modules.lms.schemas import (
     AmendmentRejectRequest,
     AmendmentPendingItem,
     WalletDetailResponse,
-    RefundDetailItem,
+    FinancialRecordListResponse,
 )
 from app.modules.lms import service as lms_service
 from app.modules.lms import financial_service
@@ -54,6 +54,7 @@ from app.modules.lms import closure_service
 from app.modules.lms import ledger_service as lms_ledger
 from app.modules.lms import compensation_service
 from app.modules.lms import cashier_service
+from app.modules.lms import financial_records_service
 from app.core.error_messages import get_error_detail
 from app.core.rate_limit import limiter
 
@@ -216,6 +217,37 @@ async def list_payments(
 ):
     return await financial_service.list_payments(
         db, enrollment_id, student_id, date_from, date_to, receipt_number
+    )
+
+
+# --- Financial Records Center ---
+@lms_router.get(
+    "/financial-records", response_model=FinancialRecordListResponse
+)
+@limiter.limit("60/minute")
+async def list_financial_records(
+    request: Request,
+    doc_type: Optional[str] = Query(None, regex="^(receipt|voucher|refund)$"),
+    date_from: Optional[date] = None,
+    date_to: Optional[date] = None,
+    search: Optional[str] = Query(None),
+    name: Optional[str] = Query(None),
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    current_user: User = Depends(
+        RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])
+    ),
+    db: AsyncSession = Depends(get_db),
+):
+    return await financial_records_service.search_financial_records(
+        db,
+        doc_type=doc_type,
+        date_from=date_from,
+        date_to=date_to,
+        search=search,
+        name=name,
+        limit=limit,
+        offset=offset,
     )
 
 
