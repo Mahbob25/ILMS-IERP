@@ -16,6 +16,7 @@ Deployment: cloud VM (AWS EC2 / GCP) behind a Cloudflare Tunnel — no public po
 | `architecture/templates-design-rules.md` | Receipt / voucher / certificate template design rules |
 | `guides/development.md` | Setup, Docker vs local, common commands, troubleshooting |
 | `guides/security.md` | Active security posture + deferred improvements |
+| `guides/user-testing-guide.md` | Arabic 7-day user testing guide (`.html`/`.pdf` also available; regenerate via `scripts/build_testing_guide.py`) |
 | `operations/active-task.md` | What's being worked on right now |
 | `operations/changelog.md` | Version history |
 | `operations/cloud-deploy.md` | Cloud VM deployment guide: provision, tunnel, deploy, backup |
