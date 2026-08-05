@@ -30,6 +30,7 @@ import {
   AlertCircle,
   HandCoins,
   FileBarChart2,
+  FolderOpen,
 } from "lucide-react";
 
 export default function DashboardLayout({
@@ -70,6 +71,7 @@ export default function DashboardLayout({
         gradebook: "سجل الدرجات",
         payments: "المدفوعات",
         expenses: "المصروفات",
+        financialRecords: "السجل المالي",
         revenue: "الإيرادات",
         teacherWallet: "محفظة المعلم",
         dailyClosures: "الإغلاق اليومي",
@@ -107,6 +109,7 @@ export default function DashboardLayout({
         gradebook: "Gradebook",
         payments: "Payments",
         expenses: "Expenses",
+        financialRecords: "Financial Records",
         revenue: "Revenue",
         teacherWallet: "Teacher Wallet",
         dailyClosures: "Daily Closures",
@@ -181,6 +184,7 @@ export default function DashboardLayout({
     page_gradebook: ["superadmin", "manager", "secretary", "teacher"],
     page_payments: ["superadmin", "manager", "secretary"],
     page_expenses: ["superadmin", "manager", "secretary"],
+    page_financial_records: ["superadmin", "manager", "secretary"],
     page_revenue: ["superadmin", "manager"],
     page_teacher_wallet: ["superadmin", "manager", "teacher"],
     page_daily_closures: ["superadmin", "manager", "secretary"],
@@ -219,6 +223,7 @@ export default function DashboardLayout({
     "dashboard/gradebook": "page_gradebook",
     "dashboard/payments": "page_payments",
     "dashboard/expenses": "page_expenses",
+    "dashboard/financial-records": "page_financial_records",
     "dashboard/revenue": "page_revenue",
     "dashboard/teacher-wallet": "page_teacher_wallet",
     "dashboard/daily-closures": "page_daily_closures",
@@ -327,6 +332,12 @@ export default function DashboardLayout({
       href: `/${locale}/dashboard/expenses`,
       icon: Wallet,
       permission: "page_expenses",
+    },
+    {
+      name: t.menu.financialRecords,
+      href: `/${locale}/dashboard/financial-records`,
+      icon: FolderOpen,
+      permission: "page_financial_records",
     },
     {
       name: t.menu.revenue,

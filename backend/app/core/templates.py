@@ -38,5 +38,9 @@ class TemplateEngine:
         template = self._load("refund-voucher-template.html")
         return self._substitute(template, variables)
 
+    def render_report(self, variables: dict) -> str:
+        template = self._load("report-template.html")
+        return self._substitute(template, variables)
+
 
 template_engine = TemplateEngine()

@@ -1,6 +1,6 @@
 # Reports Module — Implementation Plan
 
-**Status:** Draft · not implemented
+**Status:** Implemented (all phases shipped) · archived 2026-08-06
 **Target:** v1.8
 **Prereq:** None (read-only feature, no schema changes to existing tables)
 
