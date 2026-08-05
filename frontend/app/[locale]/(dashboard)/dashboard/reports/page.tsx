@@ -351,7 +351,7 @@ export default function ReportsPage() {
   const handleExportPdf = useCallback(async () => {
     if (!selectedReport) return;
     try {
-      const url = `/api/v1/reports/${selectedReport.code}/print?${exportQueryString(
+      const url = `reports/${selectedReport.code}/print?${exportQueryString(
         selectedReport,
       )}`;
       const res = await apiClient.get(url, { responseType: "text" });
