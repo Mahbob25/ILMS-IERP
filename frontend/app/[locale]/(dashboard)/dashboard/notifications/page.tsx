@@ -69,6 +69,7 @@ export default function NotificationsPage() {
     action: "approve" | "reject";
   } | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const [resolvedItems, setResolvedItems] = useState<Record<string, string>>({});
   const [clearedItems, setClearedItems] = useState<NotificationItem[] | null>(null);
 
   const t = {
@@ -245,6 +246,11 @@ export default function NotificationsPage() {
   const handleConfirmAction = async () => {
     if (!confirmAction) return;
     const { params: p, action, notificationId, type } = confirmAction;
+    const label = type === "unlock"
+      ? (locale === "ar" ? "تمت الموافقة" : "Approved")
+      : action === "approve"
+      ? (locale === "ar" ? "تمت الموافقة" : "Approved")
+      : (locale === "ar" ? "مرفوض" : "Rejected");
     setConfirmAction(null);
     setActionLoading(true);
     try {
@@ -254,7 +260,7 @@ export default function NotificationsPage() {
         await apiClient.post(`/lms/daily-closures/${p.date}/approve-unlock`);
       }
       await apiClient.post("/notifications/read", { ids: [notificationId] });
-      setItems((prev) => prev.filter((item) => item.id !== notificationId));
+      setResolvedItems((prev) => ({ ...prev, [notificationId]: label }));
     } catch {
       // best-effort
     } finally {
@@ -367,6 +373,7 @@ export default function NotificationsPage() {
                 const isAmendment = item.type === "amendment_pending";
                 const isUnlock = item.type === "unlock_requested";
                 const hasActions = isAmendment || isUnlock;
+                const resolved = resolvedItems[item.id];
 
                 return (
                   <div
@@ -411,7 +418,7 @@ export default function NotificationsPage() {
                         <p className="text-xs text-slate-500 mt-1 line-clamp-2">{body}</p>
                       )}
 
-                      {hasActions && item.params && (
+                      {hasActions && item.params && !resolved && (
                         <div className="flex items-center gap-2 mt-2">
                           {isAmendment && item.params.amendment_id && (
                             <>
@@ -465,6 +472,15 @@ export default function NotificationsPage() {
                             </button>
                           )}
                         </div>
+                      )}
+                      {resolved && (
+                        <span className={`inline-block mt-2 text-[11px] font-semibold px-2 py-0.5 rounded ${
+                          resolved.includes("رفض") || resolved === "Rejected"
+                            ? "text-red-600 bg-red-50"
+                            : "text-emerald-600 bg-emerald-50"
+                        }`}>
+                          {resolved}
+                        </span>
                       )}
                     </div>
 
