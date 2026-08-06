@@ -209,6 +209,39 @@ export default function NotificationsPage() {
 
   const ACTIONABLE_TYPES = new Set(["amendment_pending", "unlock_requested"]);
 
+  const getResolutionBadge = (item: NotificationItem): { label: string; className: string } | null => {
+    const local = resolvedItems[item.id];
+    if (local) {
+      return {
+        label: local,
+        className: local.includes("رفض") || local === "Rejected"
+          ? "text-red-600 bg-red-50"
+          : local.includes("تجاهل") || local === "Dismissed"
+          ? "text-amber-600 bg-amber-50"
+          : "text-emerald-600 bg-emerald-50",
+      };
+    }
+    const badges: Record<string, { label: string; className: string }> = {
+      amendment_approved: {
+        label: locale === "ar" ? "تمت الموافقة" : "Approved",
+        className: "text-emerald-600 bg-emerald-50",
+      },
+      amendment_rejected: {
+        label: locale === "ar" ? "مرفوض" : "Rejected",
+        className: "text-red-600 bg-red-50",
+      },
+      unlock_approved: {
+        label: locale === "ar" ? "تمت الموافقة" : "Approved",
+        className: "text-emerald-600 bg-emerald-50",
+      },
+      unlock_dismissed: {
+        label: locale === "ar" ? "تم التجاهل" : "Dismissed",
+        className: "text-amber-600 bg-amber-50",
+      },
+    };
+    return badges[item.type] ?? null;
+  };
+
   const isClearable = (item: NotificationItem) =>
     !ACTIONABLE_TYPES.has(item.type) || resolvedItems[item.id] != null;
 
@@ -391,8 +424,8 @@ export default function NotificationsPage() {
                 const isAmendment = item.type === "amendment_pending";
                 const isUnlock = item.type === "unlock_requested";
                 const hasActions = isAmendment || isUnlock;
-                const resolved = resolvedItems[item.id];
-                const canDelete = (!isAmendment && !isUnlock) || resolved != null;
+                const resolution = getResolutionBadge(item);
+                const canDelete = (!isAmendment && !isUnlock) || resolution != null;
 
                 return (
                   <div
@@ -437,7 +470,7 @@ export default function NotificationsPage() {
                         <p className="text-xs text-slate-500 mt-1 line-clamp-2">{body}</p>
                       )}
 
-                      {hasActions && item.params && !resolved && (
+                      {hasActions && item.params && !resolution && (
                         <div className="flex items-center gap-2 mt-2">
                           {isAmendment && item.params.amendment_id && (
                             <>
@@ -509,15 +542,9 @@ export default function NotificationsPage() {
                           )}
                         </div>
                       )}
-                      {resolved && (
-                        <span className={`inline-block mt-2 text-[11px] font-semibold px-2 py-0.5 rounded ${
-                          resolved.includes("رفض") || resolved === "Rejected"
-                            ? "text-red-600 bg-red-50"
-                            : resolved.includes("تجاهل") || resolved === "Dismissed"
-                            ? "text-amber-600 bg-amber-50"
-                            : "text-emerald-600 bg-emerald-50"
-                        }`}>
-                          {resolved}
+                      {resolution && (
+                        <span className={`inline-block mt-2 text-[11px] font-semibold px-2 py-0.5 rounded ${resolution.className}`}>
+                          {resolution.label}
                         </span>
                       )}
                     </div>
