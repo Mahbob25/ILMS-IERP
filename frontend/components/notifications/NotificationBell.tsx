@@ -4,12 +4,13 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { apiClient } from "@/lib/api";
 import { useAuth } from "@/components/AuthContext";
-import { Bell, Check, CheckCircle, AlertCircle, Loader2, Unlock } from "lucide-react";
+import { Bell, Check, CheckCircle, AlertCircle, Loader2, Unlock, Trash2, Undo2 } from "lucide-react";
 import { renderNotification } from "@/components/notifications/notificationMessages";
 import ConfirmModal from "@/components/ConfirmModal";
 
 const POLL_INTERVAL_MS = 30_000;
 const MAX_DROPDOWN_ITEMS = 10;
+const UNDO_CLEAR_SECONDS = 30;
 
 interface NotificationItem {
   id: string;
@@ -72,6 +73,8 @@ export default function NotificationBell() {
     action: "approve" | "reject";
   } | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const [clearedItems, setClearedItems] = useState<NotificationItem[] | null>(null);
+  const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const bellRef = useRef<HTMLDivElement>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -169,6 +172,42 @@ export default function NotificationBell() {
     }
   };
 
+  const handleClearAll = () => {
+    const snapshot = [...items];
+    setClearedItems(snapshot);
+    setItems([]);
+    setUnreadCount(0);
+
+    undoTimerRef.current = setTimeout(async () => {
+      try {
+        await apiClient.delete("/notifications");
+      } catch {
+        // best-effort
+      }
+      setClearedItems(null);
+      fetchItems();
+    }, UNDO_CLEAR_SECONDS * 1000);
+  };
+
+  const handleUndoClear = () => {
+    if (undoTimerRef.current) {
+      clearTimeout(undoTimerRef.current);
+      undoTimerRef.current = null;
+    }
+    if (clearedItems) {
+      setItems(clearedItems);
+      fetchUnreadCount();
+    }
+    setClearedItems(null);
+  };
+
+  // cleanup undo timer on unmount
+  useEffect(() => {
+    return () => {
+      if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+    };
+  }, []);
+
   const handleConfirmAction = async () => {
     if (!confirmAction) return;
     const { params: p, action, notificationId, type } = confirmAction;
@@ -204,6 +243,8 @@ export default function NotificationBell() {
         confirmUnlockMsg: "Are you sure you want to approve this day unlock request?",
         unlockApproveLabel: "Confirm Unlock",
         unlockButton: "Approve Unlock",
+        clearAll: "Clear All",
+        undoTooltip: "Undo clear",
       }
     : {
         confirmApproveTitle: "الموافقة على التعديل",
@@ -218,6 +259,8 @@ export default function NotificationBell() {
         confirmUnlockMsg: "هل أنت متأكد من الموافقة على طلب فتح هذا اليوم؟",
         unlockApproveLabel: "تأكيد الفتح",
         unlockButton: "الموافقة على الفتح",
+        clearAll: "مسح الكل",
+        undoTooltip: "تراجع عن المسح",
       };
 
   if (!user) return null;
@@ -251,15 +294,35 @@ export default function NotificationBell() {
             <h3 className="font-semibold text-sm text-slate-900">
               {locale === "ar" ? "الإشعارات" : "Notifications"}
             </h3>
-            {unreadCount > 0 && (
-              <button
-                onClick={handleMarkAllRead}
-                className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium"
-              >
-                <Check size={14} />
-                {locale === "ar" ? "تعليم الكل" : "Mark all read"}
-              </button>
-            )}
+            <div className="flex items-center gap-2">
+              {unreadCount > 0 && !clearedItems && (
+                <button
+                  onClick={handleMarkAllRead}
+                  className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium"
+                >
+                  <Check size={14} />
+                  {locale === "ar" ? "تعليم الكل" : "Mark all read"}
+                </button>
+              )}
+              {items.length > 0 && !clearedItems && (
+                <button
+                  onClick={handleClearAll}
+                  className="flex items-center gap-1 text-xs text-red-500 hover:text-red-700 font-medium"
+                >
+                  <Trash2 size={14} />
+                  {t.clearAll}
+                </button>
+              )}
+              {clearedItems && (
+                <button
+                  onClick={handleUndoClear}
+                  className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium"
+                >
+                  <Undo2 size={14} />
+                  {t.undoTooltip}
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Items */}

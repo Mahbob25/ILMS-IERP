@@ -15,8 +15,12 @@ import {
   Eye,
   CheckCircle,
   Unlock,
+  Trash2,
 } from "lucide-react";
 import ConfirmModal from "@/components/ConfirmModal";
+import UndoToast from "@/components/UndoToast";
+
+const UNDO_CLEAR_SECONDS = 30;
 
 interface NotificationItem {
   id: string;
@@ -64,6 +68,7 @@ export default function NotificationsPage() {
     action: "approve" | "reject";
   } | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const [clearedItems, setClearedItems] = useState<NotificationItem[] | null>(null);
 
   const t = {
     ar: {
@@ -94,6 +99,8 @@ export default function NotificationsPage() {
       unlockMsg: "هل أنت متأكد من الموافقة على طلب فتح هذا اليوم؟",
       unlockConfirm: "تأكيد الفتح",
       unlockButton: "الموافقة على الفتح",
+      clearAll: "مسح الكل",
+      undoTooltip: "تراجع عن المسح",
     },
     en: {
       title: "Notifications",
@@ -123,6 +130,8 @@ export default function NotificationsPage() {
       unlockMsg: "Are you sure you want to approve this day unlock request?",
       unlockConfirm: "Confirm Unlock",
       unlockButton: "Approve Unlock",
+      clearAll: "Clear All",
+      undoTooltip: "Undo clear",
     },
   }[locale === "en" ? "en" : "ar"];
 
@@ -184,6 +193,33 @@ export default function NotificationsPage() {
     } catch {
       // best-effort
     }
+  };
+
+  const handleClearAll = () => {
+    const snapshot = [...items];
+    setClearedItems(snapshot);
+    setItems([]);
+    setTotal(0);
+    setTotalPages(1);
+  };
+
+  const handleUndoClear = () => {
+    if (clearedItems) {
+      setItems(clearedItems);
+    }
+    setClearedItems(null);
+  };
+
+  const handleDismissClear = async () => {
+    try {
+      if (clearedItems && clearedItems.length > 0) {
+        await apiClient.delete("/notifications");
+      }
+    } catch {
+      // best-effort
+    }
+    setClearedItems(null);
+    fetchNotifications();
   };
 
   const handleFilterChange = (unread: boolean) => {
@@ -263,14 +299,24 @@ export default function NotificationsPage() {
             </button>
           </div>
 
-          <button
-            onClick={handleMarkAllRead}
-            disabled={total === 0}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-blue-600 hover:text-blue-800 disabled:text-slate-300 disabled:cursor-not-allowed transition-colors"
-          >
-            <Check size={14} />
-            {t.markAllRead}
-          </button>
+          {total > 0 && !clearedItems && (
+            <>
+              <button
+                onClick={handleMarkAllRead}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-blue-600 hover:text-blue-800 transition-colors"
+              >
+                <Check size={14} />
+                {t.markAllRead}
+              </button>
+              <button
+                onClick={handleClearAll}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-500 hover:text-red-700 transition-colors"
+              >
+                <Trash2 size={14} />
+                {t.clearAll}
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -498,6 +544,16 @@ export default function NotificationsPage() {
         onConfirm={handleConfirmAction}
         onCancel={() => setConfirmAction(null)}
       />
+
+      {clearedItems && (
+        <UndoToast
+          message={t.undoTooltip}
+          durationSeconds={UNDO_CLEAR_SECONDS}
+          isRtl={locale === "ar"}
+          onUndo={handleUndoClear}
+          onDismiss={handleDismissClear}
+        />
+      )}
     </div>
   );
 }

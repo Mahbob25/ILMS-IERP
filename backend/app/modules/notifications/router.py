@@ -53,3 +53,12 @@ async def mark_read(
         ids=data.ids,
     )
     return {"updated": updated}
+
+
+@notifications_router.delete("")
+async def clear_all(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    deleted = await notifications_service.clear_all(db, user_id=current_user.id)
+    return {"deleted": deleted}
