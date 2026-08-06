@@ -154,6 +154,27 @@ async def clear_all(db: AsyncSession, *, user_id: uuid.UUID) -> int:
     return result.rowcount
 
 
+async def resolve_for_user(
+    db: AsyncSession,
+    *,
+    user_id: uuid.UUID,
+    dedupe_key: str,
+    old_type: str,
+    new_type: str,
+) -> int:
+    """Change a notification's type so it is no longer actionable after the user acts."""
+    result = await db.execute(
+        update(Notification)
+        .where(
+            Notification.user_id == user_id,
+            Notification.dedupe_key == dedupe_key,
+            Notification.type == old_type,
+        )
+        .values(type=new_type)
+    )
+    return result.rowcount
+
+
 async def delete_one(
     db: AsyncSession, *, notification_id: uuid.UUID, user_id: uuid.UUID
 ) -> bool:

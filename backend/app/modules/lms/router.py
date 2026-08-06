@@ -59,11 +59,44 @@ from app.modules.lms import financial_records_service
 from app.core.error_messages import get_error_detail
 from app.core.rate_limit import limiter
 from app.modules.notifications.emitters import emit_amendment_pending
+from app.modules.notifications.emitters import _user_ids_by_role
+from app.modules.notifications.service import resolve_for_user
 import logging
 
 logger = logging.getLogger(__name__)
 
 lms_router = APIRouter(prefix="/lms", tags=["lms"])
+
+
+async def _resolve_amendment_notifications(
+    db: AsyncSession, amendment_id: uuid.UUID, new_type: str
+) -> None:
+    """After approve/reject, change amendment_pending notifications to new_type for all recipients."""
+    dedupe_key = f"amendment_pending:{amendment_id}"
+    user_ids = await _user_ids_by_role(db, "manager", "superadmin")
+    for uid in user_ids:
+        try:
+            await resolve_for_user(
+                db, user_id=uid, dedupe_key=dedupe_key,
+                old_type="amendment_pending", new_type=new_type,
+            )
+        except Exception:
+            logger.exception("Failed to resolve amendment notification type")
+
+
+async def _resolve_unlock_notifications(
+    db: AsyncSession, closure_date: date, new_type: str
+) -> None:
+    dedupe_key = f"unlock_requested:{closure_date.isoformat()}"
+    user_ids = await _user_ids_by_role(db, "manager")
+    for uid in user_ids:
+        try:
+            await resolve_for_user(
+                db, user_id=uid, dedupe_key=dedupe_key,
+                old_type="unlock_requested", new_type=new_type,
+            )
+        except Exception:
+            logger.exception("Failed to resolve unlock notification type")
 
 
 # --- Attendance ---
@@ -562,6 +595,7 @@ async def approve_unlock(
             status_code=status.HTTP_409_CONFLICT,
             detail=get_error_detail("no_unlock_request_pending", locale),
         )
+    await _resolve_unlock_notifications(db, closure_date, "unlock_approved")
     return closure
 
 
@@ -582,6 +616,7 @@ async def reject_unlock(
             status_code=status.HTTP_409_CONFLICT,
             detail=get_error_detail("no_unlock_request_pending", locale),
         )
+    await _resolve_unlock_notifications(db, closure_date, "unlock_dismissed")
     return closure
 
 
@@ -1018,6 +1053,7 @@ async def approve_amendment(
         )
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    await _resolve_amendment_notifications(db, amendment_id, "amendment_approved")
     return AmendmentResponse(
         id=amendment.id,
         contract_id=amendment.contract_id,
@@ -1066,6 +1102,7 @@ async def reject_amendment(
         )
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    await _resolve_amendment_notifications(db, amendment_id, "amendment_rejected")
     return AmendmentResponse(
         id=amendment.id,
         contract_id=amendment.contract_id,
