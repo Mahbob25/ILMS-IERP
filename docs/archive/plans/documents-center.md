@@ -1,8 +1,7 @@
 # Documents Center — Centralized Receipts & Vouchers Archive
 
-**Status:** Superseded — implemented as `financial-records` (2026-08-06, commits `d3cc12c`, `308676e`)
+**Status:** Proposed
 **Date:** 2026-08-05
-**Superseded by:** `docs/archive/plans/financial-records-center.md` (✅ implemented — see its §0 Implementation Record)
 **Constraint (HARD):** Zero database migrations. Read-only projection over existing `payments`, `expenses`, and `refunds` tables. No new tables, no schema changes, no mutation endpoints.
 
 ---
@@ -170,8 +169,19 @@ Frontend: Playwright smoke spec `frontend/tests/e2e/browser/features/documents-u
 **Developer Answer**: No.
 
 3. **Bulk print** — print all vouchers for a date range in one PDF? Nice-to-have; out of scope for v1 of this page.
+**Developer Answer**: No.
+
 
 ## 10. Risks
 
 - **Performance on huge datasets** — Python-side merge is O(payments+expenses+refunds) per page. At tens of thousands of rows it stays fine; if it ever matters, switch to one SQL UNION ALL + window pagination (same endpoint contract, no migration).
 - **Naming collision** — `documents` may be confused with the AI ingestion pipeline's document uploads (docs/plans/current.md "Next"). If so, rename page to `receipts-vouchers`. Decide at implementation kickoff.
+**Developer suggestion**: 
+recommended English & Arabic Mapping
+To keep your translation files (t.menu) clean, balanced, and natural in both RTL and LTR layouts:
+
+URL Route: /dashboard/financial-records
+
+English Label: Financial Records
+
+Arabic Label: السندات والسجلات المالية (or simply السجلات المالية) 

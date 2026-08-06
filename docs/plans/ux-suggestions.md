@@ -15,6 +15,7 @@ in a walkthrough of the actual pages and flows — not hypothetical features.
 ## Top 10 Suggestions
 
 ### 1. Central notification center (bell + badges) — highest priority
+**Status:** Implemented.
 
 Pending work is scattered: refunds, withdrawals, unlock requests, amendments, pending
 grading, unenrolled students, unclosed days — each visible only inside its own dashboard
@@ -31,6 +32,7 @@ straight to the page. Secretaries register many records; removes 2–3 navigatio
 lookup. Reuse existing input-sanitization patterns (`lib/utils/input`).
 
 ### 3. Bulk actions on tables
+**Status:** Implemented.
 
 - ✅ Mark attendance for a whole section in one grid view
 - ✅ Enter grades per section in one screen (row-per-student, editable cells)
@@ -49,6 +51,7 @@ payment + receipt preview). Same idea for "create course → start section → a
 Fewer page loads, fewer dropped records halfway.
 
 ### 5. Guided confirmations instead of native `confirm()`
+**Status:** Implemented.
 
 Destructive financial actions (refunds, withdrawals, unenrollments, cancellations) rely on
 native `confirm()`. Replace with a styled modal that forces a reason + live impact summary

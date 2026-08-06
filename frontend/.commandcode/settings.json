@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Shell(cd E:\\lms && git add frontend/app/\\[locale\\]/\\(dashboard\\)/dashboard/enrollments/page.tsx frontend/lib/api.ts && git commit -F - <<'EOF' fix: use ref-based double-click guard for enrollments + surface backend detail on 5xx The enrollment form used useState for the submitting guard, allowing a second click to slip through the render gap. Replace with a useRef guard that blocks synchronously. Also surface the backend's detail field in the 5xx interceptor instead of the generic \"Server error\" fallback. Co-authored-by: CommandCodeBot <noreply@commandcode.ai> EOF)",
+      "Shell(git:*)"
+    ],
+    "deny": [],
+    "defaultMode": "default"
+  }
+}
