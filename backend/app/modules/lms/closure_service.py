@@ -55,6 +55,14 @@ async def request_unlock(db: AsyncSession, closure_date: date) -> Optional[Daily
         return None
     closure.status = "unlock_requested"
     await db.flush()
+
+    # Fire notification (best-effort)
+    from app.modules.notifications.emitters import emit_unlock_requested
+    try:
+        await emit_unlock_requested(db, closure_date=closure.date)
+    except Exception:
+        pass
+
     return closure
 
 

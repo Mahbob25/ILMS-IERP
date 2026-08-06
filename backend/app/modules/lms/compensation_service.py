@@ -62,6 +62,14 @@ async def create_amendment(
     )
     db.add(amendment)
     await db.flush()
+
+    # Fire notification (best-effort)
+    from app.modules.notifications.emitters import emit_amendment_pending
+    try:
+        await emit_amendment_pending(db, amendment_id=amendment.id)
+    except Exception:
+        pass
+
     return amendment
 
 

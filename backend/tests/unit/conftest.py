@@ -12,3 +12,4 @@ def _register_all_models():
         Payment, Expense, LedgerEntry, TeacherWallet,
         SectionContract, IdempotencyKey,
     )
+    from app.modules.notifications.models import Notification  # noqa: F401

@@ -752,6 +752,15 @@ async def set_final_grades_bulk(
         )
         results.append(fg)
 
+    # Fire grade_submitted notification to the section's teacher (best-effort)
+    section = await get_course_section(db, section_id)
+    if section and section.teacher_id:
+        from app.modules.notifications.emitters import emit_grade_submitted
+        try:
+            await emit_grade_submitted(db, section_id=section_id, teacher_employee_id=section.teacher_id)
+        except Exception:
+            pass
+
     enrolled_count = (
         await db.scalar(
             select(func.count(Enrollment.id)).where(

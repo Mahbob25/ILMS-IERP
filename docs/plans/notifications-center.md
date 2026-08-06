@@ -48,7 +48,10 @@ no history of "what happened while I was away."
    `hasPageAccess()` passes for the target route (existing `ROUTE_PERMISSION_MAP`), and
    emitters never produce links to pages a recipient role cannot open.
 8. **No unbounded growth.** Daily cleanup job deletes rows older than
-   `NOTIFICATION_RETENTION_DAYS` (default 90). `created_at` is indexed for the sweep.
+   `NOTIFICATION_RETENTION_DAYS` (default 90) **in batches of 1,000 per pass**
+   (loop of `DELETE ... WHERE id IN (SELECT id ... ORDER BY created_at LIMIT 1000)`)
+   so a large backlog of expired rows never holds a long table lock or trips a
+   statement timeout. `created_at` is indexed for the sweep.
 
 ## Scope
 
@@ -58,7 +61,7 @@ no history of "what happened while I was away."
 |---|---|
 | `models.py` | `Notification` ORM model |
 | `schemas.py` | `NotificationResponse`, `NotificationListResponse`, `UnreadCountResponse`, `MarkReadRequest` |
-| `service.py` | `create_notification` (dedupe), `list_notifications`, `get_unread_count`, `mark_read`, `mark_all_read`, `delete_expired` |
+| `service.py` | `create_notification` (dedupe), `list_notifications`, `get_unread_count`, `mark_read`, `mark_all_read`, `delete_expired` (batched) |
 | `router.py` | API endpoints (below) |
 | `__init__.py` | empty |
 
@@ -154,7 +157,12 @@ Mounted in `app/[locale]/(dashboard)/layout.tsx` header, next to the language to
 
 - Bell icon (lucide `Bell`) with unread-count badge (cap display at `99+`).
 - Polling: `setInterval` 30s + `window` focus listener + refetch on dropdown open.
-  Aborts on unmount; never polls on login page.
+  Aborts on unmount; never polls on login page. The 30s poll is cheap by design:
+  `/unread-count` is a single `COUNT` over the existing `(user_id, is_read,
+  created_at DESC)` composite index — no joins, no table scan, no N+1. Interval
+  stays a single frontend constant (`POLL_INTERVAL_MS`); if load ever warrants it,
+  raising it to 60s costs nothing in UX because the focus listener still refreshes
+  the badge the moment the user returns to the tab.
 - Dropdown panel: last 10 notifications, grouped feel via `priority` accent
   (rose for high, amber for normal, slate for low), relative timestamps
   (client-side, respects `locale`).
@@ -197,7 +205,8 @@ Mounted in `app/[locale]/(dashboard)/layout.tsx` header, next to the language to
 - `mark_read`: own ids only; unknown/foreign id → no-op or 404; empty ids → all own rows;
   sets `read_at`; returns count.
 - `get_unread_count` scoped to user.
-- `delete_expired` removes rows past retention only.
+- `delete_expired` removes rows past retention only, in 1,000-row batches: loop
+  terminates once a batch returns < 1,000; 2,500+ expired rows all get purged.
 
 ### Backend integration (`backend/tests/integration/`)
 
@@ -224,7 +233,7 @@ Mounted in `app/[locale]/(dashboard)/layout.tsx` header, next to the language to
   apply `limiter` (existing slowapi pattern) to `POST /read` at 30/min.
 - No secrets, no PII beyond names/amounts already visible in the app; amounts are
   already shown to these roles on dashboards.
-- Cleanup job is the only delete path; it never touches read/unread distinction.
+- Cleanup job is the only delete path (batched); it never touches read/unread distinction.
 
 ## Rollout & Ops
 

@@ -128,6 +128,14 @@ async def disburse_pending_refund(
     db.add(refund)
 
     await db.flush()
+
+    # Fire notification (best-effort — failure must not break the disbursement)
+    from app.modules.notifications.emitters import emit_refund_disbursed
+    try:
+        await emit_refund_disbursed(db, refund_id=refund.id)
+    except Exception:
+        pass
+
     return refund
 
 

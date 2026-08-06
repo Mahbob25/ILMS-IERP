@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { useRouter, useParams, usePathname } from "next/navigation";
 import { useAuth } from "@/components/AuthContext";
+import { BrandLogo } from "@/components/ui/BrandLogo";
 import {
   Users,
   BookOpen,
@@ -31,7 +32,9 @@ import {
   HandCoins,
   FileBarChart2,
   FolderOpen,
+  Bell,
 } from "lucide-react";
+import NotificationBell from "@/components/notifications/NotificationBell";
 
 export default function DashboardLayout({
   children,
@@ -83,6 +86,7 @@ export default function DashboardLayout({
         cashierRefunds: "المبالغ المستردة",
         staffPayroll: "الرواتب",
         reports: "التقارير",
+        notifications: "الإشعارات",
       },
       loading: "جاري تحميل بيانات الجلسة...",
       langToggle: "English",
@@ -121,6 +125,7 @@ export default function DashboardLayout({
         cashierRefunds: "Refunds",
         staffPayroll: "Staff Payroll",
         reports: "Reports",
+        notifications: "Notifications",
       },
       loading: "Loading session data...",
       langToggle: "العربية",
@@ -196,6 +201,7 @@ export default function DashboardLayout({
     page_settings: ["superadmin", "manager", "secretary", "teacher"],
     page_staff_payroll: ["superadmin", "manager", "secretary"],
     page_reports: ["superadmin", "manager", "secretary"],
+    page_notifications: ["superadmin", "manager", "secretary", "teacher"],
   };
 
   const hasPageAccess = (permissionCodename: string): boolean => {
@@ -235,6 +241,7 @@ export default function DashboardLayout({
     "dashboard/settings": "page_settings",
     "dashboard/staff-payroll": "page_staff_payroll",
     "dashboard/reports": "page_reports",
+    "dashboard/notifications": "page_notifications",
   };
 
   const routeKey = pathname.split("/").slice(2).join("/").replace(/\/$/, "");
@@ -400,6 +407,12 @@ export default function DashboardLayout({
       permission: "page_reports",
     },
     {
+      name: t.menu.notifications,
+      href: `/${locale}/dashboard/notifications`,
+      icon: Bell,
+      permission: "page_notifications",
+    },
+    {
       name: t.menu.settings,
       href: `/${locale}/dashboard/settings`,
       icon: Settings,
@@ -419,7 +432,8 @@ export default function DashboardLayout({
       <aside className="hidden md:flex md:flex-shrink-0">
         <div className="w-64 bg-white border-y-0 border-x border-slate-200 flex flex-col">
           {/* Brand Header */}
-          <div className="h-16 flex items-center px-6 border-b border-slate-200">
+          <div className="h-16 flex items-center px-6 border-b border-slate-200 gap-2.5">
+            <BrandLogo className="w-9 h-9 p-1" />
             <span className="text-lg font-bold tracking-tight text-slate-900">
               Al-Drasat ERP
             </span>
@@ -500,6 +514,7 @@ export default function DashboardLayout({
               <Globe size={13} />
               <span>{t.langToggle}</span>
             </button>
+            <NotificationBell />
           </div>
         </header>
 
@@ -524,9 +539,12 @@ export default function DashboardLayout({
           >
             {/* Close button */}
             <div className="h-16 flex items-center justify-between px-6 border-b border-slate-200">
-              <span className="text-lg font-bold tracking-tight text-slate-900">
-                Al-Drasat ERP
-              </span>
+              <div className="flex items-center gap-2.5">
+                <BrandLogo className="w-9 h-9 p-1" />
+                <span className="text-lg font-bold tracking-tight text-slate-900">
+                  Al-Drasat ERP
+                </span>
+              </div>
               <button
                 onClick={() => setSidebarOpen(false)}
                 className="text-slate-500 hover:text-slate-900"

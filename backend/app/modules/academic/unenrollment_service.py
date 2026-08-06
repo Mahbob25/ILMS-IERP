@@ -361,6 +361,13 @@ async def unenroll_student(
             db.add(pending_refund)
             await db.flush()
 
+            # Fire notification (best-effort)
+            from app.modules.notifications.emitters import emit_refund_requested
+            try:
+                await emit_refund_requested(db, pending_refund_id=pending_refund.id, source="unenrollment")
+            except Exception:
+                pass
+
     # Soft-delete enrollment
     enrollment.deleted_at = utcnow()
     section.enrolled_count = func.greatest(section.enrolled_count - 1, 0)

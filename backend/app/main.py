@@ -28,6 +28,8 @@ setup_logging()
 
 from app.db.session import async_session_maker
 from app.modules.academic.section_startup_checks import run_daily_section_checks
+from app.modules.notifications.daily_job import run_daily_notification_checks
+from app.modules.notifications.service import delete_expired
 from app.modules.identity.router import auth_router, users_router, employees_router, permissions_router
 from app.modules.academic.router import academic_router
 from app.modules.lms.router import lms_router
@@ -35,6 +37,7 @@ from app.modules.lms.staff_payroll_router import router as staff_payroll_router
 from app.modules.lms.idempotency_service import cleanup_expired_keys, safe_cleanup_expired_keys
 from app.modules.dashboard.router import dashboard_router
 from app.modules.reports.router import reports_router
+from app.modules.notifications.router import notifications_router
 from app.middleware.idempotency import IdempotencyMiddleware
 from app.middleware.real_ip import RealIPMiddleware
 from app.middleware.csrf import CSRFMiddleware
@@ -44,6 +47,8 @@ async def lifespan(app: FastAPI):
     try:
         async with async_session_maker() as db:
             await run_daily_section_checks(db)
+            await run_daily_notification_checks(db)
+            await delete_expired(db)
             await safe_cleanup_expired_keys(db)
     except Exception as e:
         logger.warning("Database unavailable during startup — skipping daily checks: %s", e)
@@ -89,6 +94,7 @@ app.include_router(lms_router, prefix="/api/v1")
 app.include_router(dashboard_router, prefix="/api/v1")
 app.include_router(staff_payroll_router, prefix="/api/v1")
 app.include_router(reports_router, prefix="/api/v1")
+app.include_router(notifications_router, prefix="/api/v1")
 
 @app.get("/api/v1/health", tags=["system"])
 async def health_check():

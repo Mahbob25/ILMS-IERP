@@ -1,10 +1,11 @@
 import uuid
 from datetime import date, datetime, time
 from typing import Optional, TYPE_CHECKING
-from sqlalchemy import String, Integer, Float, Date, DateTime, Time, ForeignKey, Text, Boolean, Enum as SAEnum, UniqueConstraint, CheckConstraint, Numeric
+from sqlalchemy import String, Integer, Float, Date, DateTime, Time, ForeignKey, Text, Boolean, Enum as SAEnum, UniqueConstraint, CheckConstraint, Numeric, text
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID, JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
+from app.core.timezone import utcnow
 
 if TYPE_CHECKING:
     from app.modules.identity.models import Employee, User
@@ -125,6 +126,12 @@ class CourseSection(Base):
     class_duration_minutes: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     classroom: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     price: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=utcnow,
+        server_default=text("timezone('utc'::text, now())"),
+    )
     deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     flags: Mapped[dict] = mapped_column("flags", JSONB, nullable=False, default=dict, server_default="{}")

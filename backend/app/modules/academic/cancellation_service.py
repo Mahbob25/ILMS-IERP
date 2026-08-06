@@ -266,6 +266,26 @@ async def cancel_section(
         cancellation.total_refund_authorized = float(total_refund_authorized)
 
     await db.flush()
+
+    # Fire notifications (best-effort)
+    from app.modules.notifications.emitters import emit_section_cancelled, emit_refund_requested
+    try:
+        await emit_section_cancelled(db, section_id=section.id)
+    except Exception:
+        pass
+    if refund_policy == "authorize_refunds":
+        # PendingRefund rows were created above; their ids are available after flush
+        pr_result = await db.execute(
+            select(PendingRefund).where(
+                PendingRefund.section_cancellation_id == cancellation.id
+            )
+        )
+        for pr in pr_result.scalars().all():
+            try:
+                await emit_refund_requested(db, pending_refund_id=pr.id, source="cancellation")
+            except Exception:
+                pass
+
     return cancellation
 
 

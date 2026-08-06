@@ -103,6 +103,12 @@ async def _process_overdue_sections(db: AsyncSession, today: date) -> list[Cours
         ungraded = await _count_ungraded(db, section.id)
         if ungraded == 0:
             section.status = "ready_for_completion"
+            # Fire notification (best-effort)
+            from app.modules.notifications.emitters import emit_section_ready_for_completion
+            try:
+                await emit_section_ready_for_completion(db, section_id=section.id)
+            except Exception:
+                pass
         else:
             section.flags = {
                 **(section.flags or {}),

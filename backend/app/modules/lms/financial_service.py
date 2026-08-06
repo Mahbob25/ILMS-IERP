@@ -462,6 +462,14 @@ async def create_expense(
 
     await db.flush()
 
+    # Fire notification for teacher_withdrawal (best-effort)
+    if expense_type == "teacher_withdrawal":
+        from app.modules.notifications.emitters import emit_withdrawal_requested
+        try:
+            await emit_withdrawal_requested(db, expense_id=expense.id)
+        except Exception:
+            pass
+
     return expense
 
 
