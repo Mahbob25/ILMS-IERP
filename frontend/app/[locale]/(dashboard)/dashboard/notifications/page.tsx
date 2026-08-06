@@ -246,18 +246,29 @@ export default function NotificationsPage() {
   const handleConfirmAction = async () => {
     if (!confirmAction) return;
     const { params: p, action, notificationId, type } = confirmAction;
-    const label = type === "unlock"
-      ? (locale === "ar" ? "تمت الموافقة" : "Approved")
-      : action === "approve"
-      ? (locale === "ar" ? "تمت الموافقة" : "Approved")
-      : (locale === "ar" ? "مرفوض" : "Rejected");
+    let label: string;
+    if (type === "unlock") {
+      if (action === "approve") {
+        label = locale === "ar" ? "تمت الموافقة" : "Approved";
+      } else {
+        label = locale === "ar" ? "تم التجاهل" : "Dismissed";
+      }
+    } else if (action === "approve") {
+      label = locale === "ar" ? "تمت الموافقة" : "Approved";
+    } else {
+      label = locale === "ar" ? "مرفوض" : "Rejected";
+    }
     setConfirmAction(null);
     setActionLoading(true);
     try {
       if (type === "amendment") {
         await apiClient.put(`/lms/amendments/${p.amendment_id}/${action}`);
       } else if (type === "unlock") {
-        await apiClient.post(`/lms/daily-closures/${p.date}/approve-unlock`);
+        if (action === "approve") {
+          await apiClient.post(`/lms/daily-closures/${p.date}/approve-unlock`);
+        } else {
+          await apiClient.post(`/lms/daily-closures/${p.date}/reject-unlock`);
+        }
       }
       await apiClient.post("/notifications/read", { ids: [notificationId] });
       setResolvedItems((prev) => ({ ...prev, [notificationId]: label }));
@@ -374,6 +385,7 @@ export default function NotificationsPage() {
                 const isUnlock = item.type === "unlock_requested";
                 const hasActions = isAmendment || isUnlock;
                 const resolved = resolvedItems[item.id];
+                const canDelete = !isAmendment && !isUnlock;
 
                 return (
                   <div
@@ -455,21 +467,38 @@ export default function NotificationsPage() {
                             </>
                           )}
                           {isUnlock && item.params.date && (
-                            <button
-                              onClick={() =>
-                                setConfirmAction({
-                                  notificationId: item.id,
-                                  type: "unlock",
-                                  params: item.params!,
-                                  action: "approve",
-                                })
-                              }
-                              disabled={actionLoading}
-                              className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-lg text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 disabled:opacity-50 transition-colors"
-                            >
-                              <Unlock size={12} />
-                              {t.unlockButton}
-                            </button>
+                            <>
+                              <button
+                                onClick={() =>
+                                  setConfirmAction({
+                                    notificationId: item.id,
+                                    type: "unlock",
+                                    params: item.params!,
+                                    action: "approve",
+                                  })
+                                }
+                                disabled={actionLoading}
+                                className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-lg text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 disabled:opacity-50 transition-colors"
+                              >
+                                <Unlock size={12} />
+                                {t.unlockButton}
+                              </button>
+                              <button
+                                onClick={() =>
+                                  setConfirmAction({
+                                    notificationId: item.id,
+                                    type: "unlock",
+                                    params: item.params!,
+                                    action: "reject",
+                                  })
+                                }
+                                disabled={actionLoading}
+                                className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-lg text-amber-600 bg-amber-50 hover:bg-amber-100 border border-amber-200 disabled:opacity-50 transition-colors"
+                              >
+                                <X size={12} />
+                                {locale === "ar" ? "تجاهل" : "Dismiss"}
+                              </button>
+                            </>
                           )}
                         </div>
                       )}
@@ -477,6 +506,8 @@ export default function NotificationsPage() {
                         <span className={`inline-block mt-2 text-[11px] font-semibold px-2 py-0.5 rounded ${
                           resolved.includes("رفض") || resolved === "Rejected"
                             ? "text-red-600 bg-red-50"
+                            : resolved.includes("تجاهل") || resolved === "Dismissed"
+                            ? "text-amber-600 bg-amber-50"
                             : "text-emerald-600 bg-emerald-50"
                         }`}>
                           {resolved}
@@ -508,13 +539,15 @@ export default function NotificationsPage() {
                           <Eye size={14} />
                         </button>
                       )}
-                      <button
-                        onClick={() => handleDeleteOne(item.id)}
-                        className="text-xs text-slate-300 hover:text-red-500"
-                        title={locale === "ar" ? "حذف" : "Delete"}
-                      >
-                        <X size={14} />
-                      </button>
+                      {canDelete && (
+                        <button
+                          onClick={() => handleDeleteOne(item.id)}
+                          className="text-xs text-slate-300 hover:text-red-500"
+                          title={locale === "ar" ? "حذف" : "Delete"}
+                        >
+                          <X size={14} />
+                        </button>
+                      )}
                     </div>
                   </div>
                 );

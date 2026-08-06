@@ -565,6 +565,26 @@ async def approve_unlock(
     return closure
 
 
+@lms_router.post(
+    "/daily-closures/{closure_date}/reject-unlock", response_model=DailyClosureResponse
+)
+@limiter.limit("10/minute")
+async def reject_unlock(
+    request: Request,
+    closure_date: date,
+    locale: str = "ar",
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager"])),
+    db: AsyncSession = Depends(get_db),
+):
+    closure = await closure_service.reject_unlock(db, closure_date)
+    if not closure:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=get_error_detail("no_unlock_request_pending", locale),
+        )
+    return closure
+
+
 @lms_router.get("/daily-closures", response_model=list[DailyClosureResponse])
 async def list_closures(
     date_from: Optional[date] = None,

@@ -83,6 +83,21 @@ async def approve_unlock(
     return closure
 
 
+async def reject_unlock(db: AsyncSession, closure_date: date) -> Optional[DailyClosure]:
+    """Reject an unlock request — reset status from unlock_requested back to closed."""
+    result = await db.execute(
+        select(DailyClosure)
+        .where(DailyClosure.date == closure_date)
+        .with_for_update()
+    )
+    closure = result.scalar_one_or_none()
+    if not closure or closure.status != "unlock_requested":
+        return None
+    closure.status = "closed"
+    await db.flush()
+    return closure
+
+
 async def list_closures(
     db: AsyncSession,
     date_from: Optional[date] = None,

@@ -223,18 +223,29 @@ export default function NotificationBell() {
   const handleConfirmAction = async () => {
     if (!confirmAction) return;
     const { params: p, action, notificationId, type } = confirmAction;
-    const label = type === "unlock"
-      ? (locale === "ar" ? "تمت الموافقة" : "Approved")
-      : action === "approve"
-      ? (locale === "ar" ? "تمت الموافقة" : "Approved")
-      : (locale === "ar" ? "مرفوض" : "Rejected");
+    let label: string;
+    if (type === "unlock") {
+      if (action === "approve") {
+        label = locale === "ar" ? "تمت الموافقة" : "Approved";
+      } else {
+        label = locale === "ar" ? "تم التجاهل" : "Dismissed";
+      }
+    } else if (action === "approve") {
+      label = locale === "ar" ? "تمت الموافقة" : "Approved";
+    } else {
+      label = locale === "ar" ? "مرفوض" : "Rejected";
+    }
     setConfirmAction(null);
     setActionLoading(true);
     try {
       if (type === "amendment") {
         await apiClient.put(`/lms/amendments/${p.amendment_id}/${action}`);
       } else if (type === "unlock") {
-        await apiClient.post(`/lms/daily-closures/${p.date}/approve-unlock`);
+        if (action === "approve") {
+          await apiClient.post(`/lms/daily-closures/${p.date}/approve-unlock`);
+        } else {
+          await apiClient.post(`/lms/daily-closures/${p.date}/reject-unlock`);
+        }
       }
       await apiClient.post("/notifications/read", { ids: [notificationId] });
       setResolvedItems((prev) => ({ ...prev, [notificationId]: label }));
@@ -259,6 +270,9 @@ export default function NotificationBell() {
         confirmUnlockMsg: "Are you sure you want to approve this day unlock request?",
         unlockApproveLabel: "Confirm Unlock",
         unlockButton: "Approve Unlock",
+        confirmDismissTitle: "Dismiss Unlock",
+        confirmDismissMsg: "Are you sure you want to dismiss this unlock request?",
+        dismissLabel: "Dismiss",
         clearAll: "Clear All",
         undoTooltip: "Undo clear",
       }
@@ -275,6 +289,9 @@ export default function NotificationBell() {
         confirmUnlockMsg: "هل أنت متأكد من الموافقة على طلب فتح هذا اليوم؟",
         unlockApproveLabel: "تأكيد الفتح",
         unlockButton: "الموافقة على الفتح",
+        confirmDismissTitle: "تجاهل طلب الفتح",
+        confirmDismissMsg: "هل أنت متأكد من تجاهل طلب فتح اليوم؟",
+        dismissLabel: "تجاهل",
         clearAll: "مسح الكل",
         undoTooltip: "تراجع عن المسح",
       };
@@ -376,6 +393,7 @@ export default function NotificationBell() {
               const isUnlock = item.type === "unlock_requested";
               const hasActions = isAmendment || isUnlock;
               const resolved = resolvedItems[item.id];
+              const canDelete = !isAmendment && !isUnlock;
 
               return (
                 <div
@@ -384,13 +402,15 @@ export default function NotificationBell() {
                     priorityAccent[item.priority] ?? ""
                   } ${item.is_read ? "opacity-60" : ""}`}
                 >
-                  <button
-                    onClick={(e) => handleDeleteOne(e, item.id)}
-                    className="absolute top-2 right-2 p-0.5 rounded text-slate-300 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-opacity"
-                    title={locale === "ar" ? "حذف" : "Delete"}
-                  >
-                    <X size={12} />
-                  </button>
+                  {canDelete && (
+                    <button
+                      onClick={(e) => handleDeleteOne(e, item.id)}
+                      className="absolute top-2 right-2 p-0.5 rounded text-slate-300 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-opacity"
+                      title={locale === "ar" ? "حذف" : "Delete"}
+                    >
+                      <X size={12} />
+                    </button>
+                  )}
                   <button
                     onClick={() => handleClickItem(item)}
                     className="w-full text-left"
@@ -454,22 +474,40 @@ export default function NotificationBell() {
                         </>
                       )}
                       {isUnlock && item.params.date && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setConfirmAction({
-                              notificationId: item.id,
-                              type: "unlock",
-                              params: item.params!,
-                              action: "approve",
-                            });
-                          }}
-                          disabled={actionLoading}
-                          className="flex items-center gap-1 px-2 py-1 text-xs font-medium rounded text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 disabled:opacity-50 transition-colors"
-                        >
-                          <Unlock size={12} />
-                          {locale === "ar" ? "الموافقة على الفتح" : "Approve Unlock"}
-                        </button>
+                        <>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setConfirmAction({
+                                notificationId: item.id,
+                                type: "unlock",
+                                params: item.params!,
+                                action: "approve",
+                              });
+                            }}
+                            disabled={actionLoading}
+                            className="flex items-center gap-1 px-2 py-1 text-xs font-medium rounded text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 disabled:opacity-50 transition-colors"
+                          >
+                            <Unlock size={12} />
+                            {locale === "ar" ? "الموافقة على الفتح" : "Approve Unlock"}
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setConfirmAction({
+                                notificationId: item.id,
+                                type: "unlock",
+                                params: item.params!,
+                                action: "reject",
+                              });
+                            }}
+                            disabled={actionLoading}
+                            className="flex items-center gap-1 px-2 py-1 text-xs font-medium rounded text-amber-600 bg-amber-50 hover:bg-amber-100 border border-amber-200 disabled:opacity-50 transition-colors"
+                          >
+                            <X size={12} />
+                            {locale === "ar" ? "تجاهل" : "Dismiss"}
+                          </button>
+                        </>
                       )}
                     </div>
                   )}
@@ -477,6 +515,8 @@ export default function NotificationBell() {
                     <span className={`inline-block mt-2 text-[11px] font-semibold px-2 py-0.5 rounded ${
                       resolved.includes("رفض") || resolved === "Rejected"
                         ? "text-red-600 bg-red-50"
+                        : resolved.includes("تجاهل") || resolved === "Dismissed"
+                        ? "text-amber-600 bg-amber-50"
                         : "text-emerald-600 bg-emerald-50"
                     }`}>
                       {resolved}
@@ -504,21 +544,27 @@ export default function NotificationBell() {
       <ConfirmModal
         open={confirmAction !== null}
         title={
-          confirmAction?.type === "unlock"
+          confirmAction?.type === "unlock" && confirmAction?.action === "reject"
+            ? t.confirmDismissTitle
+            : confirmAction?.type === "unlock"
             ? t.confirmUnlockTitle
             : confirmAction?.action === "approve"
             ? t.confirmApproveTitle
             : t.confirmRejectTitle
         }
         message={
-          confirmAction?.type === "unlock"
+          confirmAction?.type === "unlock" && confirmAction?.action === "reject"
+            ? t.confirmDismissMsg
+            : confirmAction?.type === "unlock"
             ? t.confirmUnlockMsg
             : confirmAction?.action === "approve"
             ? t.confirmApproveMsg
             : t.confirmRejectMsg
         }
         confirmLabel={
-          confirmAction?.type === "unlock"
+          confirmAction?.type === "unlock" && confirmAction?.action === "reject"
+            ? t.dismissLabel
+            : confirmAction?.type === "unlock"
             ? t.unlockApproveLabel
             : confirmAction?.action === "approve"
             ? t.approveLabel
