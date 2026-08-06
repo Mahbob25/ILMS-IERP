@@ -32,12 +32,14 @@ lookup. Reuse existing input-sanitization patterns (`lib/utils/input`).
 
 ### 3. Bulk actions on tables
 
-- Mark attendance for a whole section in one grid view
-- Enter grades per section in one screen (row-per-student, editable cells)
-- Batch-print receipts or certificates for an entire section
+- ✅ Mark attendance for a whole section in one grid view
+- ✅ Enter grades per section in one screen (row-per-student, editable cells)
+- ✅ Batch-print receipts or certificates for an entire section (certificates done — checkbox selection + bulk delete + batch PDF download; receipts still pending)
 - Bulk refund selection in the cashier
 
 Today every record opens its own modal; batching collapses repetitive work.
+
+**Plan:** `docs/plans/bulk-actions.md` (certificates v1 implemented 2026-08-06)
 
 ### 4. Guided multi-step flows (wizards) for high-frequency tasks
 

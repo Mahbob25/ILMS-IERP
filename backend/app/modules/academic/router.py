@@ -13,7 +13,7 @@ from app.modules.academic.schemas import (
     StudentCreate, StudentUpdate, StudentResponse,
     EnrollmentCreate, EnrollmentCreateWithStudent, EnrollmentResponse, EnrollmentDetailResponse,
     FinalGradeCreate, FinalGradeBulkCreate, FinalGradeResponse, StudentGradeSummary,
-    CertificateResponse, DeactivateRequest,
+    CertificateResponse, CertificateBatchDeleteRequest, BatchDeleteResult, DeactivateRequest,
     UnenrollmentPreviewResponse, UnenrollRequest, UnenrollmentRecordResponse,
     PaginatedResponse,
 )
@@ -344,6 +344,16 @@ async def delete_certificate(
     deleted = await certificate_service.delete_certificate(db, cert_id)
     if not deleted:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Certificate not found")
+
+
+@academic_router.delete("/certificates/batch", response_model=BatchDeleteResult)
+async def delete_certificates_batch(
+    data: CertificateBatchDeleteRequest,
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager"])),
+    db: AsyncSession = Depends(get_db)
+):
+    result = await certificate_service.delete_certificates_batch(db, data.cert_ids)
+    return result
 
 
 # --- Final Grades ---

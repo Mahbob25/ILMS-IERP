@@ -278,6 +278,15 @@ class UnenrollmentRecordResponse(BaseModel):
         from_attributes = True
 
 
+class CertificateBatchDeleteRequest(BaseModel):
+    cert_ids: list[uuid.UUID] = Field(..., min_length=1, max_length=100)
+
+
+class BatchDeleteResult(BaseModel):
+    deleted_count: int
+    errors: list[str] = []
+
+
 class CertificateResponse(BaseModel):
     id: uuid.UUID
     student_id: uuid.UUID

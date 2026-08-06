@@ -220,3 +220,22 @@ async def delete_certificate(db: AsyncSession, cert_id: uuid.UUID) -> bool:
     cert.deleted_at = datetime.now(timezone.utc)
     await db.flush()
     return True
+
+
+async def delete_certificates_batch(db: AsyncSession, cert_ids: list[uuid.UUID]) -> dict:
+    deleted_count = 0
+    errors: list[str] = []
+
+    for cert_id in cert_ids:
+        try:
+            cert = await get_certificate(db, cert_id)
+            if not cert:
+                errors.append(f"Certificate {cert_id} not found")
+                continue
+            cert.deleted_at = datetime.now(timezone.utc)
+            await db.flush()
+            deleted_count += 1
+        except Exception as e:
+            errors.append(f"Certificate {cert_id}: {str(e)}")
+
+    return {"deleted_count": deleted_count, "errors": errors}

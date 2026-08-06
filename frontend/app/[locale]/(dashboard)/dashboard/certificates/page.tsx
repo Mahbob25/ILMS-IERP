@@ -8,7 +8,9 @@ import { useAuth } from "@/components/AuthContext";
 import RefreshButton from "@/components/RefreshButton";
 import CertificatePreview from "@/components/CertificatePreview";
 import EmptyState from "@/components/EmptyState";
-import { Loader2, Search, Trash2, Eye, FileDown, AlertCircle } from "lucide-react";
+import { Loader2, Search, Trash2, Eye, FileDown, AlertCircle, Square, CheckSquare } from "lucide-react";
+import { useBulkSelection } from "@/hooks/useBulkSelection";
+import BulkActionBar from "@/components/BulkActionBar";
 
 interface Certificate {
   id: string;
@@ -47,6 +49,7 @@ export default function CertificatesPage() {
       download: "تحميل PDF",
       delete: "حذف",
       confirmDelete: "هل أنت متأكد من حذف هذه الشهادة؟",
+      confirmTitle: "تأكيد الحذف",
       deleted: "تم حذف الشهادة بنجاح",
       showing: "عرض",
       of: "من",
@@ -58,6 +61,14 @@ export default function CertificatesPage() {
       courseCode: "رمز المقرر",
       finalScore: "الدرجة النهائية",
       grade: "التقدير",
+      selectAll: "تحديد الكل",
+      deselect: "إلغاء التحديد",
+      selected: "محدد",
+      deleteAll: "حذف المحدد",
+      downloadAll: "تحميل المحدد",
+      confirmBulkDelete: "هل أنت متأكد من حذف {count} شهادة؟",
+      bulkDeleted: "تم حذف {count} شهادة بنجاح",
+      bulkDeleteErrors: "فشل حذف {count} من {total} شهادة",
     },
     en: {
       title: "Certificates",
@@ -74,6 +85,7 @@ export default function CertificatesPage() {
       download: "Download PDF",
       delete: "Delete",
       confirmDelete: "Are you sure you want to delete this certificate?",
+      confirmTitle: "Confirm Deletion",
       deleted: "Certificate deleted successfully",
       showing: "Showing",
       of: "of",
@@ -85,6 +97,14 @@ export default function CertificatesPage() {
       courseCode: "Course Code",
       finalScore: "Final Score",
       grade: "Grade",
+      selectAll: "Select All",
+      deselect: "Deselect",
+      selected: "selected",
+      deleteAll: "Delete Selected",
+      downloadAll: "Download Selected",
+      confirmBulkDelete: "Delete {count} certificates?",
+      bulkDeleted: "{count} certificate(s) deleted",
+      bulkDeleteErrors: "Failed to delete {count} of {total} certificates",
     },
   }[locale === "en" ? "en" : "ar"];
 
@@ -98,7 +118,13 @@ export default function CertificatesPage() {
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [previewCert, setPreviewCert] = useState<Certificate | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Certificate | null>(null);
+  const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
+  const [bulkSubmitting, setBulkSubmitting] = useState(false);
+  const [bulkMessage, setBulkMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const limit = 15;
+
+  const pageIds = certificates.map((c) => c.id);
+  const bulk = useBulkSelection(pageIds);
 
   const fetchCertificates = useCallback(async (searchTerm = "", pageNum = 1) => {
     setMessage(null);
@@ -147,6 +173,94 @@ export default function CertificatesPage() {
       setMessage({ type: "error", text: "Delete failed" });
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (bulkSubmitting || bulk.selectedCount === 0) return;
+    setBulkSubmitting(true);
+    try {
+      const ids = Array.from(bulk.selectedIds);
+      const res = await apiClient.delete<{ deleted_count: number; errors: string[] }>("/academic/certificates/batch", {
+        data: { cert_ids: ids },
+      });
+      bulk.reset();
+      setBulkDeleteConfirm(false);
+      if (res.data.errors.length > 0) {
+        setBulkMessage({
+          type: "error",
+          text: t.bulkDeleteErrors.replace("{count}", String(res.data.errors.length)).replace("{total}", String(ids.length)),
+        });
+      } else {
+        setBulkMessage({
+          type: "success",
+          text: t.bulkDeleted.replace("{count}", String(res.data.deleted_count)),
+        });
+      }
+      fetchCertificates(search, page);
+    } catch {
+      setBulkDeleteConfirm(false);
+      setBulkMessage({ type: "error", text: "Bulk delete failed" });
+    } finally {
+      setBulkSubmitting(false);
+    }
+  };
+
+  const handleBulkDownloadPdf = async () => {
+    const ids = Array.from(bulk.selectedIds);
+    setBulkSubmitting(true);
+    try {
+      const htmlParts: string[] = [];
+      for (const certId of ids) {
+        const cert = certificates.find((c) => c.id === certId);
+        if (!cert) continue;
+        try {
+          const res = await apiClient.get<string>(`/academic/certificates/${certId}/preview`, {
+            responseType: "text",
+          });
+          htmlParts.push(res.data);
+        } catch {
+          // skip failed previews
+        }
+      }
+      if (htmlParts.length === 0) {
+        setBulkMessage({ type: "error", text: "No certificates could be loaded" });
+        return;
+      }
+
+      const combinedHtml = htmlParts.join('<div style="page-break-after: always;"></div>');
+      const container = document.createElement("div");
+      container.innerHTML = combinedHtml;
+      container.style.position = "fixed";
+      container.style.top = "0";
+      container.style.left = "0";
+      container.style.width = "297mm";
+      container.style.zIndex = "-1";
+      container.style.opacity = "0";
+      container.style.pointerEvents = "none";
+      document.body.appendChild(container);
+
+      await document.fonts.ready;
+      await new Promise((r) => setTimeout(r, 300));
+
+      const html2pdf = (await import("html2pdf.js")).default;
+      await html2pdf()
+        .set({
+          margin: 0,
+          filename: "certificates-batch.pdf",
+          image: { type: "jpeg", quality: 0.98 },
+          html2canvas: { scale: 2, useCORS: true, width: 297, height: 210 },
+          jsPDF: { unit: "mm", format: "a4", orientation: "landscape" },
+        })
+        .from(container)
+        .save();
+
+      document.body.removeChild(container);
+      bulk.reset();
+    } catch {
+      setBulkMessage({ type: "error", text: "Batch download failed" });
+    } finally {
+      setBulkSubmitting(false);
     }
   };
 
@@ -262,9 +376,44 @@ export default function CertificatesPage() {
         <EmptyState title={t.empty} message="" />
       ) : (
         <div className="card overflow-hidden">
-              <table className="data-table">
+          <BulkActionBar
+            selectedCount={bulk.selectedCount}
+            onDeselectAll={bulk.reset}
+            actions={[
+              {
+                label: t.downloadAll,
+                icon: <FileDown size={14} />,
+                onClick: handleBulkDownloadPdf,
+                disabled: bulkSubmitting,
+              },
+              ...(canDelete
+                ? [
+                    {
+                      label: t.deleteAll,
+                      icon: <Trash2 size={14} />,
+                      variant: "danger" as const,
+                      onClick: () => setBulkDeleteConfirm(true),
+                      disabled: bulkSubmitting,
+                    },
+                  ]
+                : []),
+            ]}
+            isRtl={isRtl}
+            message={bulkMessage}
+            onDismissMessage={() => setBulkMessage(null)}
+          />
+          <table className="data-table">
             <thead>
               <tr>
+                <th className="w-8">
+                  <button
+                    onClick={() => bulk.toggleAll(certificates.map((c) => c.id))}
+                    className="text-slate-400 hover:text-brand-600"
+                    title={t.selectAll}
+                  >
+                    {bulk.isAllSelected ? <CheckSquare size={16} /> : <Square size={16} />}
+                  </button>
+                </th>
                 <th>{t.certificateNumber}</th>
                 <th>{t.student}</th>
                 <th className="hidden md:table-cell">{t.studentCode}</th>
@@ -278,6 +427,14 @@ export default function CertificatesPage() {
             <tbody>
               {certificates.map((cert) => (
                 <tr key={cert.id}>
+                  <td className="w-8">
+                    <button
+                      onClick={() => bulk.toggle(cert.id)}
+                      className="text-slate-400 hover:text-brand-600"
+                    >
+                      {bulk.isSelected(cert.id) ? <CheckSquare size={16} className="text-brand-600" /> : <Square size={16} />}
+                    </button>
+                  </td>
                   <td className="font-mono text-xs font-medium text-slate-900">{cert.certificate_number}</td>
                   <td className="font-medium text-slate-900">{cert.student_name}</td>
                   <td className="hidden md:table-cell text-slate-600">{cert.student_code || "—"}</td>
@@ -351,6 +508,21 @@ export default function CertificatesPage() {
             <div className="flex gap-3 justify-end">
               <button onClick={() => setDeleteTarget(null)} className="btn-secondary">{t.close}</button>
               <button onClick={() => handleDelete(deleteTarget.id)} disabled={submitting} className="btn-primary bg-red-600 hover:bg-red-700">{t.delete}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {bulkDeleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setBulkDeleteConfirm(false)}>
+          <div className="bg-white rounded-xl shadow-2xl p-6 max-w-sm w-full mx-4" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-bold text-slate-900 mb-2">{t.confirmTitle}</h3>
+            <p className="text-sm text-slate-600 mb-4">
+              {t.confirmBulkDelete.replace("{count}", String(bulk.selectedCount))}
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button onClick={() => setBulkDeleteConfirm(false)} className="btn-secondary">{t.close}</button>
+              <button onClick={handleBulkDelete} disabled={bulkSubmitting} className="btn-primary bg-red-600 hover:bg-red-700">{t.delete}</button>
             </div>
           </div>
         </div>
