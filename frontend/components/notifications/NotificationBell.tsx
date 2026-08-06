@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { apiClient } from "@/lib/api";
 import { useAuth } from "@/components/AuthContext";
-import { Bell, Check, CheckCircle, AlertCircle, Loader2, Unlock, Trash2, Undo2, X, ExternalLink } from "lucide-react";
+import { Bell, Check, CheckCircle, AlertCircle, Loader2, Unlock, Trash2, Undo2, X, ExternalLink, RotateCcw } from "lucide-react";
 import { renderNotification } from "@/components/notifications/notificationMessages";
 import ConfirmModal from "@/components/ConfirmModal";
 
@@ -368,6 +368,13 @@ export default function NotificationBell() {
               {locale === "ar" ? "الإشعارات" : "Notifications"}
             </h3>
             <div className="flex items-center gap-2">
+              <button
+                onClick={() => { fetchItems(); fetchUnreadCount(); }}
+                className="flex items-center gap-1 text-xs text-slate-400 hover:text-slate-700 font-medium"
+                title={locale === "ar" ? "تحديث" : "Refresh"}
+              >
+                <RotateCcw size={12} />
+              </button>
               {unreadCount > 0 && !clearedItems && (
                 <button
                   onClick={handleMarkAllRead}
@@ -438,7 +445,7 @@ export default function NotificationBell() {
               return (
                 <div
                   key={item.id}
-                  className={`w-full text-left px-4 py-3 border-l-2 transition-colors duration-100 hover:bg-slate-50 relative group ${
+                  className={`w-full text-left px-4 py-3 border-l-2 border-b border-slate-50 transition-colors duration-100 hover:bg-slate-50 relative group ${
                     priorityAccent[item.priority] ?? ""
                   } ${item.is_read ? "opacity-60" : ""}`}
                 >

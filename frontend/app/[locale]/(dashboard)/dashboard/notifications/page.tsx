@@ -17,6 +17,7 @@ import {
   Unlock,
   Trash2,
   X,
+  RotateCcw,
 } from "lucide-react";
 import ConfirmModal from "@/components/ConfirmModal";
 import UndoToast from "@/components/UndoToast";
@@ -101,6 +102,9 @@ export default function NotificationsPage() {
       unlockMsg: "هل أنت متأكد من الموافقة على طلب فتح هذا اليوم؟",
       unlockConfirm: "تأكيد الفتح",
       unlockButton: "الموافقة على الفتح",
+      dismissTitle: "تجاهل طلب الفتح",
+      dismissMsg: "هل أنت متأكد من تجاهل طلب فتح اليوم؟",
+      dismissConfirm: "تجاهل",
       clearAll: "مسح الكل",
       undoTooltip: "تراجع عن المسح",
     },
@@ -132,6 +136,9 @@ export default function NotificationsPage() {
       unlockMsg: "Are you sure you want to approve this day unlock request?",
       unlockConfirm: "Confirm Unlock",
       unlockButton: "Approve Unlock",
+      dismissTitle: "Dismiss Unlock",
+      dismissMsg: "Are you sure you want to dismiss this unlock request?",
+      dismissConfirm: "Dismiss",
       clearAll: "Clear All",
       undoTooltip: "Undo clear",
     },
@@ -367,6 +374,13 @@ export default function NotificationsPage() {
 
           {total > 0 && !clearedItems && (
             <>
+              <button
+                onClick={() => fetchNotifications()}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-400 hover:text-slate-700 transition-colors"
+                title={locale === "ar" ? "تحديث" : "Refresh"}
+              >
+                <RotateCcw size={14} />
+              </button>
               <button
                 onClick={handleMarkAllRead}
                 className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-blue-600 hover:text-blue-800 transition-colors"
@@ -620,21 +634,27 @@ export default function NotificationsPage() {
       <ConfirmModal
         open={confirmAction !== null}
         title={
-          confirmAction?.type === "unlock"
+          confirmAction?.type === "unlock" && confirmAction?.action === "reject"
+            ? t.dismissTitle
+            : confirmAction?.type === "unlock"
             ? t.unlockTitle
             : confirmAction?.action === "approve"
             ? t.confirmApproveTitle
             : t.confirmRejectTitle
         }
         message={
-          confirmAction?.type === "unlock"
+          confirmAction?.type === "unlock" && confirmAction?.action === "reject"
+            ? t.dismissMsg
+            : confirmAction?.type === "unlock"
             ? t.unlockMsg
             : confirmAction?.action === "approve"
             ? t.confirmApproveMsg
             : t.confirmRejectMsg
         }
         confirmLabel={
-          confirmAction?.type === "unlock"
+          confirmAction?.type === "unlock" && confirmAction?.action === "reject"
+            ? t.dismissConfirm
+            : confirmAction?.type === "unlock"
             ? t.unlockConfirm
             : confirmAction?.action === "approve"
             ? t.approveConfirm
