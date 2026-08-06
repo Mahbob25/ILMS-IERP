@@ -4,6 +4,9 @@ import React, { useState } from "react";
 import { useRouter, useParams, usePathname } from "next/navigation";
 import { useAuth } from "@/components/AuthContext";
 import { BrandLogo } from "@/components/ui/BrandLogo";
+import WizardDirtyProvider, {
+  useWizardDirtyGuard,
+} from "@/components/wizards/WizardDirtyGuard";
 import {
   Users,
   BookOpen,
@@ -33,10 +36,25 @@ import {
   FileBarChart2,
   FolderOpen,
   Bell,
+  Workflow,
 } from "lucide-react";
 import NotificationBell from "@/components/notifications/NotificationBell";
 
 export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const params = useParams();
+  const locale = (params?.locale as string) || "ar";
+  return (
+    <WizardDirtyProvider locale={locale}>
+      <DashboardLayoutInner>{children}</DashboardLayoutInner>
+    </WizardDirtyProvider>
+  );
+}
+
+function DashboardLayoutInner({
   children,
 }: {
   children: React.ReactNode;
@@ -46,6 +64,7 @@ export default function DashboardLayout({
   const pathname = usePathname();
   const { user, permissions, loading, logout } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { guardNavigation } = useWizardDirtyGuard();
 
   const locale = (params?.locale as string) || "ar";
   const isRtl = locale === "ar";
@@ -80,6 +99,7 @@ export default function DashboardLayout({
         dailyClosures: "الإغلاق اليومي",
         pos: "نقطة البيع",
         ingestion: "استيراد المناهج",
+        wizards: "تسجيل سريع",
         systemHealth: "صحة النظام",
         backups: "النسخ الاحتياطي",
         settings: "الإعدادات",
@@ -119,6 +139,7 @@ export default function DashboardLayout({
         dailyClosures: "Daily Closures",
         pos: "Point of Sale",
         ingestion: "Curriculum Ingestion",
+        wizards: "Quick Registration",
         systemHealth: "System Health",
         backups: "Database Backups",
         settings: "Settings",
@@ -134,9 +155,8 @@ export default function DashboardLayout({
 
   const handleLanguageToggle = () => {
     const targetLocale = locale === "ar" ? "en" : "ar";
-    // Replace current locale prefix in pathname
     const newPath = pathname.replace(`/${locale}`, `/${targetLocale}`);
-    router.push(newPath);
+    guardNavigation(() => router.push(newPath));
   };
 
   if (loading) {
@@ -202,6 +222,7 @@ export default function DashboardLayout({
     page_staff_payroll: ["superadmin", "manager", "secretary"],
     page_reports: ["superadmin", "manager", "secretary"],
     page_notifications: ["superadmin", "manager", "secretary", "teacher"],
+    page_wizards: ["superadmin", "manager", "secretary"],
   };
 
   const hasPageAccess = (permissionCodename: string): boolean => {
@@ -242,6 +263,7 @@ export default function DashboardLayout({
     "dashboard/staff-payroll": "page_staff_payroll",
     "dashboard/reports": "page_reports",
     "dashboard/notifications": "page_notifications",
+    "dashboard/wizards": "page_wizards",
   };
 
   const routeKey = pathname.split("/").slice(2).join("/").replace(/\/$/, "");
@@ -267,6 +289,12 @@ export default function DashboardLayout({
       href: `/${locale}/dashboard`,
       icon: Activity,
       permission: "page_dashboard",
+    },
+    {
+      name: t.menu.wizards,
+      href: `/${locale}/dashboard/wizards/student-enrollment`,
+      icon: Workflow,
+      permission: "page_wizards",
     },
     {
       name: t.menu.users,
@@ -447,7 +475,7 @@ export default function DashboardLayout({
               return (
                 <button
                   key={item.name}
-                  onClick={() => router.push(item.href)}
+                  onClick={() => guardNavigation(() => router.push(item.href))}
                   className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all duration-150 ${
                     isActive
                       ? "bg-brand-50 text-brand-600 border border-brand-100"
@@ -561,10 +589,12 @@ export default function DashboardLayout({
                 return (
                   <button
                     key={item.name}
-                    onClick={() => {
-                      router.push(item.href);
-                      setSidebarOpen(false);
-                    }}
+                    onClick={() =>
+                      guardNavigation(() => {
+                        router.push(item.href);
+                        setSidebarOpen(false);
+                      })
+                    }
                     className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 ${
                       isActive
                         ? "bg-brand-50 text-brand-600 border border-brand-100"

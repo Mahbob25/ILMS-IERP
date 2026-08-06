@@ -5,7 +5,10 @@ import { useParams } from "next/navigation";
 import { apiClient } from "@/lib/api";
 import { useAuth } from "@/components/AuthContext";
 import Modal from "@/components/Modal";
-import Select from "@/components/ui/Select";
+import PaymentFormFields, {
+  PaymentFormState,
+  PaymentSummary,
+} from "@/components/payments/PaymentFormFields";
 import { Plus, Loader2, RefreshCw, Eye, Search, X, AlertCircle } from "lucide-react";
 import { sanitizeInput, escapeLikeWildcards } from "@/lib/utils/input";
 import ReceiptModal, { ReceiptData } from "@/components/ReceiptModal";
@@ -43,14 +46,6 @@ interface Enrollment {
   section_id: string;
   agreed_price: number | null;
   admin_discount: number | null;
-}
-
-interface PaymentSummary {
-  total_paid: number;
-  agreed_price: number | null;
-  admin_discount: number | null;
-  net_price: number | null;
-  balance_remaining: number | null;
 }
 
 export default function PaymentsPage() {
@@ -177,13 +172,7 @@ export default function PaymentsPage() {
   const [receiptSummary, setReceiptSummary] = useState<PaymentSummary | null>(
     null,
   );
-  const [form, setForm] = useState<{
-    enrollment_id: string;
-    amount: string;
-    date: string;
-    payment_method: string;
-    transaction_number: string;
-  }>({
+  const [form, setForm] = useState<PaymentFormState>({
     enrollment_id: "",
     amount: "",
     date: getLocalDateString(),
@@ -289,6 +278,28 @@ export default function PaymentsPage() {
     if (!resolved) return enrollmentId.slice(0, 8);
     const price = resolved.enrollment?.agreed_price;
     return `${resolved.student?.full_name || "?"} - ${resolved.course?.name || "?"}${price != null ? ` (${t.sar} ${price.toFixed(2)})` : ""}`;
+  };
+
+  const handleEnrollmentSelect = async (value: string) => {
+    setForm({ ...form, enrollment_id: value, amount: "" });
+    setSummary(null);
+    setFormError("");
+    if (!value) return;
+    try {
+      const res = await apiClient.get<PaymentSummary>(
+        `/lms/payments/summary/${value}`,
+      );
+      setSummary(res.data);
+      if (res.data.balance_remaining != null) {
+        setForm((prev) => ({
+          ...prev,
+          enrollment_id: value,
+          amount: res.data!.balance_remaining!.toString(),
+        }));
+      }
+    } catch {
+      // fallback
+    }
   };
 
   const handleSave = async () => {
@@ -410,175 +421,33 @@ export default function PaymentsPage() {
         size="xl"
       >
         <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">
-                {t.selectEnrollment}
-              </label>
-              <Select
-                value={form.enrollment_id}
-                onChange={async (value) => {
-                  setForm({ ...form, enrollment_id: value, amount: "" });
-                  setSummary(null);
-                  setFormError("");
-                  if (!value) return;
-                  try {
-                    const res = await apiClient.get<PaymentSummary>(
-                      `/lms/payments/summary/${value}`,
-                    );
-                    setSummary(res.data);
-                    if (res.data.balance_remaining != null) {
-                      setForm((prev) => ({
-                        ...prev,
-                        enrollment_id: value,
-                        amount: res.data!.balance_remaining!.toString(),
-                      }));
-                    }
-                  } catch {
-                    // fallback
-                  }
-                }}
-                options={enrollments.map((e) => ({
-                  value: e.id,
-                  label: enrollmentLabel(e.id),
-                }))}
-                placeholder="--"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">
-                {t.enterAmount}
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                max={summary?.balance_remaining ?? ""}
-                value={form.amount}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  if (
-                    summary?.balance_remaining != null &&
-                    parseFloat(val) > summary.balance_remaining
-                  ) {
-                    setForm({
-                      ...form,
-                      amount: summary.balance_remaining.toString(),
-                    });
-                  } else {
-                    setForm({ ...form, amount: val });
-                  }
-                }}
-                className="input-field"
-                placeholder="0.00"
-              />
-              {!form.enrollment_id && (
-                <p className="text-xs text-slate-400 mt-2">
-                  {t.selectEnrollment}
-                </p>
-              )}
-              {summary && (
-                <div className="text-xs text-slate-600 space-y-0.5 mt-2 p-2 bg-slate-50 rounded-lg">
-                  <div className="flex justify-between">
-                    <span>{t.agreedPrice}:</span>
-                    <span className="font-medium">
-                      {summary.agreed_price?.toFixed(2) ?? "—"} {t.sar}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>{t.discount}:</span>
-                    <span className="font-medium">
-                      {summary.admin_discount != null
-                        ? `${summary.admin_discount}%`
-                        : "—"}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>{t.netPrice}:</span>
-                    <span className="font-medium">
-                      {summary.net_price?.toFixed(2)} {t.sar}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>{t.totalPaid}:</span>
-                    <span className="font-medium">
-                      {summary.total_paid.toFixed(2)} {t.sar}
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-emerald-700 font-semibold">
-                    <span>{t.remaining}:</span>
-                    <span>
-                      {summary.balance_remaining != null
-                        ? summary.balance_remaining.toFixed(2)
-                        : "—"}{" "}
-                      {t.sar}
-                    </span>
-                  </div>
-                </div>
-              )}
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">
-                {t.paymentDate}
-              </label>
-              <input
-                type="date"
-                value={form.date}
-                onChange={(e) => setForm({ ...form, date: e.target.value })}
-                className="input-field"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">
-                {t.paymentMethod}
-              </label>
-              <div className="flex gap-2">
-                <button
-                  onClick={() =>
-                    setForm({
-                      ...form,
-                      payment_method: "cash",
-                      transaction_number: "",
-                    })
-                  }
-                  className={`flex-1 py-2 px-3 text-sm font-medium rounded-lg border transition-colors ${
-                    form.payment_method === "cash"
-                      ? "border-emerald-400 bg-emerald-50 text-emerald-700"
-                      : "border-slate-200 text-slate-600 hover:border-slate-300"
-                  }`}
-                >
-                  {t.cash}
-                </button>
-                <button
-                  onClick={() => setForm({ ...form, payment_method: "online" })}
-                  className={`flex-1 py-2 px-3 text-sm font-medium rounded-lg border transition-colors ${
-                    form.payment_method === "online"
-                      ? "border-emerald-400 bg-emerald-50 text-emerald-700"
-                      : "border-slate-200 text-slate-600 hover:border-slate-300"
-                  }`}
-                >
-                  {t.online}
-                </button>
-              </div>
-              {form.payment_method === "online" && (
-                <input
-                  type="text"
-                  value={form.transaction_number}
-                  onChange={(e) =>
-                    setForm({ ...form, transaction_number: e.target.value })
-                  }
-                  placeholder={t.enterTransactionNumber}
-                  className="input-field mt-2"
-                  required
-                />
-              )}
-            </div>
-          </div>
-          {formError && (
-            <div className="text-sm text-red-600 bg-red-50 p-3 rounded-lg">
-              {formError}
-            </div>
-          )}
+          <PaymentFormFields
+            form={form}
+            onFormChange={(patch) => setForm({ ...form, ...patch })}
+            enrollmentOptions={enrollments.map((e) => ({
+              value: e.id,
+              label: enrollmentLabel(e.id),
+            }))}
+            onEnrollmentSelect={handleEnrollmentSelect}
+            summary={summary}
+            formError={formError}
+            labels={{
+              selectEnrollment: t.selectEnrollment,
+              enterAmount: t.enterAmount,
+              paymentDate: t.paymentDate,
+              paymentMethod: t.paymentMethod,
+              cash: t.cash,
+              online: t.online,
+              transactionNumber: t.transactionNumber,
+              enterTransactionNumber: t.enterTransactionNumber,
+              agreedPrice: t.agreedPrice,
+              discount: t.discount,
+              netPrice: t.netPrice,
+              totalPaid: t.totalPaid,
+              remaining: t.remaining,
+              sar: t.sar,
+            }}
+          />
           <div className="flex gap-3 pt-2">
             <button onClick={handleSave} disabled={submitting} className="btn-primary">
               {submitting ? <Loader2 size={16} className="animate-spin" /> : null}

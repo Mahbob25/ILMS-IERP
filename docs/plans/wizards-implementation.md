@@ -1,6 +1,6 @@
 # Guided Multi-Step Flows (Wizards) — Implementation Plan
 
-**Status:** Planning · not started  
+**Status:** In progress — Phases 1–3D implemented, Phase 3E (E2E) pending  
 **Source:** `docs/plans/ux-suggestions.md`, item #4  
 **Effort:** L (2+ weeks)  
 **Date:** 2026-08-06

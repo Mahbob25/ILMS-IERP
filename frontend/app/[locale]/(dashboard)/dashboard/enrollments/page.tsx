@@ -6,8 +6,11 @@ import { apiClient } from "@/lib/api";
 import { useAuth } from "@/components/AuthContext";
 import ConfirmModal from "@/components/ConfirmModal";
 import Modal from "@/components/Modal";
-import Select from "@/components/ui/Select";
 import UnenrollModal from "@/components/students/UnenrollModal";
+import StudentFormFields from "@/components/students/StudentFormFields";
+import EnrollmentFormFields, {
+  EnrollmentFormFieldsHandle,
+} from "@/components/enrollments/EnrollmentFormFields";
 import { Plus, Trash2, Loader2, RefreshCw, UserX, AlertCircle } from "lucide-react";
 import { sanitizeInput, escapeLikeWildcards, validateName } from "@/lib/utils/input";
 
@@ -130,9 +133,7 @@ export default function EnrollmentsPage() {
   const [form, setForm] = useState({ student_id: "", section_id: "", admin_discount: "" });
   const [createStudentForm, setCreateStudentForm] = useState({ student_code: "", full_name: "", email: "" });
   const [nameError, setNameError] = useState("");
-  const [studentSearch, setStudentSearch] = useState("");
-  const [showStudentDropdown, setShowStudentDropdown] = useState(false);
-  const [studentSearchResults, setStudentSearchResults] = useState<Student[]>([]);
+  const enrollmentFormRef = useRef<EnrollmentFormFieldsHandle>(null);
   const [unenrollTarget, setUnenrollTarget] = useState<Enrollment | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Enrollment | null>(null);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -189,7 +190,6 @@ export default function EnrollmentsPage() {
     fetchEnrollments();
     return () => {
       if (searchTimeout) clearTimeout(searchTimeout);
-      if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
     };
   }, []);
 
@@ -220,30 +220,7 @@ export default function EnrollmentsPage() {
   const openEnrollModal = () => {
     setMessage(null);
     setForm({ student_id: "", section_id: "", admin_discount: "" });
-    setStudentSearch("");
-    setShowStudentDropdown(false);
     setShowEnrollModal(true);
-  };
-
-  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const handleStudentSearch = (query: string) => {
-    setStudentSearch(query);
-    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
-    if (!query.trim()) {
-      setStudentSearchResults(students);
-      return;
-    }
-    searchTimeoutRef.current = setTimeout(async () => {
-      try {
-        const res = await apiClient.get<{ items: Student[]; total: number }>(
-          `/academic/students?search=${encodeURIComponent(escapeLikeWildcards(query))}&limit=20`
-        );
-        setStudentSearchResults(res.data.items);
-      } catch {
-        setStudentSearchResults([]);
-      }
-    }, 300);
   };
 
   const handleSave = async () => {
@@ -288,7 +265,7 @@ export default function EnrollmentsPage() {
       const newStud = res.data;
       setStudents(prev => [...prev, newStud]);
       setForm(prev => ({ ...prev, student_id: newStud.id }));
-      setStudentSearch(`${newStud.full_name} (${newStud.student_code})`);
+      enrollmentFormRef.current?.setSearchText(`${newStud.full_name} (${newStud.student_code})`);
       setShowCreateStudentModal(false);
       setCreateStudentForm({ student_code: "", full_name: "", email: "" });
     } catch (e: any) {
@@ -379,74 +356,32 @@ export default function EnrollmentsPage() {
       {/* Enrollment Modal */}
       <Modal open={showEnrollModal} onClose={() => setShowEnrollModal(false)} title={t.add} size="xl">
         <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="relative">
-              <label className="block text-xs font-medium text-slate-700 mb-1">{t.selectStudent}</label>
-              <input
-                type="text"
-                value={studentSearch}
-                onChange={(e) => handleStudentSearch(e.target.value)}
-                onFocus={() => {
-                  setShowStudentDropdown(true);
-                  setStudentSearchResults(students);
-                }}
-                onBlur={() => setTimeout(() => setShowStudentDropdown(false), 200)}
-                placeholder={t.searchStudent}
-                className="input-field"
-              />
-              {showStudentDropdown && (
-                <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                  {studentSearchResults.length === 0 ? (
-                    <div className="px-3 py-2 text-sm text-slate-500">{t.noResults}</div>
-                  ) : (
-                    studentSearchResults.map((s) => (
-                      <button
-                        key={s.id}
-                        type="button"
-                        onMouseDown={() => {
-                          setForm({ ...form, student_id: s.id });
-                          setStudentSearch(`${s.full_name} (${s.student_code})`);
-                          setShowStudentDropdown(false);
-                        }}
-                        className="w-full text-start px-3 py-2 text-sm hover:bg-slate-50"
-                      >
-                        <span className="font-medium">{s.full_name}</span>
-                        <span className="text-slate-400 ms-2">{s.student_code}</span>
-                      </button>
-                    ))
-                  )}
-                </div>
-              )}
-              <button
-                type="button"
-                onClick={() => {
-                  setShowStudentDropdown(false);
-                  setCreateStudentForm({ student_code: "", full_name: "", email: "" });
-                  setNameError("");
-                  setShowCreateStudentModal(true);
-                }}
-                className="mt-1 text-xs text-brand-600 hover:text-brand-700 font-medium"
-              >
-                {t.orNewStudent}
-              </button>
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">{t.selectSection}</label>
-              <Select
-                value={form.section_id}
-                onChange={(value) => setForm({ ...form, section_id: value })}
-                options={sections.filter((s) => s.status !== "completed" && s.status !== "cancelled").map((s) => ({ value: s.id, label: getSectionCourse(s.id) }))}
-                placeholder="—"
-              />
-            </div>
-            {user?.role?.name !== "secretary" && (
-              <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">{t.discount}</label>
-                <input type="number" value={form.admin_discount} onChange={(e) => setForm({ ...form, admin_discount: e.target.value })}
-                  className="input-field" min={0} max={100} />
-              </div>
-            )}
-          </div>
+          <EnrollmentFormFields
+            ref={enrollmentFormRef}
+            studentId={form.student_id}
+            onStudentChange={(studentId) => setForm({ ...form, student_id: studentId })}
+            sectionId={form.section_id}
+            onSectionChange={(sectionId) => setForm({ ...form, section_id: sectionId })}
+            sections={sections}
+            getSectionLabel={getSectionCourse}
+            showDiscount={user?.role?.name !== "secretary"}
+            discount={form.admin_discount}
+            onDiscountChange={(value) => setForm({ ...form, admin_discount: value })}
+            students={students}
+            onCreateNewStudent={() => {
+              setCreateStudentForm({ student_code: "", full_name: "", email: "" });
+              setNameError("");
+              setShowCreateStudentModal(true);
+            }}
+            labels={{
+              selectStudent: t.selectStudent,
+              searchStudent: t.searchStudent,
+              orNewStudent: t.orNewStudent,
+              noResults: t.noResults,
+              selectSection: t.selectSection,
+              discount: t.discount,
+            }}
+          />
           <div className="flex gap-3 pt-2">
             <button onClick={handleSave} disabled={submitting} className="btn-primary">
               {submitting ? <Loader2 size={16} className="animate-spin" /> : null}
@@ -460,24 +395,15 @@ export default function EnrollmentsPage() {
       {/* Create Student Modal */}
       <Modal open={showCreateStudentModal} onClose={() => setShowCreateStudentModal(false)} title={t.createStudentTitle} size="xl">
         <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">{t.studentCodeLabel}</label>
-              <input type="text" value={createStudentForm.student_code} onChange={(e) => setCreateStudentForm({ ...createStudentForm, student_code: e.target.value })}
-                className="input-field" autoFocus />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">{t.fullNameLabel}</label>
-              <input type="text" value={createStudentForm.full_name} onChange={(e) => { setNameError(""); setCreateStudentForm({ ...createStudentForm, full_name: e.target.value }); }}
-                className="input-field" />
-              {nameError && <p className="text-xs text-red-500 mt-1">{nameError}</p>}
-            </div>
-            <div className="md:col-span-2">
-              <label className="block text-xs font-medium text-slate-700 mb-1">{t.emailLabel}</label>
-              <input type="email" value={createStudentForm.email} onChange={(e) => setCreateStudentForm({ ...createStudentForm, email: e.target.value })}
-                className="input-field" />
-            </div>
-          </div>
+          <StudentFormFields
+            values={createStudentForm}
+            onChange={(next) => setCreateStudentForm(next)}
+            labels={{ studentCode: t.studentCodeLabel, fullName: t.fullNameLabel, email: t.emailLabel }}
+            nameError={nameError}
+            onClearNameError={() => setNameError("")}
+            autoFocusCode
+            emailFullWidth
+          />
           <div className="flex gap-3 pt-2">
             <button onClick={handleCreateStudent} disabled={submitting} className="btn-primary">
               {submitting ? <Loader2 size={16} className="animate-spin" /> : null}

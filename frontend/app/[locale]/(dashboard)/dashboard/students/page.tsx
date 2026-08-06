@@ -7,6 +7,7 @@ import { useAuth } from "@/components/AuthContext";
 import RefreshButton from "@/components/RefreshButton";
 import ConfirmModal from "@/components/ConfirmModal";
 import Modal from "@/components/Modal";
+import StudentFormFields from "@/components/students/StudentFormFields";
 import { Plus, Pencil, Trash2, Loader2, Eye, AlertCircle } from "lucide-react";
 import { sanitizeInput, validateName } from "@/lib/utils/input";
 
@@ -264,23 +265,11 @@ export default function StudentsPage() {
 
       <Modal open={showForm} onClose={() => setShowForm(false)} title={editingId ? t.edit : t.add} size="xl">
         <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">{t.studentCode}</label>
-              <input type="text" value={form.student_code} onChange={(e) => setForm({ ...form, student_code: e.target.value })}
-                className="input-field" />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">{t.fullName}</label>
-              <input type="text" value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })}
-                className="input-field" />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">{t.email}</label>
-              <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })}
-                className="input-field" />
-            </div>
-          </div>
+          <StudentFormFields
+            values={form}
+            onChange={setForm}
+            labels={{ studentCode: t.studentCode, fullName: t.fullName, email: t.email }}
+          />
           <div className="flex gap-3 pt-2">
             <button onClick={handleSave} disabled={submitting} className="btn-primary">{submitting ? "..." : t.save}</button>
             <button onClick={() => setShowForm(false)} className="btn-secondary">{t.cancel}</button>
