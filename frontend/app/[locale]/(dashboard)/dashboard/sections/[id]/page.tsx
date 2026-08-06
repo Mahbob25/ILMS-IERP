@@ -95,7 +95,7 @@ export default function SectionStudentsPage() {
   const { user } = useAuth();
   const locale = (params?.locale as string) || "ar";
   const isRtl = locale === "ar";
-  const sectionId = params?.sectionId as string;
+  const sectionId = params?.id as string;
 
   const t = {
     ar: {

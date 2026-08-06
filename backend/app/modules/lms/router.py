@@ -836,7 +836,11 @@ async def create_amendment(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
     try:
-        await emit_amendment_pending(db, amendment_id=amendment.id)
+        await emit_amendment_pending(
+            db,
+            amendment_id=amendment.id,
+            section_id=section_id,
+        )
     except Exception:
         logger.exception("Failed to emit amendment_pending notification")
     return AmendmentResponse(

@@ -69,7 +69,8 @@ export function renderNotification(
   params: Record<string, string> | null,
   locale: string,
 ): { title: string; body: string } {
-  const entry = dictionary[titleKey];
+  const lookup = titleKey.startsWith("notif.") ? titleKey.slice(6) : titleKey;
+  const entry = dictionary[lookup];
   const l = locale === "en" ? "en" : "ar";
 
   let title = entry?.title[l] ?? titleKey;

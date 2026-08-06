@@ -129,7 +129,9 @@ async def emit_unlock_requested(db: AsyncSession, *, closure_date: date) -> None
 
 # ── Amendment emitter ─────────────────────────────────────────────────────────
 
-async def emit_amendment_pending(db: AsyncSession, *, amendment_id: uuid.UUID) -> None:
+async def emit_amendment_pending(
+    db: AsyncSession, *, amendment_id: uuid.UUID, section_id: uuid.UUID
+) -> None:
     """Called after a compensation amendment is created with PENDING status."""
     user_ids = await _user_ids_by_role(db, ROLE_MANAGER, ROLE_SUPERADMIN)
     for uid in user_ids:
@@ -139,8 +141,11 @@ async def emit_amendment_pending(db: AsyncSession, *, amendment_id: uuid.UUID) -
             type_="amendment_pending",
             title_key="notif.amendment_pending",
             body_key="notif.amendment_pending_body",
-            params={"amendment_id": str(amendment_id)},
-            target_href="dashboard/sections",
+            params={
+                "amendment_id": str(amendment_id),
+                "section_id": str(section_id),
+            },
+            target_href=f"dashboard/sections/{section_id}",
             priority="normal",
             dedupe_key=f"amendment_pending:{amendment_id}",
         )
