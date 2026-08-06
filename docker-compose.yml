@@ -55,11 +55,13 @@ services:
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:80,http://localhost:3000,https://aldrasat.edu}
       SENTRY_DSN: ${SENTRY_DSN:-}
       TEMPLATES_DIR: /app/cert&recept
+      BACKUP_DIR: /app/backups
     depends_on:
       database:
         condition: service_healthy
     volumes:
       - uploads_data:/app/uploads
+      - backups:/app/backups
       - ./cert&recept:/app/cert&recept:ro
     networks:
       - lims-internal
@@ -150,5 +152,6 @@ services:
 volumes:
   pgdata:
   uploads_data:
+  backups:
   caddy_data:
   caddy_config:

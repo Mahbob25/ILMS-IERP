@@ -364,6 +364,13 @@ async def get_extended_health(db: AsyncSession) -> dict:
     total_enrollments_result = await db.execute(select(func.count()).select_from(Enrollment))
     total_enrollments = total_enrollments_result.scalar() or 0
 
+    last_backup = None
+    try:
+        from app.modules.backups.service import get_last_backup_iso
+        last_backup = await get_last_backup_iso()
+    except Exception:
+        logger.warning("backups: unable to resolve last_backup")
+
     uptime_delta = datetime.now(timezone.utc) - _server_started_at
     days = uptime_delta.days
     hours = uptime_delta.seconds // 3600
@@ -388,5 +395,5 @@ async def get_extended_health(db: AsyncSession) -> dict:
         "total_enrollments": total_enrollments,
         "service": "lims-api-server",
         "version": "1.7",
-        "last_backup": None,
+        "last_backup": last_backup,
     }

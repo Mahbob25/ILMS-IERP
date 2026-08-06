@@ -36,6 +36,7 @@ from app.modules.lms.router import lms_router
 from app.modules.lms.staff_payroll_router import router as staff_payroll_router
 from app.modules.lms.idempotency_service import cleanup_expired_keys, safe_cleanup_expired_keys
 from app.modules.dashboard.router import dashboard_router
+from app.modules.backups.router import router as backups_router
 from app.modules.reports.router import reports_router
 from app.modules.notifications.router import notifications_router
 from app.middleware.idempotency import IdempotencyMiddleware
@@ -92,6 +93,7 @@ app.include_router(permissions_router, prefix="/api/v1")
 app.include_router(academic_router, prefix="/api/v1")
 app.include_router(lms_router, prefix="/api/v1")
 app.include_router(dashboard_router, prefix="/api/v1")
+app.include_router(backups_router, prefix="/api/v1")
 app.include_router(staff_payroll_router, prefix="/api/v1")
 app.include_router(reports_router, prefix="/api/v1")
 app.include_router(notifications_router, prefix="/api/v1")

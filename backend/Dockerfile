@@ -14,10 +14,18 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# curl is needed by the container healthcheck
+# curl is needed by the container healthcheck.
+# postgresql-client-16 provides pg_dump matching the PG16 server (Database Backups feature).
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq5 \
     curl \
+    gnupg \
+    ca-certificates \
+    && . /etc/os-release \
+    && curl -sSL https://www.postgresql.org/media/keys/ACCC4CF8.asc -o /etc/apt/trusted.gpg.d/pgdg.asc \
+    && echo "deb http://apt.postgresql.org/pub/repos/apt ${VERSION_CODENAME}-pgdg main" > /etc/apt/sources.list.d/pgdg.list \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends postgresql-client-16 \
     && rm -rf /var/lib/apt/lists/*
 
 # Install site-packages + binaries into /usr/local so the non-root
@@ -29,6 +37,9 @@ COPY --from=builder /root/.local/bin /usr/local/bin
 RUN useradd -m -u 1000 appuser
 
 COPY --chown=appuser:appuser . .
+
+# Ensure the backups volume mount point is writable by the non-root appuser.
+RUN mkdir -p /app/backups && chown -R 1000:1000 /app/backups
 
 EXPOSE 8000
 

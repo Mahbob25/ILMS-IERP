@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     HTTPS_PROXY: str = ""
     NO_PROXY: str = "localhost,127.0.0.1,.aldrasat.edu"
     NOTIFICATION_RETENTION_DAYS: int = 90
+    BACKUP_DIR: str = "/app/backups"
 
     @model_validator(mode="after")
     def validate_required_settings(self):
