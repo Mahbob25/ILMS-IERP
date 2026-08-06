@@ -141,9 +141,15 @@ async def mark_read(
     return result.rowcount
 
 
+ACTIONABLE_TYPES = {"amendment_pending", "unlock_requested"}
+
+
 async def clear_all(db: AsyncSession, *, user_id: uuid.UUID) -> int:
     result = await db.execute(
-        delete(Notification).where(Notification.user_id == user_id)
+        delete(Notification).where(
+            Notification.user_id == user_id,
+            Notification.type.not_in(ACTIONABLE_TYPES),
+        )
     )
     return result.rowcount
 

@@ -218,6 +218,7 @@ export default function NotificationsPage() {
   const handleUndoClear = () => {
     if (clearedItems) {
       setItems(clearedItems);
+      setTotal(clearedItems.length);
     }
     setClearedItems(null);
   };
