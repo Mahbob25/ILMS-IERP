@@ -4,8 +4,9 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { apiClient } from "@/lib/api";
 import { useAuth } from "@/components/AuthContext";
-import { Bell, Check, Loader2 } from "lucide-react";
+import { Bell, Check, CheckCircle, AlertCircle, Loader2 } from "lucide-react";
 import { renderNotification } from "@/components/notifications/notificationMessages";
+import ConfirmModal from "@/components/ConfirmModal";
 
 const POLL_INTERVAL_MS = 30_000;
 const MAX_DROPDOWN_ITEMS = 10;
@@ -64,6 +65,12 @@ export default function NotificationBell() {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
+  const [confirmAmendment, setConfirmAmendment] = useState<{
+    notificationId: string;
+    amendmentId: string;
+    action: "approve" | "reject";
+  } | null>(null);
+  const [actionLoading, setActionLoading] = useState(false);
 
   const bellRef = useRef<HTMLDivElement>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -161,6 +168,45 @@ export default function NotificationBell() {
     }
   };
 
+  const handleAmendmentAction = async () => {
+    if (!confirmAmendment) return;
+    const { amendmentId, action, notificationId } = confirmAmendment;
+    setConfirmAmendment(null);
+    setActionLoading(true);
+    try {
+      await apiClient.put(`/lms/amendments/${amendmentId}/${action}`);
+      await apiClient.post("/notifications/read", { ids: [notificationId] });
+      setItems((prev) => prev.filter((item) => item.id !== notificationId));
+      fetchUnreadCount();
+    } catch {
+      // best-effort
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const t = locale === "en"
+    ? {
+        confirmApproveTitle: "Approve Amendment",
+        confirmApproveMsg: "Are you sure you want to approve this contract amendment?",
+        confirmRejectTitle: "Reject Amendment",
+        confirmRejectMsg: "Are you sure you want to reject this contract amendment?",
+        confirmYes: "Yes",
+        cancel: "Cancel",
+        approveLabel: "Confirm Approval",
+        rejectLabel: "Confirm Rejection",
+      }
+    : {
+        confirmApproveTitle: "الموافقة على التعديل",
+        confirmApproveMsg: "هل أنت متأكد من الموافقة على تعديل العقد؟",
+        confirmRejectTitle: "رفض التعديل",
+        confirmRejectMsg: "هل أنت متأكد من رفض تعديل العقد؟",
+        confirmYes: "نعم",
+        cancel: "إلغاء",
+        approveLabel: "تأكيد الموافقة",
+        rejectLabel: "تأكيد الرفض",
+      };
+
   if (!user) return null;
 
   const badgeLabel =
@@ -234,39 +280,103 @@ export default function NotificationBell() {
                 item.params,
                 locale,
               );
+              const isAmendment = item.type === "amendment_pending";
+              const amendmentId = isAmendment ? item.params?.amendment_id : null;
 
               return (
-                <button
+                <div
                   key={item.id}
-                  onClick={() => handleClickItem(item)}
                   className={`w-full text-left px-4 py-3 border-l-2 transition-colors duration-100 hover:bg-slate-50 ${
                     priorityAccent[item.priority] ?? ""
                   } ${item.is_read ? "opacity-60" : ""}`}
                 >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-slate-900 truncate">
-                        {title}
-                      </p>
-                      {body && (
-                        <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">
-                          {body}
+                  <button
+                    onClick={() => handleClickItem(item)}
+                    className="w-full text-left"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-slate-900 truncate">
+                          {title}
                         </p>
+                        {body && (
+                          <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">
+                            {body}
+                          </p>
+                        )}
+                      </div>
+                      {!item.is_read && (
+                        <span className="mt-1.5 h-2 w-2 rounded-full bg-blue-500 shrink-0" />
                       )}
                     </div>
-                    {!item.is_read && (
-                      <span className="mt-1.5 h-2 w-2 rounded-full bg-blue-500 shrink-0" />
-                    )}
-                  </div>
-                  <p className="text-[11px] text-slate-400 mt-1.5">
-                    {relativeTime(item.created_at, locale)}
-                  </p>
-                </button>
+                    <p className="text-[11px] text-slate-400 mt-1.5">
+                      {relativeTime(item.created_at, locale)}
+                    </p>
+                  </button>
+
+                  {isAmendment && amendmentId && (
+                    <div className="flex items-center gap-1 mt-2">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setConfirmAmendment({
+                            notificationId: item.id,
+                            amendmentId,
+                            action: "approve",
+                          });
+                        }}
+                        disabled={actionLoading}
+                        className="flex items-center gap-1 px-2 py-1 text-xs font-medium rounded text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 disabled:opacity-50 transition-colors"
+                      >
+                        <CheckCircle size={12} />
+                        {locale === "ar" ? "موافقة" : "Approve"}
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setConfirmAmendment({
+                            notificationId: item.id,
+                            amendmentId,
+                            action: "reject",
+                          });
+                        }}
+                        disabled={actionLoading}
+                        className="flex items-center gap-1 px-2 py-1 text-xs font-medium rounded text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 disabled:opacity-50 transition-colors"
+                      >
+                        <AlertCircle size={12} />
+                        {locale === "ar" ? "رفض" : "Reject"}
+                      </button>
+                    </div>
+                  )}
+                </div>
               );
             })}
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        open={confirmAmendment !== null}
+        title={
+          confirmAmendment?.action === "approve"
+            ? t.confirmApproveTitle
+            : t.confirmRejectTitle
+        }
+        message={
+          confirmAmendment?.action === "approve"
+            ? t.confirmApproveMsg
+            : t.confirmRejectMsg
+        }
+        confirmLabel={
+          confirmAmendment?.action === "approve"
+            ? t.approveLabel
+            : t.rejectLabel
+        }
+        cancelLabel={t.cancel}
+        isRtl={locale === "ar"}
+        onConfirm={handleAmendmentAction}
+        onCancel={() => setConfirmAmendment(null)}
+      />
     </div>
   );
 }
