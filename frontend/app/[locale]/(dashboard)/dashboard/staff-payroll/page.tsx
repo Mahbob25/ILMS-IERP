@@ -5,6 +5,10 @@ import { useParams } from "next/navigation";
 import { apiClient } from "@/lib/api";
 import { useAuth } from "@/components/AuthContext";
 import Modal from "@/components/Modal";
+import GuidedConfirmSection from "@/components/GuidedConfirmSection";
+import UndoToast from "@/components/UndoToast";
+import { useClosureStatus } from "@/hooks/useClosureStatus";
+import { useUndoableAction } from "@/hooks/useUndoableAction";
 import { Loader2, RefreshCw, Wallet, AlertCircle } from "lucide-react";
 
 interface StaffMember {
@@ -42,6 +46,7 @@ export default function StaffPayrollPage() {
       insufficient: "رصيد غير كافٍ",
       success: "تم الصرف بنجاح",
       error: "حدث خطأ",
+      undoMessage: "تم صرف الراتب — يمكنك التراجع",
       sar: "ريال",
       empty: "لا يوجد موظفون متاحون",
       manager: "مدير",
@@ -72,6 +77,7 @@ export default function StaffPayrollPage() {
       insufficient: "Insufficient balance",
       success: "Withdrawal processed",
       error: "An error occurred",
+      undoMessage: "Salary draw processed — undo available",
       sar: "YER",
       empty: "No staff members available",
       manager: "Manager",
@@ -94,6 +100,9 @@ export default function StaffPayrollPage() {
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
   const [fetchError, setFetchError] = useState("");
+  const [reason, setReason] = useState("");
+  const closureStatus = useClosureStatus(new Date().toISOString().slice(0, 10));
+  const { undoConfig, showUndo, dismissUndo } = useUndoableAction();
 
   const fetchStaff = useCallback(async () => {
     setLoading(true);
@@ -124,10 +133,12 @@ export default function StaffPayrollPage() {
     setDescription("");
     setError("");
     setSuccessMsg("");
+    setReason("");
   };
 
   const handleWithdraw = async () => {
     if (!selectedMember) return;
+    if (!reason.trim()) return;
 
     const amount = parseFloat(withdrawAmount);
     if (isNaN(amount) || amount <= 0) return;
@@ -140,7 +151,7 @@ export default function StaffPayrollPage() {
     setError("");
 
     try {
-      await apiClient.post(
+      const res = await apiClient.post(
         `/staff-payroll/${selectedMember.id}/withdraw`,
         {
           amount,
@@ -151,16 +162,33 @@ export default function StaffPayrollPage() {
       await fetchStaff();
 
       setSuccessMsg(t.success);
-      setTimeout(() => {
-        setSelectedMember(null);
-        setSuccessMsg("");
-      }, 1200);
+      const expenseId = res.data.id;
+      const memberName = selectedMember.full_name;
+      setSelectedMember(null);
+      setReason("");
+
+      showUndo({
+        undoEndpoint: `/lms/expenses/${expenseId}/void`,
+        undoBody: { void_reason: reason.trim() },
+        toastMessage: t.undoMessage,
+      });
     } catch (e: any) {
       const detail =
         e?.response?.data?.detail || t.error;
       setError(detail);
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleUndo = async () => {
+    if (!undoConfig) return;
+    try {
+      await apiClient.post(undoConfig.undoEndpoint, undoConfig.undoBody || {});
+      dismissUndo();
+      await fetchStaff();
+    } catch {
+      dismissUndo();
     }
   };
 
@@ -352,6 +380,14 @@ export default function StaffPayrollPage() {
               />
             </div>
 
+            <GuidedConfirmSection
+              reason={reason}
+              onReasonChange={setReason}
+              isRtl={isRtl}
+              locale={locale}
+              closureStatus={closureStatus}
+            />
+
             {error && (
               <div className="text-sm text-red-600 bg-red-50 p-3 rounded-lg">
                 {error}
@@ -361,7 +397,7 @@ export default function StaffPayrollPage() {
             <div className="flex gap-3 pt-2">
               <button
                 onClick={handleWithdraw}
-                disabled={submitting || !withdrawAmount || parseFloat(withdrawAmount) <= 0}
+                disabled={submitting || !withdrawAmount || parseFloat(withdrawAmount) <= 0 || !reason.trim() || closureStatus === "closed" || closureStatus === "unlock_requested"}
                 className="btn-primary"
               >
                 {submitting ? (
@@ -373,6 +409,7 @@ export default function StaffPayrollPage() {
                 onClick={() => {
                   setSelectedMember(null);
                   setError("");
+                  setReason("");
                 }}
                 disabled={submitting}
                 className="btn-secondary"
@@ -383,6 +420,16 @@ export default function StaffPayrollPage() {
           </div>
         )}
       </Modal>
+
+      {undoConfig && (
+        <UndoToast
+          message={undoConfig.toastMessage}
+          durationSeconds={30}
+          isRtl={isRtl}
+          onUndo={handleUndo}
+          onDismiss={dismissUndo}
+        />
+      )}
     </div>
   );
 }

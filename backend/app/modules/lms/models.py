@@ -33,6 +33,7 @@ class LedgerEntryType(str, enum.Enum):
     AMENDMENT_ADJUSTMENT = "amendment_adjustment"
     REVERSAL = "reversal"
     WITHDRAWAL = "withdrawal"
+    WITHDRAWAL_REVERSAL = "withdrawal_reversal"
     DEACTIVATION_REVERSAL = "deactivation_reversal"
     REFUND_DISBURSEMENT = "refund_disbursement"
 
@@ -208,6 +209,11 @@ class Expense(Base):
     created_by: Mapped[uuid.UUID] = mapped_column(
         PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), nullable=False, index=True
     )
+    voided_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    voided_by: Mapped[Optional[uuid.UUID]] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), nullable=True
+    )
+    void_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     recipient_employee: Mapped[Optional["Employee"]] = relationship(back_populates="expenses")
     created_by_user: Mapped["User"] = relationship(foreign_keys=[created_by])

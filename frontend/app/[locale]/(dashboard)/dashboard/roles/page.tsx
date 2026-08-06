@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { apiClient } from "@/lib/api";
 import { sanitizeInput } from "@/lib/utils/input";
 import { useAuth } from "@/components/AuthContext";
+import ConfirmModal from "@/components/ConfirmModal";
 import RefreshButton from "@/components/RefreshButton";
 import {
   Loader2, Shield, AlertCircle, Save, RotateCcw,
@@ -51,6 +52,7 @@ export default function RolesPage() {
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const [confirmSwitch, setConfirmSwitch] = useState<{ roleId: string } | null>(null);
 
   const submitting = saving;
 
@@ -177,7 +179,7 @@ export default function RolesPage() {
         {roles.map((role) => (
           <button
             key={role.id}
-            onClick={() => { if (!dirty || confirm("You have unsaved changes. Discard?")) { setActiveRoleId(role.id); setDirty(false); } }}
+            onClick={() => { if (!dirty) { setActiveRoleId(role.id); setDirty(false); } else { setConfirmSwitch({ roleId: role.id }); } }}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
               activeRoleId === role.id
                 ? "bg-brand-50 text-brand-700 border-brand-200 shadow-sm"
@@ -260,6 +262,23 @@ export default function RolesPage() {
           </button>
         </div>
       )}
+
+      <ConfirmModal
+        open={confirmSwitch !== null}
+        title={isRtl ? "تغييرات غير محفوظة" : "Unsaved Changes"}
+        message={isRtl ? "لديك تغييرات غير محفوظة. هل ترغب في التخلي عنها؟" : "You have unsaved changes. Discard?"}
+        confirmLabel={isRtl ? "تجاهل" : "Discard"}
+        cancelLabel={isRtl ? "إلغاء" : "Cancel"}
+        isRtl={isRtl}
+        onConfirm={() => {
+          if (confirmSwitch) {
+            setActiveRoleId(confirmSwitch.roleId);
+            setDirty(false);
+          }
+          setConfirmSwitch(null);
+        }}
+        onCancel={() => setConfirmSwitch(null)}
+      />
     </div>
   );
 }

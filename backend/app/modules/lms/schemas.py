@@ -98,9 +98,16 @@ class ExpenseResponse(BaseModel):
     type: str
     created_by: Optional[uuid.UUID] = None
     created_by_name: str = ""
+    voided_at: Optional[datetime] = None
+    voided_by: Optional[uuid.UUID] = None
+    void_reason: Optional[str] = None
 
     class Config:
         from_attributes = True
+
+
+class VoidExpenseRequest(BaseModel):
+    void_reason: str
 
 
 class EligibleRecipientResponse(BaseModel):

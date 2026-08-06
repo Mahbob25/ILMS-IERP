@@ -52,6 +52,7 @@ async def list_staff_for_payroll(
             Expense.type == "salary_draw",
             Expense.date >= month_start,
             Expense.date <= month_end,
+            Expense.voided_at.is_(None),
         )
         .group_by(Expense.recipient_id)
     )
@@ -115,6 +116,7 @@ async def process_salary_withdrawal(
             Expense.recipient_id == employee_id,
             Expense.date >= month_start,
             Expense.date <= withdrawal_date,
+            Expense.voided_at.is_(None),
         )
     )
     total_drawn = float(total_result.scalar() or 0)

@@ -1,5 +1,5 @@
 import uuid
-from datetime import date
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -210,3 +210,40 @@ async def get_cashier_refund_history(
         "data": data,
         "meta": {"total": total, "page": page, "per_page": per_page},
     }
+
+
+async def undo_refund(
+    db: AsyncSession,
+    refund_id: uuid.UUID,
+    undone_by: uuid.UUID,
+) -> PendingRefund:
+    refund_result = await db.execute(
+        select(Refund)
+        .options(joinedload(Refund.pending_refund))
+        .where(Refund.id == refund_id)
+        .with_for_update()
+    )
+    refund = refund_result.scalar_one_or_none()
+    if not refund:
+        raise ValueError("Refund not found")
+
+    if refund.disbursed_at:
+        elapsed = (datetime.now(timezone.utc) - refund.disbursed_at).total_seconds()
+        if elapsed > 30:
+            raise ValueError("Undo window expired (30 seconds)")
+
+    if refund.disbursed_at and await is_date_closed(db, refund.disbursed_at.date()):
+        raise ValueError("Cannot undo refund on a closed financial day")
+
+    pending_refund = refund.pending_refund
+    if not pending_refund:
+        raise ValueError("Pending refund not found")
+    if pending_refund.status != "CLAIMED":
+        raise ValueError("Refund is not in CLAIMED status")
+
+    await db.delete(refund)
+
+    pending_refund.status = "UNCLAIMED"
+    await db.flush()
+
+    return pending_refund

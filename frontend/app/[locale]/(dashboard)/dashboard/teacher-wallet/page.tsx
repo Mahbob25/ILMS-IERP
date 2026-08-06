@@ -5,8 +5,12 @@ import { useParams } from "next/navigation";
 import { apiClient } from "@/lib/api";
 import { useAuth } from "@/components/AuthContext";
 import Modal from "@/components/Modal";
+import GuidedConfirmSection from "@/components/GuidedConfirmSection";
+import UndoToast from "@/components/UndoToast";
 import EmptyState from "@/components/EmptyState";
 import { sanitizeInput } from "@/lib/utils/input";
+import { useClosureStatus } from "@/hooks/useClosureStatus";
+import { useUndoableAction } from "@/hooks/useUndoableAction";
 import {
   Loader2, RefreshCw, Wallet, ChevronDown, ChevronUp,
   DollarSign, Users, X, Plus, AlertCircle,
@@ -334,6 +338,7 @@ function AdminWalletOverview({ locale }: { locale: string }) {
       balanceAfter: "الرصيد بعد الخصم",
       withdrawalSuccess: "تم السحب بنجاح",
       withdrawalError: "فشل السحب",
+      undoMessage: "تم السحب — يمكنك التراجع",
     },
     en: {
       title: "Teacher Wallet",
@@ -368,6 +373,7 @@ function AdminWalletOverview({ locale }: { locale: string }) {
       balanceAfter: "Balance after",
       withdrawalSuccess: "Withdrawal successful",
       withdrawalError: "Withdrawal failed",
+      undoMessage: "Withdrawal processed — undo available",
     },
   }[locale === "en" ? "en" : "ar"];
 
@@ -388,6 +394,9 @@ function AdminWalletOverview({ locale }: { locale: string }) {
   const [modalPreviewAvailable, setModalPreviewAvailable] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const [modalReason, setModalReason] = useState("");
+  const closureStatus = useClosureStatus(modalDate);
+  const { undoConfig, showUndo, dismissUndo } = useUndoableAction();
 
   const fetchAll = useCallback(async () => {
     try {
@@ -457,10 +466,12 @@ function AdminWalletOverview({ locale }: { locale: string }) {
     setModalError("");
     setModalSuccess(false);
     setModalPreviewAvailable(null);
+    setModalReason("");
   };
 
   const handleSubmitWithdrawal = async () => {
     if (!modalTeacher) return;
+    if (!modalReason.trim()) return;
     const amount = parseFloat(modalAmount);
     if (isNaN(amount) || amount <= 0) {
       setModalError("Invalid amount");
@@ -475,28 +486,46 @@ function AdminWalletOverview({ locale }: { locale: string }) {
     setModalSubmitting(true);
     setModalError("");
     try {
-      await apiClient.post("/lms/expenses", {
+      const res = await apiClient.post("/lms/expenses", {
         type: "teacher_withdrawal",
         recipient_id: modalTeacher.id,
         amount,
         description: modalDesc ? sanitizeInput(modalDesc) : null,
         date: modalDate,
       });
+      const expenseId = res.data.id;
       setModalSuccess(true);
-      setTimeout(async () => {
-        const teacherId = modalTeacher.id;
-        closeWithdrawModal();
-        await fetchAll();
-        if (expandedId === teacherId) {
-          const res = await apiClient.get<Expense[]>(`/lms/teacher-wallets/${teacherId}/withdrawals`);
-          setExpandedWithdrawals(res.data);
-        }
-      }, 1200);
+      closeWithdrawModal();
+      await fetchAll();
+      if (expandedId === modalTeacher.id) {
+        try {
+          const withdrawalRes = await apiClient.get<Expense[]>(`/lms/teacher-wallets/${modalTeacher.id}/withdrawals`);
+          setExpandedWithdrawals(withdrawalRes.data);
+        } catch { /* ignore */ }
+      }
+      showUndo({
+        undoEndpoint: `/lms/expenses/${expenseId}/void`,
+        undoBody: { void_reason: sanitizeInput(modalReason) },
+        toastMessage: (typeof t.undoMessage === "function"
+          ? t.undoMessage(amount, modalTeacher.full_name)
+          : `${amount.toFixed(2)} ${t.sar} — undo available`),
+      });
     } catch (err: any) {
       const msg = err?.response?.data?.detail || t.withdrawalError;
       setModalError(msg);
+      setModalSubmitting(false);
     }
-    setModalSubmitting(false);
+  };
+
+  const handleUndo = async () => {
+    if (!undoConfig) return;
+    try {
+      await apiClient.post(undoConfig.undoEndpoint, undoConfig.undoBody || {});
+      dismissUndo();
+      await fetchAll();
+    } catch {
+      dismissUndo();
+    }
   };
 
   const stats = React.useMemo(() => {
@@ -739,6 +768,14 @@ function AdminWalletOverview({ locale }: { locale: string }) {
                 />
               </div>
 
+              <GuidedConfirmSection
+                reason={modalReason}
+                onReasonChange={setModalReason}
+                isRtl={isRtl}
+                locale={locale}
+                closureStatus={closureStatus}
+              />
+
               {modalError && (
                 <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{modalError}</p>
               )}
@@ -749,7 +786,7 @@ function AdminWalletOverview({ locale }: { locale: string }) {
                 </button>
                 <button
                   type="submit"
-                  disabled={modalSubmitting || submitting}
+                  disabled={modalSubmitting || submitting || !modalReason.trim() || closureStatus === "closed" || closureStatus === "unlock_requested"}
                   className="btn-primary text-xs px-4 py-2 flex items-center gap-1"
                 >
                   {modalSubmitting && <Loader2 size={12} className="animate-spin" />}
@@ -760,6 +797,16 @@ function AdminWalletOverview({ locale }: { locale: string }) {
           </div>
         )}
       </Modal>
+
+      {undoConfig && (
+        <UndoToast
+          message={undoConfig.toastMessage}
+          durationSeconds={30}
+          isRtl={isRtl}
+          onUndo={handleUndo}
+          onDismiss={dismissUndo}
+        />
+      )}
     </div>
   );
 }

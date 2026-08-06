@@ -3,7 +3,8 @@
 import React, { useState, useEffect } from "react";
 import { apiClient } from "@/lib/api";
 import Modal from "@/components/Modal";
-import { Loader2, AlertTriangle, DollarSign, Users, Ban, FileText } from "lucide-react";
+import { useClosureStatus } from "@/hooks/useClosureStatus";
+import { Loader2, AlertTriangle, DollarSign, Users, Ban, FileText, CalendarClock } from "lucide-react";
 
 interface CancelPreview {
   section_id: string;
@@ -46,6 +47,8 @@ export default function CancelSectionModal({
   const [refundPolicy, setRefundPolicy] = useState<"authorize_refunds" | "no_refund">("authorize_refunds");
   const [reason, setReason] = useState("");
   const [forceCancellation, setForceCancellation] = useState(false);
+  const closureStatus = useClosureStatus(new Date().toISOString().slice(0, 10));
+  const isDateBlocked = closureStatus === "closed" || closureStatus === "unlock_requested";
 
   const t = {
     ar: {
@@ -78,6 +81,8 @@ export default function CancelSectionModal({
       next: "التالي",
       loading: "جاري التحميل...",
       error: "حدث خطأ",
+      closureBlocked: "هذا التاريخ مغلق مالياً — يجب فتح اليوم قبل الإلغاء",
+      closureUnlockRequested: "تم طلب فتح اليوم — بانتظار موافقة المدير",
     },
     en: {
       title: "Cancel Section",
@@ -109,6 +114,8 @@ export default function CancelSectionModal({
       next: "Next",
       loading: "Loading...",
       error: "An error occurred",
+      closureBlocked: "This date is closed — the day must be unlocked before cancelling",
+      closureUnlockRequested: "Unlock requested — awaiting manager approval",
     },
   }[locale === "en" ? "en" : "ar"];
 
@@ -356,6 +363,20 @@ export default function CancelSectionModal({
                   placeholder={t.reasonPlaceholder}
                 />
               </div>
+
+              {isDateBlocked && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-start gap-2">
+                  {closureStatus === "unlock_requested" ? (
+                    <CalendarClock size={14} className="text-amber-600 mt-0.5 shrink-0" />
+                  ) : (
+                    <AlertTriangle size={14} className="text-amber-600 mt-0.5 shrink-0" />
+                  )}
+                  <p className="text-xs text-amber-700">
+                    {closureStatus === "unlock_requested" ? t.closureUnlockRequested : t.closureBlocked}
+                  </p>
+                </div>
+              )}
+
               <div className="bg-slate-50 rounded-lg p-3 space-y-1 text-sm">
                 <p className="font-semibold text-slate-800">{t.summary}</p>
                 <p className="text-slate-600">{t.cancelAction}: {sectionName}</p>

@@ -33,6 +33,7 @@ from app.modules.lms.schemas import (
     TeacherWalletResponse,
     ExpenseCreate,
     ExpenseResponse,
+    VoidExpenseRequest,
     EligibleRecipientResponse,
     DailyClosureResponse,
     DailyLedgerResponse,
@@ -439,6 +440,49 @@ async def get_expense(
             status_code=status.HTTP_404_NOT_FOUND, detail="Expense not found"
         )
     return expense
+
+
+@lms_router.post("/expenses/{expense_id}/void", response_model=ExpenseResponse)
+@limiter.limit("10/minute")
+async def void_expense(
+    request: Request,
+    expense_id: uuid.UUID,
+    data: VoidExpenseRequest,
+    current_user: User = Depends(
+        RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])
+    ),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        expense = await financial_service.void_expense(
+            db,
+            expense_id=expense_id,
+            void_reason=data.void_reason,
+            voided_by=current_user.id,
+        )
+    except ValueError as e:
+        detail = str(e)
+        if "not found" in detail.lower():
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=detail)
+        if "expired" in detail.lower() or "window" in detail.lower():
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=detail)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=detail)
+
+    return {
+        "id": expense.id,
+        "amount": float(expense.amount),
+        "description": expense.description,
+        "recipient_name": expense.recipient_name,
+        "recipient_id": expense.recipient_id,
+        "date": expense.date,
+        "receipt_number": expense.receipt_number,
+        "type": expense.type,
+        "created_by": expense.created_by,
+        "created_by_name": "",
+        "voided_at": expense.voided_at,
+        "voided_by": expense.voided_by,
+        "void_reason": expense.void_reason,
+    }
 
 
 @lms_router.get("/expenses/{expense_id}/preview")
@@ -1168,6 +1212,33 @@ async def get_refund_history(
         page=page,
         per_page=per_page,
     )
+
+
+@lms_router.post("/cashier/refunds/{refund_id}/undo")
+@limiter.limit("10/minute")
+async def undo_refund_disbursement(
+    request: Request,
+    refund_id: uuid.UUID,
+    current_user: User = Depends(
+        RoleChecker(allowed_roles=["superadmin", "manager", "secretary", "accountant"])
+    ),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        pending_refund = await cashier_service.undo_refund(
+            db,
+            refund_id=refund_id,
+            undone_by=current_user.id,
+        )
+    except ValueError as e:
+        detail = str(e)
+        if "not found" in detail.lower():
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=detail)
+        if "expired" in detail.lower() or "window" in detail.lower():
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=detail)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=detail)
+
+    return {"success": True, "pending_refund_id": str(pending_refund.id), "status": pending_refund.status}
 
 
 # --- Phase 7: Admin Audit Views ---

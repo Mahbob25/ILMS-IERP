@@ -94,6 +94,7 @@ async def process_withdrawal(
             Expense.recipient_id == employee_id,
             Expense.date >= month_start,
             Expense.date <= withdrawal_date,
+            Expense.voided_at.is_(None),
         )
     )
     total_drawn = float(total_result.scalar() or 0)

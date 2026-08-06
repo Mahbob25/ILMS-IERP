@@ -24,6 +24,7 @@ from app.modules.academic.models import (
 )
 from app.modules.identity.models import Employee, EmployeeType, User
 from app.core.error_messages import get_error_detail
+from app.core.timezone import utcnow
 
 
 async def get_next_receipt_number(db: AsyncSession, payment_date: date) -> str:
@@ -264,6 +265,9 @@ async def get_teacher_withdrawals(db: AsyncSession, employee_id: uuid.UUID) -> l
             "type": e.type,
             "created_by": e.created_by,
             "created_by_name": (e.created_by_user.full_name or "") if e.created_by_user else "",
+            "voided_at": e.voided_at,
+            "voided_by": e.voided_by,
+            "void_reason": e.void_reason,
         }
         for e in expenses
     ]
@@ -317,6 +321,7 @@ async def get_eligible_recipients(db: AsyncSession, recipient_type: str) -> list
                 Expense.date >= month_start,
                 Expense.date <= now,
                 Expense.recipient_id.isnot(None),
+                Expense.voided_at.is_(None),
             ).group_by(Expense.recipient_id)
         )
         draws_map = dict(total_draws_result.fetchall())
@@ -421,6 +426,7 @@ async def create_expense(
                 Expense.recipient_id == recipient_id,
                 Expense.date >= month_start,
                 Expense.date <= expense_date,
+                Expense.voided_at.is_(None),
             )
         )
         total_drawn = float(total_result.scalar() or 0)
@@ -510,6 +516,9 @@ async def list_expenses(
             "type": e.type,
             "created_by": e.created_by,
             "created_by_name": (e.created_by_user.full_name or "") if e.created_by_user else "",
+            "voided_at": e.voided_at,
+            "voided_by": e.voided_by,
+            "void_reason": e.void_reason,
         }
         for e in expenses
     ]
@@ -535,8 +544,10 @@ async def get_expense(db: AsyncSession, expense_id: uuid.UUID) -> Optional[dict]
         "type": expense.type,
         "created_by": expense.created_by,
         "created_by_name": (expense.created_by_user.full_name or "") if expense.created_by_user else "",
+        "voided_at": expense.voided_at,
+        "voided_by": expense.voided_by,
+        "void_reason": expense.void_reason,
     }
-
 
 
 # ─────────────────────────────────────────────
@@ -808,5 +819,58 @@ async def get_student_payment_summary(
         "net_price": net_price,
         "balance_remaining": balance_remaining,
     }
+
+
+async def void_expense(
+    db: AsyncSession,
+    expense_id: uuid.UUID,
+    void_reason: str,
+    voided_by: uuid.UUID,
+) -> Expense:
+    result = await db.execute(
+        select(Expense)
+        .where(Expense.id == expense_id)
+        .with_for_update()
+    )
+    expense = result.scalar_one_or_none()
+    if not expense:
+        raise ValueError("Expense not found")
+    if expense.voided_at is not None:
+        raise ValueError("Expense already voided")
+    if expense.type not in ("teacher_withdrawal", "salary_draw"):
+        raise ValueError("Only teacher withdrawals and salary draws can be voided")
+    if await is_date_closed(db, expense.date):
+        raise ValueError("Cannot void an expense on a closed financial day")
+
+    elapsed = (utcnow() - expense.created_at.replace(tzinfo=timezone.utc)).total_seconds()
+    if elapsed > 30:
+        raise ValueError("Undo window expired (30 seconds)")
+
+    if not void_reason or not void_reason.strip():
+        raise ValueError("void_reason is required")
+
+    expense.voided_at = utcnow()
+    expense.voided_by = voided_by
+    expense.void_reason = void_reason.strip()
+
+    if expense.type == "teacher_withdrawal" and expense.recipient_id:
+        wallet = await get_or_create_wallet(db, expense.recipient_id)
+        amount = Decimal(str(expense.amount))
+        await ledger_record(
+            db=db,
+            wallet_id=wallet.id,
+            contract_id=None,
+            entry_type=LedgerEntryType.WITHDRAWAL_REVERSAL,
+            total_amount=amount,
+            available_delta=amount,
+            frozen_delta=Decimal("0"),
+            reference_type="expense",
+            reference_id=expense.id,
+            narrative=f"Void reversal for {expense.receipt_number}: {void_reason}",
+            created_by=voided_by,
+        )
+
+    await db.flush()
+    return expense
 
 

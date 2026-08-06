@@ -4,6 +4,10 @@ import React, { useState } from "react";
 import { apiClient } from "@/lib/api";
 import { sanitizeInput } from "@/lib/utils/input";
 import Modal from "@/components/Modal";
+import GuidedConfirmSection from "@/components/GuidedConfirmSection";
+import UndoToast from "@/components/UndoToast";
+import { useClosureStatus } from "@/hooks/useClosureStatus";
+import { useUndoableAction } from "@/hooks/useUndoableAction";
 import { Loader2, DollarSign, User } from "lucide-react";
 
 interface DisburseRefundItem {
@@ -43,8 +47,11 @@ export default function DisburseRefundModal({
   onSuccess,
 }: DisburseRefundModalProps) {
   const [notes, setNotes] = useState("");
+  const [reason, setReason] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const closureStatus = useClosureStatus(new Date().toISOString().slice(0, 10));
+  const { undoConfig, showUndo, dismissUndo } = useUndoableAction();
 
   const t = {
     ar: {
@@ -62,6 +69,8 @@ export default function DisburseRefundModal({
       cancel: "إلغاء",
       error: "فشل عملية الصرف",
       success: "تم الصرف بنجاح",
+      undoMessage: (amount: number, name: string) =>
+        `تم صرف ${amount.toFixed(2)} ${currency} إلى ${name} — يمكنك التراجع`,
     },
     en: {
       title: "Disburse Refund",
@@ -78,15 +87,18 @@ export default function DisburseRefundModal({
       cancel: "Cancel",
       error: "Disbursement failed",
       success: "Disbursement successful",
+      undoMessage: (amount: number, name: string) =>
+        `Disbursed ${amount.toFixed(2)} ${currency} to ${name} — undo available`,
     },
   }[locale === "en" ? "en" : "ar"];
 
   const handleConfirm = async () => {
     if (!refund) return;
+    if (!reason.trim()) return;
     setLoading(true);
     setError(null);
     try {
-      const body: Record<string, string> = {};
+      const body: Record<string, string> = { reason: sanitizeInput(reason.trim()) };
       if (notes.trim()) body.notes = sanitizeInput(notes.trim());
       const res = await apiClient.post<{
         success: boolean;
@@ -95,10 +107,25 @@ export default function DisburseRefundModal({
       }>(`/lms/cashier/pending-refunds/${refund.id}/disburse`, body);
       onSuccess(res.data.receipt_number, res.data.refund_id);
       onClose();
+      showUndo({
+        undoEndpoint: `/lms/cashier/refunds/${res.data.refund_id}/undo`,
+        toastMessage: (t.undoMessage as Function)(refund.amount, refund.student_name || ""),
+      });
     } catch (e: any) {
       setError(e?.response?.data?.detail || t.error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleUndo = async () => {
+    if (!undoConfig) return;
+    try {
+      await apiClient.post(undoConfig.undoEndpoint);
+      dismissUndo();
+      onSuccess("", "");
+    } catch {
+      dismissUndo();
     }
   };
 
@@ -116,90 +143,110 @@ export default function DisburseRefundModal({
   if (!refund) return null;
 
   return (
-    <Modal open={open} onClose={onClose} title={t.title} size="lg" isRtl={isRtl}>
-      <div className="space-y-4" dir={isRtl ? "rtl" : "ltr"}>
-        {/* Student Info */}
-        <div className="bg-slate-50 rounded-lg p-4 space-y-2">
-          <p className="text-xs font-semibold text-slate-500 flex items-center gap-1">
-            <User size={12} /> {t.studentInfo}
-          </p>
-          <div className="grid grid-cols-2 gap-2 text-sm">
-            <div>
-              <span className="text-slate-500">{t.name}: </span>
-              <span className="font-semibold text-slate-900">
-                {refund.student_name || "—"}
-              </span>
+    <>
+      <Modal open={open} onClose={onClose} title={t.title} size="lg" isRtl={isRtl}>
+        <div className="space-y-4" dir={isRtl ? "rtl" : "ltr"}>
+          {/* Student Info */}
+          <div className="bg-slate-50 rounded-lg p-4 space-y-2">
+            <p className="text-xs font-semibold text-slate-500 flex items-center gap-1">
+              <User size={12} /> {t.studentInfo}
+            </p>
+            <div className="grid grid-cols-2 gap-2 text-sm">
+              <div>
+                <span className="text-slate-500">{t.name}: </span>
+                <span className="font-semibold text-slate-900">
+                  {refund.student_name || "—"}
+                </span>
+              </div>
+              <div>
+                <span className="text-slate-500">{t.code}: </span>
+                <span className="font-semibold text-slate-900">
+                  {refund.student_code || "—"}
+                </span>
+              </div>
             </div>
+          </div>
+
+          {/* Amount */}
+          <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4 text-center">
+            <p className="text-xs text-emerald-600 mb-1">{t.amount}</p>
+            <p className="text-2xl font-bold text-emerald-700">
+              {refund.amount.toFixed(2)} {currency}
+            </p>
+          </div>
+
+          {/* Cancellation Details */}
+          <div className="grid grid-cols-2 gap-3 text-xs text-slate-600">
+            {cancellationReference && (
+              <div>
+                <span className="text-slate-400">{t.cancelRef}: </span>
+                <span className="font-medium">{cancellationReference}</span>
+              </div>
+            )}
             <div>
-              <span className="text-slate-500">{t.code}: </span>
-              <span className="font-semibold text-slate-900">
-                {refund.student_code || "—"}
+              <span className="text-slate-400">{t.cancelDate}: </span>
+              <span className="font-medium">
+                {formatDate(refund.created_at)}
               </span>
             </div>
           </div>
-        </div>
 
-        {/* Amount */}
-        <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4 text-center">
-          <p className="text-xs text-emerald-600 mb-1">{t.amount}</p>
-          <p className="text-2xl font-bold text-emerald-700">
-            {refund.amount.toFixed(2)} {currency}
-          </p>
-        </div>
+          {/* Notes */}
+          <div>
+            <label className="block text-xs font-medium text-slate-700 mb-1">
+              {t.notes}
+            </label>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              className="input-field"
+              rows={2}
+              placeholder={t.notesPlaceholder}
+            />
+          </div>
 
-        {/* Cancellation Details */}
-        <div className="grid grid-cols-2 gap-3 text-xs text-slate-600">
-          {cancellationReference && (
-            <div>
-              <span className="text-slate-400">{t.cancelRef}: </span>
-              <span className="font-medium">{cancellationReference}</span>
+          <GuidedConfirmSection
+            reason={reason}
+            onReasonChange={setReason}
+            isRtl={isRtl}
+            locale={locale}
+            closureStatus={closureStatus}
+          />
+
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md text-sm">
+              {error}
             </div>
           )}
-          <div>
-            <span className="text-slate-400">{t.cancelDate}: </span>
-            <span className="font-medium">
-              {formatDate(refund.created_at)}
-            </span>
+
+          <div className="flex gap-3 pt-2">
+            <button
+              onClick={handleConfirm}
+              disabled={loading || !reason.trim() || closureStatus === "closed" || closureStatus === "unlock_requested"}
+              className="btn-primary flex-1 flex items-center justify-center gap-2"
+            >
+              {loading && <Loader2 size={14} className="animate-spin" />}
+              <DollarSign size={14} />
+              {typeof t.confirmLabel === "function"
+                ? t.confirmLabel(refund.amount, refund.student_name || "")
+                : t.confirmLabel}
+            </button>
+            <button onClick={onClose} className="btn-secondary flex-1">
+              {t.cancel}
+            </button>
           </div>
         </div>
+      </Modal>
 
-        {/* Notes */}
-        <div>
-          <label className="block text-xs font-medium text-slate-700 mb-1">
-            {t.notes}
-          </label>
-          <textarea
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            className="input-field"
-            rows={2}
-            placeholder={t.notesPlaceholder}
-          />
-        </div>
-
-        {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md text-sm">
-            {error}
-          </div>
-        )}
-
-        <div className="flex gap-3 pt-2">
-          <button
-            onClick={handleConfirm}
-            disabled={loading}
-            className="btn-primary flex-1 flex items-center justify-center gap-2"
-          >
-            {loading && <Loader2 size={14} className="animate-spin" />}
-            <DollarSign size={14} />
-            {typeof t.confirmLabel === "function"
-              ? t.confirmLabel(refund.amount, refund.student_name || "")
-              : t.confirmLabel}
-          </button>
-          <button onClick={onClose} className="btn-secondary flex-1">
-            {t.cancel}
-          </button>
-        </div>
-      </div>
-    </Modal>
+      {undoConfig && (
+        <UndoToast
+          message={undoConfig.toastMessage}
+          durationSeconds={30}
+          isRtl={isRtl}
+          onUndo={handleUndo}
+          onDismiss={dismissUndo}
+        />
+      )}
+    </>
   );
 }
