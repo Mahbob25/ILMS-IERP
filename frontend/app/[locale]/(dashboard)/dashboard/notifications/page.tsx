@@ -209,13 +209,16 @@ export default function NotificationsPage() {
 
   const ACTIONABLE_TYPES = new Set(["amendment_pending", "unlock_requested"]);
 
+  const isClearable = (item: NotificationItem) =>
+    !ACTIONABLE_TYPES.has(item.type) || resolvedItems[item.id] != null;
+
   const handleClearAll = () => {
-    const nonActionable = items.filter((item) => !ACTIONABLE_TYPES.has(item.type));
-    const actionable = items.filter((item) => ACTIONABLE_TYPES.has(item.type));
-    setClearedItems(nonActionable);
-    setItems(actionable);
-    setTotal(actionable.length);
-    if (actionable.length === 0) setTotalPages(1);
+    const toClear = items.filter(isClearable);
+    const kept = items.filter((item) => !isClearable(item));
+    setClearedItems(toClear);
+    setItems(kept);
+    setTotal(kept.length);
+    if (kept.length === 0) setTotalPages(1);
   };
 
   const handleUndoClear = () => {
@@ -338,7 +341,7 @@ export default function NotificationsPage() {
                 <Check size={14} />
                 {t.markAllRead}
               </button>
-              {items.some((item) => !ACTIONABLE_TYPES.has(item.type)) && (
+              {items.some(isClearable) && (
                 <button
                   onClick={handleClearAll}
                   className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-500 hover:text-red-700 transition-colors"

@@ -186,12 +186,15 @@ export default function NotificationBell() {
 
   const ACTIONABLE_TYPES = new Set(["amendment_pending", "unlock_requested"]);
 
+  const isClearable = (item: NotificationItem) =>
+    !ACTIONABLE_TYPES.has(item.type) || resolvedItems[item.id] != null;
+
   const handleClearAll = () => {
-    const nonActionable = items.filter((item) => !ACTIONABLE_TYPES.has(item.type));
-    const actionable = items.filter((item) => ACTIONABLE_TYPES.has(item.type));
-    setClearedItems(nonActionable);
-    setItems(actionable);
-    const cleanedUnread = nonActionable.filter((i) => !i.is_read).length;
+    const toClear = items.filter(isClearable);
+    const kept = items.filter((item) => !isClearable(item));
+    setClearedItems(toClear);
+    setItems(kept);
+    const cleanedUnread = toClear.filter((i) => !i.is_read).length;
     setUnreadCount((prev) => Math.max(0, prev - cleanedUnread));
 
     undoTimerRef.current = setTimeout(async () => {
@@ -341,7 +344,7 @@ export default function NotificationBell() {
                   {locale === "ar" ? "تعليم الكل" : "Mark all read"}
                 </button>
               )}
-              {items.length > 0 && !clearedItems && items.some((item) => !ACTIONABLE_TYPES.has(item.type)) && (
+              {items.length > 0 && !clearedItems && items.some(isClearable) && (
                 <button
                   onClick={handleClearAll}
                   className="flex items-center gap-1 text-xs text-red-500 hover:text-red-700 font-medium"
