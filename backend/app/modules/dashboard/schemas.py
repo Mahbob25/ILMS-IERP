@@ -77,6 +77,28 @@ class SystemHealth(BaseModel):
     db_status: str
     api_uptime: str
 
+class ExtendedSystemHealth(BaseModel):
+    db_status: str
+    api_uptime: str
+    disk_usage_percent: float
+    disk_total_gb: float
+    disk_used_gb: float
+    memory_percent: float
+    memory_total_gb: float
+    memory_used_gb: float
+    cpu_percent: float
+    total_users: int
+    total_students: int
+    total_courses: int
+    total_enrollments: int
+    service: str
+    version: str
+    last_backup: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
 class AuditLogEntry(BaseModel):
     id: uuid.UUID
     user_name: Optional[str] = None

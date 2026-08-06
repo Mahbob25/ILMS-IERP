@@ -1,12 +1,16 @@
+import logging
 import uuid
 from datetime import date, datetime, timezone
-from app.core.timezone import get_today
 from typing import Optional
+
+import psutil
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import joinedload
-from sqlalchemy import func
+from sqlalchemy import func, text
 from sqlalchemy.orm import selectinload
+
+from app.core.timezone import get_today
 from app.modules.academic.models import Course, CourseSection, Student, Enrollment, Refund, PendingRefund
 from app.modules.lms.models import (
     Payment, Expense, TeacherWallet, DailyClosure,
@@ -17,6 +21,10 @@ from app.modules.dashboard.schemas import (
     SectionInfo, TodaySession,
     DailyTransaction, UnlockRequest, AuditLogEntry,
 )
+
+logger = logging.getLogger(__name__)
+
+_server_started_at = datetime.now(timezone.utc)
 
 
 async def get_teacher_dashboard(db: AsyncSession, employee_id: uuid.UUID) -> dict:
@@ -329,4 +337,56 @@ async def get_superadmin_dashboard(db: AsyncSession) -> dict:
         "system_health": health,
         "backup_status": backup_status,
         "recent_audit_logs": audit_logs,
+    }
+
+
+async def get_extended_health(db: AsyncSession) -> dict:
+    db_status = "disconnected"
+    try:
+        await db.execute(text("SELECT 1"))
+        db_status = "connected"
+    except Exception:
+        logger.warning("Health check — database unreachable")
+
+    disk = psutil.disk_usage("/")
+    mem = psutil.virtual_memory()
+    cpu = psutil.cpu_percent(interval=0)
+
+    total_users_result = await db.execute(select(func.count()).select_from(User))
+    total_users = total_users_result.scalar() or 0
+
+    total_students_result = await db.execute(select(func.count()).select_from(Student))
+    total_students = total_students_result.scalar() or 0
+
+    total_courses_result = await db.execute(select(func.count()).select_from(Course))
+    total_courses = total_courses_result.scalar() or 0
+
+    total_enrollments_result = await db.execute(select(func.count()).select_from(Enrollment))
+    total_enrollments = total_enrollments_result.scalar() or 0
+
+    uptime_delta = datetime.now(timezone.utc) - _server_started_at
+    days = uptime_delta.days
+    hours = uptime_delta.seconds // 3600
+    if days > 0:
+        api_uptime = f"{days} day{'s' if days != 1 else ''} {hours}h"
+    else:
+        api_uptime = f"{hours}h {(uptime_delta.seconds % 3600) // 60}m"
+
+    return {
+        "db_status": db_status,
+        "api_uptime": api_uptime,
+        "disk_usage_percent": disk.percent,
+        "disk_total_gb": round(disk.total / (1024 ** 3), 1),
+        "disk_used_gb": round(disk.used / (1024 ** 3), 1),
+        "memory_percent": mem.percent,
+        "memory_total_gb": round(mem.total / (1024 ** 3), 1),
+        "memory_used_gb": round(mem.used / (1024 ** 3), 1),
+        "cpu_percent": cpu,
+        "total_users": total_users,
+        "total_students": total_students,
+        "total_courses": total_courses,
+        "total_enrollments": total_enrollments,
+        "service": "lims-api-server",
+        "version": "1.7",
+        "last_backup": None,
     }

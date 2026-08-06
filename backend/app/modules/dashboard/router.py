@@ -8,6 +8,7 @@ from app.modules.dashboard.schemas import (
     SecretaryDashboardResponse,
     ManagerDashboardResponse,
     SuperadminDashboardResponse,
+    ExtendedSystemHealth,
 )
 from app.modules.dashboard import service as dashboard_service
 
@@ -44,3 +45,11 @@ async def superadmin_dashboard(
     db: AsyncSession = Depends(get_db),
 ):
     return await dashboard_service.get_superadmin_dashboard(db)
+
+
+@dashboard_router.get("/health", response_model=ExtendedSystemHealth)
+async def dashboard_health(
+    current_user: User = Depends(superadmin_gate),
+    db: AsyncSession = Depends(get_db),
+):
+    return await dashboard_service.get_extended_health(db)
