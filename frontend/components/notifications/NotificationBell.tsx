@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { apiClient } from "@/lib/api";
 import { useAuth } from "@/components/AuthContext";
-import { Bell, Check, CheckCircle, AlertCircle, Loader2, Unlock, Trash2, Undo2 } from "lucide-react";
+import { Bell, Check, CheckCircle, AlertCircle, Loader2, Unlock, Trash2, Undo2, X, ExternalLink } from "lucide-react";
 import { renderNotification } from "@/components/notifications/notificationMessages";
 import ConfirmModal from "@/components/ConfirmModal";
 
@@ -159,6 +159,17 @@ export default function NotificationBell() {
     // Navigate
     if (item.target_href) {
       router.push(`/${locale}/${item.target_href}`);
+    }
+  };
+
+  const handleDeleteOne = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    try {
+      await apiClient.delete(`/notifications/${id}`);
+      setItems((prev) => prev.filter((item) => item.id !== id));
+      fetchUnreadCount();
+    } catch {
+      // best-effort
     }
   };
 
@@ -363,10 +374,17 @@ export default function NotificationBell() {
               return (
                 <div
                   key={item.id}
-                  className={`w-full text-left px-4 py-3 border-l-2 transition-colors duration-100 hover:bg-slate-50 ${
+                  className={`w-full text-left px-4 py-3 border-l-2 transition-colors duration-100 hover:bg-slate-50 relative group ${
                     priorityAccent[item.priority] ?? ""
                   } ${item.is_read ? "opacity-60" : ""}`}
                 >
+                  <button
+                    onClick={(e) => handleDeleteOne(e, item.id)}
+                    className="absolute top-2 right-2 p-0.5 rounded text-slate-300 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-opacity"
+                    title={locale === "ar" ? "حذف" : "Delete"}
+                  >
+                    <X size={12} />
+                  </button>
                   <button
                     onClick={() => handleClickItem(item)}
                     className="w-full text-left"
@@ -453,6 +471,18 @@ export default function NotificationBell() {
               );
             })}
           </div>
+
+          {/* View All footer */}
+          <button
+            onClick={() => {
+              setOpen(false);
+              router.push(`/${locale}/dashboard/notifications`);
+            }}
+            className="w-full px-4 py-2.5 text-center text-xs font-medium text-blue-600 hover:text-blue-800 hover:bg-blue-50 border-t border-slate-100 transition-colors flex items-center justify-center gap-1"
+          >
+            {locale === "ar" ? "عرض جميع الإشعارات" : "View All Notifications"}
+            <ExternalLink size={12} />
+          </button>
         </div>
       )}
 

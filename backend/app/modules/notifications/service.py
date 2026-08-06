@@ -148,6 +148,18 @@ async def clear_all(db: AsyncSession, *, user_id: uuid.UUID) -> int:
     return result.rowcount
 
 
+async def delete_one(
+    db: AsyncSession, *, notification_id: uuid.UUID, user_id: uuid.UUID
+) -> bool:
+    result = await db.execute(
+        delete(Notification).where(
+            Notification.id == notification_id,
+            Notification.user_id == user_id,
+        )
+    )
+    return result.rowcount > 0
+
+
 async def delete_expired(db: AsyncSession, *, retention_days: Optional[int] = None) -> int:
     if retention_days is None:
         retention_days = settings.NOTIFICATION_RETENTION_DAYS

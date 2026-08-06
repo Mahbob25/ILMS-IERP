@@ -16,6 +16,7 @@ import {
   CheckCircle,
   Unlock,
   Trash2,
+  X,
 } from "lucide-react";
 import ConfirmModal from "@/components/ConfirmModal";
 import UndoToast from "@/components/UndoToast";
@@ -182,6 +183,16 @@ export default function NotificationsPage() {
         next.delete(id);
         return next;
       });
+    }
+  };
+
+  const handleDeleteOne = async (id: string) => {
+    try {
+      await apiClient.delete(`/notifications/${id}`);
+      setItems((prev) => prev.filter((item) => item.id !== id));
+      setTotal((prev) => prev - 1);
+    } catch {
+      // best-effort
     }
   };
 
@@ -481,6 +492,13 @@ export default function NotificationsPage() {
                           <Eye size={14} />
                         </button>
                       )}
+                      <button
+                        onClick={() => handleDeleteOne(item.id)}
+                        className="text-xs text-slate-300 hover:text-red-500"
+                        title={locale === "ar" ? "حذف" : "Delete"}
+                      >
+                        <X size={14} />
+                      </button>
                     </div>
                   </div>
                 );

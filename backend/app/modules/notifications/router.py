@@ -1,3 +1,5 @@
+import uuid
+
 from fastapi import APIRouter, Depends, Query, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -53,6 +55,20 @@ async def mark_read(
         ids=data.ids,
     )
     return {"updated": updated}
+
+
+@notifications_router.delete("/{notification_id}")
+async def delete_one(
+    notification_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    deleted = await notifications_service.delete_one(
+        db, notification_id=notification_id, user_id=current_user.id
+    )
+    if not deleted:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+    return {"deleted": True}
 
 
 @notifications_router.delete("")
