@@ -103,9 +103,9 @@ export default function SuperadminDashboard() {
             <div key={i} className="card p-5 h-20" />
           ))}
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="card p-5 h-20" />
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <div key={i} className="card h-20" />
           ))}
         </div>
         <div className="card p-5 h-64" />
@@ -166,7 +166,7 @@ export default function SuperadminDashboard() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="card p-4 flex items-center gap-3">
           <div className="w-10 h-10 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
             <Users size={20} />

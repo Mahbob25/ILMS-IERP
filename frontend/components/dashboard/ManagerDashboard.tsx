@@ -155,8 +155,8 @@ export default function ManagerDashboard() {
     return (
       <div className="space-y-6 max-w-6xl mx-auto animate-pulse">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="card p-5 h-24" />
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="card h-20" />
           ))}
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -184,55 +184,55 @@ export default function ManagerDashboard() {
 
   return (
     <><div className="space-y-6 max-w-6xl mx-auto animate-fade-in">
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-        <div className="card p-5 flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-            <Users size={24} />
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="card p-4 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+            <Users size={20} />
           </div>
           <div>
-            <p className="text-2xl font-bold text-slate-900">{data.total_students}</p>
+            <p className="text-xl font-bold text-slate-900">{data.total_students}</p>
             <p className="text-xs text-slate-500">{t.students}</p>
           </div>
         </div>
-        <div className="card p-5 flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-            <BookOpen size={24} />
+        <div className="card p-4 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+            <BookOpen size={20} />
           </div>
           <div>
-            <p className="text-2xl font-bold text-slate-900">{data.total_courses}</p>
+            <p className="text-xl font-bold text-slate-900">{data.total_courses}</p>
             <p className="text-xs text-slate-500">{t.courses}</p>
           </div>
         </div>
         <button
           onClick={() => router.push(`/${locale}/dashboard/revenue`)}
-          className="card p-5 flex items-center gap-4 group hover:ring-2 hover:ring-brand-200 transition-all text-end"
+          className="card p-4 flex items-center gap-3 group hover:ring-2 hover:ring-brand-200 transition-all text-end"
         >
-          <div className="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-            <DollarSign size={24} />
+          <div className="w-10 h-10 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+            <DollarSign size={20} />
           </div>
-          <div className="flex-1">
-            <p className="text-2xl font-bold text-slate-900">{data.monthly_revenue.toFixed(2)} {currencySymbol}</p>
+          <div className="flex-1 min-w-0">
+            <p className="text-xl font-bold text-slate-900 truncate">{data.monthly_revenue.toFixed(2)} {currencySymbol}</p>
             <p className="text-xs text-slate-500">{t.revenue}</p>
           </div>
-          <span className="text-[10px] text-brand-500 opacity-0 group-hover:opacity-100 transition-opacity">
+          <span className="text-[10px] text-brand-500 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
             {locale === "ar" ? "عرض التفاصيل ←" : "View Details →"}
           </span>
         </button>
-        <div className="card p-5 flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
-            <RotateCcw size={24} />
+        <div className="card p-4 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+            <RotateCcw size={20} />
           </div>
           <div>
-            <p className="text-2xl font-bold text-slate-900">{data.monthly_refunds.toFixed(2)} {currencySymbol}</p>
+            <p className="text-xl font-bold text-slate-900">{data.monthly_refunds.toFixed(2)} {currencySymbol}</p>
             <p className="text-xs text-slate-500">{t.refunds}</p>
           </div>
         </div>
-        <div className="card p-5 flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-red-50 text-red-600 flex items-center justify-center shrink-0">
-            <Wallet size={24} />
+        <div className="card p-4 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-lg bg-red-50 text-red-600 flex items-center justify-center shrink-0">
+            <Wallet size={20} />
           </div>
           <div>
-            <p className="text-2xl font-bold text-slate-900">{data.monthly_expenses.toFixed(2)} {currencySymbol}</p>
+            <p className="text-xl font-bold text-slate-900">{data.monthly_expenses.toFixed(2)} {currencySymbol}</p>
             <p className="text-xs text-slate-500">{t.expenses}</p>
           </div>
         </div>
@@ -339,13 +339,13 @@ export default function ManagerDashboard() {
         </div>
       </div>
 
-      <div className="card p-5">
+      <div className="card p-4">
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-            <Users size={24} />
+          <div className="w-10 h-10 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+            <Users size={20} />
           </div>
           <div>
-            <p className="text-2xl font-bold text-slate-900">{data.recent_activity_count}</p>
+            <p className="text-xl font-bold text-slate-900">{data.recent_activity_count}</p>
             <p className="text-xs text-slate-500">{t.recentActivity}</p>
           </div>
         </div>

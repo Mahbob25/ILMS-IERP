@@ -115,8 +115,8 @@ export default function SecretaryDashboard() {
     return (
       <div className="space-y-6 max-w-6xl mx-auto animate-pulse">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="card p-5 h-24" />
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="card h-20" />
           ))}
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -138,48 +138,48 @@ export default function SecretaryDashboard() {
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto animate-fade-in">
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-        <div className="card p-5 flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-            <DollarSign size={24} />
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="card p-4 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+            <DollarSign size={20} />
           </div>
           <div>
-            <p className="text-2xl font-bold text-slate-900">{data.today_payments_total.toFixed(2)} {currencySymbol}</p>
+            <p className="text-xl font-bold text-slate-900">{data.today_payments_total.toFixed(2)} {currencySymbol}</p>
             <p className="text-xs text-slate-500">{t.payments} ({data.today_payments_count})</p>
           </div>
         </div>
-        <div className="card p-5 flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-red-50 text-red-600 flex items-center justify-center shrink-0">
-            <Wallet size={24} />
+        <div className="card p-4 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-lg bg-red-50 text-red-600 flex items-center justify-center shrink-0">
+            <Wallet size={20} />
           </div>
           <div>
-            <p className="text-2xl font-bold text-slate-900">{data.today_expenses_total.toFixed(2)} {currencySymbol}</p>
+            <p className="text-xl font-bold text-slate-900">{data.today_expenses_total.toFixed(2)} {currencySymbol}</p>
             <p className="text-xs text-slate-500">{t.expenses} ({data.today_expenses_count})</p>
           </div>
         </div>
-        <div className="card p-5 flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
-            <RotateCcw size={24} />
+        <div className="card p-4 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+            <RotateCcw size={20} />
           </div>
           <div>
-            <p className="text-2xl font-bold text-slate-900">{data.today_refunds_total.toFixed(2)} {currencySymbol}</p>
+            <p className="text-xl font-bold text-slate-900">{data.today_refunds_total.toFixed(2)} {currencySymbol}</p>
             <p className="text-xs text-slate-500">{t.refunds} ({data.today_refunds_count})</p>
           </div>
         </div>
-        <div className="card p-5 flex items-center gap-4">
-          <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${
+        <div className="card p-4 flex items-center gap-3">
+          <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${
             data.pending_students > 0 ? "bg-amber-50 text-amber-600" : "bg-slate-50 text-slate-400"
           }`}>
-            <Users size={24} />
+            <Users size={20} />
           </div>
           <div>
-            <p className="text-2xl font-bold text-slate-900">{data.pending_students}</p>
+            <p className="text-xl font-bold text-slate-900">{data.pending_students}</p>
             <p className="text-xs text-slate-500">{t.pending}</p>
           </div>
         </div>
-        <div className="card p-5 flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-            <CalendarCheck size={24} />
+        <div className="card p-4 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+            <CalendarCheck size={20} />
           </div>
           <div>
             <span className={closureBadge(data.daily_closure_status)}>

@@ -76,7 +76,7 @@ export default function TeacherDashboard() {
       <div className="space-y-6 max-w-6xl mx-auto animate-pulse">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="card p-5 h-24" />
+            <div key={i} className="card h-20" />
           ))}
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -100,41 +100,41 @@ export default function TeacherDashboard() {
   return (
     <div className="space-y-6 max-w-6xl mx-auto animate-fade-in">
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="card p-5 flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-            <BookOpen size={24} />
+        <div className="card p-4 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+            <BookOpen size={20} />
           </div>
           <div>
-            <p className="text-2xl font-bold text-slate-900">{data.sections_count}</p>
+            <p className="text-xl font-bold text-slate-900">{data.sections_count}</p>
             <p className="text-xs text-slate-500">{t.sections}</p>
           </div>
         </div>
-        <div className="card p-5 flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-            <Calendar size={24} />
+        <div className="card p-4 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+            <Calendar size={20} />
           </div>
           <div>
-            <p className="text-2xl font-bold text-slate-900">{data.today_sessions_count}</p>
+            <p className="text-xl font-bold text-slate-900">{data.today_sessions_count}</p>
             <p className="text-xs text-slate-500">{t.todaySessions}</p>
           </div>
         </div>
-        <div className="card p-5 flex items-center gap-4">
-          <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${
+        <div className="card p-4 flex items-center gap-3">
+          <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${
             data.pending_grading > 0 ? "bg-amber-50 text-amber-600" : "bg-slate-50 text-slate-400"
           }`}>
-            <ClipboardCheck size={24} />
+            <ClipboardCheck size={20} />
           </div>
           <div>
-            <p className="text-2xl font-bold text-slate-900">{data.pending_grading}</p>
+            <p className="text-xl font-bold text-slate-900">{data.pending_grading}</p>
             <p className="text-xs text-slate-500">{t.pendingGrading}</p>
           </div>
         </div>
-        <div className="card p-5 flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-violet-50 text-violet-600 flex items-center justify-center shrink-0">
-            <Wallet size={24} />
+        <div className="card p-4 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-lg bg-violet-50 text-violet-600 flex items-center justify-center shrink-0">
+            <Wallet size={20} />
           </div>
           <div>
-            <p className="text-2xl font-bold text-slate-900">{data.wallet_balance.toFixed(2)} {currencySymbol}</p>
+            <p className="text-xl font-bold text-slate-900">{data.wallet_balance.toFixed(2)} {currencySymbol}</p>
             <p className="text-xs text-slate-500">{t.wallet}</p>
           </div>
         </div>
