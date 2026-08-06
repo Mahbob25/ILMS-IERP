@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useAuth } from "@/components/AuthContext";
-import { LogIn, Globe, ShieldAlert } from "lucide-react";
+import { Globe, ShieldAlert } from "lucide-react";
 import { sanitizeInput } from "@/lib/utils/input";
 
 export default function LoginPage() {
@@ -105,8 +105,12 @@ export default function LoginPage() {
 
         {/* Branding & Subtitle */}
         <div className="text-center mb-8">
-          <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-brand-600 to-brand-400 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-brand-500/20">
-            <LogIn className="text-white" size={24} />
+          <div className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-white border border-slate-200 shadow-lg shadow-brand-500/20 flex items-center justify-center mx-auto mb-4 p-2 overflow-hidden">
+            <img
+              src="/logo.jpeg"
+              alt="Al-Drasat ERP Logo"
+              className="w-full h-full object-contain"
+            />
           </div>
           <h1 className="text-xl md:text-2xl font-bold tracking-tight text-slate-900">
             {t.title}
