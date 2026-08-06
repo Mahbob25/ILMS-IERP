@@ -506,9 +506,7 @@ function AdminWalletOverview({ locale }: { locale: string }) {
       showUndo({
         undoEndpoint: `/lms/expenses/${expenseId}/void`,
         undoBody: { void_reason: sanitizeInput(modalReason) },
-        toastMessage: (typeof t.undoMessage === "function"
-          ? t.undoMessage(amount, modalTeacher.full_name)
-          : `${amount.toFixed(2)} ${t.sar} — undo available`),
+        toastMessage: t.undoMessage,
       });
     } catch (err: any) {
       const msg = err?.response?.data?.detail || t.withdrawalError;
