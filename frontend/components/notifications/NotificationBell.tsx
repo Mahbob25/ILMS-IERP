@@ -397,7 +397,7 @@ export default function NotificationBell() {
               const isUnlock = item.type === "unlock_requested";
               const hasActions = isAmendment || isUnlock;
               const resolved = resolvedItems[item.id];
-              const canDelete = !isAmendment && !isUnlock;
+              const canDelete = (!isAmendment && !isUnlock) || resolved != null;
 
               return (
                 <div
