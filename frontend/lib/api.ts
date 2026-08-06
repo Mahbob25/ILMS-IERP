@@ -109,7 +109,8 @@ apiClient.interceptors.response.use(
         await new Promise((resolve) => setTimeout(resolve, delay));
         return apiClient(originalRequest);
       }
-      const serverError = new Error("Server error. Please try again later.");
+      const detail = (error.response?.data as any)?.detail;
+      const serverError = new Error(detail || "Server error. Please try again later.");
       (serverError as any).code = "SERVER_ERROR";
       Sentry.captureException(error);
       return Promise.reject(serverError);

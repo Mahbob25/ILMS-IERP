@@ -137,6 +137,7 @@ export default function EnrollmentsPage() {
   const [deleteTarget, setDeleteTarget] = useState<Enrollment | null>(null);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const submittingRef = useRef(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -246,7 +247,8 @@ export default function EnrollmentsPage() {
   };
 
   const handleSave = async () => {
-    if (!form.section_id || !form.student_id || submitting) return;
+    if (!form.section_id || !form.student_id || submittingRef.current) return;
+    submittingRef.current = true;
     setSubmitting(true);
     try {
       const payload: Record<string, unknown> = {
@@ -262,17 +264,19 @@ export default function EnrollmentsPage() {
       const detail = e?.response?.data?.detail || e?.message || "Failed to save enrollment";
       setMessage({ type: "error", text: detail });
     } finally {
+      submittingRef.current = false;
       setSubmitting(false);
     }
   };
 
   const handleCreateStudent = async () => {
-    if (!createStudentForm.student_code || !createStudentForm.full_name || submitting) return;
+    if (!createStudentForm.student_code || !createStudentForm.full_name || submittingRef.current) return;
     setNameError("");
     if (!validateName(createStudentForm.full_name, locale as "ar" | "en")) {
       setNameError(t.nameInvalid);
       return;
     }
+    submittingRef.current = true;
     setSubmitting(true);
     try {
       const payload: Record<string, unknown> = {
@@ -291,6 +295,7 @@ export default function EnrollmentsPage() {
       const detail = e?.response?.data?.detail || e?.message || "Failed to create student";
       setMessage({ type: "error", text: detail });
     } finally {
+      submittingRef.current = false;
       setSubmitting(false);
     }
   };
