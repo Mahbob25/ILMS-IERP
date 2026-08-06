@@ -184,11 +184,15 @@ export default function NotificationBell() {
     }
   };
 
+  const ACTIONABLE_TYPES = new Set(["amendment_pending", "unlock_requested"]);
+
   const handleClearAll = () => {
-    const snapshot = [...items];
-    setClearedItems(snapshot);
-    setItems([]);
-    setUnreadCount(0);
+    const nonActionable = items.filter((item) => !ACTIONABLE_TYPES.has(item.type));
+    const actionable = items.filter((item) => ACTIONABLE_TYPES.has(item.type));
+    setClearedItems(nonActionable);
+    setItems(actionable);
+    const cleanedUnread = nonActionable.filter((i) => !i.is_read).length;
+    setUnreadCount((prev) => Math.max(0, prev - cleanedUnread));
 
     undoTimerRef.current = setTimeout(async () => {
       try {
@@ -207,7 +211,7 @@ export default function NotificationBell() {
       undoTimerRef.current = null;
     }
     if (clearedItems) {
-      setItems(clearedItems);
+      setItems((prev) => [...clearedItems, ...prev]);
       fetchUnreadCount();
     }
     setClearedItems(null);
@@ -337,7 +341,7 @@ export default function NotificationBell() {
                   {locale === "ar" ? "تعليم الكل" : "Mark all read"}
                 </button>
               )}
-              {items.length > 0 && !clearedItems && (
+              {items.length > 0 && !clearedItems && items.some((item) => !ACTIONABLE_TYPES.has(item.type)) && (
                 <button
                   onClick={handleClearAll}
                   className="flex items-center gap-1 text-xs text-red-500 hover:text-red-700 font-medium"

@@ -207,27 +207,28 @@ export default function NotificationsPage() {
     }
   };
 
+  const ACTIONABLE_TYPES = new Set(["amendment_pending", "unlock_requested"]);
+
   const handleClearAll = () => {
-    const snapshot = [...items];
-    setClearedItems(snapshot);
-    setItems([]);
-    setTotal(0);
-    setTotalPages(1);
+    const nonActionable = items.filter((item) => !ACTIONABLE_TYPES.has(item.type));
+    const actionable = items.filter((item) => ACTIONABLE_TYPES.has(item.type));
+    setClearedItems(nonActionable);
+    setItems(actionable);
+    setTotal(actionable.length);
+    if (actionable.length === 0) setTotalPages(1);
   };
 
   const handleUndoClear = () => {
     if (clearedItems) {
-      setItems(clearedItems);
-      setTotal(clearedItems.length);
+      setItems((prev) => [...clearedItems, ...prev]);
+      setTotal((prev) => prev + clearedItems.length);
     }
     setClearedItems(null);
   };
 
   const handleDismissClear = async () => {
     try {
-      if (clearedItems && clearedItems.length > 0) {
-        await apiClient.delete("/notifications");
-      }
+      await apiClient.delete("/notifications");
     } catch {
       // best-effort
     }
@@ -337,13 +338,15 @@ export default function NotificationsPage() {
                 <Check size={14} />
                 {t.markAllRead}
               </button>
-              <button
-                onClick={handleClearAll}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-500 hover:text-red-700 transition-colors"
-              >
-                <Trash2 size={14} />
-                {t.clearAll}
-              </button>
+              {items.some((item) => !ACTIONABLE_TYPES.has(item.type)) && (
+                <button
+                  onClick={handleClearAll}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-500 hover:text-red-700 transition-colors"
+                >
+                  <Trash2 size={14} />
+                  {t.clearAll}
+                </button>
+              )}
             </>
           )}
         </div>
