@@ -57,6 +57,10 @@ from app.modules.lms import cashier_service
 from app.modules.lms import financial_records_service
 from app.core.error_messages import get_error_detail
 from app.core.rate_limit import limiter
+from app.modules.notifications.emitters import emit_amendment_pending
+import logging
+
+logger = logging.getLogger(__name__)
 
 lms_router = APIRouter(prefix="/lms", tags=["lms"])
 
@@ -788,7 +792,8 @@ async def create_amendment(
     contract = result.scalar_one_or_none()
     if not contract:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Contract not found"
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No contract assigned to this section. Assign a contract before requesting an increase.",
         )
     if (
         current_user.role.name == "teacher"
@@ -829,6 +834,11 @@ async def create_amendment(
         )
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+    try:
+        await emit_amendment_pending(db, amendment_id=amendment.id)
+    except Exception:
+        logger.exception("Failed to emit amendment_pending notification")
     return AmendmentResponse(
         id=amendment.id,
         contract_id=amendment.contract_id,

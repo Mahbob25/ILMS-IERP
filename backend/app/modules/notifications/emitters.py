@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 
 ROLE_MANAGER = "manager"
 ROLE_SECRETARY = "secretary"
+ROLE_SUPERADMIN = "superadmin"
 
 
 async def _user_ids_by_role(db: AsyncSession, *role_names: str) -> list[uuid.UUID]:
@@ -130,7 +131,7 @@ async def emit_unlock_requested(db: AsyncSession, *, closure_date: date) -> None
 
 async def emit_amendment_pending(db: AsyncSession, *, amendment_id: uuid.UUID) -> None:
     """Called after a compensation amendment is created with PENDING status."""
-    user_ids = await _user_ids_by_role(db, ROLE_MANAGER)
+    user_ids = await _user_ids_by_role(db, ROLE_MANAGER, ROLE_SUPERADMIN)
     for uid in user_ids:
         await create_notification(
             db,
