@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { apiClient } from "@/lib/api";
 import { useAuth } from "@/components/AuthContext";
-import { Bell, Check, CheckCircle, AlertCircle, Loader2 } from "lucide-react";
+import { Bell, Check, CheckCircle, AlertCircle, Loader2, Unlock } from "lucide-react";
 import { renderNotification } from "@/components/notifications/notificationMessages";
 import ConfirmModal from "@/components/ConfirmModal";
 
@@ -65,9 +65,10 @@ export default function NotificationBell() {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
-  const [confirmAmendment, setConfirmAmendment] = useState<{
+  const [confirmAction, setConfirmAction] = useState<{
     notificationId: string;
-    amendmentId: string;
+    type: "amendment" | "unlock";
+    params: Record<string, string>;
     action: "approve" | "reject";
   } | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
@@ -168,13 +169,17 @@ export default function NotificationBell() {
     }
   };
 
-  const handleAmendmentAction = async () => {
-    if (!confirmAmendment) return;
-    const { amendmentId, action, notificationId } = confirmAmendment;
-    setConfirmAmendment(null);
+  const handleConfirmAction = async () => {
+    if (!confirmAction) return;
+    const { params: p, action, notificationId, type } = confirmAction;
+    setConfirmAction(null);
     setActionLoading(true);
     try {
-      await apiClient.put(`/lms/amendments/${amendmentId}/${action}`);
+      if (type === "amendment") {
+        await apiClient.put(`/lms/amendments/${p.amendment_id}/${action}`);
+      } else if (type === "unlock") {
+        await apiClient.post(`/lms/daily-closures/${p.date}/approve-unlock`);
+      }
       await apiClient.post("/notifications/read", { ids: [notificationId] });
       setItems((prev) => prev.filter((item) => item.id !== notificationId));
       fetchUnreadCount();
@@ -195,6 +200,10 @@ export default function NotificationBell() {
         cancel: "Cancel",
         approveLabel: "Confirm Approval",
         rejectLabel: "Confirm Rejection",
+        confirmUnlockTitle: "Approve Unlock",
+        confirmUnlockMsg: "Are you sure you want to approve this day unlock request?",
+        unlockApproveLabel: "Confirm Unlock",
+        unlockButton: "Approve Unlock",
       }
     : {
         confirmApproveTitle: "الموافقة على التعديل",
@@ -205,6 +214,10 @@ export default function NotificationBell() {
         cancel: "إلغاء",
         approveLabel: "تأكيد الموافقة",
         rejectLabel: "تأكيد الرفض",
+        confirmUnlockTitle: "الموافقة على فتح اليوم",
+        confirmUnlockMsg: "هل أنت متأكد من الموافقة على طلب فتح هذا اليوم؟",
+        unlockApproveLabel: "تأكيد الفتح",
+        unlockButton: "الموافقة على الفتح",
       };
 
   if (!user) return null;
@@ -281,7 +294,8 @@ export default function NotificationBell() {
                 locale,
               );
               const isAmendment = item.type === "amendment_pending";
-              const amendmentId = isAmendment ? item.params?.amendment_id : null;
+              const isUnlock = item.type === "unlock_requested";
+              const hasActions = isAmendment || isUnlock;
 
               return (
                 <div
@@ -314,38 +328,62 @@ export default function NotificationBell() {
                     </p>
                   </button>
 
-                  {isAmendment && amendmentId && (
+                  {hasActions && item.params && (
                     <div className="flex items-center gap-1 mt-2">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setConfirmAmendment({
-                            notificationId: item.id,
-                            amendmentId,
-                            action: "approve",
-                          });
-                        }}
-                        disabled={actionLoading}
-                        className="flex items-center gap-1 px-2 py-1 text-xs font-medium rounded text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 disabled:opacity-50 transition-colors"
-                      >
-                        <CheckCircle size={12} />
-                        {locale === "ar" ? "موافقة" : "Approve"}
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setConfirmAmendment({
-                            notificationId: item.id,
-                            amendmentId,
-                            action: "reject",
-                          });
-                        }}
-                        disabled={actionLoading}
-                        className="flex items-center gap-1 px-2 py-1 text-xs font-medium rounded text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 disabled:opacity-50 transition-colors"
-                      >
-                        <AlertCircle size={12} />
-                        {locale === "ar" ? "رفض" : "Reject"}
-                      </button>
+                      {isAmendment && item.params.amendment_id && (
+                        <>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setConfirmAction({
+                                notificationId: item.id,
+                                type: "amendment",
+                                params: item.params!,
+                                action: "approve",
+                              });
+                            }}
+                            disabled={actionLoading}
+                            className="flex items-center gap-1 px-2 py-1 text-xs font-medium rounded text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 disabled:opacity-50 transition-colors"
+                          >
+                            <CheckCircle size={12} />
+                            {locale === "ar" ? "موافقة" : "Approve"}
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setConfirmAction({
+                                notificationId: item.id,
+                                type: "amendment",
+                                params: item.params!,
+                                action: "reject",
+                              });
+                            }}
+                            disabled={actionLoading}
+                            className="flex items-center gap-1 px-2 py-1 text-xs font-medium rounded text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 disabled:opacity-50 transition-colors"
+                          >
+                            <AlertCircle size={12} />
+                            {locale === "ar" ? "رفض" : "Reject"}
+                          </button>
+                        </>
+                      )}
+                      {isUnlock && item.params.date && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setConfirmAction({
+                              notificationId: item.id,
+                              type: "unlock",
+                              params: item.params!,
+                              action: "approve",
+                            });
+                          }}
+                          disabled={actionLoading}
+                          className="flex items-center gap-1 px-2 py-1 text-xs font-medium rounded text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 disabled:opacity-50 transition-colors"
+                        >
+                          <Unlock size={12} />
+                          {locale === "ar" ? "الموافقة على الفتح" : "Approve Unlock"}
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
@@ -356,26 +394,32 @@ export default function NotificationBell() {
       )}
 
       <ConfirmModal
-        open={confirmAmendment !== null}
+        open={confirmAction !== null}
         title={
-          confirmAmendment?.action === "approve"
+          confirmAction?.type === "unlock"
+            ? t.confirmUnlockTitle
+            : confirmAction?.action === "approve"
             ? t.confirmApproveTitle
             : t.confirmRejectTitle
         }
         message={
-          confirmAmendment?.action === "approve"
+          confirmAction?.type === "unlock"
+            ? t.confirmUnlockMsg
+            : confirmAction?.action === "approve"
             ? t.confirmApproveMsg
             : t.confirmRejectMsg
         }
         confirmLabel={
-          confirmAmendment?.action === "approve"
+          confirmAction?.type === "unlock"
+            ? t.unlockApproveLabel
+            : confirmAction?.action === "approve"
             ? t.approveLabel
             : t.rejectLabel
         }
         cancelLabel={t.cancel}
         isRtl={locale === "ar"}
-        onConfirm={handleAmendmentAction}
-        onCancel={() => setConfirmAmendment(null)}
+        onConfirm={handleConfirmAction}
+        onCancel={() => setConfirmAction(null)}
       />
     </div>
   );

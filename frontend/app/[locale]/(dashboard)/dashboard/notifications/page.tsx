@@ -14,6 +14,7 @@ import {
   ChevronRight,
   Eye,
   CheckCircle,
+  Unlock,
 } from "lucide-react";
 import ConfirmModal from "@/components/ConfirmModal";
 
@@ -56,9 +57,10 @@ export default function NotificationsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [markingIds, setMarkingIds] = useState<Set<string>>(new Set());
-  const [confirmAmendment, setConfirmAmendment] = useState<{
+  const [confirmAction, setConfirmAction] = useState<{
     notificationId: string;
-    amendmentId: string;
+    type: "amendment" | "unlock";
+    params: Record<string, string>;
     action: "approve" | "reject";
   } | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
@@ -88,6 +90,10 @@ export default function NotificationsPage() {
       approveConfirm: "تأكيد الموافقة",
       rejectConfirm: "تأكيد الرفض",
       cancel: "إلغاء",
+      unlockTitle: "الموافقة على فتح اليوم",
+      unlockMsg: "هل أنت متأكد من الموافقة على طلب فتح هذا اليوم؟",
+      unlockConfirm: "تأكيد الفتح",
+      unlockButton: "الموافقة على الفتح",
     },
     en: {
       title: "Notifications",
@@ -113,6 +119,10 @@ export default function NotificationsPage() {
       approveConfirm: "Confirm Approval",
       rejectConfirm: "Confirm Rejection",
       cancel: "Cancel",
+      unlockTitle: "Approve Unlock",
+      unlockMsg: "Are you sure you want to approve this day unlock request?",
+      unlockConfirm: "Confirm Unlock",
+      unlockButton: "Approve Unlock",
     },
   }[locale === "en" ? "en" : "ar"];
 
@@ -185,13 +195,17 @@ export default function NotificationsPage() {
     if (href) router.push(`/${locale}/${href}`);
   };
 
-  const handleAmendmentAction = async () => {
-    if (!confirmAmendment) return;
-    const { amendmentId, action, notificationId } = confirmAmendment;
-    setConfirmAmendment(null);
+  const handleConfirmAction = async () => {
+    if (!confirmAction) return;
+    const { params: p, action, notificationId, type } = confirmAction;
+    setConfirmAction(null);
     setActionLoading(true);
     try {
-      await apiClient.put(`/lms/amendments/${amendmentId}/${action}`);
+      if (type === "amendment") {
+        await apiClient.put(`/lms/amendments/${p.amendment_id}/${action}`);
+      } else if (type === "unlock") {
+        await apiClient.post(`/lms/daily-closures/${p.date}/approve-unlock`);
+      }
       await apiClient.post("/notifications/read", { ids: [notificationId] });
       setItems((prev) => prev.filter((item) => item.id !== notificationId));
     } catch {
@@ -294,7 +308,8 @@ export default function NotificationsPage() {
                 );
                 const isMarking = markingIds.has(item.id);
                 const isAmendment = item.type === "amendment_pending";
-                const amendmentId = isAmendment ? item.params?.amendment_id : null;
+                const isUnlock = item.type === "unlock_requested";
+                const hasActions = isAmendment || isUnlock;
 
                 return (
                   <div
@@ -339,36 +354,59 @@ export default function NotificationsPage() {
                         <p className="text-xs text-slate-500 mt-1 line-clamp-2">{body}</p>
                       )}
 
-                      {isAmendment && amendmentId && (
+                      {hasActions && item.params && (
                         <div className="flex items-center gap-2 mt-2">
-                          <button
-                            onClick={() =>
-                              setConfirmAmendment({
-                                notificationId: item.id,
-                                amendmentId,
-                                action: "approve",
-                              })
-                            }
-                            disabled={actionLoading}
-                            className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-lg text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 disabled:opacity-50 transition-colors"
-                          >
-                            <CheckCircle size={12} />
-                            {t.approve}
-                          </button>
-                          <button
-                            onClick={() =>
-                              setConfirmAmendment({
-                                notificationId: item.id,
-                                amendmentId,
-                                action: "reject",
-                              })
-                            }
-                            disabled={actionLoading}
-                            className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-lg text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 disabled:opacity-50 transition-colors"
-                          >
-                            <AlertCircle size={12} />
-                            {t.reject}
-                          </button>
+                          {isAmendment && item.params.amendment_id && (
+                            <>
+                              <button
+                                onClick={() =>
+                                  setConfirmAction({
+                                    notificationId: item.id,
+                                    type: "amendment",
+                                    params: item.params!,
+                                    action: "approve",
+                                  })
+                                }
+                                disabled={actionLoading}
+                                className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-lg text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 disabled:opacity-50 transition-colors"
+                              >
+                                <CheckCircle size={12} />
+                                {t.approve}
+                              </button>
+                              <button
+                                onClick={() =>
+                                  setConfirmAction({
+                                    notificationId: item.id,
+                                    type: "amendment",
+                                    params: item.params!,
+                                    action: "reject",
+                                  })
+                                }
+                                disabled={actionLoading}
+                                className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-lg text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 disabled:opacity-50 transition-colors"
+                              >
+                                <AlertCircle size={12} />
+                                {t.reject}
+                              </button>
+                            </>
+                          )}
+                          {isUnlock && item.params.date && (
+                            <button
+                              onClick={() =>
+                                setConfirmAction({
+                                  notificationId: item.id,
+                                  type: "unlock",
+                                  params: item.params!,
+                                  action: "approve",
+                                })
+                              }
+                              disabled={actionLoading}
+                              className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-lg text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 disabled:opacity-50 transition-colors"
+                            >
+                              <Unlock size={12} />
+                              {t.unlockButton}
+                            </button>
+                          )}
                         </div>
                       )}
                     </div>
@@ -433,26 +471,32 @@ export default function NotificationsPage() {
       )}
 
       <ConfirmModal
-        open={confirmAmendment !== null}
+        open={confirmAction !== null}
         title={
-          confirmAmendment?.action === "approve"
+          confirmAction?.type === "unlock"
+            ? t.unlockTitle
+            : confirmAction?.action === "approve"
             ? t.confirmApproveTitle
             : t.confirmRejectTitle
         }
         message={
-          confirmAmendment?.action === "approve"
+          confirmAction?.type === "unlock"
+            ? t.unlockMsg
+            : confirmAction?.action === "approve"
             ? t.confirmApproveMsg
             : t.confirmRejectMsg
         }
         confirmLabel={
-          confirmAmendment?.action === "approve"
+          confirmAction?.type === "unlock"
+            ? t.unlockConfirm
+            : confirmAction?.action === "approve"
             ? t.approveConfirm
             : t.rejectConfirm
         }
         cancelLabel={t.cancel}
         isRtl={locale === "ar"}
-        onConfirm={handleAmendmentAction}
-        onCancel={() => setConfirmAmendment(null)}
+        onConfirm={handleConfirmAction}
+        onCancel={() => setConfirmAction(null)}
       />
     </div>
   );
