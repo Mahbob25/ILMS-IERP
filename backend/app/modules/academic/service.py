@@ -7,6 +7,7 @@ from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import joinedload
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy import exists, func, or_, and_
 
 logger = logging.getLogger(__name__)
@@ -532,6 +533,15 @@ async def create_enrollment(
         return None
     if section.enrolled_count >= section.capacity:
         return None
+    existing_enrollment = await db.execute(
+        select(Enrollment.id).where(
+            Enrollment.student_id == student_id,
+            Enrollment.section_id == section_id,
+            Enrollment.deleted_at.is_(None),
+        )
+    )
+    if existing_enrollment.scalar_one_or_none():
+        return None
     enrollment = Enrollment(
         student_id=student_id,
         section_id=section_id,
@@ -540,7 +550,12 @@ async def create_enrollment(
     )
     db.add(enrollment)
     section.enrolled_count += 1
-    await db.flush()
+    try:
+        await db.flush()
+    except IntegrityError as e:
+        if "uq_enrollments_active" in str(e):
+            return None
+        raise
     return enrollment
 
 

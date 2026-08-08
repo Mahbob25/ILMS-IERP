@@ -14,6 +14,7 @@ import {
   Clock,
   RotateCcw,
   UserX,
+  Workflow,
   ChevronDown,
   ChevronUp,
 } from "lucide-react";
@@ -119,6 +120,8 @@ export default function ManagerDashboard() {
       unenrolledBy: "بواسطة",
       showMore: "عرض المزيد",
       refund: "استرداد",
+      quickActions: "إجراءات سريعة",
+      quickRegistration: "تسجيل سريع",
     },
     en: {
       students: "Total Students",
@@ -148,6 +151,8 @@ export default function ManagerDashboard() {
       unenrolledBy: "By",
       showMore: "Show More",
       refund: "Refund",
+      quickActions: "Quick Actions",
+      quickRegistration: "Quick Registration",
     },
   }[locale === "en" ? "en" : "ar"];
 
@@ -236,6 +241,20 @@ export default function ManagerDashboard() {
             <p className="text-xs text-slate-500">{t.expenses}</p>
           </div>
         </div>
+      </div>
+
+      <div className="card p-5">
+        <h3 className="text-sm font-bold text-slate-900 mb-4 flex items-center gap-2">
+          <Workflow size={16} className="text-rose-500" />
+          <span>{t.quickActions}</span>
+        </h3>
+        <button
+          onClick={() => router.push(`/${locale}/dashboard/wizards/student-enrollment`)}
+          className="w-full flex items-center gap-3 px-4 py-3 rounded-lg bg-rose-50 text-rose-700 border border-rose-100 hover:bg-rose-100 transition-all text-sm font-medium"
+        >
+          <Workflow size={18} />
+          <span>{t.quickRegistration}</span>
+        </button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

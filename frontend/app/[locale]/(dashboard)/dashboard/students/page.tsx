@@ -8,7 +8,7 @@ import RefreshButton from "@/components/RefreshButton";
 import ConfirmModal from "@/components/ConfirmModal";
 import Modal from "@/components/Modal";
 import StudentFormFields from "@/components/students/StudentFormFields";
-import { Plus, Pencil, Trash2, Loader2, Eye, AlertCircle } from "lucide-react";
+import { Plus, Pencil, Trash2, Loader2, Eye, AlertCircle, Workflow } from "lucide-react";
 import { sanitizeInput, validateName } from "@/lib/utils/input";
 
 interface Student {
@@ -34,6 +34,7 @@ export default function StudentsPage() {
       email: "البريد الإلكتروني",
       actions: "الإجراءات",
       add: "إضافة طالب",
+      quickEnroll: "تسجيل سريع",
       edit: "تعديل",
       delete: "حذف",
       save: "حفظ",
@@ -61,6 +62,7 @@ export default function StudentsPage() {
       email: "Email",
       actions: "Actions",
       add: "Add Student",
+      quickEnroll: "Quick Enroll",
       edit: "Edit",
       delete: "Delete",
       save: "Save",
@@ -223,6 +225,15 @@ export default function StudentsPage() {
             <button onClick={openCreate} className="btn-primary flex items-center gap-2">
               <Plus size={16} />
               <span>{t.add}</span>
+            </button>
+          )}
+          {canEdit && (
+            <button
+              onClick={() => router.push(`/${locale}/dashboard/wizards/student-enrollment`)}
+              className="btn-secondary flex items-center gap-2"
+            >
+              <Workflow size={16} />
+              <span>{t.quickEnroll}</span>
             </button>
           )}
         </div>

@@ -10,6 +10,7 @@ import {
   CalendarCheck,
   ShoppingCart,
   UserPlus,
+  Workflow,
   FileText,
   AlertCircle,
   RotateCcw,
@@ -77,6 +78,7 @@ export default function SecretaryDashboard() {
       expense: "مصروف",
       enrollments: "تسجيلات اليوم",
       noTransactions: "لا توجد تعاملات اليوم",
+      quickRegistration: "تسجيل سريع",
     },
     en: {
       payments: "Payments",
@@ -96,6 +98,7 @@ export default function SecretaryDashboard() {
       expense: "Expense",
       enrollments: "Today's Enrollments",
       noTransactions: "No transactions today",
+      quickRegistration: "Quick Registration",
     },
   }[locale === "en" ? "en" : "ar"];
 
@@ -214,6 +217,13 @@ export default function SecretaryDashboard() {
             >
               <ShoppingCart size={18} />
               <span>{t.pos}</span>
+            </button>
+            <button
+              onClick={() => router.push(`/${locale}/dashboard/wizards/student-enrollment`)}
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-lg bg-rose-50 text-rose-700 border border-rose-100 hover:bg-rose-100 transition-all text-sm font-medium"
+            >
+              <Workflow size={18} />
+              <span>{t.quickRegistration}</span>
             </button>
           </div>
         </div>

@@ -198,12 +198,23 @@ export default function StudentEnrollmentWizard({
   );
   const [loading, setLoading] = useState(true);
   const [dataError, setDataError] = useState(false);
+  const [serverDetail, setServerDetail] = useState("");
   const [students, setStudents] = useState<Student[]>([]);
   const [sections, setSections] = useState<CourseSection[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
 
   const markDirty = useCallback(() => setDirty(true), [setDirty]);
-  const markClean = useCallback(() => setDirty(false), [setDirty]);
+  const markClean = useCallback(() => {
+    setDirty(false);
+    setServerDetail("");
+  }, [setDirty]);
+
+  const detailOf = (err: unknown) =>
+    (
+      err as {
+        response?: { data?: { detail?: string } };
+      }
+    )?.response?.data?.detail || "";
 
   const fetchLookups = useCallback(async () => {
     try {
@@ -262,6 +273,7 @@ export default function StudentEnrollmentWizard({
   };
 
   const handleCreateStudent = async () => {
+    setServerDetail("");
     if (
       !state.createStudentForm.student_code.trim() ||
       !state.createStudentForm.full_name.trim()
@@ -299,12 +311,14 @@ export default function StudentEnrollmentWizard({
           email: res.data.email || "",
         },
       });
-    } catch {
+    } catch (err) {
+      setServerDetail(detailOf(err));
       dispatch({ type: "SET_ERROR", error: "create_failed" });
     }
   };
 
   const handleEnroll = async () => {
+    setServerDetail("");
     if (!state.student) {
       dispatch({ type: "SET_ERROR", error: "no_student" });
       return;
@@ -342,12 +356,14 @@ export default function StudentEnrollmentWizard({
         },
         summary: summaryRes.data,
       });
-    } catch {
+    } catch (err) {
+      setServerDetail(detailOf(err));
       dispatch({ type: "SET_ERROR", error: "enroll_failed" });
     }
   };
 
   const handlePay = async () => {
+    setServerDetail("");
     if (!state.enrollment) return;
     const amount = parseFloat(state.paymentForm.amount);
     if (!amount || amount <= 0) {
@@ -398,7 +414,8 @@ export default function StudentEnrollmentWizard({
         },
         summary: summaryRes.data,
       });
-    } catch {
+    } catch (err) {
+      setServerDetail(detailOf(err));
       dispatch({ type: "SET_ERROR", error: "pay_failed" });
     }
   };
@@ -466,7 +483,7 @@ export default function StudentEnrollmentWizard({
         }
       : null;
 
-  const stepError = errorText(state.error);
+  const stepError = errorText(state.error) || serverDetail;
 
   const studentLabels: StudentStepLabels = {
     selectStudent: t.selectStudent,

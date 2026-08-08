@@ -1,6 +1,6 @@
 # Guided Multi-Step Flows (Wizards) — Implementation Plan
 
-**Status:** In progress — Phases 1–3D implemented, Phase 3E (E2E) pending  
+**Status:** Phases 1–3 implemented; Phase 4 cancelled; Phase 5 (Dashboard Integration + Polish) in progress  
 **Source:** `docs/plans/ux-suggestions.md`, item #4  
 **Effort:** L (2+ weeks)  
 **Date:** 2026-08-06
@@ -273,9 +273,11 @@ Skip step 3: advance to "Complete" screen with summary (no payment recorded)
 
 ---
 
-### Phase 4: Wizard 2 — Course + Section + Teacher Assignment (3–4 days)
+### Phase 4: Wizard 2 — Course + Section + Teacher Assignment — CANCELLED
 
-**Goal**: Build the course creation wizard.
+> **Cancelled.** The Course + Section + Teacher Assignment wizard is no longer required.
+> This section is retained for historical reference only. No work will be done under Phase 4,
+> and Phase 5 has been revised to remove all dependencies on Wizard 2.
 
 **Tasks**:
 1. Create `frontend/app/[locale]/(dashboard)/dashboard/wizards/course-section/page.tsx`
@@ -302,16 +304,21 @@ Skip step 3: advance to "Complete" screen with summary (no payment recorded)
 **Goal**: Make wizards discoverable from the main dashboard.
 
 **Tasks**:
-1. Add "Quick Actions" cards on the dashboard page:
-   - "Register New Student" → links to Wizard 1
-   - "Create New Course" → links to Wizard 2
-2. Add wizard links to existing pages (e.g., "Quick Enroll" button on students page, "Quick Create Section" on courses page)
-3. Track wizard completions (optional — increment a counter for analytics, not blocking)
+1. Add "Quick Registration" shortcut to dashboards that have wizard access (Phase 4/Wizard 2 cancelled, so the "Create New Course" card is dropped):
+   - SecretaryDashboard: add a "Quick Registration" button to the existing Quick Actions card → links to Wizard 1
+   - ManagerDashboard: add a small "Quick Registration" card → links to Wizard 1
+   - (Superadmin already has a Wizard 1 sidebar shortcut; Teachers have no wizard access.)
+2. Add wizard links to existing pages:
+   - "Quick Enroll" button on students page → links to Wizard 1 (`/dashboard/wizards/student-enrollment`)
+   - "Sections" quick link on courses page → links to the existing `/dashboard/sections` page (replaces the cancelled "Quick Create Section" wizard destination; `SectionFormModal` already lives there)
+3. Track wizard completions (optional — client-side `localStorage` counter, not blocking, no backend required)
 
 **Files to modify**:
-- `frontend/app/[locale]/(dashboard)/dashboard/page.tsx` — dashboard cards
+- `docs/plans/wizards-implementation.md` — this doc (Phase 4 / Phase 5 revised)
+- `frontend/components/dashboard/SecretaryDashboard.tsx` — "Quick Registration" button
+- `frontend/components/dashboard/ManagerDashboard.tsx` — "Quick Registration" card
 - `frontend/app/[locale]/(dashboard)/dashboard/students/page.tsx` — "Quick Enroll" link
-- `frontend/app/[locale]/(dashboard)/dashboard/courses/page.tsx` — "Quick Create Section" link
+- `frontend/app/[locale]/(dashboard)/dashboard/courses/page.tsx` — "Sections" link
 
 ---
 
@@ -324,8 +331,8 @@ Skip step 3: advance to "Complete" screen with summary (no payment recorded)
 ### E2E Tests (Playwright — project already has Playwright config)
 - Wizard 1 happy path: create student → enroll → pay (3 steps)
 - Wizard 1 partial: pick existing student → enroll → skip payment
-- Wizard 2 happy path: create course → create section with teacher
 - Navigation abandonment: start wizard, attempt to navigate away
+- (Phase 4 / Wizard 2 cancelled — that test case is removed)
 
 ### Manual Testing Checklist
 - Both wizards in Arabic (RTL) and English (LTR)

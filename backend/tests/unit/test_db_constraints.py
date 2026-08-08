@@ -3,6 +3,7 @@ from datetime import date
 from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock, patch, PropertyMock
 import pytest
+from sqlalchemy.exc import IntegrityError
 
 
 @pytest.mark.asyncio
@@ -87,8 +88,16 @@ async def test_enrollments_discount_check_rejects_over_100(mock_db, mock_user):
     mock_section.enrolled_count = 0
     mock_section.price = Decimal("1000")
 
-    mock_db.execute = AsyncMock()
-    mock_db.execute.return_value = MagicMock(scalar_one_or_none=MagicMock(return_value=mock_section))
+    async def execute_side_effect(query, **kwargs):
+        if "course_section" in str(query).lower():
+            s = MagicMock()
+            s.scalar_one_or_none.return_value = mock_section
+            return s
+        r = MagicMock()
+        r.scalar_one_or_none.return_value = None
+        return r
+
+    mock_db.execute = AsyncMock(side_effect=execute_side_effect)
     mock_db.add = AsyncMock()
     mock_db.flush = AsyncMock()
 
@@ -176,3 +185,66 @@ async def test_ledger_entries_delta_check_available_plus_frozen_equals_total():
     )
     assert entry.total_amount == Decimal("100")
     assert entry.available_delta + entry.frozen_delta == entry.total_amount
+
+
+@pytest.mark.asyncio
+async def test_create_enrollment_duplicate_active_returns_none(mock_db):
+    from app.modules.academic.service import create_enrollment
+
+    section_id = uuid.uuid4()
+    student_id = uuid.uuid4()
+    mock_section = MagicMock()
+    mock_section.id = section_id
+    mock_section.capacity = 30
+    mock_section.enrolled_count = 0
+    mock_section.price = Decimal("1000")
+
+    async def execute_side_effect(query, **kwargs):
+        if "course_section" in str(query).lower():
+            s = MagicMock()
+            s.scalar_one_or_none.return_value = mock_section
+            return s
+        r = MagicMock()
+        r.scalar_one_or_none.return_value = object()
+        return r
+
+    mock_db.execute = AsyncMock(side_effect=execute_side_effect)
+    mock_db.add = AsyncMock()
+    mock_db.flush = AsyncMock()
+
+    result = await create_enrollment(mock_db, section_id=section_id, student_id=student_id)
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_create_enrollment_unique_violation_returns_none(mock_db):
+    from app.modules.academic.service import create_enrollment
+
+    section_id = uuid.uuid4()
+    mock_section = MagicMock()
+    mock_section.id = section_id
+    mock_section.capacity = 30
+    mock_section.enrolled_count = 0
+    mock_section.price = Decimal("1000")
+
+    async def execute_side_effect(query, **kwargs):
+        if "course_section" in str(query).lower():
+            s = MagicMock()
+            s.scalar_one_or_none.return_value = mock_section
+            return s
+        r = MagicMock()
+        r.scalar_one_or_none.return_value = None
+        return r
+
+    mock_db.execute = AsyncMock(side_effect=execute_side_effect)
+    mock_db.add = AsyncMock()
+    mock_db.flush = AsyncMock(
+        side_effect=IntegrityError(
+            "INSERT INTO enrollments ...",
+            {},
+            Exception('duplicate key value violates unique constraint "uq_enrollments_active"'),
+        )
+    )
+
+    result = await create_enrollment(mock_db, section_id=section_id, student_id=uuid.uuid4())
+    assert result is None

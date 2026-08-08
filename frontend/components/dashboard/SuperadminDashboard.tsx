@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { apiClient } from "@/lib/api";
+import useSystemHealth, { percentColor, formatGB } from "@/hooks/useSystemHealth";
 import {
   Activity,
   Database,
@@ -42,6 +43,7 @@ export default function SuperadminDashboard() {
   const params = useParams();
   const locale = (params?.locale as string) || "ar";
   const currencySymbol = locale === "ar" ? "ريال" : "YER";
+  const { data: healthData } = useSystemHealth();
   const [data, setData] = useState<SuperadminDashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState(false);
@@ -152,7 +154,18 @@ export default function SuperadminDashboard() {
           </div>
           <div>
             <p className="text-xs text-slate-500">{t.storage}</p>
-            <p className="text-sm font-semibold text-slate-900">-</p>
+            {healthData != null ? (
+              <>
+                <p className={`text-sm font-bold ${percentColor(healthData.disk_usage_percent)}`}>
+                  {healthData.disk_usage_percent}%
+                </p>
+                <p className="text-xs text-slate-400">
+                  {formatGB(healthData.disk_used_gb)} / {formatGB(healthData.disk_total_gb)}
+                </p>
+              </>
+            ) : (
+              <p className="text-sm font-semibold text-slate-900">-</p>
+            )}
           </div>
         </div>
         <div className="card p-4 flex items-center gap-3">
@@ -161,7 +174,11 @@ export default function SuperadminDashboard() {
           </div>
           <div>
             <p className="text-xs text-slate-500">{t.backup}</p>
-            <p className="text-sm font-semibold text-slate-900">{data.backup_status || t.na}</p>
+            <p className="text-sm font-semibold text-slate-900">
+              {healthData?.last_backup
+                ? new Date(healthData.last_backup).toLocaleString(locale === "ar" ? "ar-SA" : "en-US")
+                : t.na}
+            </p>
           </div>
         </div>
       </div>

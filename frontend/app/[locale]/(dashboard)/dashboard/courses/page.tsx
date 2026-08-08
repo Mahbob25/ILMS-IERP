@@ -1,12 +1,12 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { apiClient } from "@/lib/api";
 import { useAuth } from "@/components/AuthContext";
 import ConfirmModal from "@/components/ConfirmModal";
 import Modal from "@/components/Modal";
-import { Plus, Pencil, Trash2, Loader2, RefreshCw, AlertCircle } from "lucide-react";
+import { Plus, Pencil, Trash2, Loader2, RefreshCw, AlertCircle, BookMarked } from "lucide-react";
 import { sanitizeInput, escapeLikeWildcards } from "@/lib/utils/input";
 
 interface Course {
@@ -19,6 +19,7 @@ interface Course {
 
 export default function CoursesPage() {
   const params = useParams();
+  const router = useRouter();
   const { user } = useAuth();
   const locale = (params?.locale as string) || "ar";
   const isRtl = locale === "ar";
@@ -33,6 +34,7 @@ export default function CoursesPage() {
       credits: "الوحدات",
       actions: "الإجراءات",
       add: "إضافة مقرر",
+      sectionsLink: "الشعب الدراسية",
       edit: "تعديل",
       delete: "حذف",
       save: "حفظ",
@@ -61,6 +63,7 @@ export default function CoursesPage() {
       credits: "Credits",
       actions: "Actions",
       add: "Add Course",
+      sectionsLink: "Course Sections",
       edit: "Edit",
       delete: "Delete",
       save: "Save",
@@ -224,6 +227,16 @@ export default function CoursesPage() {
             <button onClick={openCreate} className="btn-primary flex items-center gap-2">
               <Plus size={16} />
               <span>{t.add}</span>
+            </button>
+          )}
+          {canEdit && (
+            <button
+              onClick={() => router.push(`/${locale}/dashboard/sections`)}
+              className="btn-secondary flex items-center gap-2"
+              title={t.sectionsLink}
+            >
+              <BookMarked size={16} />
+              <span>{t.sectionsLink}</span>
             </button>
           )}
         </div>

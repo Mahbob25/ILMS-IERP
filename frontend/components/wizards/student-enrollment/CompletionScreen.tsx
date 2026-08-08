@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useEffect } from "react";
 import { CheckCircle2, Receipt, RotateCcw } from "lucide-react";
 
 export interface CompletionScreenLabels {
@@ -49,6 +49,21 @@ export default function CompletionScreen({
 }: CompletionScreenProps) {
   const fmt = (v: number | null | undefined) =>
     v != null ? `${v.toFixed(2)} ${labels.sar}` : "—";
+
+  // Optional telemetry: track how many times this wizard successfully completes.
+  // Non-blocking, client-only localStorage counter for future dashboard stats.
+  useEffect(() => {
+    try {
+      const stored = parseInt(
+        localStorage.getItem("wizard1Completions") || "0",
+        10
+      );
+      localStorage.setItem(
+        "wizard1Completions",
+        String(isNaN(stored) ? 1 : stored + 1)
+      );
+    } catch {}
+  }, []);
 
   return (
     <div className="animate-fade-in text-center">
