@@ -8,4 +8,9 @@ const nextConfig = {
   experimental: { cpus: 1 },
 };
 
-module.exports = withSentryConfig(nextConfig);
+module.exports = withSentryConfig(nextConfig, {
+  // No Sentry auth token is configured — skip source map generation and
+  // telemetry to cut next build memory usage significantly (small EC2 builds)
+  sourcemaps: { disable: true },
+  telemetry: false,
+});
