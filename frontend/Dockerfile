@@ -14,7 +14,7 @@ COPY . .
 # Environment variables must be present during build
 ENV NEXT_TELEMETRY_DISABLED 1
 # Cap Node heap so `next build` stays within the Docker build memory limit (avoids OOM SIGKILL)
-ENV NODE_OPTIONS="--max-old-space-size=2048"
+ENV NODE_OPTIONS="--max-old-space-size=1536"
 RUN npm run build
 
 # Production image, copy all the files and run next
