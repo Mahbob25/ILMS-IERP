@@ -23,19 +23,101 @@ interface RoleInfo {
   name: string;
 }
 
-const PERMISSION_GROUPS: Record<string, string> = {
-  general: "General",
-  academic: "Academic",
-  operations: "Operations",
-  financial: "Financial",
-  system: "System",
+const PERMISSION_GROUPS: Record<string, Record<string, string>> = {
+  ar: {
+    general: "عام",
+    academic: "أكاديمي",
+    operations: "العمليات",
+    financial: "المالية",
+    system: "النظام",
+  },
+  en: {
+    general: "General",
+    academic: "Academic",
+    operations: "Operations",
+    financial: "Financial",
+    system: "System",
+  },
 };
 
-const SYSTEM_ROLE_NAMES: Record<string, string> = {
-  superadmin: "Super Admin",
-  manager: "Manager",
-  secretary: "Secretary",
-  teacher: "Teacher",
+const SYSTEM_ROLE_NAMES: Record<string, Record<string, string>> = {
+  ar: {
+    superadmin: "مدير خارق",
+    manager: "مسؤول النظام",
+    secretary: "سكرتير",
+    teacher: "معلم",
+    accountant: "محاسب",
+    cleaner: "عامل نظافة",
+  },
+  en: {
+    superadmin: "Super Admin",
+    manager: "Manager",
+    secretary: "Secretary",
+    teacher: "Teacher",
+    accountant: "Accountant",
+    cleaner: "Cleaner",
+  },
+};
+
+const PERMISSION_LABELS: Record<string, Record<string, string>> = {
+  ar: {
+    page_dashboard: "لوحة التحكم",
+    page_users: "إدارة المستخدمين",
+    page_employees: "إدارة الموظفين",
+    page_roles: "الأدوار والصلاحيات",
+    page_courses: "المقررات",
+    page_sections: "الشعب الدراسية",
+    page_students: "الطلاب",
+    page_enrollments: "التسجيلات",
+    page_attendance: "الحضور",
+    page_gradebook: "سجل الدرجات",
+    page_payments: "المدفوعات",
+    page_expenses: "المصروفات",
+    page_financial_records: "السجل المالي",
+    page_revenue: "الإيرادات",
+    page_teacher_wallet: "محفظة المعلم",
+    page_daily_closures: "الإغلاق اليومي",
+    page_pos: "نقطة البيع",
+    page_cashier_refunds: "المبالغ المستردة",
+    page_certificates: "الشهادات",
+    page_ingestion: "استيراد المناهج",
+    page_health: "صحة النظام",
+    page_backups: "النسخ الاحتياطي",
+    page_settings: "الإعدادات",
+    page_staff_payroll: "الرواتب",
+    page_reports: "التقارير",
+    page_notifications: "الإشعارات",
+    page_wizards: "تسجيل سريع",
+  },
+  en: {
+    page_dashboard: "Dashboard",
+    page_users: "User Management",
+    page_employees: "Employee Management",
+    page_roles: "Roles & Permissions",
+    page_courses: "Courses",
+    page_sections: "Course Sections",
+    page_students: "Students",
+    page_enrollments: "Enrollments",
+    page_attendance: "Attendance",
+    page_gradebook: "Gradebook",
+    page_payments: "Payments",
+    page_expenses: "Expenses",
+    page_financial_records: "Financial Records",
+    page_revenue: "Revenue",
+    page_teacher_wallet: "Teacher Wallet",
+    page_daily_closures: "Daily Closures",
+    page_pos: "Point of Sale",
+    page_cashier_refunds: "Refunds",
+    page_certificates: "Certificates",
+    page_ingestion: "Curriculum Ingestion",
+    page_health: "System Health",
+    page_backups: "Database Backups",
+    page_settings: "Settings",
+    page_staff_payroll: "Staff Payroll",
+    page_reports: "Reports",
+    page_notifications: "Notifications",
+    page_wizards: "Quick Registration",
+  },
 };
 
 export default function RolesPage() {
@@ -60,14 +142,21 @@ export default function RolesPage() {
     ar: {
       title: "صلاحيات الأدوار", noPerm: "لا توجد صلاحيات بعد",
       save: "حفظ التغييرات", cancel: "إلغاء التغييرات", saved: "تم الحفظ",
-      saveErr: "فشل الحفظ", search: "بحث...",
+      saveErr: "فشل الحفظ", search: "بحث...", accessDenied: "غير مصرح بالوصول",
     },
     en: {
       title: "Role Permissions", noPerm: "No permissions configured yet",
       save: "Save Changes", cancel: "Cancel Changes", saved: "Saved",
-      saveErr: "Failed to save", search: "Search...",
+      saveErr: "Failed to save", search: "Search...", accessDenied: "Access denied",
     },
   }[locale === "en" ? "en" : "ar"];
+
+  const roleLabel = (name: string) =>
+    SYSTEM_ROLE_NAMES[isRtl ? "ar" : "en"][name] || name;
+  const groupLabel = (group: string) =>
+    PERMISSION_GROUPS[isRtl ? "ar" : "en"][group] || group;
+  const permissionLabel = (perm: Permission) =>
+    PERMISSION_LABELS[isRtl ? "ar" : "en"][perm.codename] || perm.label;
 
   useEffect(() => {
     if (!user?.is_superadmin && !authPermissions.includes("page_roles")) return;
@@ -137,7 +226,7 @@ export default function RolesPage() {
     return (
       <div className="max-w-6xl mx-auto text-center py-20">
         <AlertCircle className="mx-auto text-red-400 mb-4" size={48} />
-        <p className="text-red-500 font-medium">Access denied</p>
+        <p className="text-red-500 font-medium">{t.accessDenied}</p>
       </div>
     );
   }
@@ -167,7 +256,7 @@ export default function RolesPage() {
             <h2 className="text-lg font-bold text-slate-900">{t.title}</h2>
             {activeRole && (
               <p className="text-xs text-slate-400">
-                {SYSTEM_ROLE_NAMES[activeRole.name] || activeRole.name}
+                {roleLabel(activeRole.name)}
               </p>
             )}
           </div>
@@ -186,7 +275,7 @@ export default function RolesPage() {
                 : "bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100"
             } border`}
           >
-            {SYSTEM_ROLE_NAMES[role.name] || role.name}
+            {roleLabel(role.name)}
           </button>
         ))}
       </div>
@@ -202,7 +291,7 @@ export default function RolesPage() {
       {Object.entries(groupedPerms).map(([group, perms]) => (
         <div key={group} className="card p-5">
           <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider mb-3">
-            {PERMISSION_GROUPS[group] || group}
+            {groupLabel(group)}
           </h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
             {perms.map((perm) => {
@@ -227,7 +316,7 @@ export default function RolesPage() {
                   <span className={`text-sm font-medium ${
                     isActive ? "text-brand-700" : "text-slate-600"
                   }`}>
-                    {perm.label}
+                    {permissionLabel(perm)}
                   </span>
                 </button>
               );
