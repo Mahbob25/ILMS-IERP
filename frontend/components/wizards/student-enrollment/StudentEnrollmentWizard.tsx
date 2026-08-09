@@ -38,6 +38,8 @@ interface CourseSection {
   id: string;
   course_id: string;
   status: string;
+  capacity: number;
+  enrolled_count: number;
 }
 
 interface Course {
@@ -202,6 +204,9 @@ export default function StudentEnrollmentWizard({
   const [students, setStudents] = useState<Student[]>([]);
   const [sections, setSections] = useState<CourseSection[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
+  const [enrolledSectionIds, setEnrolledSectionIds] = useState<Set<string>>(
+    new Set()
+  );
 
   const markDirty = useCallback(() => setDirty(true), [setDirty]);
   const markClean = useCallback(() => {
@@ -242,6 +247,38 @@ export default function StudentEnrollmentWizard({
   useEffect(() => {
     fetchLookups();
   }, [fetchLookups]);
+
+useEffect(() => {
+    const student = state.student;
+    if (!student) {
+      setEnrolledSectionIds(new Set());
+      return;
+    }
+    let cancelled = false;
+    const fetchStudentEnrollments = async () => {
+      try {
+        const res = await apiClient.get<{
+          items: { section_id: string }[];
+          total: number;
+        }>(
+  `/academic/enrollments?student_id=${student.id}&limit=1000`
+        );
+        if (!cancelled) {
+          setEnrolledSectionIds(
+            new Set(res.data.items.map((e) => e.section_id))
+          );
+        }
+      } catch {
+        if (!cancelled) {
+          setEnrolledSectionIds(new Set());
+        }
+      }
+    };
+    fetchStudentEnrollments();
+    return () => {
+      cancelled = true;
+    };
+  }, [state.student?.id]);
 
   const getSectionCourse = useCallback(
     (sectionId: string) => {
@@ -454,6 +491,14 @@ export default function StudentEnrollmentWizard({
         }
       : null;
 
+  const availableSections = sections.filter(
+    (s) =>
+      s.status !== "completed" &&
+      s.status !== "cancelled" &&
+      !enrolledSectionIds.has(s.id) &&
+      s.enrolled_count < s.capacity
+  );
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-48">
@@ -602,7 +647,7 @@ export default function StudentEnrollmentWizard({
               markDirty();
               dispatch({ type: "SET_SECTION", sectionId });
             }}
-            sections={sections}
+            sections={availableSections}
             getSectionLabel={getSectionCourse}
             showDiscount={user?.role?.name !== "secretary"}
             discount={state.discount}

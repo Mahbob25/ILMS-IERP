@@ -112,4 +112,28 @@ test.describe('Student Enrollment Wizard (Authenticated)', () => {
     await wizard.closeReceipt()
     await wizard.expectCompletion()
   })
+
+  test('warns before leaving with unsaved progress, then honors stay/leave', async ({
+    page,
+  }) => {
+    // Enter create-student mode and type into the form to dirty the wizard
+    await wizard.startCreateStudent()
+    await wizard.fillStudentForm('NAV01', 'Nav Guard Student', 'nav@example.com')
+
+    // Sidebar navigation while dirty is intercepted by the navigation guard
+    await dashboard.clickSidebarLink('Dashboard')
+    await wizard.expectLeaveConfirmVisible()
+    expect(page.url()).toContain('/wizards/student-enrollment')
+
+    // Cancel -> stays on the wizard, still dirty
+    await wizard.cancelLeave()
+    await expect(page.locator('text=Leave this page?')).toBeHidden()
+    expect(page.url()).toContain('/wizards/student-enrollment')
+
+    // Confirm leave -> navigates away and clears dirty state
+    await dashboard.clickSidebarLink('Dashboard')
+    await wizard.expectLeaveConfirmVisible()
+    await wizard.confirmLeave()
+    await expect(page).toHaveURL(/\/en\/dashboard$/)
+  })
 })

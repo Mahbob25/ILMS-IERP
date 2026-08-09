@@ -104,4 +104,18 @@ export class WizardPage {
   async closeReceipt(): Promise<void> {
     await this.page.getByRole('button', { name: 'Close' }).click()
   }
+
+  async expectLeaveConfirmVisible(): Promise<void> {
+    await expect(this.page.locator('text=Leave this page?')).toBeVisible({
+      timeout: 5000,
+    })
+  }
+
+  async confirmLeave(): Promise<void> {
+    await this.page.getByRole('button', { name: 'Leave' }).click()
+  }
+
+  async cancelLeave(): Promise<void> {
+    await this.page.getByRole('button', { name: 'Stay' }).click()
+  }
 }

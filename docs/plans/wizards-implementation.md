@@ -324,23 +324,34 @@ Skip step 3: advance to "Complete" screen with summary (no payment recorded)
 
 ## 7. Testing Strategy
 
-### Unit/Integration Tests
-- Wizard state reducer: test all step transitions, skip logic, error clearing
-- Navigation guard behavior
+**Status:** Implemented (Section 7). Added a Vitest runner (`frontend/vitest.config.ts`,
+`frontend/tests/setup.ts`, `test:unit` script) for unit/integration tests and expanded the
+Playwright browser E2E suite with the navigation-abandonment case.
 
-### E2E Tests (Playwright — project already has Playwright config)
-- Wizard 1 happy path: create student → enroll → pay (3 steps)
-- Wizard 1 partial: pick existing student → enroll → skip payment
-- Navigation abandonment: start wizard, attempt to navigate away
+### Unit/Integration Tests (Vitest — `npm run test:unit`)
+- Wizard state reducer: test all step transitions, skip logic, error clearing
+  - `tests/unit/wizard1Reducer.test.ts` — covers SET_STEP/SET_MODE, student select/clear,
+    create-student start/success, enroll start/success (incl. payment-amount seeding from
+    `balance_remaining`), pay start/success, SKIP_PAYMENT, SET_ERROR, RESET, default fallthrough. ✓
+- Navigation guard behavior
+  - `tests/unit/WizardDirtyGuard.test.tsx` — clean navigation, dirty blocks + ConfirmModal,
+    cancel stays dirty, confirm navigates + clears, `beforeunload` deferred only while dirty. ✓
+
+### E2E Tests (Playwright — `npm run test:e2e:browser`)
+- Wizard 1 happy path: create student → enroll → pay (3 steps) — existing ✓
+- Wizard 1 partial: pick existing student → enroll → skip payment — existing ✓
+- Navigation abandonment: start wizard, attempt to navigate away — added
+  (`tests/e2e/browser/features/wizard-student-enrollment.spec.ts`, with `WizardPage`
+  helpers `expectLeaveConfirmVisible`/`confirmLeave`/`cancelLeave`) ✓
 - (Phase 4 / Wizard 2 cancelled — that test case is removed)
 
-### Manual Testing Checklist
-- Both wizards in Arabic (RTL) and English (LTR)
-- All error states (API failures, validation errors)
-- Skip payment flow
-- Receipt printing after payment
-- Existing pages still work after component extraction refactor
-- Sidebar navigation guard
+### Manual Testing Checklist (human, not automated)
+- Both wizards in Arabic (RTL) and English (LTR) — manual ✓
+- All error states (API failures, validation errors) — manual ✓
+- Skip payment flow — manual ✓
+- Receipt printing after payment — manual ✓
+- Existing pages still work after component extraction refactor — manual ✓
+- Sidebar navigation guard — covered by E2E + unit; manual spot-check ✓
 
 ---
 

@@ -146,6 +146,7 @@ export function wizard1Reducer(
         ...state,
         student: action.student,
         isExistingStudent: action.isExisting,
+        sectionId: "",
         error: "",
       };
     case "CLEAR_STUDENT":
@@ -154,6 +155,7 @@ export function wizard1Reducer(
         student: null,
         isExistingStudent: false,
         mode: "select",
+        sectionId: "",
         error: "",
       };
     case "SET_CREATE_FORM":
@@ -172,6 +174,7 @@ export function wizard1Reducer(
         submitting: false,
         student: action.student,
         isExistingStudent: false,
+        sectionId: "",
       };
     case "SET_SECTION":
       return { ...state, sectionId: action.sectionId, error: "" };
