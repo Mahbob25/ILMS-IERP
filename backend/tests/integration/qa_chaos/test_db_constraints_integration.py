@@ -143,16 +143,8 @@ class TestDBConstraintsIntegration:
         migration_path = (
             "backend/alembic/versions/202607130000_db_check_constraints_phase_1.py"
         )
-        try:
-            with open(migration_path, encoding="utf-8") as f:
-                content = f.read()
-        except FileNotFoundError:
-            migration_path = (
-                "E:/lms/backend/alembic/versions/"
-                "202607130000_db_check_constraints_phase_1.py"
-            )
-            with open(migration_path, encoding="utf-8") as f:
-                content = f.read()
+        with open(migration_path, encoding="utf-8") as f:
+            content = f.read()
 
         for code, info in expected_constraints.items():
             assert info["constraint_name"] in content, (
@@ -162,7 +154,7 @@ class TestDBConstraintsIntegration:
 
     def test_all_constraints_use_not_valid_pattern(self):
         migration_path = (
-            "E:/lms/backend/alembic/versions/"
+            "backend/alembic/versions/"
             "202607130000_db_check_constraints_phase_1.py"
         )
         with open(migration_path, encoding="utf-8") as f:
@@ -180,7 +172,7 @@ class TestDBConstraintsIntegration:
 
     def test_all_constraints_have_validate_step(self):
         migration_path = (
-            "E:/lms/backend/alembic/versions/"
+            "backend/alembic/versions/"
             "202607130000_db_check_constraints_phase_1.py"
         )
         with open(migration_path, encoding="utf-8") as f:
@@ -195,7 +187,7 @@ class TestDBConstraintsIntegration:
 
     def test_uq_enrollments_active_partial_unique_index_exists(self):
         migration_path = (
-            "E:/lms/backend/alembic/versions/"
+            "backend/alembic/versions/"
             "202607130000_db_check_constraints_phase_1.py"
         )
         with open(migration_path, encoding="utf-8") as f:
