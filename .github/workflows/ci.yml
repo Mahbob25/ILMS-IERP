@@ -37,11 +37,13 @@ jobs:
         working-directory: backend
         env:
           DATABASE_URL: postgresql+asyncpg://lims:lims_test@localhost:5432/lims_test
+          JWT_SECRET_KEY: ci_test_key_not_used_in_production_do_not_use
       - name: Run backend tests
         run: pytest -v --cov=app --cov-report=term-missing
         working-directory: backend
         env:
           DATABASE_URL: postgresql+asyncpg://lims:lims_test@localhost:5432/lims_test
+          JWT_SECRET_KEY: ci_test_key_not_used_in_production_do_not_use
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
