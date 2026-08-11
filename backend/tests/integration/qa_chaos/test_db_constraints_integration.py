@@ -1,4 +1,9 @@
 import pytest
+from pathlib import Path
+
+MIGRATION_FILE = (
+    Path(__file__).parents[3] / "alembic" / "versions" / "202607130000_db_check_constraints_phase_1.py"
+)
 
 
 expected_constraints = {
@@ -140,11 +145,7 @@ class TestDBConstraintsIntegration:
         assert "holdback_rate" in c["check"]
 
     def test_all_d01_d13_present_in_migration(self):
-        migration_path = (
-            "backend/alembic/versions/202607130000_db_check_constraints_phase_1.py"
-        )
-        with open(migration_path, encoding="utf-8") as f:
-            content = f.read()
+        content = MIGRATION_FILE.read_text(encoding="utf-8")
 
         for code, info in expected_constraints.items():
             assert info["constraint_name"] in content, (
@@ -153,12 +154,7 @@ class TestDBConstraintsIntegration:
             )
 
     def test_all_constraints_use_not_valid_pattern(self):
-        migration_path = (
-            "backend/alembic/versions/"
-            "202607130000_db_check_constraints_phase_1.py"
-        )
-        with open(migration_path, encoding="utf-8") as f:
-            content = f.read()
+        content = MIGRATION_FILE.read_text(encoding="utf-8")
 
         for code, info in expected_constraints.items():
             add_pattern = f"ADD CONSTRAINT {info['constraint_name']}"
@@ -171,12 +167,7 @@ class TestDBConstraintsIntegration:
             )
 
     def test_all_constraints_have_validate_step(self):
-        migration_path = (
-            "backend/alembic/versions/"
-            "202607130000_db_check_constraints_phase_1.py"
-        )
-        with open(migration_path, encoding="utf-8") as f:
-            content = f.read()
+        content = MIGRATION_FILE.read_text(encoding="utf-8")
 
         for code, info in expected_constraints.items():
             validate_pattern = f"VALIDATE CONSTRAINT {info['constraint_name']}"
@@ -186,12 +177,7 @@ class TestDBConstraintsIntegration:
             )
 
     def test_uq_enrollments_active_partial_unique_index_exists(self):
-        migration_path = (
-            "backend/alembic/versions/"
-            "202607130000_db_check_constraints_phase_1.py"
-        )
-        with open(migration_path, encoding="utf-8") as f:
-            content = f.read()
+        content = MIGRATION_FILE.read_text(encoding="utf-8")
 
         assert "uq_enrollments_active" in content, (
             "S21: partial unique index 'uq_enrollments_active' not in migration"

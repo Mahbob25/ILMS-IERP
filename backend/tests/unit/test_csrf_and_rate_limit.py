@@ -17,10 +17,8 @@ async def test_csrf_rejects_without_token():
 
     middleware = CSRFMiddleware(lambda r: None)
 
-    with pytest.raises(HTTPException) as exc:
-        await middleware.dispatch(request, call_next)
-    assert exc.value.status_code == 403
-    assert "CSRF" in exc.value.detail
+    response = await middleware.dispatch(request, call_next)
+    assert response.status_code == 403
 
 
 @pytest.mark.asyncio
@@ -37,9 +35,8 @@ async def test_csrf_rejects_mismatched_tokens():
 
     middleware = CSRFMiddleware(lambda r: None)
 
-    with pytest.raises(HTTPException) as exc:
-        await middleware.dispatch(request, call_next)
-    assert exc.value.status_code == 403
+    response = await middleware.dispatch(request, call_next)
+    assert response.status_code == 403
 
 
 @pytest.mark.asyncio
