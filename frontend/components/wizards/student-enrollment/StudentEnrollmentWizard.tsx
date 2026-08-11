@@ -495,8 +495,7 @@ useEffect(() => {
     (s) =>
       s.status !== "completed" &&
       s.status !== "cancelled" &&
-      !enrolledSectionIds.has(s.id) &&
-      s.enrolled_count < s.capacity
+      !enrolledSectionIds.has(s.id)
   );
 
   if (loading) {
