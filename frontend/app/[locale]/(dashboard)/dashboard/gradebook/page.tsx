@@ -8,6 +8,7 @@ import RefreshButton from "@/components/RefreshButton";
 import Select from "@/components/ui/Select";
 import EmptyState from "@/components/EmptyState";
 import { sanitizeInput } from "@/lib/utils/input";
+import TableContainer from "@/components/ui/TableContainer";
 import { Loader2, Save, AlertCircle } from "lucide-react";
 
 interface CourseSection { id: string; course_id: string; teacher_id: string; status: string; }
@@ -263,7 +264,8 @@ export default function GradebookPage() {
               <button onClick={() => setMessage(null)} className="float-end">&times;</button>
             </div>
           )}
-          <table className="data-table">
+          <TableContainer>
+            <table className="data-table">
             <thead>
               <tr>
                 <th className="w-8">#</th>
@@ -308,7 +310,8 @@ export default function GradebookPage() {
                 </tr>
               ))}
             </tbody>
-          </table>
+            </table>
+            </TableContainer>
           {sectionStudents.length > 0 && !readOnly && (
             <div className="flex justify-end px-4 py-3 border-t border-slate-200">
               <button

@@ -10,6 +10,7 @@ import EmptyState from "@/components/EmptyState";
 import { sanitizeInput } from "@/lib/utils/input";
 import { Loader2, Check, X, Clock, AlertCircle } from "lucide-react";
 import { getLocalDateString } from "@/lib/dates";
+import TableContainer from '@/components/ui/TableContainer';
 
 interface CourseSection { id: string; course_id: string; teacher_id: string; }
 interface Course { id: string; name: string; code: string; }
@@ -252,7 +253,8 @@ export default function AttendancePage() {
 
       {selectedSectionId && enrolledStudents.length > 0 && (
         <div className="card overflow-hidden">
-          <table className="data-table">
+          <TableContainer>
+            <table className="data-table">
             <thead>
               <tr>
                 <th>#</th>
@@ -290,6 +292,7 @@ export default function AttendancePage() {
               ))}
             </tbody>
           </table>
+        </TableContainer>
         </div>
       )}
     </div>

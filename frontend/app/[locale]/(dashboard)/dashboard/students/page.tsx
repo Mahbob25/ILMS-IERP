@@ -10,6 +10,7 @@ import Modal from "@/components/Modal";
 import StudentFormFields from "@/components/students/StudentFormFields";
 import { Plus, Pencil, Trash2, Loader2, Eye, AlertCircle, Workflow } from "lucide-react";
 import { sanitizeInput, validateName } from "@/lib/utils/input";
+import TableContainer from '@/components/ui/TableContainer';
 
 interface Student {
   id: string;
@@ -292,7 +293,8 @@ export default function StudentsPage() {
         <div className="card p-8 text-center text-sm text-slate-500">{t.empty}</div>
       ) : (
         <div className="card overflow-hidden">
-          <table className="data-table">
+          <TableContainer>
+            <table className="data-table">
             <thead>
               <tr>
                 <th>{t.studentCode}</th>
@@ -341,6 +343,7 @@ export default function StudentsPage() {
               ))}
             </tbody>
           </table>
+        </TableContainer>
           <div className="flex items-center justify-between px-4 py-3 border-t border-slate-200 text-sm text-slate-600">
             <span>{t.showing} {Math.min((page - 1) * limit + 1, totalCount)}–{Math.min(page * limit, totalCount)} {t.of} {totalCount}</span>
             <div className="flex items-center gap-2">

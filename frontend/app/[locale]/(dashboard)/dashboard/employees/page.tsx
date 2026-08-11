@@ -13,6 +13,7 @@ import {
   UserCheck, UserX, Shield,
 } from "lucide-react";
 import { sanitizeInput, escapeLikeWildcards, validateName } from "@/lib/utils/input";
+import TableContainer from '@/components/ui/TableContainer';
 
 interface Employee {
   id: string;
@@ -466,7 +467,8 @@ export default function EmployeesPage() {
         <div className="card p-8 text-center text-sm text-slate-500">{t.empty}</div>
       ) : (
         <div className="card overflow-hidden">
-          <table className="data-table">
+          <TableContainer>
+            <table className="data-table">
             <thead>
               <tr>
                 <th>{t.fullName}</th>
@@ -568,6 +570,7 @@ export default function EmployeesPage() {
               ))}
             </tbody>
           </table>
+        </TableContainer>
         </div>
       )}
 

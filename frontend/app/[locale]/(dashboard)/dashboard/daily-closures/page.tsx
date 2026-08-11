@@ -6,6 +6,7 @@ import { apiClient } from "@/lib/api";
 import { useAuth } from "@/components/AuthContext";
 import { Loader2, RefreshCw, Lock, Unlock, Eye } from "lucide-react";
 import { formatDisplayDate } from "@/lib/dates";
+import TableContainer from '@/components/ui/TableContainer';
 
 interface DailyClosure {
   date: string;
@@ -214,7 +215,8 @@ export default function DailyClosuresPage() {
         <div className="card p-8 text-center text-sm text-slate-500">{t.empty}</div>
       ) : (
         <div className="card overflow-hidden">
-          <table className="data-table">
+          <TableContainer>
+            <table className="data-table">
             <thead>
               <tr>
                 <th>{t.date}</th>
@@ -272,6 +274,7 @@ export default function DailyClosuresPage() {
               ))}
             </tbody>
           </table>
+        </TableContainer>
         </div>
       )}
 

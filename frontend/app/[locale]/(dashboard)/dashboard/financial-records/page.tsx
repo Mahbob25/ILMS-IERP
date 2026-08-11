@@ -10,6 +10,7 @@ import { escapeLikeWildcards } from "@/lib/utils/input";
 import ReceiptModal from "@/components/ReceiptModal";
 import RefundReceipt from "@/components/cashier/RefundReceipt";
 import { formatDisplayDate } from "@/lib/dates";
+import TableContainer from '@/components/ui/TableContainer';
 
 interface FinancialRecord {
   doc_type: "receipt" | "voucher" | "refund";
@@ -353,7 +354,8 @@ export default function FinancialRecordsPage() {
       ) : (
         <>
           <div className="card overflow-hidden">
-            <table className="data-table">
+            <TableContainer>
+              <table className="data-table">
               <thead>
                 <tr>
                   <th>{t.docType}</th>
@@ -399,6 +401,7 @@ export default function FinancialRecordsPage() {
                 ))}
               </tbody>
             </table>
+        </TableContainer>
           </div>
 
           <div className="flex items-center justify-between text-sm text-slate-600">

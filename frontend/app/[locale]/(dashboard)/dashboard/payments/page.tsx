@@ -13,6 +13,7 @@ import { Plus, Loader2, RefreshCw, Eye, Search, X, AlertCircle } from "lucide-re
 import { sanitizeInput, escapeLikeWildcards } from "@/lib/utils/input";
 import ReceiptModal, { ReceiptData } from "@/components/ReceiptModal";
 import { getLocalDateString, formatDisplayDate } from "@/lib/dates";
+import TableContainer from '@/components/ui/TableContainer';
 
 interface Payment {
   id: string;
@@ -470,7 +471,8 @@ export default function PaymentsPage() {
         </div>
       ) : (
         <div className="card overflow-hidden">
-          <table className="data-table">
+          <TableContainer>
+            <table className="data-table">
             <thead>
               <tr>
                 <th>{t.receiptNumber}</th>
@@ -545,6 +547,7 @@ export default function PaymentsPage() {
               })}
             </tbody>
           </table>
+        </TableContainer>
         </div>
       )}
 

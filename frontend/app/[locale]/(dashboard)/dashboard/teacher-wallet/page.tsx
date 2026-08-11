@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { getLocalDateString, formatDisplayDate, formatDisplayDateTime } from "@/lib/dates";
 import ContractStatusBadge from "@/components/sections/ContractStatusBadge";
+import TableContainer from "@/components/ui/TableContainer";
 
 // ─── Shared Types ───────────────────────────────────────────────────────────
 
@@ -230,7 +231,8 @@ function TeacherWalletView({ locale, employeeId }: { locale: string; employeeId:
               <div className="px-4 py-3 border-b border-slate-200 flex items-center justify-between">
                 <h3 className="text-sm font-bold text-slate-900">{t.sectionBreakdown}</h3>
               </div>
-              <table className="data-table">
+              <TableContainer>
+                <table className="data-table">
                 <thead>
                   <tr>
                     <th>{t.course}</th>
@@ -261,7 +263,8 @@ function TeacherWalletView({ locale, employeeId }: { locale: string; employeeId:
                     </tr>
                   ))}
                 </tbody>
-              </table>
+                </table>
+                </TableContainer>
             </div>
           )}
           <div>
@@ -270,7 +273,8 @@ function TeacherWalletView({ locale, employeeId }: { locale: string; employeeId:
               <EmptyState title={t.emptyHistory} message="" />
             ) : (
               <div className="card overflow-hidden">
-                <table className="data-table">
+                <TableContainer>
+                  <table className="data-table">
                   <thead>
                     <tr>
                       <th>{t.receiptNumber}</th>
@@ -289,7 +293,8 @@ function TeacherWalletView({ locale, employeeId }: { locale: string; employeeId:
                       </tr>
                     ))}
                   </tbody>
-                </table>
+                  </table>
+                  </TableContainer>
               </div>
             )}
           </div>
@@ -594,7 +599,8 @@ function AdminWalletOverview({ locale }: { locale: string }) {
         <EmptyState title={t.noTeachers} message="" />
       ) : (
         <div className="card overflow-hidden">
-          <table className="data-table">
+          <TableContainer>
+            <table className="data-table">
             <thead>
               <tr>
                 <th className="w-8"></th>
@@ -650,7 +656,8 @@ function AdminWalletOverview({ locale }: { locale: string }) {
                             ) : expandedWithdrawals.length === 0 ? (
                               <EmptyState title={t.emptyHistory} message="" />
                             ) : (
-                              <table className="data-table text-xs">
+                              <TableContainer>
+                                <table className="data-table text-xs">
                                 <thead>
                                   <tr>
                                     <th>{t.receiptNumber}</th>
@@ -669,7 +676,8 @@ function AdminWalletOverview({ locale }: { locale: string }) {
                                     </tr>
                                   ))}
                                 </tbody>
-                              </table>
+                                </table>
+                              </TableContainer>
                             )}
                           </div>
                         </td>
@@ -680,6 +688,7 @@ function AdminWalletOverview({ locale }: { locale: string }) {
               })}
             </tbody>
           </table>
+          </TableContainer>
         </div>
       )}
 

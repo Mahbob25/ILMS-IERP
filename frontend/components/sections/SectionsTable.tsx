@@ -19,6 +19,7 @@ import CancelSectionModal from "@/components/sections/CancelSectionModal";
 import DeactivateSectionModal from "@/components/sections/DeactivateSectionModal";
 import CompleteSectionModal from "@/components/sections/CompleteSectionModal";
 import ContractStatusBadge from "@/components/sections/ContractStatusBadge";
+import TableContainer from "@/components/ui/TableContainer";
 
 interface CourseSection {
   id: string;
@@ -116,7 +117,8 @@ export default function SectionsTable({
 
   return (
     <div className="card overflow-hidden">
-      <table className="data-table">
+      <TableContainer>
+        <table className="data-table">
         <thead>
           <tr>
             <th>{t.course}</th>
@@ -265,7 +267,8 @@ export default function SectionsTable({
             );
           })}
         </tbody>
-      </table>
+        </table>
+        </TableContainer>
       <div className="flex items-center justify-between px-4 py-3 border-t border-slate-200 text-sm text-slate-600">
         <span>{t.showing} {Math.min((page - 1) * limit + 1, totalCount)}–{Math.min(page * limit, totalCount)} {t.of} {totalCount}</span>
         <div className="flex items-center gap-2">

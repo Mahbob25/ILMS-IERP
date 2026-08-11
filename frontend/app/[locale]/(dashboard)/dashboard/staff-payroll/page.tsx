@@ -10,6 +10,7 @@ import UndoToast from "@/components/UndoToast";
 import { useClosureStatus } from "@/hooks/useClosureStatus";
 import { useUndoableAction } from "@/hooks/useUndoableAction";
 import { Loader2, RefreshCw, Wallet, AlertCircle } from "lucide-react";
+import TableContainer from '@/components/ui/TableContainer';
 
 interface StaffMember {
   id: string;
@@ -263,7 +264,8 @@ export default function StaffPayrollPage() {
       )}
 
       <div className="card overflow-hidden">
-        <table className="data-table">
+        <TableContainer>
+          <table className="data-table">
           <thead>
             <tr>
               <th>{t.name}</th>
@@ -318,6 +320,7 @@ export default function StaffPayrollPage() {
             )}
           </tbody>
         </table>
+        </TableContainer>
       </div>
 
       <Modal
