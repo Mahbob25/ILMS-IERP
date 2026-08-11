@@ -347,7 +347,13 @@ async def complete_section(
             )
 
         if section.contract.status == ContractStatus.ACTIVE:
-            await ledger_finalize_grades(db, section_id=section.id)
+            if force and ungraded:
+                # Bypass grade check override: skip finalization
+                # and manually advance contract to GRADES_SUBMITTED
+                section.contract.status = ContractStatus.GRADES_SUBMITTED
+                section.contract.updated_at = datetime.now(timezone.utc)
+            else:
+                await ledger_finalize_grades(db, section_id=section.id)
 
         if section.contract.status == ContractStatus.GRADES_SUBMITTED:
             await ledger_settle_contract(
