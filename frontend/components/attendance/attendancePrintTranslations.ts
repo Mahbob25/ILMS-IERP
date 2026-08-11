@@ -1,0 +1,30 @@
+export function getAttendancePrintTranslations(locale: string) {
+  const isAr = locale === "ar";
+  return {
+    title: isAr ? "كشف الحضور الورقي" : "Attendance Sheet",
+    subtitle: isAr ? "جاهز للطباعة — املأ الحضور بالقلم" : "Print-ready roster — fill attendance by hand",
+    course: isAr ? "المقرر" : "Course",
+    section: isAr ? "الشعبة" : "Section",
+    teacher: isAr ? "المدرس" : "Teacher",
+    classroom: isAr ? "القاعة" : "Classroom",
+    schedule: isAr ? "الجدول" : "Schedule",
+    date: isAr ? "التاريخ" : "Date",
+    institute: isAr ? "المعهد" : "Institute",
+    seq: isAr ? "م" : "#",
+    studentName: isAr ? "اسم الطالب" : "Student Name",
+    studentCode: isAr ? "الرقم" : "Code",
+    present: isAr ? "حاضر" : "Present",
+    absent: isAr ? "غائب" : "Absent",
+    late: isAr ? "متأخر" : "Late",
+    excused: isAr ? "معذور" : "Excused",
+    notes: isAr ? "ملاحظات" : "Notes",
+    signatureTeacher: isAr ? "توقيع المدرس" : "Teacher Signature",
+    signatureAdmin: isAr ? "توقيع الإدارة" : "Admin Signature",
+    page: isAr ? "صفحة" : "Page",
+    print: isAr ? "طباعة" : "Print",
+    back: isAr ? "رجوع" : "Back",
+    noSection: isAr ? "اختر شعبة من صفحة الحضور أولاً" : "Pick a section from the Attendance page first",
+    noStudents: isAr ? "لا يوجد طلاب مسجلون في هذه الشعبة" : "No students enrolled in this section",
+    empty: isAr ? "لا توجد بيانات للطباعة" : "Nothing to print",
+  };
+}

@@ -97,3 +97,14 @@
 .wizard-step-enter {
   animation: wizardStepEnter 0.25s ease-out;
 }
+
+@media print {
+  @page { size: A4; margin: 12mm; }
+  body { background: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  header, aside, nav { display: none !important; }
+  .no-print { display: none !important; }
+  .print-sheet { box-shadow: none !important; border: none !important; }
+  .print-row { break-inside: avoid; page-break-inside: avoid; }
+  thead { display: table-header-group; }
+  tfoot { display: table-footer-group; }
+}

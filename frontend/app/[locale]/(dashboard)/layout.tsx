@@ -39,6 +39,7 @@ import {
   Workflow,
 } from "lucide-react";
 import NotificationBell from "@/components/notifications/NotificationBell";
+import GlobalSearch from "@/components/search/GlobalSearch";
 
 export default function DashboardLayout({
   children,
@@ -223,6 +224,7 @@ function DashboardLayoutInner({
     page_reports: ["superadmin", "manager", "secretary"],
     page_notifications: ["superadmin", "manager", "secretary", "teacher"],
     page_wizards: ["superadmin", "manager", "secretary"],
+    page_search: ["superadmin", "manager", "secretary", "teacher"],
   };
 
   const hasPageAccess = (permissionCodename: string): boolean => {
@@ -264,6 +266,7 @@ function DashboardLayoutInner({
     "dashboard/reports": "page_reports",
     "dashboard/notifications": "page_notifications",
     "dashboard/wizards": "page_wizards",
+    "dashboard/search": "page_search",
   };
 
   const routeKey = pathname.split("/").slice(2).join("/").replace(/\/$/, "");
@@ -534,6 +537,7 @@ function DashboardLayoutInner({
           </div>
 
           <div className="flex items-center gap-3">
+            <GlobalSearch />
             {/* Language Switch */}
             <button
               onClick={handleLanguageToggle}

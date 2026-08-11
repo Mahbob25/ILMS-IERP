@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { apiClient } from "@/lib/api";
 import { useAuth } from "@/components/AuthContext";
 import RefreshButton from "@/components/RefreshButton";
@@ -22,6 +22,7 @@ const STATUS_OPTIONS = ["present", "absent", "late", "excused"];
 
 export default function AttendancePage() {
   const params = useParams();
+  const router = useRouter();
   const { user } = useAuth();
   const readOnly = user?.role?.name !== "teacher";
   const locale = (params?.locale as string) || "ar";
@@ -196,6 +197,14 @@ export default function AttendancePage() {
         </div>
         <div className="flex items-center gap-2">
           <RefreshButton onRefresh={fetchData} />
+          {selectedSectionId && (
+            <button
+              onClick={() => router.push(`/${locale}/dashboard/attendance/print?sectionId=${selectedSectionId}&date=${encodeURIComponent(sessionDate)}`)}
+              className="btn-secondary text-xs"
+            >
+              {locale === "ar" ? "طباعة الكشف" : "Print Sheet"}
+            </button>
+          )}
         </div>
       </div>
 
