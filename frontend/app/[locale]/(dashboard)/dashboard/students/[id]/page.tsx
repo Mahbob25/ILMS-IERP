@@ -8,6 +8,7 @@ import RefreshButton from "@/components/RefreshButton";
 import Modal from "@/components/Modal";
 import Select from "@/components/ui/Select";
 import { Loader2, ArrowLeft, Wallet, DollarSign, Plus, X, Award, Eye, FileDown, Check, Clock, AlertCircle, UserX, ChevronDown, ChevronUp } from "lucide-react";
+import TableContainer from "@/components/ui/TableContainer";
 import CertificatePreview from "@/components/CertificatePreview";
 import PendingRefundBadge from "@/components/students/PendingRefundBadge";
 
@@ -580,7 +581,7 @@ export default function StudentDetailPage() {
           {payments.length === 0 ? (
             <p className="text-sm text-slate-500 text-center py-4">{t.noPayments}</p>
           ) : (
-            <div className="overflow-x-auto">
+            <TableContainer>
               <table className="data-table text-xs">
                 <thead>
                   <tr>
@@ -606,7 +607,7 @@ export default function StudentDetailPage() {
                   })}
                 </tbody>
               </table>
-            </div>
+            </TableContainer>
           )}
         </div>
       </div>
@@ -654,7 +655,7 @@ export default function StudentDetailPage() {
         {certificates.length === 0 ? (
           <p className="text-sm text-slate-500 text-center py-4">{t.noCertificates}</p>
         ) : (
-          <div className="overflow-x-auto">
+          <TableContainer>
             <table className="data-table text-xs">
               <thead>
                 <tr>
@@ -723,7 +724,7 @@ export default function StudentDetailPage() {
                 ))}
               </tbody>
             </table>
-          </div>
+          </TableContainer>
         )}
       </div>
 

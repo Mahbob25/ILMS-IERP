@@ -21,6 +21,7 @@ import {
   ChevronUp,
   AlertCircle,
 } from "lucide-react";
+import TableContainer from "@/components/ui/TableContainer";
 import SectionWarningBanner from "@/components/sections/SectionWarningBanner";
 import SectionStatusBadge from "@/components/sections/SectionStatusBadge";
 import FinancialSummary from "@/components/sections/FinancialSummary";
@@ -707,7 +708,7 @@ export default function SectionStudentsPage() {
             {t.empty}
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <TableContainer>
             <table className="data-table">
               <thead>
                 <tr>
@@ -795,7 +796,7 @@ export default function SectionStudentsPage() {
                 ))}
               </tbody>
             </table>
-          </div>
+          </TableContainer>
         )}
       </div>
 

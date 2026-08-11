@@ -10,6 +10,7 @@ import CertificatePreview from "@/components/CertificatePreview";
 import EmptyState from "@/components/EmptyState";
 import { Loader2, Search, Trash2, Eye, FileDown, AlertCircle, Square, CheckSquare } from "lucide-react";
 import { useBulkSelection } from "@/hooks/useBulkSelection";
+import TableContainer from "@/components/ui/TableContainer";
 import BulkActionBar from "@/components/BulkActionBar";
 
 interface Certificate {
@@ -402,7 +403,8 @@ export default function CertificatesPage() {
             message={bulkMessage}
             onDismissMessage={() => setBulkMessage(null)}
           />
-          <table className="data-table">
+          <TableContainer>
+            <table className="data-table">
             <thead>
               <tr>
                 <th className="w-8">
@@ -472,7 +474,8 @@ export default function CertificatesPage() {
                 </tr>
               ))}
             </tbody>
-          </table>
+            </table>
+          </TableContainer>
           <div className="flex items-center justify-between px-4 py-3 border-t border-slate-200 text-sm text-slate-600">
             <span>{t.showing} {Math.min((page - 1) * limit + 1, totalCount)}–{Math.min(page * limit, totalCount)} {t.of} {totalCount}</span>
             <div className="flex items-center gap-2">

@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { apiClient } from "@/lib/api";
 import { useAuth } from "@/components/AuthContext";
 import { Loader2, ChevronLeft, ChevronRight, Lock, ArrowLeft, RotateCcw } from "lucide-react";
+import TableContainer from "@/components/ui/TableContainer";
 import { formatDisplayDate } from "@/lib/dates";
 
 interface PaymentDetail {
@@ -306,7 +307,7 @@ export default function DailyLedgerPage() {
         {ledger.payments.length === 0 ? (
           <div className="p-5 text-sm text-slate-500">{t.noPayments}</div>
         ) : (
-          <div className="overflow-x-auto">
+          <TableContainer>
             <table className="data-table">
               <thead>
                 <tr>
@@ -341,7 +342,7 @@ export default function DailyLedgerPage() {
                 ))}
               </tbody>
             </table>
-          </div>
+          </TableContainer>
         )}
       </div>
 
@@ -353,7 +354,7 @@ export default function DailyLedgerPage() {
         {ledger.expenses.length === 0 ? (
           <div className="p-5 text-sm text-slate-500">{t.noExpenses}</div>
         ) : (
-          <div className="overflow-x-auto">
+          <TableContainer>
             <table className="data-table">
               <thead>
                 <tr>
@@ -376,7 +377,7 @@ export default function DailyLedgerPage() {
                 ))}
               </tbody>
             </table>
-          </div>
+          </TableContainer>
         )}
       </div>
 
@@ -388,7 +389,7 @@ export default function DailyLedgerPage() {
         {ledger.refunds.length === 0 ? (
           <div className="p-5 text-sm text-slate-500">{t.noRefunds}</div>
         ) : (
-          <div className="overflow-x-auto">
+          <TableContainer>
             <table className="data-table">
               <thead>
                 <tr>
@@ -409,7 +410,7 @@ export default function DailyLedgerPage() {
                 ))}
               </tbody>
             </table>
-          </div>
+          </TableContainer>
         )}
       </div>
 

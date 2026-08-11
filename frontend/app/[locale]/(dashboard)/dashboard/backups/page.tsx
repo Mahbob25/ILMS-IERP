@@ -8,6 +8,7 @@ import AccessDenied from "@/components/AccessDenied";
 import RefreshButton from "@/components/RefreshButton";
 import ConfirmModal from "@/components/ConfirmModal";
 import EmptyState from "@/components/EmptyState";
+import TableContainer from "@/components/ui/TableContainer";
 import UndoToast from "@/components/UndoToast";
 import {
   Database,
@@ -317,7 +318,7 @@ export default function BackupsPage() {
         {data.items.length === 0 ? (
           <EmptyState title={t.none} message={t.noneMsg} />
         ) : (
-          <div className="overflow-x-auto">
+          <TableContainer>
             <table className="data-table w-full">
               <thead>
                 <tr>
@@ -372,7 +373,7 @@ export default function BackupsPage() {
                 ))}
               </tbody>
             </table>
-          </div>
+          </TableContainer>
         )}
       </div>
 

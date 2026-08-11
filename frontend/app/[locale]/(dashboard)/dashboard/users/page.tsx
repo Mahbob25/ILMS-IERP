@@ -12,6 +12,7 @@ import {
   Plus, Pencil, Trash2, Loader2, Search, Shield, AlertCircle,
   UserCog, UserCheck, User, Users as UsersIcon,
 } from "lucide-react";
+import TableContainer from "@/components/ui/TableContainer";
 import { sanitizeInput } from "@/lib/utils/input";
 
 interface RoleInfo {
@@ -490,7 +491,8 @@ export default function UsersPage() {
         <div className="card p-8 text-center text-sm text-slate-500">{t.empty}</div>
       ) : (
         <div className="card overflow-hidden">
-          <table className="data-table">
+          <TableContainer>
+            <table className="data-table">
             <thead>
               <tr>
                 <th>{t.fullName}</th>
@@ -555,7 +557,8 @@ export default function UsersPage() {
                 );
               })}
             </tbody>
-          </table>
+            </table>
+          </TableContainer>
         </div>
       )}
 

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { apiClient } from "@/lib/api";
+import TableContainer from "@/components/ui/TableContainer";
 import { Loader2, RefreshCw, FileText } from "lucide-react";
 
 interface RefundRecord {
@@ -140,7 +141,7 @@ export default function DisbursementHistory({
         <div className="p-8 text-center text-sm text-slate-500">{t.noData}</div>
       ) : (
         <>
-          <div className="overflow-x-auto">
+          <TableContainer>
               <table className="data-table">
               <thead>
                 <tr>
@@ -204,7 +205,7 @@ export default function DisbursementHistory({
                 ))}
               </tbody>
             </table>
-          </div>
+          </TableContainer>
           <div className="flex items-center justify-between px-4 py-3 border-t border-slate-200 text-sm text-slate-600">
             <span>
               {t.showing} {Math.min((page - 1) * limit + 1, total)}–

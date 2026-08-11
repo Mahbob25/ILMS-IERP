@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { apiClient } from "@/lib/api";
 import useSystemHealth, { percentColor, formatGB } from "@/hooks/useSystemHealth";
+import TableContainer from "@/components/ui/TableContainer";
 import {
   Activity,
   Database,
@@ -248,7 +249,8 @@ export default function SuperadminDashboard() {
         {data.recent_audit_logs.length === 0 ? (
           <p className="text-sm text-slate-400 py-6 text-center">{t.noLogs}</p>
         ) : (
-          <table className="data-table">
+          <TableContainer>
+            <table className="data-table">
             <thead>
               <tr>
                 <th>{t.user}</th>
@@ -267,7 +269,8 @@ export default function SuperadminDashboard() {
                 </tr>
               ))}
             </tbody>
-          </table>
+            </table>
+          </TableContainer>
         )}
       </div>
     </div>
