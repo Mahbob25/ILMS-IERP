@@ -13,6 +13,7 @@ import EnrollmentFormFields, {
 } from "@/components/enrollments/EnrollmentFormFields";
 import { Plus, Trash2, Loader2, RefreshCw, UserX, AlertCircle } from "lucide-react";
 import { sanitizeInput, escapeLikeWildcards, validateName } from "@/lib/utils/input";
+import { formatSectionLabel } from "@/lib/section-format";
 
 interface Enrollment {
   id: string;
@@ -24,7 +25,14 @@ interface Enrollment {
 }
 
 interface Student { id: string; student_code: string; full_name: string; }
-interface CourseSection { id: string; course_id: string; status: string; }
+interface CourseSection {
+  id: string;
+  course_id: string;
+  status: string;
+  class_time?: string | null;
+  class_duration_minutes?: number | null;
+  classroom?: string | null;
+}
 interface Course { id: string; name: string; code: string; }
 
 export default function EnrollmentsPage() {
@@ -197,12 +205,21 @@ export default function EnrollmentsPage() {
 
   const getStudentName = (id: string) => students.find((s) => s.id === id)?.full_name || id;
   const getStudentCode = (id: string) => students.find((s) => s.id === id)?.student_code || "";
-  const getSectionCourse = (sectionId: string) => {
-    const sect = sections.find((s) => s.id === sectionId);
-    if (!sect) return sectionId;
-    const course = courses.find((c) => c.id === sect.course_id);
-    return course ? `${course.name} (${course.code})` : sectionId;
-  };
+  const getSectionLabel = useCallback(
+    (sectionId: string) => {
+      const sect = sections.find((s) => s.id === sectionId);
+      if (!sect) return sectionId;
+      return formatSectionLabel(
+        sect,
+        (cid) => {
+          const c = courses.find((c2) => c2.id === cid);
+          return c ? `${c.name} (${c.code})` : undefined;
+        },
+        locale,
+      );
+    },
+    [sections, courses, locale],
+  );
   const getSectionName = (sectionId: string) => {
     const sect = sections.find((s) => s.id === sectionId);
     if (!sect) return sectionId;
@@ -363,7 +380,7 @@ export default function EnrollmentsPage() {
             sectionId={form.section_id}
             onSectionChange={(sectionId) => setForm({ ...form, section_id: sectionId })}
             sections={sections}
-            getSectionLabel={getSectionCourse}
+            getSectionLabel={getSectionLabel}
             showDiscount={user?.role?.name !== "secretary"}
             discount={form.admin_discount}
             onDiscountChange={(value) => setForm({ ...form, admin_discount: value })}
@@ -446,7 +463,7 @@ export default function EnrollmentsPage() {
                       onClick={() => router.push(`/${locale}/dashboard/sections/${enrollment.section_id}`)}
                       className="text-blue-600 hover:underline text-start"
                     >
-                      {getSectionCourse(enrollment.section_id)}
+                      {getSectionLabel(enrollment.section_id)}
                     </button>
                   </td>
                   <td className="text-slate-600">{enrollment.agreed_price != null ? `${enrollment.agreed_price}` : "—"}</td>

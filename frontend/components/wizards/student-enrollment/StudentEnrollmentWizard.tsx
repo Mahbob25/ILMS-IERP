@@ -7,6 +7,7 @@ import {
   sanitizeInput,
   validateName,
 } from "@/lib/utils/input";
+import { formatSectionLabel } from "@/lib/section-format";
 import { useWizardDirtyGuard } from "@/components/wizards/WizardDirtyGuard";
 import WizardStepper, {
   WizardStepperStep,
@@ -40,6 +41,9 @@ interface CourseSection {
   status: string;
   capacity: number;
   enrolled_count: number;
+  class_time?: string | null;
+  class_duration_minutes?: number | null;
+  classroom?: string | null;
 }
 
 interface Course {
@@ -284,14 +288,20 @@ useEffect(() => {
     };
   }, [state.student?.id]);
 
-  const getSectionCourse = useCallback(
+  const getSectionLabel = useCallback(
     (sectionId: string) => {
       const sect = sections.find((s) => s.id === sectionId);
       if (!sect) return sectionId;
-      const course = courses.find((c) => c.id === sect.course_id);
-      return course ? `${course.name} (${course.code})` : sectionId;
+      return formatSectionLabel(
+        sect,
+        (cid) => {
+          const c = courses.find((c2) => c2.id === cid);
+          return c ? `${c.name} (${c.code})` : undefined;
+        },
+        locale,
+      );
     },
-    [sections, courses]
+    [sections, courses, locale],
   );
 
   const errorText = (code: string) =>
@@ -491,7 +501,7 @@ useEffect(() => {
     state.enrollment && state.student
       ? {
           value: state.enrollment.id,
-          label: `${state.student.full_name} - ${getSectionCourse(state.sectionId)}`,
+          label: `${state.student.full_name} - ${getSectionLabel(state.sectionId)}`,
         }
       : null;
 
@@ -520,7 +530,7 @@ useEffect(() => {
           amount: state.payment.amount,
           student_name: state.student?.full_name,
           course_name: state.sectionId
-            ? getSectionCourse(state.sectionId)
+            ? getSectionLabel(state.sectionId)
             : undefined,
           payment_method: state.payment.payment_method,
           transaction_number: state.payment.transaction_number,
@@ -651,7 +661,7 @@ useEffect(() => {
               dispatch({ type: "SET_SECTION", sectionId });
             }}
             sections={availableSections}
-            getSectionLabel={getSectionCourse}
+            getSectionLabel={getSectionLabel}
             showDiscount={user?.role?.name !== "secretary"}
             discount={state.discount}
             onDiscountChange={(discount) => {
@@ -685,7 +695,7 @@ useEffect(() => {
               student_code: state.student?.student_code || "",
             }}
             courseName={
-              state.sectionId ? getSectionCourse(state.sectionId) : ""
+              state.sectionId ? getSectionLabel(state.sectionId) : ""
             }
             summary={state.summary}
             payment={
