@@ -192,7 +192,7 @@ export default function SectionsTable({
                     >
                       <Eye size={14} />
                     </button>
-                    {canEdit && section.status !== "completed" && section.status !== "cancelled" && (
+                    {canEdit && section.status === "pending" && (
                       <button onClick={() => onEdit(section)} className="btn-icon" title={t.edit}><Pencil size={14} /></button>
                     )}
                     {canDelete && (

@@ -113,6 +113,14 @@ async def update_course_section(
     current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])),
     db: AsyncSession = Depends(get_db)
 ):
+    existing = await academic_service.get_course_section(db, section_id)
+    if not existing:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course section not found")
+    if existing.status != "pending":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Section can only be edited while in pending status. Deactivate it first if changes are needed.",
+        )
     cleaned = {k: v for k, v in data.model_dump().items() if v is not None}
     section = await academic_service.update_course_section(db, section_id, cleaned)
     if not section:

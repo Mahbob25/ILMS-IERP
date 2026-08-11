@@ -705,6 +705,11 @@ async def assign_section_contract(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Section not found"
         )
+    if section.status != "pending":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Contract can only be assigned while section is in pending status. Use the amendment flow for active sections.",
+        )
     comp_model = data.compensation_model.lower()
     if comp_model not in ("fixed", "percentage"):
         raise HTTPException(
