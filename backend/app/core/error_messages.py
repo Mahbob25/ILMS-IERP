@@ -27,6 +27,10 @@ ERROR_MESSAGES = {
         "ar": "لا يمكن الدفع لشعبة ملغية",
         "en": "Cannot pay for a cancelled section",
     },
+    "section_no_price": {
+        "ar": "لا يمكن التسجيل - الشعبة ليس لها سعر محدد. يجب تعيين السعر أولاً",
+        "en": "Cannot enroll - section has no price set. Set the section price first",
+    },
 }
 
 

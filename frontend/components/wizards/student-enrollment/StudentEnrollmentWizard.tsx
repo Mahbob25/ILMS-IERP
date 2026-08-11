@@ -527,7 +527,7 @@ useEffect(() => {
         }
       : null;
 
-  const stepError = errorText(state.error) || serverDetail;
+  const stepError = serverDetail || errorText(state.error);
 
   const studentLabels: StudentStepLabels = {
     selectStudent: t.selectStudent,

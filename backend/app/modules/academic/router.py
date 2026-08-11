@@ -27,6 +27,7 @@ from app.modules.academic.models import (
     PendingRefund, Refund, DailyJobsLog,
 )
 from app.core.timezone import get_today
+from app.core.error_messages import get_error_detail
 from app.core.rate_limit import limiter
 
 academic_router = APIRouter(prefix="/academic", tags=["academic"])
@@ -491,14 +492,19 @@ async def create_enrollment(
 ):
     if data.admin_discount is not None and current_user.role.name not in ("superadmin", "manager"):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only managers can set discounts")
+    section = await academic_service.get_course_section(db, data.section_id)
+    if not section:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Section not found")
+    if section.price is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=get_error_detail("section_no_price", "ar"),
+        )
     enrollment = await academic_service.create_enrollment(
         db, section_id=data.section_id, student_id=data.student_id,
         admin_discount=data.admin_discount
     )
     if enrollment is None:
-        section = await academic_service.get_course_section(db, data.section_id)
-        if not section:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Section not found")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Section is full or enrollment already exists")
     return enrollment
 
@@ -512,6 +518,14 @@ async def create_enrollment_with_student(
 ):
     if data.admin_discount is not None and current_user.role.name not in ("superadmin", "manager"):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only managers can set discounts")
+    section = await academic_service.get_course_section(db, data.section_id)
+    if not section:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Section not found")
+    if section.price is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=get_error_detail("section_no_price", "ar"),
+        )
     student_data = None
     if not data.student_id and data.student_code and data.full_name:
         student_data = {
@@ -524,9 +538,6 @@ async def create_enrollment_with_student(
         admin_discount=data.admin_discount, student_data=student_data
     )
     if enrollment is None:
-        section = await academic_service.get_course_section(db, data.section_id)
-        if not section:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Section not found")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Section is full or enrollment already exists")
     return enrollment
 
