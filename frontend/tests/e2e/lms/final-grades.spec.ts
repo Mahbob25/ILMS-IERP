@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { authHeader } from '../fixtures/tokens'
+import { authHeader, ensureAuthHeader } from '../fixtures/tokens'
 
 const BASE_URL = process.env.BASE_URL || 'http://localhost:8000/api/v1'
 
@@ -7,6 +7,8 @@ test.describe('LMS: Final Grades', () => {
   const headers = authHeader('superadmin')
 
   test('should set final grades for a section', async ({ request }) => {
+    const teacherHeaders = await ensureAuthHeader('teacher')
+
     const sectionsRes = await request.get(`${BASE_URL}/academic/course-sections?status=active&limit=5`, { headers })
     const body = await sectionsRes.json()
     const sections = body.items || []
@@ -30,7 +32,7 @@ test.describe('LMS: Final Grades', () => {
     }))
 
     const response = await request.put(`${BASE_URL}/academic/sections/${sectionId}/final-grades`, {
-      headers,
+      headers: teacherHeaders,
       data: { grades },
     })
     expect(response.status()).toBe(200)
@@ -40,6 +42,8 @@ test.describe('LMS: Final Grades', () => {
   })
 
   test('should reject final grade > 100', async ({ request }) => {
+    const teacherHeaders = await ensureAuthHeader('teacher')
+
     const sectionsRes = await request.get(`${BASE_URL}/academic/course-sections?status=active&limit=5`, { headers })
     const body = await sectionsRes.json()
     const sections = body.items || []
@@ -49,7 +53,7 @@ test.describe('LMS: Final Grades', () => {
     }
 
     const response = await request.put(`${BASE_URL}/academic/sections/${sections[0].id}/final-grades`, {
-      headers,
+      headers: teacherHeaders,
       data: {
         grades: [{ student_id: '00000000-0000-0000-0000-000000000000', final_score: 150 }],
       },

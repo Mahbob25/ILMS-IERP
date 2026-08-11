@@ -222,26 +222,30 @@ export default function StudentEnrollmentWizard({
     )?.response?.data?.detail || "";
 
   const fetchLookups = useCallback(async () => {
-    try {
-      const [studentRes, sectionRes, courseRes] = await Promise.all([
-        apiClient.get<{ items: Student[]; total: number }>(
+    const [studentRes, sectionRes, courseRes] = await Promise.all([
+      apiClient
+        .get<{ items: Student[]; total: number }>(
           "/academic/students?limit=1000"
-        ),
-        apiClient.get<{ items: CourseSection[]; total: number }>(
+        )
+        .catch(() => null),
+      apiClient
+        .get<{ items: CourseSection[]; total: number }>(
           "/academic/course-sections?limit=1000"
-        ),
-        apiClient.get<{ items: Course[]; total: number }>(
+        )
+        .catch(() => null),
+      apiClient
+        .get<{ items: Course[]; total: number }>(
           "/academic/courses?limit=1000"
-        ),
-      ]);
-      setStudents(studentRes.data.items);
-      setSections(sectionRes.data.items);
-      setCourses(courseRes.data.items);
-    } catch {
+        )
+        .catch(() => null),
+    ]);
+    if (studentRes) setStudents(studentRes.data.items);
+    if (sectionRes) setSections(sectionRes.data.items);
+    if (courseRes) setCourses(courseRes.data.items);
+    if (!studentRes || !sectionRes || !courseRes) {
       setDataError(true);
-    } finally {
-      setLoading(false);
     }
+    setLoading(false);
   }, []);
 
   useEffect(() => {

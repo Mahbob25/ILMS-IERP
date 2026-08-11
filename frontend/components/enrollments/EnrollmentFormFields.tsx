@@ -44,6 +44,7 @@ interface EnrollmentFormFieldsProps {
   labels: EnrollmentFormLabels;
   lockedStudent?: boolean;
   lockedStudentName?: string;
+  filterCompletedCancelled?: boolean;
 }
 
 const EnrollmentFormFields = forwardRef<
@@ -65,6 +66,7 @@ const EnrollmentFormFields = forwardRef<
     labels,
     lockedStudent = false,
     lockedStudentName = "",
+    filterCompletedCancelled = true,
   },
   ref
 ) {
@@ -111,9 +113,10 @@ const EnrollmentFormFields = forwardRef<
         <Select
           value={sectionId}
           onChange={(value) => onSectionChange(value)}
-          options={sections
-            .filter((s) => s.status !== "completed" && s.status !== "cancelled")
-            .map((s) => ({ value: s.id, label: getSectionLabel(s.id) }))}
+          options={(filterCompletedCancelled
+            ? sections.filter((s) => s.status !== "completed" && s.status !== "cancelled")
+            : sections
+          ).map((s) => ({ value: s.id, label: getSectionLabel(s.id) }))}
           placeholder="—"
         />
       </div>

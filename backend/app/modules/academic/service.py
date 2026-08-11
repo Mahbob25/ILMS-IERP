@@ -148,8 +148,12 @@ async def list_course_sections(
         CourseSection.deleted_at.is_(None)
     )
     if teacher_id:
-        query = query.where(CourseSection.teacher_id == teacher_id)
-        count_query = count_query.where(CourseSection.teacher_id == teacher_id)
+        query = query.where(
+            or_(CourseSection.teacher_id == teacher_id, CourseSection.teacher_id.is_(None))
+        )
+        count_query = count_query.where(
+            or_(CourseSection.teacher_id == teacher_id, CourseSection.teacher_id.is_(None))
+        )
     if status:
         query = query.where(CourseSection.status == status)
         count_query = count_query.where(CourseSection.status == status)

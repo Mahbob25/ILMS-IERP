@@ -59,6 +59,7 @@ export default function SectionEnrollmentStep({
         }}
         lockedStudent
         lockedStudentName={studentName}
+        filterCompletedCancelled={false}
       />
       {error && (
         <p className="text-sm text-red-600 mt-3">{error}</p>
