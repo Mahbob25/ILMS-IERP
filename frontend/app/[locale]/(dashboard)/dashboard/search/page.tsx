@@ -7,6 +7,16 @@ import { searchGrouped, GroupedSearchResponse, SearchHit } from "@/lib/search";
 
 const TABS = ["all", "students", "courses", "sections", "enrollments", "payments", "expenses"] as const;
 
+const TAB_LABELS: Record<string, { ar: string; en: string }> = {
+  all: { ar: "الكل", en: "All" },
+  students: { ar: "الطلاب", en: "Students" },
+  courses: { ar: "المقررات", en: "Courses" },
+  sections: { ar: "الشعب", en: "Sections" },
+  enrollments: { ar: "التسجيلات", en: "Enrollments" },
+  payments: { ar: "المدفوعات", en: "Payments" },
+  expenses: { ar: "المصروفات", en: "Expenses" },
+};
+
 export default function SearchPage() {
   const params = useParams();
   const router = useRouter();
@@ -75,7 +85,7 @@ export default function SearchPage() {
               onClick={() => setTab(t)}
               className={`px-3 py-1.5 rounded-full text-xs font-medium border ${tab === t ? "bg-brand-600 text-white border-brand-600" : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"}`}
             >
-              {t === "all" ? (isRtl ? "الكل" : "All") : t}
+              {TAB_LABELS[t]?.[isRtl ? "ar" : "en"] || t}
             </button>
           ))}
         </div>
@@ -94,7 +104,7 @@ export default function SearchPage() {
               <li key={`${h.type}-${h.id}`} onClick={() => router.push(h.href)} className="px-4 py-3 hover:bg-slate-50 cursor-pointer flex flex-col gap-0.5">
                 <span className="text-sm font-medium text-slate-900">{h.label}</span>
                 {h.sublabel && <span className="text-xs text-slate-500">{h.sublabel}</span>}
-                <span className="text-[11px] text-slate-400 uppercase">{h.type}</span>
+                <span className="text-[11px] text-slate-400 uppercase">{TAB_LABELS[h.type]?.[isRtl ? "ar" : "en"] || h.type}</span>
               </li>
             ))}
           </ul>
