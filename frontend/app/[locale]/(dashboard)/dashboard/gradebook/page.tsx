@@ -107,6 +107,7 @@ export default function GradebookPage() {
   const getCourseName = (id: string) => courses.find((c) => c.id === id)?.name || id;
 
   const isCompleted = selectedSection?.status === "completed";
+  const readOnly = isCompleted || user?.role?.name !== "teacher";
 
   useEffect(() => {
     if (!selectedSectionId) return;
@@ -286,8 +287,8 @@ export default function GradebookPage() {
                       type="number"
                       value={grades[enr.student_id]?.score ?? ""}
                       onChange={(e) => handleScoreChange(enr.student_id, e.target.value)}
-                      readOnly={isCompleted}
-                      className={`input-field w-24 text-center ${isCompleted ? "bg-slate-100 cursor-not-allowed" : ""}`}
+                      readOnly={readOnly}
+                      className={`input-field w-24 text-center ${readOnly ? "bg-slate-100 cursor-not-allowed" : ""}`}
                       min={0}
                       max={100}
                       step={0.5}
@@ -299,8 +300,8 @@ export default function GradebookPage() {
                       type="text"
                       value={grades[enr.student_id]?.notes ?? ""}
                       onChange={(e) => handleNotesChange(enr.student_id, e.target.value)}
-                      readOnly={isCompleted}
-                      className={`input-field w-full ${isCompleted ? "bg-slate-100 cursor-not-allowed" : ""}`}
+                      readOnly={readOnly}
+                      className={`input-field w-full ${readOnly ? "bg-slate-100 cursor-not-allowed" : ""}`}
                       placeholder="—"
                     />
                   </td>
@@ -308,7 +309,7 @@ export default function GradebookPage() {
               ))}
             </tbody>
           </table>
-          {sectionStudents.length > 0 && !isCompleted && (
+          {sectionStudents.length > 0 && !readOnly && (
             <div className="flex justify-end px-4 py-3 border-t border-slate-200">
               <button
                 onClick={handleSaveAll}

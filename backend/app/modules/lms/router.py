@@ -108,7 +108,7 @@ async def _resolve_unlock_notifications(
 async def create_attendance_session(
     data: AttendanceSessionCreate,
     current_user: User = Depends(
-        RoleChecker(allowed_roles=["superadmin", "manager", "secretary", "teacher"])
+        RoleChecker(allowed_roles=["teacher"])
     ),
     db: AsyncSession = Depends(get_db),
 ):
@@ -122,10 +122,7 @@ async def create_attendance_session(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Cannot create attendance for a section that is not active",
         )
-    if (
-        current_user.role.name == "teacher"
-        and section.teacher_id != current_user.employee_id
-    ):
+    if section.teacher_id != current_user.employee_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, detail="Not your section"
         )
@@ -174,7 +171,7 @@ async def submit_attendance(
     session_id: uuid.UUID,
     data: AttendanceSubmit,
     current_user: User = Depends(
-        RoleChecker(allowed_roles=["superadmin", "manager", "secretary", "teacher"])
+        RoleChecker(allowed_roles=["teacher"])
     ),
     db: AsyncSession = Depends(get_db),
 ):
@@ -183,7 +180,7 @@ async def submit_attendance(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Session not found"
         )
-    if current_user.role.name == "teacher" and session.created_by != current_user.id:
+    if session.created_by != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, detail="Not your session"
         )

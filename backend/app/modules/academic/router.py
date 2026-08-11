@@ -364,19 +364,14 @@ async def set_section_final_grades(
     request: Request,
     section_id: uuid.UUID,
     data: FinalGradeBulkCreate,
-    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary", "teacher"])),
+    current_user: User = Depends(RoleChecker(allowed_roles=["teacher"])),
     db: AsyncSession = Depends(get_db)
 ):
-    section = None
-    if current_user.role.name == "teacher":
-        section = await academic_service.get_course_section(db, section_id)
-        if not section or section.teacher_id != current_user.employee_id:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied to this section")
-
-    if not section:
-        section = await academic_service.get_course_section(db, section_id)
+    section = await academic_service.get_course_section(db, section_id)
     if not section:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Section not found")
+    if section.teacher_id != current_user.employee_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied to this section")
     if section.status != "active":
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot set grades for a section that is not active")
 

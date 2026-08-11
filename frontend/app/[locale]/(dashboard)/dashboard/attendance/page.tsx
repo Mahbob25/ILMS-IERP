@@ -23,6 +23,7 @@ const STATUS_OPTIONS = ["present", "absent", "late", "excused"];
 export default function AttendancePage() {
   const params = useParams();
   const { user } = useAuth();
+  const readOnly = user?.role?.name !== "teacher";
   const locale = (params?.locale as string) || "ar";
   const isRtl = locale === "ar";
 
@@ -214,7 +215,7 @@ export default function AttendancePage() {
             <input type="date" value={sessionDate} onChange={(e) => setSessionDate(e.target.value)} className="input-field" />
           </div>
           <div className="flex items-end">
-            {selectedSectionId && (
+            {selectedSectionId && !readOnly && (
               <button onClick={handleCreateOrSave} disabled={saving || submitting} className="btn-primary flex items-center gap-2">
                 {saving ? <Loader2 size={16} className="animate-spin" /> : null}
                 <span>{currentSession ? t.save : t.createSession}</span>
@@ -261,7 +262,10 @@ export default function AttendancePage() {
                         <button
                           key={status}
                           onClick={() => setStatus(student.id, status)}
+                          disabled={readOnly}
                           className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all duration-150 ${
+                            readOnly ? "opacity-60 cursor-not-allowed" : ""
+                          } ${
                             (records[student.id] || "present") === status
                               ? "bg-brand-50 border-brand-300 text-brand-700"
                               : "bg-white border-slate-200 text-slate-500 hover:bg-slate-50"
