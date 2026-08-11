@@ -1,6 +1,6 @@
 # Guided Confirmations with 30-Second Soft-Undo — Implementation Plan
 
-**Status:** Draft · not implemented
+**Status:** Implemented (commit 370a1df)
 **Target:** v1.8
 **Prereq:** None (one additive migration; existing tables only gain nullable columns)
 **Backlog origin:** `docs/plans/ux-suggestions.md` #5

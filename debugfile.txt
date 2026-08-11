@@ -1,0 +1,282 @@
+ubuntu@ip-172-31-3-133:~/ILMS-IERP$ free -h
+               total        used        free      shared  buff/cache   available
+Mem:           3.7Gi       1.5Gi       2.2Gi        24Mi       510Mi       2.3Gi
+Swap:             0B          0B          0B
+ubuntu@ip-172-31-3-133:~/ILMS-IERP$ nproc
+2
+ubuntu@ip-172-31-3-133:~/ILMS-IERP$ cat /etc/os-release | head -2
+PRETTY_NAME="Ubuntu 26.04 LTS"
+NAME="Ubuntu"
+ubuntu@ip-172-31-3-133:~/ILMS-IERP$ sudo dmesg -T | grep -i -A5 "killed process"
+[Thu Aug  6 12:36:57 2026] Out of memory: Killed process 1045299 (systemd) total-vm:22060kB, anon-rss:2512kB, file-rss:2376kB, shmem-rss:0kB, UID:1000 pgtables:92kB oom_score_adj:100
+[Thu Aug  6 12:37:06 2026] containerd-shim invoked oom-killer: gfp_mask=0x140cca(GFP_HIGHUSER_MOVABLE|__GFP_COMP), order=0, oom_score_adj=-998
+[Thu Aug  6 12:37:06 2026] CPU: 1 UID: 0 PID: 263946 Comm: containerd-shim Not tainted 7.0.0-1006-aws #6-Ubuntu PREEMPTLAZY
+[Thu Aug  6 12:37:06 2026] Hardware name: Amazon EC2 c7i-flex.large/, BIOS 1.0 10/16/2017
+[Thu Aug  6 12:37:06 2026] Call Trace:
+[Thu Aug  6 12:37:06 2026]  <TASK>
+--
+[Thu Aug  6 12:37:06 2026] Out of memory: Killed process 1045301 ((sd-pam)) total-vm:22740kB, anon-rss:2012kB, file-rss:1072kB, shmem-rss:0kB, UID:1000 pgtables:72kB oom_score_adj:100
+[Thu Aug  6 12:37:39 2026] systemd invoked oom-killer: gfp_mask=0x140cca(GFP_HIGHUSER_MOVABLE|__GFP_COMP), order=0, oom_score_adj=0
+[Thu Aug  6 12:37:39 2026] CPU: 1 UID: 0 PID: 1 Comm: systemd Not tainted 7.0.0-1006-aws #6-Ubuntu PREEMPTLAZY
+[Thu Aug  6 12:37:39 2026] Hardware name: Amazon EC2 c7i-flex.large/, BIOS 1.0 10/16/2017
+[Thu Aug  6 12:37:39 2026] Call Trace:
+[Thu Aug  6 12:37:39 2026]  <TASK>
+--
+[Thu Aug  6 12:37:39 2026] Out of memory: Killed process 1091396 (uvicorn) total-vm:515960kB, anon-rss:106044kB, file-rss:8kB, shmem-rss:0kB, UID:1000 pgtables:372kB oom_score_adj:0
+[Thu Aug  6 12:37:41 2026] br-1f8585f53aac: port 2(veth5b31045) entered disabled state
+[Thu Aug  6 12:37:41 2026] vetha9f342d: renamed from eth0
+[Thu Aug  6 12:37:41 2026] br-1f8585f53aac: port 2(veth5b31045) entered disabled state
+[Thu Aug  6 12:37:41 2026] veth5b31045 (unregistering): left allmulticast mode
+[Thu Aug  6 12:37:41 2026] veth5b31045 (unregistering): left promiscuous mode
+--
+[Sat Aug  8 16:56:19 2026] Out of memory: Killed process 1977528 (systemd) total-vm:22312kB, anon-rss:2444kB, file-rss:2440kB, shmem-rss:0kB, UID:1000 pgtables:84kB oom_score_adj:100
+[Sat Aug  8 16:56:19 2026] systemd invoked oom-killer: gfp_mask=0x140cca(GFP_HIGHUSER_MOVABLE|__GFP_COMP), order=0, oom_score_adj=0
+[Sat Aug  8 16:56:19 2026] CPU: 0 UID: 0 PID: 1 Comm: systemd Not tainted 7.0.0-1006-aws #6-Ubuntu PREEMPTLAZY
+[Sat Aug  8 16:56:19 2026] Hardware name: Amazon EC2 c7i-flex.large/, BIOS 1.0 10/16/2017
+[Sat Aug  8 16:56:19 2026] Call Trace:
+[Sat Aug  8 16:56:19 2026]  <TASK>
+--
+[Sat Aug  8 16:56:19 2026] Out of memory: Killed process 1977531 ((sd-pam)) total-vm:22744kB, anon-rss:2016kB, file-rss:924kB, shmem-rss:0kB, UID:1000 pgtables:80kB oom_score_adj:100
+[Sat Aug  8 16:56:19 2026] systemd invoked oom-killer: gfp_mask=0x140cca(GFP_HIGHUSER_MOVABLE|__GFP_COMP), order=0, oom_score_adj=0
+[Sat Aug  8 16:56:19 2026] CPU: 0 UID: 0 PID: 1 Comm: systemd Not tainted 7.0.0-1006-aws #6-Ubuntu PREEMPTLAZY
+[Sat Aug  8 16:56:19 2026] Hardware name: Amazon EC2 c7i-flex.large/, BIOS 1.0 10/16/2017
+[Sat Aug  8 16:56:19 2026] Call Trace:
+[Sat Aug  8 16:56:19 2026]  <TASK>
+--
+[Sat Aug  8 16:56:19 2026] Out of memory: Killed process 1106134 (uvicorn) total-vm:595128kB, anon-rss:111952kB, file-rss:8kB, shmem-rss:0kB, UID:1000 pgtables:384kB oom_score_adj:0
+[Sat Aug  8 16:56:21 2026] br-1f8585f53aac: port 2(veth22ef7a3) entered disabled state
+[Sat Aug  8 16:56:21 2026] veth6b7ec07: renamed from eth0
+[Sat Aug  8 16:56:21 2026] br-1f8585f53aac: port 2(veth22ef7a3) entered disabled state
+[Sat Aug  8 16:56:21 2026] veth22ef7a3 (unregistering): left allmulticast mode
+[Sat Aug  8 16:56:21 2026] veth22ef7a3 (unregistering): left promiscuous mode
+--
+[Sun Aug  9 00:58:02 2026] Out of memory: Killed process 2108945 (systemd) total-vm:21904kB, anon-rss:2604kB, file-rss:2324kB, shmem-rss:0kB, UID:1000 pgtables:88kB oom_score_adj:100
+[Sun Aug  9 00:58:07 2026] in:imklog invoked oom-killer: gfp_mask=0x140cca(GFP_HIGHUSER_MOVABLE|__GFP_COMP), order=0, oom_score_adj=0
+[Sun Aug  9 00:58:07 2026] CPU: 0 UID: 100 PID: 192554 Comm: in:imklog Not tainted 7.0.0-1006-aws #6-Ubuntu PREEMPTLAZY
+[Sun Aug  9 00:58:07 2026] Hardware name: Amazon EC2 c7i-flex.large/, BIOS 1.0 10/16/2017
+[Sun Aug  9 00:58:07 2026] Call Trace:
+[Sun Aug  9 00:58:07 2026]  <TASK>
+--
+[Sun Aug  9 00:58:07 2026] Out of memory: Killed process 2108950 ((sd-pam)) total-vm:22744kB, anon-rss:2016kB, file-rss:1000kB, shmem-rss:0kB, UID:1000 pgtables:76kB oom_score_adj:100
+[Sun Aug  9 00:58:21 2026] uvicorn invoked oom-killer: gfp_mask=0x140cca(GFP_HIGHUSER_MOVABLE|__GFP_COMP), order=0, oom_score_adj=0
+[Sun Aug  9 00:58:21 2026] CPU: 0 UID: 1000 PID: 2003392 Comm: uvicorn Not tainted 7.0.0-1006-aws #6-Ubuntu PREEMPTLAZY
+[Sun Aug  9 00:58:21 2026] Hardware name: Amazon EC2 c7i-flex.large/, BIOS 1.0 10/16/2017
+[Sun Aug  9 00:58:21 2026] Call Trace:
+[Sun Aug  9 00:58:21 2026]  <TASK>
+--
+[Sun Aug  9 00:58:21 2026] Out of memory: Killed process 2003392 (uvicorn) total-vm:519936kB, anon-rss:109908kB, file-rss:36kB, shmem-rss:0kB, UID:1000 pgtables:380kB oom_score_adj:0
+[Sun Aug  9 00:58:34 2026] docker-compose invoked oom-killer: gfp_mask=0x140cca(GFP_HIGHUSER_MOVABLE|__GFP_COMP), order=0, oom_score_adj=0
+[Sun Aug  9 00:58:34 2026] CPU: 0 UID: 1000 PID: 2112001 Comm: docker-compose Not tainted 7.0.0-1006-aws #6-Ubuntu PREEMPTLAZY
+[Sun Aug  9 00:58:34 2026] Hardware name: Amazon EC2 c7i-flex.large/, BIOS 1.0 10/16/2017
+[Sun Aug  9 00:58:34 2026] Call Trace:
+[Sun Aug  9 00:58:34 2026]  <TASK>
+--
+[Sun Aug  9 00:58:34 2026] Out of memory: Killed process 2112465 (node) total-vm:65550136kB, anon-rss:2011852kB, file-rss:8kB, shmem-rss:0kB, UID:0 pgtables:32688kB oom_score_adj:-500
+[Sun Aug  9 00:58:36 2026] oom_reaper: reaped process 2112465 (node), now anon-rss:0kB, file-rss:0kB, shmem-rss:0kB
+[Sun Aug  9 00:58:36 2026] systemd-journald[191822]: Under memory pressure, flushing caches.
+[Sun Aug  9 00:58:38 2026] br-1f8585f53aac: port 2(veth65eeb1a) entered disabled state
+[Sun Aug  9 00:58:38 2026] veth7bd86e1: renamed from eth0
+[Sun Aug  9 00:58:38 2026] br-1f8585f53aac: port 2(veth65eeb1a) entered disabled state
+--
+[Sun Aug  9 01:03:58 2026] Out of memory: Killed process 2114429 (node) total-vm:65744520kB, anon-rss:2203756kB, file-rss:48kB, shmem-rss:0kB, UID:0 pgtables:36188kB oom_score_adj:-500
+[Sun Aug  9 01:03:59 2026] docker0: port 1(veth391c5f8) entered disabled state
+[Sun Aug  9 01:03:59 2026] veth8ca8b2f: renamed from eth0
+[Sun Aug  9 01:03:59 2026] docker0: port 1(veth391c5f8) entered disabled state
+[Sun Aug  9 01:03:59 2026] veth391c5f8 (unregistering): left allmulticast mode
+[Sun Aug  9 01:03:59 2026] veth391c5f8 (unregistering): left promiscuous mode
+--
+[Sun Aug  9 01:14:26 2026] Out of memory: Killed process 2117616 (node) total-vm:65848812kB, anon-rss:2296252kB, file-rss:8kB, shmem-rss:0kB, UID:0 pgtables:31312kB oom_score_adj:-500
+[Sun Aug  9 01:14:27 2026] docker0: port 1(vethdd0f097) entered disabled state
+[Sun Aug  9 01:14:27 2026] vethe7ba849: renamed from eth0
+[Sun Aug  9 01:14:27 2026] docker0: port 1(vethdd0f097) entered disabled state
+[Sun Aug  9 01:14:27 2026] vethdd0f097 (unregistering): left allmulticast mode
+[Sun Aug  9 01:14:27 2026] vethdd0f097 (unregistering): left promiscuous mode
+ubuntu@ip-172-31-3-133:~/ILMS-IERP$ git pull
+Already up to date.
+ubuntu@ip-172-31-3-133:~/ILMS-IERP$ docker compose build --progress=plain backend
+--progress is a global compose flag, better use `docker compose --progress xx build ...
+ Image ilms-ierp-backend Building
+#1 [internal] load local bake definitions
+#1 reading from stdin 520B done
+#1 DONE 0.0s
+
+#2 [internal] load build definition from Dockerfile
+#2 transferring dockerfile: 2.08kB done
+#2 WARN: FromAsCasing: 'as' and 'FROM' keywords' casing do not match (line 1)
+#2 DONE 0.0s
+
+#3 [internal] load metadata for docker.io/library/python:3.11-slim
+#3 DONE 0.6s
+
+#4 [internal] load .dockerignore
+#4 transferring context: 134B done
+#4 DONE 0.0s
+
+#5 [builder 1/5] FROM docker.io/library/python:3.11-slim@sha256:90744cff8f32887f075c47d747a173ff333e9e98801667af93c357fa9f5e28ff
+#5 resolve docker.io/library/python:3.11-slim@sha256:90744cff8f32887f075c47d747a173ff333e9e98801667af93c357fa9f5e28ff 0.0s done
+#5 DONE 0.0s
+
+#6 [internal] load build context
+#6 transferring context: 9.81kB 0.0s done
+#6 DONE 0.0s
+
+#7 [stage-1  9/10] COPY --chown=appuser:appuser docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+#7 CACHED
+
+#8 [stage-1  7/10] COPY --chown=appuser:appuser . .
+#8 CACHED
+
+#9 [builder 4/5] COPY requirements.txt .
+#9 CACHED
+
+#10 [stage-1  4/10] COPY --from=builder /root/.local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+#10 CACHED
+
+#11 [stage-1  5/10] COPY --from=builder /root/.local/bin /usr/local/bin
+#11 CACHED
+
+#12 [stage-1  6/10] RUN useradd -m -u 1000 appuser
+#12 CACHED
+
+#13 [stage-1  8/10] RUN mkdir -p /app/backups && chown -R 1000:1000 /app/backups
+#13 CACHED
+
+#14 [builder 3/5] RUN apt-get update && apt-get install -y --no-install-recommends     build-essential     libpq-dev     && rm -rf /var/lib/apt/lists/*
+#14 CACHED
+
+#15 [stage-1  3/10] RUN apt-get update && apt-get install -y --no-install-recommends     libpq5     curl     gnupg     ca-certificates     && . /etc/os-release     && curl -sSL https://www.postgresql.org/media/keys/ACCC4CF8.asc -o /etc/apt/trusted.gpg.d/pgdg.asc     && echo "deb http://apt.postgresql.org/pub/repos/apt ${VERSION_CODENAME}-pgdg main" > /etc/apt/sources.list.d/pgdg.list     && apt-get update     && apt-get install -y --no-install-recommends postgresql-client-16     && rm -rf /var/lib/apt/lists/*
+#15 CACHED
+
+#16 [builder 5/5] RUN pip install --no-cache-dir --user -r requirements.txt
+#16 CACHED
+
+#17 [builder 2/5] WORKDIR /app
+#17 CACHED
+
+#18 [stage-1 10/10] RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+#18 CACHED
+
+#19 exporting to image
+#19 exporting layers done
+#19 exporting manifest sha256:24d99233360484e648b273495e0b82b4c61de41616628aa336a8c4fc42939b5b done
+#19 exporting config sha256:826b90fc6f4a06298e1e7bf0a0275a7dae70cf1a1d8706620531ec18c77356ce done
+#19 exporting attestation manifest sha256:aa0ff2571c8487b9c2efdaf8b3dd248fec562ce2806574b72d22a80dfef8113c 0.0s done
+#19 exporting manifest list sha256:0266e8c6c3863929c90295311db79e6b2a4376dcfc6200d3355a7580d5e215cb 0.0s done
+#19 naming to docker.io/library/ilms-ierp-backend:latest done
+#19 unpacking to docker.io/library/ilms-ierp-backend:latest done
+#19 DONE 0.1s
+
+#20 resolving provenance for metadata file
+#20 DONE 0.0s
+ Image ilms-ierp-backend Built
+ubuntu@ip-172-31-3-133:~/ILMS-IERP$ docker compose build --progress=plain frontend
+--progress is a global compose flag, better use `docker compose --progress xx build ...
+ Image ilms-ierp-frontend Building
+#1 [internal] load local bake definitions
+#1 reading from stdin 940B done
+#1 DONE 0.0s
+
+#2 [internal] load build definition from Dockerfile
+#2 transferring dockerfile: 1.55kB done
+#2 DONE 0.0s
+
+#3 [internal] load metadata for docker.io/library/node:18-alpine
+#3 DONE 0.6s
+
+#4 [internal] load .dockerignore
+#4 transferring context: 242B done
+#4 DONE 0.0s
+
+#5 [deps 1/5] FROM docker.io/library/node:18-alpine@sha256:8d6421d663b4c28fd3ebc498332f249011d118945588d0a35cb9bc4b8ca09d9e
+#5 resolve docker.io/library/node:18-alpine@sha256:8d6421d663b4c28fd3ebc498332f249011d118945588d0a35cb9bc4b8ca09d9e 0.0s done
+#5 DONE 0.0s
+
+#6 [internal] load build context
+#6 transferring context: 10.67kB 0.0s done
+#6 DONE 0.1s
+
+#7 [deps 3/5] WORKDIR /app
+#7 CACHED
+
+#8 [deps 4/5] COPY package.json package-lock.json ./
+#8 CACHED
+
+#9 [deps 5/5] RUN npm ci
+#9 CACHED
+
+#10 [builder 3/5] COPY --from=deps /app/node_modules ./node_modules
+#10 CACHED
+
+#11 [builder 2/5] WORKDIR /app
+#11 CACHED
+
+#12 [deps 2/5] RUN apk add --no-cache libc6-compat
+#12 CACHED
+
+#13 [builder 4/5] COPY . .
+#13 CACHED
+
+#14 [builder 5/5] RUN npm run build
+#14 1.481
+#14 1.481 > lims-frontend@1.0.0 build
+#14 1.481 > next build
+#14 1.481
+#14 4.781   ▲ Next.js 14.2.3
+#14 4.782   - Experiments (use with caution):
+#14 4.782     · instrumentationHook
+#14 4.782
+#14 4.804    Creating an optimized production build ...
+#14 4.829    Downloading swc package @next/swc-linux-x64-gnu...
+#14 4.832  ⚠ Found lockfile missing swc dependencies, patching...
+#14 6.017  ⚠ Lockfile was successfully patched, please run "npm install" to ensure @next/swc dependencies are downloaded
+#14 6.759    Downloading swc package @next/swc-linux-x64-musl...
+#14 8.886 [@sentry/nextjs] It appears you've configured a `sentry.server.config.ts` file. Please ensure to put this file's content into the `register()` function of a Next.js instrumentation hook instead. To ensure correct functionality of the SDK, `Sentry.init` must be called inside `instrumentation.ts`. Learn more about setting up an instrumentation hook in Next.js: https://nextjs.org/docs/app/building-your-application/optimizing/instrumentation. You can safely delete the `sentry.server.config.ts` file afterward.
+#14 8.889 warn  - It seems like you don't have a global error handler set up. It is recommended that you add a global-error.js file with Sentry instrumentation so that React rendering errors are reported to Sentry. Read more: https://docs.sentry.io/platforms/javascript/guides/nextjs/manual-setup/#react-render-errors-in-app-router (you can suppress this warning by setting SENTRY_SUPPRESS_GLOBAL_ERROR_HANDLER_FILE_WARNING=1 as environment variable)
+#14 9.274 [@sentry/nextjs] It appears you've configured a `sentry.edge.config.ts` file. Please ensure to put this file's content into the `register()` function of a Next.js instrumentation hook instead. To ensure correct functionality of the SDK, `Sentry.init` must be called inside `instrumentation.ts`. Learn more about setting up an instrumentation hook in Next.js: https://nextjs.org/docs/app/building-your-application/optimizing/instrumentation. You can safely delete the `sentry.edge.config.ts` file afterward.
+#14 9.277 [@sentry/nextjs] The Sentry SDK has enabled source map generation for your Next.js app. If you don't want to serve Source Maps to your users, either set the `sourcemaps.deleteSourcemapsAfterUpload` option to true, or manually delete the source maps after the build. In future Sentry SDK versions `sourcemaps.deleteSourcemapsAfterUpload` will default to `true`. If you do not want to generate and upload sourcemaps, set the `sourcemaps.disable` option in `withSentryConfig()`.
+#14 9.320 [@sentry/nextjs - Node.js] Warning: No auth token provided. Will not create release. Please set the `authToken` option. You can find information on how to generate a Sentry auth token here: https://docs.sentry.io/api/auth/
+#14 9.320 [@sentry/nextjs - Node.js] Warning: No auth token provided. Will not upload source maps. Please set the `authToken` option. You can find information on how to generate a Sentry auth token here: https://docs.sentry.io/api/auth/
+#14 9.378 [@sentry/nextjs - Node.js] Info: Sending telemetry data on issues and performance to Sentry. To disable telemetry, set `options.telemetry` to `false`.
+#14 48.38 npm error path /app
+#14 48.38 npm error command failed
+#14 48.38 npm error signal SIGKILL
+#14 48.38 npm error command sh -c next build
+#14 48.38 npm notice
+#14 48.38 npm notice New major version of npm available! 10.8.2 -> 12.0.2
+#14 48.38 npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2
+#14 48.38 npm notice To update run: npm install -g npm@12.0.2
+#14 48.38 npm notice
+#14 48.38 npm error A complete log of this run can be found in: /root/.npm/_logs/2026-08-09T01_20_52_904Z-debug-0.log
+#14 ERROR: process "/bin/sh -c npm run build" did not complete successfully: exit code: 1
+------
+ > [builder 5/5] RUN npm run build:
+48.38 npm error path /app
+48.38 npm error command failed
+48.38 npm error signal SIGKILL
+48.38 npm error command sh -c next build
+48.38 npm notice
+48.38 npm notice New major version of npm available! 10.8.2 -> 12.0.2
+48.38 npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2
+48.38 npm notice To update run: npm install -g npm@12.0.2
+48.38 npm notice
+48.38 npm error A complete log of this run can be found in: /root/.npm/_logs/2026-08-09T01_20_52_904Z-debug-0.log
+------
+Dockerfile:18
+
+--------------------
+
+  16 |     # Cap Node heap so `next build` stays within the Docker build memory limit (avoids OOM SIGKILL)
+
+  17 |     ENV NODE_OPTIONS="--max-old-space-size=1536"
+
+  18 | >>> RUN npm run build
+
+  19 |
+
+  20 |     # Production image, copy all the files and run next
+
+--------------------
+
+failed to solve: process "/bin/sh -c npm run build" did not complete successfully: exit code: 1
+
+ubuntu@ip-172-31-3-133:~/ILMS-IERP$
