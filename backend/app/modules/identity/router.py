@@ -15,6 +15,7 @@ from app.modules.identity.schemas import (
     EmployeeResponse, EmployeeCreate, EmployeeUpdate, EmployeeDetailResponse,
     GrantAccessRequest, LinkedUserInfo,
     PermissionResponse, RolePermissionsResponse, RolePermissionsUpdate,
+    ChangePasswordRequest, UpdateMeRequest,
 )
 from app.modules.identity.security import (
     verify_password,
@@ -268,6 +269,36 @@ async def auth_me(current_user: User = Depends(get_current_user)):
         "is_superadmin": current_user.is_superadmin,
     }
 
+@auth_router.post("/change-password")
+@limiter.limit("5/minute")
+async def change_password(
+    body: ChangePasswordRequest,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if not verify_password(body.current_password, current_user.password_hash):
+        await identity_service.create_audit_log(
+            db=db,
+            user_id=current_user.id,
+            action="PASSWORD_CHANGE_FAILED",
+            ip_address=request.client.host if request.client else None,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Current password is incorrect",
+        )
+    current_user.password_hash = get_password_hash(body.new_password)
+    await db.flush()
+    await identity_service.create_audit_log(
+        db=db,
+        user_id=current_user.id,
+        action="PASSWORD_CHANGED",
+        ip_address=request.client.host if request.client else None,
+    )
+    return {"status": "success"}
+
+
 @auth_router.get("/me/permissions")
 async def auth_me_permissions(
     current_user: User = Depends(get_current_user),
@@ -366,6 +397,32 @@ async def list_users(
     query = query.order_by(User.email)
     result = await db.execute(query)
     return result.scalars().all()
+
+
+@users_router.patch("/me", response_model=UserResponse)
+async def patch_me(
+    body: UpdateMeRequest,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    data = body.model_dump(exclude_unset=True)
+    if not data:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No fields to update")
+    for key, value in data.items():
+        setattr(current_user, key, value)
+    await db.flush()
+    await identity_service.create_audit_log(
+        db=db,
+        user_id=current_user.id,
+        action="USER_PREFS_UPDATED",
+        payload={"fields": list(data.keys())},
+        ip_address=request.client.host if request.client else None,
+    )
+    result = await db.execute(
+        select(User).options(joinedload(User.role), joinedload(User.employee)).where(User.id == current_user.id)
+    )
+    return result.scalar_one()
 
 
 @users_router.get("/me", response_model=UserResponse)

@@ -39,6 +39,7 @@ from app.modules.dashboard.router import dashboard_router
 from app.modules.backups.router import router as backups_router
 from app.modules.reports.router import reports_router
 from app.modules.notifications.router import notifications_router
+from app.modules.settings.router import settings_router
 from app.middleware.idempotency import IdempotencyMiddleware
 from app.middleware.real_ip import RealIPMiddleware
 from app.middleware.csrf import CSRFMiddleware
@@ -97,6 +98,7 @@ app.include_router(backups_router, prefix="/api/v1")
 app.include_router(staff_payroll_router, prefix="/api/v1")
 app.include_router(reports_router, prefix="/api/v1")
 app.include_router(notifications_router, prefix="/api/v1")
+app.include_router(settings_router, prefix="/api/v1")
 
 @app.get("/api/v1/health", tags=["system"])
 async def health_check():

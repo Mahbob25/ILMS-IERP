@@ -9,6 +9,7 @@
 - **Reports module (v1.8) shipped** — 12-report catalog, full CSV/print/PDF export, permission gating, 97% coverage on the module (see `archive/plans/reports-module.md`)
 - **Financial Records Center shipped** — centralized read-only archive of receipts/vouchers/refunds with search/filter/reprint (see `archive/plans/financial-records-center.md`; zero-migration constraint upheld)
 - Cloud deployment prep: Cloudflare Tunnel ingress, prod compose ready, deploy/backup scripts
+- **Settings — Phases 1, 3, 4 shipped** — self-service password/language (Phase 1, no migration) + superadmin System tab with `system_settings` KV (institute profile + runtime defaults, migration `202608060005`) + Coming soon for notifications/logo upload + bilingual polish; Phase 2 (notifications) remains Coming soon per v1 decision (see `archive/plans/settings-page.md`)
 
 ## Now
 

@@ -153,6 +153,15 @@ class UserUpdate(BaseModel):
 
     _validate_password = field_validator("password")(_validate_password_strength)
 
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str = Field(..., min_length=8)
+
+    _validate_password = field_validator("new_password")(_validate_password_strength)
+
+class UpdateMeRequest(BaseModel):
+    locale_pref: Optional[str] = Field(None, pattern="^(ar|en)$")
+
 # --- Teacher/Detail Schemas (unchanged) ---
 
 class SectionInfo(BaseModel):
