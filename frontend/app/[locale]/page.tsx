@@ -22,15 +22,40 @@ export default function LandingPage() {
   const [contactErr, setContactErr] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch(`/api/v1/public/landing?locale=${locale}`).then((r) => r.json()).then((d) => { if (d && Object.keys(d).length) setOverride(d); }).catch(() => {});
-    fetch(`/api/v1/public/announcements`).then((r) => r.json()).then((d) => { if (Array.isArray(d) && d.length) setAnnouncements(d); }).catch(() => {});
+    fetch(`/api/v1/public/landing?locale=${locale}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d && typeof d === "object" && !Array.isArray(d) && !("detail" in d) && (d.programs || d.heroKicker || d.heroLine1)) setOverride(d);
+      })
+      .catch(() => {});
+    fetch(`/api/v1/public/announcements`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((d) => { if (Array.isArray(d)) setAnnouncements(d); })
+      .catch(() => {});
   }, [locale]);
 
-  const t: any = override ? { ...defaults, ...override, programs: override.programs || defaults.programs, ateliers: override.ateliers || defaults.ateliers, levels: defaults.levels, liveLabel: defaults.liveLabel, liveCardTitle: defaults.liveCardTitle, lang: defaults.lang, navAI: override.navAI || defaults.navAI, navPrograms: override.navPrograms || defaults.navPrograms, navAteliers: override.navAteliers || defaults.navAteliers, navCampus: override.navCampus || defaults.navCampus, navContact: override.navContact || defaults.navContact, staffLogin: override.staffLogin || defaults.staffLogin } : defaults;
-  (t as any).levels = defaults.levels;
-  (t as any).liveLabel = defaults.liveLabel;
-  (t as any).liveCardTitle = defaults.liveCardTitle;
-  (t as any).lang = defaults.lang;
+  const t: any = (() => {
+    if (!override || typeof override !== "object" || Array.isArray(override) || "detail" in override) return defaults;
+    const base: any = { ...defaults };
+    for (const k of Object.keys(override)) {
+      const v = (override as any)[k];
+      if (v == null) continue;
+      if (k === "programs" || k === "ateliers" || k === "levels") {
+        if (Array.isArray(v) && v.length) base[k] = v;
+      } else if (typeof v === "string") {
+        if (v.trim() !== "") base[k] = v;
+      } else {
+        base[k] = v;
+      }
+    }
+    if (!Array.isArray(base.programs) || !base.programs.length) base.programs = defaults.programs;
+    if (!Array.isArray(base.ateliers) || !base.ateliers.length) base.ateliers = defaults.ateliers;
+    if (!Array.isArray(base.levels) || !base.levels.length) base.levels = defaults.levels;
+    base.liveLabel = defaults.liveLabel;
+    base.liveCardTitle = defaults.liveCardTitle;
+    base.lang = defaults.lang;
+    return base;
+  })();
 
   async function submitContact(e: React.FormEvent) {
     e.preventDefault();

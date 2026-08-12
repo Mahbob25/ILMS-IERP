@@ -1,5 +1,19 @@
+/**
+ * Fallbacks used when /public/landing has not been filled yet.
+ * Extra keys needed by layout that are not editable via CMS:
+ */
 export const landingDefaults = {
   ar: {
+    navAI: "الذكاء الاصطناعي",
+    navPrograms: "البرامج",
+    navAteliers: "الورش",
+    navCampus: "الحرم",
+    navContact: "العنوان",
+    staffLogin: "دخول الكادر",
+    liveLabel: "مباشر من الحرم",
+    liveCardTitle: "جدول اليوم",
+    levels: ["A1", "A2", "B1", "B2", "C1", "C2"] as string[],
+    lang: "English",
     heroKicker: "مستوى واحد في كل مرة",
     heroLine1: "تتعلّم",
     heroLine2: "بمساعدة الذكاء الإصطناعي",
@@ -30,6 +44,16 @@ export const landingDefaults = {
     footer: "© معهد الدراسات — تعز. التسجيل حضوري.",
   },
   en: {
+    navAI: "AI",
+    navPrograms: "Programs",
+    navAteliers: "Ateliers",
+    navCampus: "Campus",
+    navContact: "Visit",
+    staffLogin: "Staff login",
+    liveLabel: "Live from campus",
+    liveCardTitle: "Today",
+    levels: ["A1", "A2", "B1", "B2", "C1", "C2"] as string[],
+    lang: "العربية",
     heroKicker: "One level at a time",
     heroLine1: "Learn it",
     heroLine2: "with AI",
