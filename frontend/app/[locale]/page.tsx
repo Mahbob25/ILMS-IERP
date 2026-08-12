@@ -12,7 +12,8 @@ export default function LandingV2Page() {
 
   const t = {
     ar: {
-      pill: "معهد الدراسات · حلب — لغات وعلوم حاسب",
+      navAI: "الذكاء الاصطناعي",
+      pill: "معهد الدراسات · حلب — لغات وعلوم حاسب وذكاء اصطناعي",
       navPrograms: "البرامج",
       navAteliers: "الورش",
       navCampus: "الحرم",
@@ -20,21 +21,23 @@ export default function LandingV2Page() {
       staffLogin: "دخول الكادر",
       heroKicker: "مستوى واحد في كل مرة",
       heroLine1: "تتعلّم",
-      heroLine2: "وتطبّق",
-      heroLine3: "في نفس اليوم.",
-      heroDesc: "فصول 8 طلاب كحد أقصى، مختبر يومي، وشهادة تُتحقّق برمز. إنجليزية وفرنسية وبرمجة وشبكات — نفس المبنى، نفس الجودة منذ 1998.",
+      heroLine2: "بمساعدة AI",
+      heroLine3: "وتطبّق في نفس اليوم.",
+      heroDesc: "فصول 8 طلاب، مختبر يومي، ومساعد ذكاء اصطناعي يرافقك — يصحح نطقك، يراجع كودك، ويبني لك خطة مراجعة. نفس المبنى منذ 1998، بعقل جديد.",
       ctaPrimary: "شاهد البرامج",
       ctaGhost: "جولة في الحرم →",
       micro: "التسجيل حضوري فقط · اختبار تحديد مستوى مجاني",
       liveLabel: "مباشر من الحرم",
       liveCardTitle: "جدول اليوم",
       levels: ["A1", "A2", "B1", "B2", "C1", "C2"],
-      programsTitle: "ثلاث مسارات. نفس الانضباط.",
-      programsSub: "كل مسار له ورشة، مشروع نهائي، وشهادة قابلة للتحقق.",
-      cards: [
-        { n: "01", k: "اللغات", d: "محادثة يومية، مختبر صوتي، وامتحان كل وحدتين. من الحروف إلى المناظرة.", meta: "A1 → C2", dot: "#FF3B30" },
-        { n: "02", k: "علوم الحاسب", d: "بايثون، قواعد بيانات، شبكات وويب. تبني شيئًا يعمل كل أسبوع.", meta: "12 مساقًا", dot: "#0EA5E9" },
-        { n: "03", k: "الدبلومات", d: "محاسبة وإدارة وسكرتارية. تدريب عملي وملف إنجاز تقدّمه لصاحب العمل.", meta: "180 ساعة", dot: "#FFD60A" },
+      programsEyebrow: "البرامج",
+      programsTitle: "اختر ما تريد أن تتقنه",
+      programsSub: "قائمة مفتوحة — نضيف مسارات جديدة كل فصل. كل برنامج له ورشة، مشروع، وشهادة تُتحقّق.",
+      programs: [
+        { k: "اللغات", d: "محادثة يومية ومخبر صوتي — من الحروف إلى المناظرة.", meta: "A1 → C2" },
+        { k: "علوم الحاسب", d: "بايثون، قواعد بيانات، شبكات وويب — تبني شيئًا يعمل كل أسبوع.", meta: "12 مساقًا" },
+        { k: "الذكاء الاصطناعي", d: "أساسيات عملية — أدوات، بيانات، ومشاريع يمكنك عرضها.", meta: "جديد" },
+        { k: "الدبلومات", d: "محاسبة وإدارة وسكرتارية — حالات واقعية وملف إنجاز.", meta: "180 ساعة" },
       ],
       ateliersTitle: "الورش — حيث يحدث التعلّم",
       ateliers: [
@@ -50,7 +53,8 @@ export default function LandingV2Page() {
       lang: "English",
     },
     en: {
-      pill: "Al-Drasat · Aleppo — Languages & Computing",
+      navAI: "AI",
+      pill: "Al-Drasat · Aleppo — Languages, Computing & AI",
       navPrograms: "Programs",
       navAteliers: "Ateliers",
       navCampus: "Campus",
@@ -58,22 +62,24 @@ export default function LandingV2Page() {
       staffLogin: "Staff login",
       heroKicker: "One level at a time",
       heroLine1: "Learn it",
-      heroLine2: "and ship it",
-      heroLine3: "same day.",
+      heroLine2: "with AI",
+      heroLine3: "ship it same day.",
       heroDesc:
-        "8 max per section, daily lab, QR-verifiable certificate. English, French, Python, networks — same building, same rigor since 1998.",
+        "8 max per section, daily lab, QR-verifiable certificate — plus an AI companion that tunes your pronunciation, reviews your code, and builds your revision plan. Since 1998, now AI-forward.",
       ctaPrimary: "See programs",
       ctaGhost: "Tour campus →",
       micro: "On-campus enrolment · Free placement test",
       liveLabel: "Live from campus",
       liveCardTitle: "Today",
       levels: ["A1", "A2", "B1", "B2", "C1", "C2"],
-      programsTitle: "Three tracks. Same discipline.",
-      programsSub: "Each track has an atelier, a final project, and a certificate you can verify.",
-      cards: [
-        { n: "01", k: "Languages", d: "Daily conversation, audio lab, test every two units. Letters to debate.", meta: "A1 → C2", dot: "#FF3B30" },
-        { n: "02", k: "Computing", d: "Python, DB, networks & web. You ship something that runs every week.", meta: "12 courses", dot: "#0EA5E9" },
-        { n: "03", k: "Diplomas", d: "Accounting, management, secretarial. Real cases and a portfolio to show.", meta: "180 hrs", dot: "#FFD60A" },
+      programsEyebrow: "Programs",
+      programsTitle: "Choose what you want to master",
+      programsSub: "Open list — we add tracks each term. Every program has an atelier, a project, and a verifiable certificate.",
+      programs: [
+        { k: "Languages", d: "Daily conversation & audio lab — letters to debate.", meta: "A1 → C2" },
+        { k: "Computing", d: "Python, DB, networks & web — ship something every week.", meta: "12 courses" },
+        { k: "Artificial Intelligence", d: "Practical AI — tools, data and projects you can demo.", meta: "New" },
+        { k: "Diplomas", d: "Accounting, management, secretarial — real cases & portfolio.", meta: "180 hrs" },
       ],
       ateliersTitle: "Ateliers — where learning happens",
       ateliers: [
@@ -112,8 +118,8 @@ export default function LandingV2Page() {
             <nav className="hidden lg:flex items-center gap-1 ms-2 p-1 rounded-full bg-white border border-[#0A0A0A]/10 shadow-sm">
               {[
                 [t.navPrograms, "#programs"],
+                [(t as any).navAI, "#ai"],
                 [t.navAteliers, "#ateliers"],
-                [t.navCampus, "#campus"],
                 [t.navContact, "#contact"],
               ].map(([label, href]) => (
                 <a
@@ -309,39 +315,97 @@ export default function LandingV2Page() {
         <style>{`@keyframes tape2 { from { transform: translateX(0)} to { transform: translateX(-50%) } }`}</style>
       </div>
 
-      <section id="programs" className="mx-auto max-w-[1280px] px-4 md:px-6 mt-8 md:mt-10">
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <h2 className="text-[26px] md:text-[34px] font-black tracking-[-0.05em]" style={{ fontFamily: "Space Grotesk, sans-serif" }}>
-            {t.programsTitle}
-          </h2>
-          <p className="max-w-[44ch] text-[13px] leading-6 opacity-60">{t.programsSub}</p>
-        </div>
-        <div className="mt-6 grid grid-cols-12 gap-4 md:gap-6">
-          {t.cards.map((c) => (
-            <article key={c.k} className="col-span-12 md:col-span-4 rounded-[24px] bg-white border border-[#0A0A0A]/10 overflow-hidden shadow-sm flex flex-col">
-              <div className="h-2 w-full" style={{ background: c.dot }} />
-              <div className="p-6 flex-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-[11px] font-black px-2.5 py-1 rounded-full bg-[#0A0A0A] text-white" style={{ fontFamily: "JetBrains Mono, monospace" }}>
-                    {c.n}
-                  </span>
-                  <span className="text-[11px] font-bold opacity-60" style={{ fontFamily: "JetBrains Mono, monospace" }}>
-                    {c.meta}
-                  </span>
+      <section id="ai" className="mx-auto max-w-[1280px] px-4 md:px-6 mt-6">
+        <div className="rounded-[28px] bg-[#0A0A0A] text-white overflow-hidden border border-black">
+          <div className="grid grid-cols-12">
+            <div className="col-span-12 lg:col-span-5 p-6 md:p-8">
+              <div className="inline-flex items-center gap-2 text-[11px] tracking-[0.14em] font-bold px-3 py-1.5 rounded-full bg-white/10 border border-white/15" style={{ fontFamily: "JetBrains Mono, monospace" }}>
+                <span className="h-1.5 w-1.5 rounded-full bg-[#FFD60A] animate-pulse" /> {isAr ? "AI · مساعدك في التعلّم" : "AI · YOUR LEARNING COMPANION"}
+              </div>
+              <h2 className="mt-3 text-[24px] md:text-[28px] font-black tracking-[-0.05em]" style={{ fontFamily: "Space Grotesk, sans-serif" }}>
+                {isAr ? "ذكاء يساعدك تتعلّم أسرع" : "AI that helps you learn faster"}
+              </h2>
+              <p className="mt-2 text-[13px] leading-6 opacity-70">
+                {isAr ? "ليس بديلًا عن المعلّم — بل مساعد يومي يرافقك بعد الحصة. يصحح، يراجع، ويذكّرك بما تحتاج." : "Not replacing the teacher — a daily companion after class. It corrects, reviews, and reminds you what matters."}
+              </p>
+              <div className="mt-4 text-[11px] opacity-60" style={{ fontFamily: "JetBrains Mono, monospace" }}>
+                {isAr ? "يعمل على هاتفك · مجاني لطلاب المعهد" : "On your phone · Free for students"}
+              </div>
+            </div>
+            <div className="col-span-12 lg:col-span-7 p-4 md:p-6 grid grid-cols-1 sm:grid-cols-3 gap-3 bg-white/[0.04]">
+              {[
+                { k: isAr ? "مدرّب النطق" : "Pronunciation coach", p: isAr ? "سجّل جملة، يصحح نطقك فورًا ويعطيك تمارين قصيرة." : "Record a sentence — instant correction + micro-drills." },
+                { k: isAr ? "مراجع الكود" : "Code reviewer", p: isAr ? "الصق كودك، يكشف الخطأ ويقترح تحسينًا — تتعلم لماذا." : "Paste code — finds bugs and suggests better patterns." },
+                { k: isAr ? "خطة المراجعة" : "Revision plan", p: isAr ? "يبني لك خطة يومية حسب أخطائك ويذكّرك بها." : "Builds a daily plan from your mistakes and nudges you." },
+              ].map((c) => (
+                <div key={c.k} className="rounded-2xl bg-white text-[#0A0A0A] border border-white/10 p-4">
+                  <div className="text-[11px] tracking-[0.14em] font-black opacity-60" style={{ fontFamily: "JetBrains Mono, monospace" }}>{c.k.toUpperCase()}</div>
+                  <p className="mt-2 text-[12.5px] leading-5 opacity-70">{c.p}</p>
                 </div>
-                <h3 className="mt-3 text-[18px] font-black tracking-[-0.03em]" style={{ fontFamily: "Space Grotesk, sans-serif" }}>
-                  {c.k}
-                </h3>
-                <p className="mt-2 text-[13px] leading-6 opacity-70">{c.d}</p>
+              ))}
+              <div className="sm:col-span-3 rounded-2xl bg-[#FFD60A] text-[#0A0A0A] px-4 py-3 flex items-center justify-between gap-3">
+                <span className="text-[12px] font-bold" style={{ fontFamily: "JetBrains Mono, monospace" }}>{isAr ? "قريبًا: مساعد دراسة بالعربية" : "Soon: Arabic study assistant"}</span>
+                <span className="text-[11px] opacity-70">{isAr ? "اسأل بلغتك" : "Ask in your language"}</span>
               </div>
-              <div className="px-6 py-3 border-t border-[#0A0A0A]/10 bg-[#FFFBF0]/60 flex items-center justify-between">
-                <span className="text-[11px] font-bold opacity-60" style={{ fontFamily: "JetBrains Mono, monospace" }}>
-                  {isAr ? "التسجيل حضوري" : "On-campus"}
-                </span>
-                <span className="h-2 w-2 rounded-full" style={{ background: c.dot }} />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="programs" className="mx-auto max-w-[1280px] px-4 md:px-6 mt-8 md:mt-10">
+        <div className="rounded-[28px] bg-white border border-[#0A0A0A]/10 overflow-hidden shadow-sm">
+          <div className="px-6 md:px-8 py-6 flex flex-wrap items-end justify-between gap-4 border-b border-[#0A0A0A]/10">
+            <div>
+              <div className="text-[11px] tracking-[0.16em] font-bold opacity-50" style={{ fontFamily: "JetBrains Mono, monospace" }}>
+                {(t as any).programsEyebrow.toUpperCase()}
               </div>
-            </article>
-          ))}
+              <h2 className="mt-1 text-[24px] md:text-[30px] font-black tracking-[-0.05em]" style={{ fontFamily: "Space Grotesk, sans-serif" }}>
+                {t.programsTitle}
+              </h2>
+            </div>
+            <p className="max-w-[46ch] text-[13px] leading-6 opacity-60">{t.programsSub}</p>
+          </div>
+
+          <div className="divide-y divide-[#0A0A0A]/10">
+            {(t as any).programs.map((p: any, i: number) => (
+              <div key={p.k} className="group grid grid-cols-12 gap-4 px-6 md:px-8 py-5 hover:bg-[#FFFBF0]/60 transition">
+                <div className="col-span-12 md:col-span-5 flex items-center gap-3">
+                  <span
+                    className="h-8 w-8 rounded-full grid place-items-center text-[11px] font-black border bg-[#0A0A0A] text-white shrink-0"
+                    style={{ fontFamily: "JetBrains Mono, monospace" }}
+                  >
+                    {String(i + 1).padStart(2, "0")}
+                  </span>
+                  <div className="min-w-0">
+                    <div className="text-[16px] font-black tracking-[-0.03em] leading-none" style={{ fontFamily: "Space Grotesk, sans-serif" }}>
+                      {p.k}
+                    </div>
+                    <div className="text-[11px] font-bold opacity-60" style={{ fontFamily: "JetBrains Mono, monospace" }}>
+                      {p.meta}
+                    </div>
+                  </div>
+                </div>
+                <p className="col-span-12 md:col-span-5 text-[13px] leading-6 opacity-70 self-center">{p.d}</p>
+                <div className="col-span-12 md:col-span-2 flex md:justify-end items-center gap-2 self-center">
+                  <a
+                    href="#contact"
+                    className="inline-flex items-center gap-1.5 text-[12px] font-bold px-3.5 py-2 rounded-full bg-white border border-[#0A0A0A]/12 group-hover:bg-[#0A0A0A] group-hover:text-white group-hover:border-[#0A0A0A] transition"
+                  >
+                    {isAr ? "التفاصيل" : "Details"} <span aria-hidden>→</span>
+                  </a>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="px-6 md:px-8 py-3 bg-[#FFFBF0]/60 border-t border-[#0A0A0A]/10 flex items-center justify-between text-[11px]">
+            <span className="opacity-60" style={{ fontFamily: "JetBrains Mono, monospace" }}>
+              {isAr ? "نضيف مسارات جديدة كل فصل" : "New tracks each term"}
+            </span>
+            <span className="opacity-40" style={{ fontFamily: "JetBrains Mono, monospace" }}>
+              {isAr ? "التسجيل حضوري" : "On-campus enrolment"}
+            </span>
+          </div>
         </div>
       </section>
 
