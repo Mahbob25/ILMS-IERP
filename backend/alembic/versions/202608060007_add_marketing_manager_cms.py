@@ -24,26 +24,59 @@ def upgrade() -> None:
         WHERE NOT EXISTS (SELECT 1 FROM roles WHERE name='marketing_manager')
     """))
 
-    for codename, label, group in [
+    permissions = [
         ("page_content", "Landing Content", "marketing"),
         ("page_announcements", "Announcements", "marketing"),
         ("page_contacts", "Contacts Inbox", "marketing"),
-    ]:
-        conn.execute(sa.text("""
-            INSERT INTO permissions (id, codename, label, "group")
-            SELECT gen_random_uuid(), :codename, :label, :group
-            WHERE NOT EXISTS (SELECT 1 FROM permissions WHERE codename=:codename)
-        """), {"codename": codename, "label": label, "group": group})
+    ]
+    perm_ids: dict[str, str] = {}
+    for codename, label, group_name in permissions:
+        existing = conn.execute(
+            sa.text("SELECT id FROM permissions WHERE codename = :codename"),
+            {"codename": codename},
+        ).fetchone()
+        if existing:
+            perm_ids[codename] = existing[0]
+        else:
+            conn.execute(
+                sa.text(
+                    'INSERT INTO permissions (id, codename, label, "group") '
+                    "VALUES (gen_random_uuid(), :codename, :label, :group_name)"
+                ),
+                {"codename": codename, "label": label, "group_name": group_name},
+            )
+            row = conn.execute(
+                sa.text("SELECT id FROM permissions WHERE codename = :codename"),
+                {"codename": codename},
+            ).fetchone()
+            perm_ids[codename] = row[0]  # type: ignore[index]
+
+    # ensure page_bookings id is known for granting
+    for codename in ["page_bookings"]:
+        row = conn.execute(
+            sa.text("SELECT id FROM permissions WHERE codename = :codename"),
+            {"codename": codename},
+        ).fetchone()
+        if row:
+            perm_ids[codename] = row[0]
 
     for codename in ["page_content", "page_announcements", "page_contacts", "page_bookings"]:
-        conn.execute(sa.text("""
-            INSERT INTO role_permissions (role_id, permission_id)
-            SELECT r.id, p.id FROM roles r, permissions p
-            WHERE r.name='marketing_manager' AND p.codename=:codename
-            AND NOT EXISTS (
-                SELECT 1 FROM role_permissions rp WHERE rp.role_id=r.id AND rp.permission_id=p.id
+        perm_id = perm_ids.get(codename)
+        if not perm_id:
+            continue
+        role_row = conn.execute(sa.text("SELECT id FROM roles WHERE name='marketing_manager'")).fetchone()
+        if not role_row:
+            continue
+        role_id = role_row[0]
+        exists = conn.execute(
+            sa.text("SELECT 1 FROM role_permissions WHERE role_id = :role_id AND permission_id = :perm_id"),
+            {"role_id": role_id, "perm_id": perm_id},
+        ).fetchone()
+        if not exists:
+            conn.execute(
+                sa.text("INSERT INTO role_permissions (role_id, permission_id) VALUES (:role_id, :perm_id)"),
+                {"role_id": role_id, "perm_id": perm_id},
             )
-        """), {"codename": codename})
 
     op.create_table(
         "landing_content",
