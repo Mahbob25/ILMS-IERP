@@ -16,6 +16,7 @@ from app.modules.identity.models import Role, User, RefreshToken, AuditLog, Empl
 from app.modules.academic.models import Course, CourseSection, Student, Enrollment, Certificate, FinalGrade, SectionCancellation, PendingRefund, Refund, DailyJobsLog, SectionCompletionOverride, SectionLifecycleConfig, UnenrollmentRecord, UnenrollmentOverride
 from app.modules.lms.models import AttendanceSession, AttendanceRecord, Assignment, Submission, Grade, Payment, Expense, TeacherWallet, DailyClosure, SectionContract, LedgerEntry, CompensationAmendmentRequest, IdempotencyKey
 from app.modules.settings.models import SystemSetting
+from app.modules.bookings.models import Booking  # noqa: F401 — register metadata
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

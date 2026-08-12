@@ -82,6 +82,7 @@ function DashboardLayoutInner({
       },
       menu: {
         dashboard: "لوحة التحكم",
+        bookings: "الحجوزات",
         employees: "الموظفين",
         roles: "الأدوار",
         users: "المستخدمين",
@@ -122,6 +123,7 @@ function DashboardLayoutInner({
       },
       menu: {
         dashboard: "Dashboard",
+        bookings: "Bookings",
         employees: "Employees",
         roles: "Roles",
         users: "User Management",
@@ -225,6 +227,7 @@ function DashboardLayoutInner({
     page_notifications: ["superadmin", "manager", "secretary", "teacher"],
     page_wizards: ["superadmin", "manager", "secretary"],
     page_search: ["superadmin", "manager", "secretary", "teacher"],
+    page_bookings: ["superadmin", "manager", "secretary"],
   };
 
   const hasPageAccess = (permissionCodename: string): boolean => {
@@ -267,6 +270,7 @@ function DashboardLayoutInner({
     "dashboard/notifications": "page_notifications",
     "dashboard/wizards": "page_wizards",
     "dashboard/search": "page_search",
+    "dashboard/bookings": "page_bookings",
   };
 
   const routeKey = pathname.split("/").slice(2).join("/").replace(/\/$/, "");
@@ -298,6 +302,12 @@ function DashboardLayoutInner({
       href: `/${locale}/dashboard/wizards/student-enrollment`,
       icon: Workflow,
       permission: "page_wizards",
+    },
+    {
+      name: t.menu.bookings,
+      href: `/${locale}/dashboard/bookings`,
+      icon: Calendar,
+      permission: "page_bookings",
     },
     {
       name: t.menu.users,

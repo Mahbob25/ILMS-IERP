@@ -23,7 +23,7 @@ export default function LandingV2Page() {
       heroLine1: "تتعلّم",
       heroLine2: "بمساعدة AI",
       heroLine3: "وتطبّق في نفس اليوم.",
-      heroDesc: "فصول 8 طلاب، مختبر يومي، ومساعد ذكاء اصطناعي يرافقك — يصحح نطقك، يراجع كودك، ويبني لك خطة مراجعة. نفس المبنى منذ 1998، بعقل جديد.",
+      heroDesc: "فصول 8 طلاب، مختبر يومي، ومساعد ذكاء اصطناعي يرافقك — يصحح نطقك، يراجع كودك، ويبني لك خطة مراجعة. في تعز منذ 1998، بعقل جديد.",
       ctaPrimary: "شاهد البرامج",
       ctaGhost: "جولة في الحرم →",
       micro: "التسجيل حضوري فقط · اختبار تحديد مستوى مجاني",
@@ -34,10 +34,10 @@ export default function LandingV2Page() {
       programsTitle: "اختر ما تريد أن تتقنه",
       programsSub: "قائمة مفتوحة — نضيف مسارات جديدة كل فصل. كل برنامج له ورشة، مشروع، وشهادة تُتحقّق.",
       programs: [
-        { k: "اللغات", d: "محادثة يومية ومخبر صوتي — من الحروف إلى المناظرة.", meta: "A1 → C2" },
-        { k: "علوم الحاسب", d: "بايثون، قواعد بيانات، شبكات وويب — تبني شيئًا يعمل كل أسبوع.", meta: "12 مساقًا" },
-        { k: "الذكاء الاصطناعي", d: "أساسيات عملية — أدوات، بيانات، ومشاريع يمكنك عرضها.", meta: "جديد" },
-        { k: "الدبلومات", d: "محاسبة وإدارة وسكرتارية — حالات واقعية وملف إنجاز.", meta: "180 ساعة" },
+        { id: "languages", k: "اللغات", d: "محادثة يومية ومخبر صوتي — من الحروف إلى المناظرة.", meta: "A1 → C2" },
+        { id: "computing", k: "علوم الحاسب", d: "بايثون، قواعد بيانات، شبكات وويب — تبني شيئًا يعمل كل أسبوع.", meta: "12 مساقًا" },
+        { id: "ai", k: "الذكاء الاصطناعي", d: "أساسيات عملية — أدوات، بيانات، ومشاريع يمكنك عرضها.", meta: "جديد" },
+        { id: "diplomas", k: "الدبلومات", d: "محاسبة وإدارة وسكرتارية — حالات واقعية وملف إنجاز.", meta: "180 ساعة" },
       ],
       ateliersTitle: "الورش — حيث يحدث التعلّم",
       ateliers: [
@@ -46,10 +46,10 @@ export default function LandingV2Page() {
         { k: "ورشة الأعمال", v: "حالات واقعية", p: "فواتير، ميزانيات، ومراسلات — كما في الشركة." },
       ],
       contactTitle: "تعال وشاهد حصة",
-      address: "حلب — بناء الدراسات، الطابق الثاني — جانب مشفى الضبيط",
+      address: "تعز — اليمن — معهد الدراسات",
       hours: "السبت – الخميس · 08:30 — 19:30",
-      phone: "021 — 123 4567",
-      footer: "© معهد الدراسات — حلب. التسجيل حضوري.",
+      phone: "04 — 123 456",
+      footer: "© معهد الدراسات — تعز. التسجيل حضوري.",
       lang: "English",
     },
     en: {
@@ -76,10 +76,10 @@ export default function LandingV2Page() {
       programsTitle: "Choose what you want to master",
       programsSub: "Open list — we add tracks each term. Every program has an atelier, a project, and a verifiable certificate.",
       programs: [
-        { k: "Languages", d: "Daily conversation & audio lab — letters to debate.", meta: "A1 → C2" },
-        { k: "Computing", d: "Python, DB, networks & web — ship something every week.", meta: "12 courses" },
-        { k: "Artificial Intelligence", d: "Practical AI — tools, data and projects you can demo.", meta: "New" },
-        { k: "Diplomas", d: "Accounting, management, secretarial — real cases & portfolio.", meta: "180 hrs" },
+        { id: "languages", k: "Languages", d: "Daily conversation & audio lab — letters to debate.", meta: "A1 → C2" },
+        { id: "computing", k: "Computing", d: "Python, DB, networks & web — ship something every week.", meta: "12 courses" },
+        { id: "ai", k: "Artificial Intelligence", d: "Practical AI — tools, data and projects you can demo.", meta: "New" },
+        { id: "diplomas", k: "Diplomas", d: "Accounting, management, secretarial — real cases & portfolio.", meta: "180 hrs" },
       ],
       ateliersTitle: "Ateliers — where learning happens",
       ateliers: [
@@ -88,10 +88,10 @@ export default function LandingV2Page() {
         { k: "Business Atelier", v: "Real cases", p: "Invoices, budgets, letters — as in a company." },
       ],
       contactTitle: "Come watch a class",
-      address: "Aleppo — Al-Drasat Bldg, 2nd floor, near Al-Dabbit Hospital",
+      address: "Taiz — Yemen — Al-Drasat Institute",
       hours: "Sat–Thu · 08:30 — 19:30",
-      phone: "021 — 123 4567",
-      footer: "© Al-Drasat Institute — Aleppo. On-campus enrolment.",
+      phone: "04 — 123 456",
+      footer: "© Al-Drasat Institute — Taiz. On-campus enrolment.",
       lang: "العربية",
     },
   }[isAr ? "ar" : "en"];
@@ -103,16 +103,16 @@ export default function LandingV2Page() {
       <header className="sticky top-0 z-40 bg-[#FFFBF0]/85 backdrop-blur-xl border-b border-[#0A0A0A]/10">
         <div className="mx-auto max-w-[1280px] px-4 md:px-6 h-[64px] flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-xl bg-[#0A0A0A] text-white grid place-items-center overflow-hidden shrink-0">
+            <div className="h-9 w-9 rounded-[10px] bg-white border border-[#0A0A0A]/10 grid place-items-center overflow-hidden shrink-0 p-1">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/logo.jpeg" alt="Al-Drasat" className="h-7 w-7 object-contain mix-blend-screen" />
+              <img src="/logo.jpeg" alt="Al-Drasat" className="h-full w-full object-contain" />
             </div>
             <div className="leading-none hidden sm:block">
-              <div className="font-bold tracking-[-0.04em] text-[14px]" style={{ fontFamily: "Space Grotesk, sans-serif" }}>
-                AL-DRASAT
+              <div className="font-bold tracking-[-0.04em] text-[14px]" style={{ fontFamily: isAr ? "IBM Plex Sans Arabic, sans-serif" : "Space Grotesk, sans-serif" }}>
+                {isAr ? "معهد الدراسات" : "AL-DRASAT"}
               </div>
               <div className="text-[10px] tracking-[0.14em] opacity-60" style={{ fontFamily: "JetBrains Mono, monospace" }}>
-                INSTITUTE — 1998
+                {isAr ? "تعز · اليمن — ١٩٩٨" : "TAIZ · YEMEN — 1998"}
               </div>
             </div>
             <nav className="hidden lg:flex items-center gap-1 ms-2 p-1 rounded-full bg-white border border-[#0A0A0A]/10 shadow-sm">
@@ -151,17 +151,7 @@ export default function LandingV2Page() {
       </header>
 
       <section className="mx-auto max-w-[1280px] px-4 md:px-6 pt-5 md:pt-7">
-        <div
-          className="inline-flex items-center gap-2 rounded-full bg-white border border-[#0A0A0A]/10 px-3 py-1.5 text-[11px] font-semibold shadow-sm"
-          style={{ fontFamily: "JetBrains Mono, monospace" }}
-        >
-          <span className="h-2 w-2 rounded-full bg-[#FF3B30] animate-pulse" />
-          {t.pill}
-          <span className="hidden sm:inline opacity-40">·</span>
-          <span className="hidden sm:inline opacity-60">{isAr ? "اختبار مجاني 20 دقيقة" : "Free 20-min test"}</span>
-        </div>
-
-        <div className="mt-4 grid grid-cols-12 gap-4 md:gap-6 items-stretch">
+        <div className="grid grid-cols-12 gap-4 md:gap-6 items-stretch">
           <div className="col-span-12 lg:col-span-7 relative rounded-[28px] bg-white border border-[#0A0A0A]/10 overflow-hidden shadow-[0_16px_50px_rgba(10,10,10,0.08)]">
             <div className="absolute inset-0 pointer-events-none opacity-[0.04]" style={{ backgroundImage: "radial-gradient(#0A0A0A 1px, transparent 1px)", backgroundSize: "16px 16px" }} />
             <div className="absolute -top-20 -end-20 h-[320px] w-[320px] rounded-full bg-[#FFD60A]/25 blur-[40px]" />
@@ -263,7 +253,7 @@ export default function LandingV2Page() {
                 ))}
               </div>
               <div className="px-4 pb-4">
-                <a href="#contact" className="w-full rounded-full bg-white text-[#0A0A0A] py-3 text-[13px] font-bold grid place-items-center hover:bg-[#FFFBF0] transition">
+                <a href={`/${locale}/book`} className="w-full rounded-full bg-white text-[#0A0A0A] py-3 text-[13px] font-bold grid place-items-center hover:bg-[#FFFBF0] transition">
                   {isAr ? "احجز مقعد تجربة مجاني" : "Save a free trial seat"} →
                 </a>
               </div>
@@ -297,22 +287,24 @@ export default function LandingV2Page() {
         </div>
       </section>
 
-      <div className="mt-6 border-y border-[#0A0A0A]/10 bg-[#0A0A0A] text-white overflow-hidden">
-        <div className="flex animate-[tape2_20s_linear_infinite] whitespace-nowrap">
-          {Array.from({ length: 2 }).map((_, i) => (
-            <div key={i} className="flex items-center gap-3 py-3 ps-3" style={{ fontFamily: "JetBrains Mono, monospace" }}>
-              {["Aleppo", "Languages", "Coding", "Networks", "Diplomas", "Placement Test"].map((w) => (
-                <span key={w + i} className="inline-flex items-center gap-3">
-                  <span className="text-[12px] tracking-[0.14em] font-bold opacity-90">{w.toUpperCase()}</span>
-                  <span className="h-1.5 w-1.5 rounded-full bg-[#FFD60A]" />
-                </span>
-              ))}
-              <span className="text-[12px] tracking-[0.14em] font-bold opacity-40">— 1998 → NOW —</span>
-              <span className="h-1.5 w-1.5 rounded-full bg-[#FF3B30]" />
-            </div>
-          ))}
+      <div className="mx-auto max-w-[1280px] px-4 md:px-6 mt-6">
+        <div className="rounded-2xl border border-[#0A0A0A]/10 bg-[#0A0A0A] text-white overflow-hidden">
+          <div className="flex animate-[tape2_20s_linear_infinite] whitespace-nowrap">
+            {Array.from({ length: 2 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-3 py-3 ps-3" style={{ fontFamily: "JetBrains Mono, monospace" }}>
+                {(isAr ? ["تعز", "لغات", "برمجة", "شبكات", "دبلومات", "اختبار تحديد مستوى"] : ["Taiz", "Languages", "Coding", "Networks", "Diplomas", "Placement Test"]).map((w) => (
+                  <span key={w + i} className="inline-flex items-center gap-3">
+                    <span className="text-[12px] tracking-[0.14em] font-bold opacity-90">{w.toUpperCase()}</span>
+                    <span className="h-1.5 w-1.5 rounded-full bg-[#FFD60A]" />
+                  </span>
+                ))}
+                <span className="text-[12px] tracking-[0.14em] font-bold opacity-40">{isAr ? "— تعز — ١٩٩٨ → الآن —" : "— TAIZ — 1998 → NOW —"}</span>
+                <span className="h-1.5 w-1.5 rounded-full bg-[#FF3B30]" />
+              </div>
+            ))}
+          </div>
+          <style>{`@keyframes tape2 { from { transform: translateX(0)} to { transform: translateX(-50%) } }`}</style>
         </div>
-        <style>{`@keyframes tape2 { from { transform: translateX(0)} to { transform: translateX(-50%) } }`}</style>
       </div>
 
       <section id="ai" className="mx-auto max-w-[1280px] px-4 md:px-6 mt-6">
@@ -388,7 +380,7 @@ export default function LandingV2Page() {
                 <p className="col-span-12 md:col-span-5 text-[13px] leading-6 opacity-70 self-center">{p.d}</p>
                 <div className="col-span-12 md:col-span-2 flex md:justify-end items-center gap-2 self-center">
                   <a
-                    href="#contact"
+                    href={`/${locale}/programs#${p.id}`}
                     className="inline-flex items-center gap-1.5 text-[12px] font-bold px-3.5 py-2 rounded-full bg-white border border-[#0A0A0A]/12 group-hover:bg-[#0A0A0A] group-hover:text-white group-hover:border-[#0A0A0A] transition"
                   >
                     {isAr ? "التفاصيل" : "Details"} <span aria-hidden>→</span>
@@ -462,7 +454,7 @@ export default function LandingV2Page() {
             <p className="mt-1 text-[12.5px] leading-5 opacity-60">
               {isAr ? "احجز مقعدك — نرسل لك تأكيدًا بالوقت والقاعة." : "Save your seat — we send time & room confirmation."}
             </p>
-            <a href="#contact" className="mt-4 w-full rounded-full bg-[#FF3B30] text-white py-3 text-[13px] font-bold grid place-items-center hover:bg-[#E3342B] transition">
+            <a href={`/${locale}/book`} className="mt-4 w-full rounded-full bg-[#FF3B30] text-white py-3 text-[13px] font-bold grid place-items-center hover:bg-[#E3342B] transition">
               {isAr ? "احجز الآن" : "Book now"} →
             </a>
           </div>
@@ -473,7 +465,7 @@ export default function LandingV2Page() {
         <div className="rounded-2xl bg-white border border-[#0A0A0A]/10 px-5 py-4 flex flex-col md:flex-row items-center justify-between gap-3">
           <span className="text-[12px] opacity-70">{t.footer}</span>
           <span className="text-[11px] opacity-50" style={{ fontFamily: "JetBrains Mono, monospace" }}>
-            Aleppo — Voice · Code · Work
+            Taiz — Voice · Code · Work
           </span>
         </div>
       </footer>
