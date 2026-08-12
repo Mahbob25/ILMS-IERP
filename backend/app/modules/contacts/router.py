@@ -8,6 +8,8 @@ from app.modules.identity.dependencies import RoleChecker
 from app.modules.identity.models import User
 from app.modules.contacts.schemas import ContactCreate, ContactCreateResponse, ContactAdminResponse, ContactStatusUpdate
 from app.modules.contacts import service as contact_service
+import logging
+logger = logging.getLogger(__name__)
 
 contacts_router = APIRouter(tags=["contacts"])
 
@@ -21,6 +23,11 @@ async def create_public_contact(request: Request, body: ContactCreate, db: Async
     if len(digits) < 7:
         raise HTTPException(status_code=400, detail="Invalid phone number")
     row = await contact_service.create_contact(db, name=body.name, phone=body.phone, message=body.message, locale=body.locale)
+    try:
+        from app.modules.notifications.emitters import emit_contact_created
+        await emit_contact_created(db, contact_id=row.id)
+    except Exception:
+        logger.warning("emit_contact_created failed for %s", row.id, exc_info=True)
     return ContactCreateResponse(id=row.id, status=row.status)
 
 

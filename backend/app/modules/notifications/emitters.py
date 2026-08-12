@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 ROLE_MANAGER = "manager"
 ROLE_SECRETARY = "secretary"
 ROLE_SUPERADMIN = "superadmin"
+ROLE_MARKETING = "marketing_manager"
 
 
 async def _user_ids_by_role(db: AsyncSession, *role_names: str) -> list[uuid.UUID]:
@@ -271,3 +272,37 @@ async def emit_grade_submitted(
         priority="low",
         dedupe_key=f"grade_submitted:{section_id}",
     )
+
+
+# ── Marketing emitters ────────────────────────────────────────────────────────
+
+async def emit_booking_created(db: AsyncSession, *, booking_id: uuid.UUID) -> None:
+    user_ids = await _user_ids_by_role(db, ROLE_MARKETING, ROLE_MANAGER, ROLE_SECRETARY)
+    for uid in user_ids:
+        await create_notification(
+            db,
+            user_id=uid,
+            type_="booking_created",
+            title_key="notif.booking_created",
+            body_key="notif.booking_created_body",
+            params={"booking_id": str(booking_id)},
+            target_href="dashboard/bookings",
+            priority="normal",
+            dedupe_key=f"booking_created:{booking_id}",
+        )
+
+
+async def emit_contact_created(db: AsyncSession, *, contact_id: uuid.UUID) -> None:
+    user_ids = await _user_ids_by_role(db, ROLE_MARKETING)
+    for uid in user_ids:
+        await create_notification(
+            db,
+            user_id=uid,
+            type_="contact_created",
+            title_key="notif.contact_created",
+            body_key="notif.contact_created_body",
+            params={"contact_id": str(contact_id)},
+            target_href="dashboard/contacts",
+            priority="normal",
+            dedupe_key=f"contact_created:{contact_id}",
+        )

@@ -11,7 +11,9 @@ export type NotificationType =
   | "grade_submitted"
   | "unclosed_day"
   | "section_low_occupancy"
-  | "section_overdue";
+  | "section_overdue"
+  | "booking_created"
+  | "contact_created";
 
 const dictionary: Record<
   string,
@@ -60,6 +62,14 @@ const dictionary: Record<
   "section_overdue": {
     title: { ar: "شعبة متأخرة", en: "Overdue Section" },
     body: { ar: "شعبة نشطة تجاوزت تاريخ الانتهاء", en: "An active section is past its end date" },
+  },
+  "booking_created": {
+    title: { ar: "حجز جديد", en: "New Booking" },
+    body: { ar: "تم إنشاء حجز تجريبي جديد", en: "A new trial booking was created" },
+  },
+  "contact_created": {
+    title: { ar: "رسالة تواصل جديدة", en: "New Contact Message" },
+    body: { ar: "وصلت رسالة جديدة من الموقع", en: "A new message arrived from the site" },
   },
 };
 

@@ -10,6 +10,8 @@ from app.modules.bookings.schemas import (
     BookingCreate, BookingCreateResponse, BookingAdminResponse, BookingStatusUpdate
 )
 from app.modules.bookings import service as booking_service
+import logging
+logger = logging.getLogger(__name__)
 
 bookings_router = APIRouter(tags=["bookings"])
 
@@ -34,6 +36,11 @@ async def create_public_booking(
         message=body.message,
         locale=body.locale,
     )
+    try:
+        from app.modules.notifications.emitters import emit_booking_created
+        await emit_booking_created(db, booking_id=b.id)
+    except Exception:
+        logger.warning("emit_booking_created failed for %s", b.id, exc_info=True)
     return BookingCreateResponse(id=b.id, status=b.status)
 
 
