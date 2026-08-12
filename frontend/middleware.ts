@@ -40,19 +40,14 @@ export function middleware(request: NextRequest) {
   const hasRefreshToken = request.cookies.has('refresh_token');
   const accessToken = request.cookies.get('access_token')?.value;
 
-  // Define protection rules
-  const isDashboardPath = cleanPath.startsWith('/dashboard') || cleanPath === '/';
+  // Define protection rules — "/" is the public landing (with integrated login)
+  const isDashboardPath = cleanPath.startsWith('/dashboard');
   const isAdminPath = cleanPath.startsWith('/admin');
 
   // Redirect to login if user attempts to reach dashboard/admin without active refresh token
   if (isDashboardPath || isAdminPath) {
     if (!hasRefreshToken) {
       return NextResponse.redirect(new URL(`/${pathnameLocale}/login`, request.url));
-    }
-    
-    // If authenticated user hits root "/", redirect to dashboard
-    if (cleanPath === '/') {
-      return NextResponse.redirect(new URL(`/${pathnameLocale}/dashboard`, request.url));
     }
   }
 
