@@ -21,7 +21,7 @@ export default function LandingPage() {
       staffLogin: "دخول الكادر",
       heroKicker: "مستوى واحد في كل مرة",
       heroLine1: "تتعلّم",
-      heroLine2: "بمساعدة AI",
+      heroLine2: "بمساعدة الذكاء الإصطناعي",
       heroLine3: "وتطبّق في نفس اليوم.",
       heroDesc: "فصول 8 طلاب، مختبر يومي، ومساعد ذكاء اصطناعي يرافقك — يصحح نطقك، يراجع كودك، ويبني لك خطة مراجعة. في تعز منذ 1998، بعقل جديد.",
       ctaPrimary: "شاهد البرامج",
@@ -347,58 +347,106 @@ export default function LandingPage() {
       </section>
 
       <section id="programs" className="mx-auto max-w-[1280px] px-4 md:px-6 mt-8 md:mt-10">
-        <div className="rounded-[28px] bg-white border border-[#0A0A0A]/10 overflow-hidden shadow-sm">
-          <div className="px-6 md:px-8 py-6 flex flex-wrap items-end justify-between gap-4 border-b border-[#0A0A0A]/10">
-            <div>
-              <div className="text-[11px] tracking-[0.16em] font-bold opacity-50" style={{ fontFamily: "JetBrains Mono, monospace" }}>
-                {(t as any).programsEyebrow.toUpperCase()}
-              </div>
-              <h2 className="mt-1 text-[24px] md:text-[30px] font-black tracking-[-0.05em]" style={{ fontFamily: "Space Grotesk, sans-serif" }}>
-                {t.programsTitle}
-              </h2>
-            </div>
-            <p className="max-w-[46ch] text-[13px] leading-6 opacity-60">{t.programsSub}</p>
-          </div>
-
-          <div className="divide-y divide-[#0A0A0A]/10">
-            {(t as any).programs.map((p: any, i: number) => (
-              <div key={p.k} className="group grid grid-cols-12 gap-4 px-6 md:px-8 py-5 hover:bg-[#FFFBF0]/60 transition">
-                <div className="col-span-12 md:col-span-5 flex items-center gap-3">
-                  <span
-                    className="h-8 w-8 rounded-full grid place-items-center text-[11px] font-black border bg-[#0A0A0A] text-white shrink-0"
-                    style={{ fontFamily: "JetBrains Mono, monospace" }}
-                  >
-                    {String(i + 1).padStart(2, "0")}
+        <div className="rounded-[32px] bg-[#0A0A0A] p-[1.5px] shadow-[0_20px_60px_rgba(10,10,10,0.12)]">
+          <div className="rounded-[30px] bg-[#FFFBF0] overflow-hidden">
+            <div className="px-6 md:px-8 pt-8 pb-6 flex flex-col lg:flex-row lg:items-end justify-between gap-5">
+              <div>
+                <div className="inline-flex items-center gap-2">
+                  <span className="h-1.5 w-1.5 rounded-full bg-[#FF3B30] animate-pulse" />
+                  <span className="text-[11px] tracking-[0.18em] font-black opacity-40" style={{ fontFamily: "JetBrains Mono, monospace" }}>
+                    {(t as any).programsEyebrow.toUpperCase()} — 04 TRACKS
                   </span>
-                  <div className="min-w-0">
-                    <div className="text-[16px] font-black tracking-[-0.03em] leading-none" style={{ fontFamily: "Space Grotesk, sans-serif" }}>
-                      {p.k}
-                    </div>
-                    <div className="text-[11px] font-bold opacity-60" style={{ fontFamily: "JetBrains Mono, monospace" }}>
-                      {p.meta}
-                    </div>
-                  </div>
+                  <span className="hidden sm:inline-flex text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#FFD60A] border border-[#0A0A0A]/10" style={{ fontFamily: "JetBrains Mono, monospace" }}>
+                    {isAr ? "التسجيل مفتوح" : "OPEN ENROLMENT"}
+                  </span>
                 </div>
-                <p className="col-span-12 md:col-span-5 text-[13px] leading-6 opacity-70 self-center">{p.d}</p>
-                <div className="col-span-12 md:col-span-2 flex md:justify-end items-center gap-2 self-center">
-                  <a
-                    href={`/${locale}/programs#${p.id}`}
-                    className="inline-flex items-center gap-1.5 text-[12px] font-bold px-3.5 py-2 rounded-full bg-white border border-[#0A0A0A]/12 group-hover:bg-[#0A0A0A] group-hover:text-white group-hover:border-[#0A0A0A] transition"
-                  >
-                    {isAr ? "التفاصيل" : "Details"} <span aria-hidden>→</span>
-                  </a>
-                </div>
+                <h2 className="mt-3 text-[26px] md:text-[34px] font-black tracking-[-0.05em] leading-[0.9]" style={{ fontFamily: "Space Grotesk, sans-serif" }}>
+                  {t.programsTitle}
+                </h2>
               </div>
-            ))}
-          </div>
+              <p className="max-w-[42ch] text-[13.5px] leading-6 opacity-60 lg:text-end lg:pb-1" style={{ fontFamily: isAr ? "IBM Plex Sans Arabic, Inter" : "Inter" }}>
+                {t.programsSub}
+              </p>
+            </div>
 
-          <div className="px-6 md:px-8 py-3 bg-[#FFFBF0]/60 border-t border-[#0A0A0A]/10 flex items-center justify-between text-[11px]">
-            <span className="opacity-60" style={{ fontFamily: "JetBrains Mono, monospace" }}>
-              {isAr ? "نضيف مسارات جديدة كل فصل" : "New tracks each term"}
-            </span>
-            <span className="opacity-40" style={{ fontFamily: "JetBrains Mono, monospace" }}>
-              {isAr ? "التسجيل حضوري" : "On-campus enrolment"}
-            </span>
+            <div className="px-3 md:px-4 pb-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
+                {(t as any).programs.map((p: any, i: number) => {
+                  const styles = [
+                    { accent: "#FF3B30", tint: "#FFF1F0", iconBg: "bg-[#FF3B30]", label: isAr ? "لغة" : "LINGUA" },
+                    { accent: "#0EA5E9", tint: "#EFF6FF", iconBg: "bg-[#0EA5E9]", label: isAr ? "كود" : "CODE" },
+                    { accent: "#7C3AED", tint: "#F5F0FF", iconBg: "bg-[#7C3AED]", label: "AI" },
+                    { accent: "#0A0A0A", tint: "#F5F5F0", iconBg: "bg-[#0A0A0A]", label: isAr ? "مهني" : "PRO" },
+                  ][i];
+                  const icons = [
+                    <svg key="i0" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden><circle cx="12" cy="12" r="8.2" /><ellipse cx="12" cy="12" rx="4.1" ry="8.2" /><path d="M3.8 12H20.2M5.6 8.2H18.4M5.6 15.8H18.4" /></svg>,
+                    <svg key="i1" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M9 8 5 12 9 16" /><path d="M15 8 19 12 15 16" /><path d="M14.5 5 9.5 19" /></svg>,
+                    <svg key="i2" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.55" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M12 3.2 13.1 8 18 9.2 13.1 10.4 12 15.2 10.9 10.4 6 9.2 10.9 8 12 3.2Z" /><path d="M18.6 13.2 19.1 14.8 20.7 15.3 19.1 15.8 18.6 17.4 18.1 15.8 16.5 15.3 18.1 14.8 18.6 13.2Z" /><path d="M6.8 13.6 7.2 14.9 8.5 15.3 7.2 15.7 6.8 17 6.4 15.7 5.1 15.3 6.4 14.9 6.8 13.6Z" /></svg>,
+                    <svg key="i3" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round" aria-hidden><rect x="6.5" y="3.5" width="11" height="14.5" rx="1.6" /><path d="M8.8 7.5H15.2M8.8 10.5H15.2M8.8 13.5H13.2" /><circle cx="14.8" cy="16.2" r="2.7" /><path d="M13.2 18.6 14.8 17 16.4 18.6" /></svg>,
+                  ][i];
+                  return (
+                    <a
+                      key={p.k}
+                      href={`/${locale}/programs#${p.id}`}
+                      className="group relative rounded-[24px] bg-white border border-[#0A0A0A]/10 overflow-hidden hover:shadow-[0_18px_48px_rgba(10,10,10,0.10)] hover:-translate-y-[3px] hover:border-[#0A0A0A]/15 transition-all duration-300 flex flex-col"
+                    >
+                      <div className="h-[4px] w-full" style={{ background: styles.accent }} />
+                      <span
+                        className="absolute -top-1 -end-2 text-[84px] font-black leading-none select-none pointer-events-none opacity-[0.04] group-hover:opacity-[0.07] transition"
+                        style={{ fontFamily: "Space Grotesk, sans-serif" }}
+                      >
+                        0{i + 1}
+                      </span>
+                      <div className="p-6 md:p-7 flex flex-col flex-1">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className={`h-11 w-11 rounded-[14px] ${styles.iconBg} text-white grid place-items-center shrink-0 shadow-sm`}>
+                            {icons}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="hidden sm:inline text-[10px] tracking-[0.14em] font-black px-2.5 py-1 rounded-full bg-[#0A0A0A] text-white" style={{ fontFamily: "JetBrains Mono, monospace" }}>
+                              {styles.label}
+                            </span>
+                            <span className="text-[11px] font-bold px-2.5 py-1 rounded-full border bg-white" style={{ fontFamily: "JetBrains Mono, monospace", borderColor: styles.accent + "22", background: styles.tint }}>
+                              {p.meta}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="mt-5">
+                          <h3 className="text-[19px] md:text-[20px] font-black tracking-[-0.04em] leading-none flex items-center gap-2" style={{ fontFamily: "Space Grotesk, sans-serif" }}>
+                            {p.k}
+                            <span className="h-6 w-6 rounded-full bg-[#0A0A0A] text-white grid place-items-center text-[12px] opacity-0 group-hover:opacity-100 translate-x-[-4px] group-hover:translate-x-0 transition-all duration-300">
+                              →
+                            </span>
+                          </h3>
+                          <p className="mt-2.5 text-[13.5px] leading-6 opacity-60 line-clamp-2" style={{ fontFamily: isAr ? "IBM Plex Sans Arabic, Inter" : "Inter" }}>{p.d}</p>
+                        </div>
+
+                        <div className="mt-5 flex items-center gap-2 text-[11px] font-bold" style={{ fontFamily: "JetBrains Mono, monospace" }}>
+                          <span className="h-px flex-1 bg-[#0A0A0A]/10 group-hover:bg-[#0A0A0A]/15 transition" />
+                          <span className="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#FFFBF0] border border-[#0A0A0A]/10 group-hover:bg-[#0A0A0A] group-hover:text-white group-hover:border-[#0A0A0A] transition">
+                            {isAr ? "استكشف" : "Explore"} <span className="group-hover:translate-x-0.5 transition">→</span>
+                          </span>
+                        </div>
+
+                        <div className="mt-3 flex items-center gap-1.5 text-[10px] tracking-[0.08em] font-bold opacity-30" style={{ fontFamily: "JetBrains Mono, monospace" }}>
+                          <span className="h-1 w-1 rounded-full" style={{ background: styles.accent }} /> {isAr ? "ورشة · مشروع · شهادة QR" : "ATELIER · PROJECT · QR CERT"}
+                        </div>
+                      </div>
+                    </a>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="mx-3 md:mx-4 mb-3 md:mb-4 rounded-2xl bg-white border border-[#0A0A0A]/10 px-4 md:px-5 py-3 flex flex-wrap items-center justify-between gap-3 text-[11px]">
+              <span className="inline-flex items-center gap-2 font-bold" style={{ fontFamily: "JetBrains Mono, monospace" }}>
+                <span className="h-2 w-2 rounded-full bg-[#22C55E] animate-pulse" /> {isAr ? "نضيف مسارات جديدة كل فصل — اسأل عن القادم" : "New tracks each term — ask about next intake"}
+              </span>
+              <span className="opacity-40 hidden sm:inline" style={{ fontFamily: "JetBrains Mono, monospace" }}>
+                {isAr ? "التسجيل حضوري · اختبار مستوى مجاني" : "On-campus enrolment · Free placement test"}
+              </span>
+            </div>
           </div>
         </div>
       </section>
