@@ -7,7 +7,7 @@ import { useAuth } from "@/components/AuthContext";
 import RefreshButton from "@/components/RefreshButton";
 import Modal from "@/components/Modal";
 import Select from "@/components/ui/Select";
-import { Loader2, ArrowLeft, Wallet, DollarSign, Plus, X, Award, Eye, FileDown, Check, Clock, AlertCircle, UserX, ChevronDown, ChevronUp } from "lucide-react";
+import { Loader2, ArrowLeft, Wallet, DollarSign, Plus, X, Award, Eye, FileDown, Check, Clock, AlertCircle, UserX, ChevronDown, ChevronUp, Printer } from "lucide-react";
 import TableContainer from "@/components/ui/TableContainer";
 import CertificatePreview from "@/components/CertificatePreview";
 import PendingRefundBadge from "@/components/students/PendingRefundBadge";
@@ -141,6 +141,8 @@ export default function StudentDetailPage() {
       unenrolled: "غير مسجل",
       unenrolledDate: "تاريخ إلغاء التسجيل",
       refundAmount: "قيمة الاسترداد",
+      report: "التقرير",
+      viewReport: "عرض التقرير",
     },
     en: {
       title: "Student",
@@ -203,6 +205,8 @@ export default function StudentDetailPage() {
       unenrolled: "Unenrolled",
       unenrolledDate: "Unenrolled At",
       refundAmount: "Refund",
+      report: "Report",
+      viewReport: "View Report",
     },
   }[locale === "en" ? "en" : "ar"];
 
@@ -441,7 +445,17 @@ export default function StudentDetailPage() {
                   <div key={enr.id} className={`border rounded-xl p-4 space-y-3 ${borderClass}`}>
                     <div className="flex items-center justify-between gap-2">
                       <p className="font-medium text-slate-900 text-sm truncate">{sectionInfo.name}</p>
-                      {statusBadge}
+                      <div className="flex items-center gap-2 shrink-0">
+                        {statusBadge}
+                        <button
+                          onClick={() => router.push(`/${locale}/dashboard/students/${studentId}/sections/${enr.section_id}/report`)}
+                          className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-white border border-slate-200 text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
+                          title={t.viewReport}
+                        >
+                          <Printer size={12} />
+                          {t.report}
+                        </button>
+                      </div>
                     </div>
                     <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
                       <div>

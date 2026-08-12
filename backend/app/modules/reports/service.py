@@ -13,6 +13,11 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
+from decimal import Decimal
+
+from fastapi import HTTPException
+
+from app.core.timezone import utcnow
 from app.modules.academic.models import Course, CourseSection, Enrollment, Student, FinalGrade
 from app.modules.academic.certificate_service import get_grade_label
 from app.modules.lms.models import (
@@ -21,6 +26,7 @@ from app.modules.lms.models import (
     DailyClosure,
     Expense,
     LedgerEntry,
+    Payment,
     TeacherWallet,
 )
 from app.modules.lms.financial_service import get_revenue_overview
@@ -586,4 +592,232 @@ async def get_grade_summary(db: AsyncSession, section_id: Optional[uuid.UUID] = 
         "total_graded_students": len(all_scores),
         "overall_average": round(sum(all_scores) / len(all_scores), 1) if all_scores else 0.0,
         "sections": sections,
+    }
+
+
+async def _load_enrollment_for_student_section(
+    db: AsyncSession, student_id: uuid.UUID, section_id: uuid.UUID
+):
+    enrollment_result = await db.execute(
+        select(Enrollment)
+        .options(
+            joinedload(Enrollment.student),
+            joinedload(Enrollment.section).joinedload(CourseSection.course),
+            joinedload(Enrollment.section).joinedload(CourseSection.teacher_employee),
+        )
+        .where(
+            Enrollment.student_id == student_id,
+            Enrollment.section_id == section_id,
+            Enrollment.deleted_at.is_(None),
+        )
+    )
+    return enrollment_result.unique().scalar_one_or_none()
+
+
+async def get_student_section_report(
+    db: AsyncSession,
+    student_id: uuid.UUID,
+    section_id: uuid.UUID,
+) -> dict:
+    from app.modules.academic.models import Certificate, UnenrollmentRecord, SectionCancellation
+
+    enrollment = await _load_enrollment_for_student_section(db, student_id, section_id)
+    if not enrollment:
+        raise HTTPException(status_code=404, detail="Enrollment not found for this student and section")
+
+    student_record = enrollment.student
+    if not student_record or student_record.deleted_at is not None:
+        raise HTTPException(status_code=404, detail="Student not found")
+
+    section = enrollment.section
+    if not section or section.deleted_at is not None:
+        raise HTTPException(status_code=404, detail="Section not found")
+
+    course = section.course
+    teacher_employee = section.teacher_employee
+
+    agreed_price = enrollment.agreed_price if enrollment.agreed_price is not None else section.price
+    admin_discount = enrollment.admin_discount
+    net_price = None
+    if agreed_price is not None:
+        if admin_discount is not None:
+            net_price = Decimal(str(agreed_price)) - (Decimal(str(agreed_price)) * Decimal(str(admin_discount)) / Decimal("100"))
+        else:
+            net_price = Decimal(str(agreed_price))
+
+    total_paid_result = await db.execute(
+        select(func.coalesce(func.sum(Payment.amount), 0)).where(Payment.enrollment_id == enrollment.id)
+    )
+    total_paid = Decimal(str(total_paid_result.scalar() or 0))
+    balance_remaining = None
+    if net_price is not None:
+        balance_remaining = net_price - total_paid
+
+    payments_result = await db.execute(
+        select(Payment)
+        .options(joinedload(Payment.created_by_user))
+        .where(Payment.enrollment_id == enrollment.id)
+        .order_by(Payment.date.asc(), Payment.receipt_number.asc())
+    )
+    payments = payments_result.scalars().all()
+    payment_rows = [
+        {
+            "id": str(p.id),
+            "receipt_number": p.receipt_number,
+            "amount": float(p.amount),
+            "date": p.date.isoformat() if p.date else None,
+            "payment_method": p.payment_method if isinstance(p.payment_method, str) else p.payment_method.value,
+            "created_by_name": p.created_by_user.full_name if p.created_by_user and p.created_by_user.full_name else "",
+        }
+        for p in payments
+    ]
+
+    attendance_summary_rows = await db.execute(
+        select(AttendanceRecord.status, func.count(AttendanceRecord.id))
+        .join(AttendanceSession, AttendanceRecord.session_id == AttendanceSession.id)
+        .where(AttendanceRecord.student_id == student_id, AttendanceSession.section_id == section_id)
+        .group_by(AttendanceRecord.status)
+    )
+    counts = {status: cnt for status, cnt in attendance_summary_rows.all()}
+    present_count = int(counts.get("present", 0))
+    absent_count = int(counts.get("absent", 0))
+    late_count = int(counts.get("late", 0))
+    excused_count = int(counts.get("excused", 0))
+    total_sessions = present_count + absent_count + late_count + excused_count
+    attendance_rate = round(present_count / total_sessions * 100, 1) if total_sessions else 0.0
+
+    detail_cap = 500
+    detail_result = await db.execute(
+        select(AttendanceSession.date, AttendanceRecord.status, AttendanceSession.id)
+        .join(AttendanceRecord, AttendanceRecord.session_id == AttendanceSession.id)
+        .where(AttendanceRecord.student_id == student_id, AttendanceSession.section_id == section_id)
+        .order_by(AttendanceSession.date.desc())
+        .limit(detail_cap)
+    )
+    attendance_records = [
+        {"date": d.isoformat() if d else None, "status": status, "session_id": str(sid)}
+        for d, status, sid in detail_result.all()
+    ]
+
+    grade_result = await db.execute(
+        select(FinalGrade).where(FinalGrade.section_id == section_id, FinalGrade.student_id == student_id)
+    )
+    grade_row = grade_result.scalar_one_or_none()
+    grade_payload = None
+    if grade_row:
+        score = float(grade_row.final_score)
+        grade_payload = {
+            "final_score": score,
+            "grade_label": get_grade_label(score),
+            "notes": grade_row.notes,
+            "graded_at": grade_row.graded_at.isoformat() if grade_row.graded_at else None,
+            "graded_by": str(grade_row.graded_by) if grade_row.graded_by else None,
+        }
+
+    cert_result = await db.execute(
+        select(Certificate)
+        .where(Certificate.student_id == student_id, Certificate.section_id == section_id, Certificate.deleted_at.is_(None))
+        .order_by(Certificate.issued_at.desc())
+        .limit(1)
+    )
+    cert_row = cert_result.scalar_one_or_none()
+    certificate_payload = None
+    if cert_row:
+        certificate_payload = {
+            "certificate_number": cert_row.certificate_number,
+            "issued_at": cert_row.issued_at.isoformat() if cert_row.issued_at else None,
+            "final_score": float(cert_row.final_score) if cert_row.final_score is not None else None,
+            "grade_label": cert_row.grade_label,
+        }
+
+    unenroll_result = await db.execute(
+        select(UnenrollmentRecord)
+        .where(UnenrollmentRecord.enrollment_id == enrollment.id)
+        .order_by(UnenrollmentRecord.unenrolled_at.desc())
+        .limit(1)
+    )
+    unenroll_row = unenroll_result.scalar_one_or_none()
+    unenroll_payload = None
+    if unenroll_row:
+        unenroll_payload = {
+            "unenrolled_at": unenroll_row.unenrolled_at.isoformat() if unenroll_row.unenrolled_at else None,
+            "reason": unenroll_row.reason,
+            "refund_policy": unenroll_row.refund_policy,
+            "refund_authorized_amount": float(unenroll_row.refund_authorized_amount or 0),
+        }
+
+    cancellation_payload = None
+    if section.status == "cancelled":
+        cancel_result = await db.execute(
+            select(SectionCancellation)
+            .where(SectionCancellation.section_id == section_id)
+            .order_by(SectionCancellation.cancelled_at.desc())
+            .limit(1)
+        )
+        cancel_row = cancel_result.scalar_one_or_none()
+        if cancel_row:
+            cancellation_payload = {
+                "cancelled_at": cancel_row.cancelled_at.isoformat() if cancel_row.cancelled_at else None,
+                "reason": cancel_row.reason,
+                "refund_policy": cancel_row.refund_policy,
+            }
+
+    schedule_parts: list[str] = []
+    if section.class_time:
+        schedule_parts.append(section.class_time.strftime("%H:%M"))
+    if section.classroom:
+        schedule_parts.append(f"Room {section.classroom}")
+    schedule_label = " · ".join(schedule_parts) if schedule_parts else ""
+
+    return {
+        "student": {
+            "id": str(student_record.id),
+            "student_code": student_record.student_code,
+            "full_name": student_record.full_name,
+            "email": student_record.email,
+        },
+        "section": {
+            "id": str(section.id),
+            "course_id": str(section.course_id),
+            "course_name": course.name if course else "",
+            "course_code": course.code if course else "",
+            "teacher_id": str(section.teacher_id) if section.teacher_id else None,
+            "teacher_name": teacher_employee.full_name if teacher_employee else "",
+            "status": section.status,
+            "start_date": section.start_date.isoformat() if section.start_date else None,
+            "end_date": section.end_date.isoformat() if section.end_date else None,
+            "class_time": section.class_time.strftime("%H:%M") if section.class_time else None,
+            "class_duration_minutes": section.class_duration_minutes,
+            "classroom": section.classroom,
+            "schedule_label": schedule_label,
+            "price": float(section.price) if section.price is not None else None,
+        },
+        "enrollment": {
+            "id": str(enrollment.id),
+            "enrolled_at": enrollment.enrolled_at.isoformat() if enrollment.enrolled_at else None,
+            "agreed_price": float(agreed_price) if agreed_price is not None else None,
+            "admin_discount": float(admin_discount) if admin_discount is not None else None,
+            "net_price": float(net_price) if net_price is not None else None,
+            "total_paid": float(total_paid),
+            "balance_remaining": float(balance_remaining) if balance_remaining is not None else None,
+            "unenroll_record": unenroll_payload,
+            "cancellation": cancellation_payload,
+        },
+        "attendance": {
+            "summary": {
+                "total_sessions": total_sessions,
+                "present_count": present_count,
+                "absent_count": absent_count,
+                "late_count": late_count,
+                "excused_count": excused_count,
+                "attendance_rate": attendance_rate,
+            },
+            "records": attendance_records,
+        },
+        "grade": grade_payload,
+        "payments": payment_rows,
+        "certificate": certificate_payload,
+        "ai_summary": None,
+        "ai_suggestions": [],
+        "generated_at": utcnow().isoformat(),
     }

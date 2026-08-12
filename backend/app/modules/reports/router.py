@@ -48,6 +48,7 @@ _ROLE_GATES: dict[str, list[str]] = {
     "teacher_payouts": ["superadmin", "manager"],
     "staff_payroll": ["superadmin", "manager", "secretary"],
     "grade_summary": ["superadmin", "manager", "teacher"],
+    "student_section_report": ["superadmin", "manager", "secretary", "teacher"],
 }
 
 
@@ -74,6 +75,20 @@ async def _report_role_gate(
     return current_user
 
 
+async def _assert_teacher_section_access(
+    db: AsyncSession, current_user: User, section_id: UUID
+) -> None:
+    if current_user.is_superadmin:
+        return
+    if current_user.role and current_user.role.name == "teacher":
+        from app.modules.academic.service import get_course_section
+
+        section = await get_course_section(db, section_id)
+        if not section or section.teacher_id != current_user.employee_id:
+            raise HTTPException(status_code=403, detail="Access denied to this section")
+        return
+
+
 async def _fetch_report(
     code: str,
     db: AsyncSession,
@@ -85,6 +100,7 @@ async def _fetch_report(
     status: Optional[str] = None,
     teacher_id: Optional[UUID] = None,
     section_id: Optional[UUID] = None,
+    student_id: Optional[UUID] = None,
 ):
     """Route an export/print request to the matching service function."""
     if code == "pnl_summary":
@@ -111,6 +127,10 @@ async def _fetch_report(
         return await reports_service.get_staff_payroll_report(db, month=month)
     if code == "grade_summary":
         return await reports_service.get_grade_summary(db, section_id=section_id)
+    if code == "student_section_report":
+        if student_id is None or section_id is None:
+            raise HTTPException(status_code=400, detail="student_id and section_id are required for student_section_report")
+        return await reports_service.get_student_section_report(db, student_id, section_id)
     raise HTTPException(status_code=404, detail=f"Unknown report code: {code}")
 
 
@@ -126,14 +146,17 @@ async def export_report_csv(
     status: Optional[str] = Query(default=None),
     teacher_id: Optional[UUID] = Query(default=None),
     section_id: Optional[UUID] = Query(default=None),
+    student_id: Optional[UUID] = Query(default=None),
     current_user: User = Depends(_report_role_gate),
     db: AsyncSession = Depends(get_db),
 ):
     """Download a report as CSV (headers localized via `locale`)."""
     _ensure_known_code(code)
+    if code == "student_section_report" and section_id is not None:
+        await _assert_teacher_section_access(db, current_user, section_id)
     payload = await _fetch_report(
         code, db, start_date, end_date, ledger_date, report_date, month,
-        status, teacher_id, section_id,
+        status, teacher_id, section_id, student_id,
     )
     return csv_download_response(code, payload, locale=locale)
 
@@ -150,14 +173,17 @@ async def export_report_print(
     status: Optional[str] = Query(default=None),
     teacher_id: Optional[UUID] = Query(default=None),
     section_id: Optional[UUID] = Query(default=None),
+    student_id: Optional[UUID] = Query(default=None),
     current_user: User = Depends(_report_role_gate),
     db: AsyncSession = Depends(get_db),
 ):
     """Render a print-ready HTML document (for browser print / PDF save)."""
     _ensure_known_code(code)
+    if code == "student_section_report" and section_id is not None:
+        await _assert_teacher_section_access(db, current_user, section_id)
     payload = await _fetch_report(
         code, db, start_date, end_date, ledger_date, report_date, month,
-        status, teacher_id, section_id,
+        status, teacher_id, section_id, student_id,
     )
     return print_html_response(code, payload, locale=locale)
 
@@ -167,6 +193,20 @@ async def get_report_catalog(
     current_user: User = Depends(PermissionChecker("page_reports")),
 ) -> ReportCatalogResponse:
     return await reports_service.list_report_catalog()
+
+
+@reports_router.get("/student-section", response_model=dict)
+async def get_student_section_report_json(
+    student_id: UUID,
+    section_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    gate = _ROLE_GATES.get("student_section_report", [])
+    if not current_user.is_superadmin and current_user.role.name not in gate:
+        raise HTTPException(status_code=403, detail=f"Access denied: Requires one of roles {gate}")
+    await _assert_teacher_section_access(db, current_user, section_id)
+    return await reports_service.get_student_section_report(db, student_id, section_id)
 
 
 # --- A. Financial reports ---

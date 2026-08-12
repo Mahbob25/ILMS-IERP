@@ -102,6 +102,27 @@ _COL_LABELS: dict[str, tuple[str, str]] = {
     "graded_count": ("عدد المقيّمين", "Graded"),
     "average_score": ("المتوسط", "Average"),
     "distribution": ("التوزيع", "Distribution"),
+    "enrolled_at": ("تاريخ التسجيل", "Enrolled At"),
+    "agreed_price": ("السعر المتفق عليه", "Agreed Price"),
+    "admin_discount": ("الخصم الإداري", "Admin Discount"),
+    "net_price": ("صافي السعر", "Net Price"),
+    "remaining_balance": ("المتبقي", "Remaining"),
+    "total_paid": ("المدفوع", "Total Paid"),
+    "attendance_rate": ("نسبة الحضور", "Attendance Rate"),
+    "present": ("حاضر", "Present"),
+    "absent": ("غائب", "Absent"),
+    "late": ("متأخر", "Late"),
+    "excused": ("معذور", "Excused"),
+    "total_sessions": ("الجلسات", "Sessions"),
+    "final_score": ("الدرجة النهائية", "Final Score"),
+    "grade_label": ("التقدير", "Grade"),
+    "graded_at": ("تاريخ التقييم", "Graded At"),
+    "graded_by": ("قيّم بواسطة", "Graded By"),
+    "certificate_number": ("رقم الشهادة", "Certificate No"),
+    "issued_at": ("تاريخ الإصدار", "Issued At"),
+    "unenrolled_at": ("تاريخ إلغاء التسجيل", "Unenrolled At"),
+    "cancellation_reason": ("سبب الإلغاء", "Cancellation Reason"),
+    "schedule_label": ("الجدول", "Schedule"),
     "month": ("الشهر", "Month"),
     "total_students": ("الطلاب", "Students"),
     "active_count": ("النشطون", "Active"),
@@ -139,6 +160,7 @@ _REPORT_TITLES: dict[str, tuple[str, str]] = {
     "teacher_payouts": ("ملخص سحوبات المعلمين", "Teacher Payout Summary"),
     "staff_payroll": ("سجل رواتب الموظفين", "Staff Payroll Register"),
     "grade_summary": ("ملخص الدرجات", "Grade Summary"),
+    "student_section_report": ("تقرير الطالب في الشعبة", "Student Section Report"),
 }
 
 # Section shape: (title_ar, title_en, column_keys, rows)
@@ -703,6 +725,135 @@ def _sections_grade_summary(payload: dict) -> list[Section]:
     ]
 
 
+def _sections_student_section_report(payload: dict) -> list[Section]:
+    student = payload.get("student") or {}
+    section = payload.get("section") or {}
+    enrollment = payload.get("enrollment") or {}
+    attendance = payload.get("attendance") or {}
+    summary = attendance.get("summary") or {}
+    grade = payload.get("grade")
+    payments = payload.get("payments") or []
+    certificate = payload.get("certificate")
+    ai_summary = payload.get("ai_summary")
+
+    header = [[
+        _csv_value(student.get("student_code")),
+        _csv_value(student.get("full_name")),
+        _csv_value(student.get("email")),
+        _csv_value(section.get("course_name")),
+        _csv_value(section.get("teacher_name")),
+        _csv_value(section.get("status")),
+        _csv_value(enrollment.get("enrolled_at")),
+        _csv_value(section.get("schedule_label")),
+    ]]
+
+    finance = [[
+        _money(enrollment.get("agreed_price")),
+        _money(enrollment.get("admin_discount")),
+        _money(enrollment.get("net_price")),
+        _money(enrollment.get("total_paid")),
+        _money(enrollment.get("balance_remaining")),
+        _csv_value(enrollment.get("cancellation", {}).get("reason") if enrollment.get("cancellation") else enrollment.get("unenroll_record", {}).get("reason") if enrollment.get("unenroll_record") else ""),
+    ]]
+
+    attendance_summary = [[
+        summary.get("total_sessions", 0),
+        summary.get("present_count", 0),
+        summary.get("absent_count", 0),
+        summary.get("late_count", 0),
+        summary.get("excused_count", 0),
+        summary.get("attendance_rate", 0),
+    ]]
+
+    attendance_detail = [
+        [_csv_value(r.get("date")), _csv_value(r.get("status"))]
+        for r in (attendance.get("records") or [])
+    ]
+
+    grade_rows = []
+    if grade:
+        grade_rows.append([
+            grade.get("final_score", ""),
+            _csv_value(grade.get("grade_label")),
+            _csv_value(grade.get("notes")),
+            _csv_value(grade.get("graded_at")),
+            _csv_value(grade.get("graded_by")),
+        ])
+
+    payment_rows = [
+        [
+            _csv_value(p.get("receipt_number")),
+            _money(p.get("amount", 0)),
+            _csv_value(p.get("date")),
+            _csv_value(p.get("payment_method")),
+            _csv_value(p.get("created_by_name")),
+        ]
+        for p in payments
+    ]
+
+    cert_rows = []
+    if certificate:
+        cert_rows.append([
+            _csv_value(certificate.get("certificate_number")),
+            _csv_value(certificate.get("issued_at")),
+            certificate.get("final_score", ""),
+            _csv_value(certificate.get("grade_label")),
+        ])
+
+    sections: list[Section] = [
+        (
+            "الطالب والشعبة",
+            "Student & Section",
+            ["student_code", "full_name", "email", "course_name", "teacher_name", "status", "enrolled_at", "schedule_label"],
+            header,
+        ),
+        (
+            "المالية",
+            "Finance",
+            ["agreed_price", "admin_discount", "net_price", "total_paid", "remaining_balance", "reason"],
+            finance,
+        ),
+        (
+            "ملخص الحضور",
+            "Attendance Summary",
+            ["total_sessions", "present", "absent", "late", "excused", "attendance_rate"],
+            attendance_summary,
+        ),
+        (
+            "تفاصيل الحضور",
+            "Attendance Detail",
+            ["date", "status"],
+            attendance_detail,
+        ),
+        (
+            "الدرجة",
+            "Grade",
+            ["final_score", "grade_label", "description", "graded_at", "graded_by"],
+            grade_rows,
+        ),
+        (
+            "المدفوعات",
+            "Payments",
+            ["receipt_number", "amount", "date", "payment_method", "created_by_name"],
+            payment_rows,
+        ),
+        (
+            "الشهادة",
+            "Certificate",
+            ["certificate_number", "issued_at", "final_score", "grade_label"],
+            cert_rows,
+        ),
+    ]
+    if ai_summary:
+        sections.append((
+            "رؤى الذكاء الاصطناعي",
+            "AI Insights",
+            ["description"],
+            [[_csv_value(ai_summary)]],
+        ))
+    return sections
+
+
 _SECTION_BUILDERS: dict[str, SectionBuilder] = {
     "pnl_summary": _sections_pnl_summary,
     "daily_ledger": _sections_daily_ledger,
@@ -716,6 +867,7 @@ _SECTION_BUILDERS: dict[str, SectionBuilder] = {
     "teacher_payouts": _sections_teacher_payouts,
     "staff_payroll": _sections_staff_payroll,
     "grade_summary": _sections_grade_summary,
+    "student_section_report": _sections_student_section_report,
 }
 
 
@@ -760,6 +912,10 @@ def csv_download_response(
 
 
 def _period_label(report_code: str, payload: Any) -> str:
+    if report_code == "student_section_report":
+        student = payload.get("student") or {}
+        section = payload.get("section") or {}
+        return f"{_csv_value(student.get('full_name'))} · {_csv_value(section.get('course_name'))}"
     if report_code == "pnl_summary":
         period_from, period_to = _period_start_end(payload.get("daily_breakdown") or [])
         return f"{period_from} — {period_to}" if period_from else ""
