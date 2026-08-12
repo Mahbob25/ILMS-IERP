@@ -6,6 +6,7 @@ import TeacherDashboard from "@/components/dashboard/TeacherDashboard";
 import SecretaryDashboard from "@/components/dashboard/SecretaryDashboard";
 import ManagerDashboard from "@/components/dashboard/ManagerDashboard";
 import SuperadminDashboard from "@/components/dashboard/SuperadminDashboard";
+import MarketingDashboard from "@/components/dashboard/MarketingDashboard";
 
 export default function DashboardPage() {
   const { user } = useAuth();
@@ -20,9 +21,11 @@ export default function DashboardPage() {
       return <SecretaryDashboard />;
     case "manager":
       return <ManagerDashboard />;
+    case "marketing_manager":
+      return <MarketingDashboard />;
     case "superadmin":
       return <SuperadminDashboard />;
     default:
-      return <TeacherDashboard />;
+      return <MarketingDashboard />;
   }
 }

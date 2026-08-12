@@ -210,7 +210,7 @@ function DashboardLayoutInner({
 
   // Permission to role fallback mapping (when permissions aren't loaded yet)
   const PAGE_PERMISSION_MAP: Record<string, string[]> = {
-    page_dashboard: ["superadmin", "manager", "secretary", "teacher"],
+    page_dashboard: ["superadmin", "manager", "secretary", "teacher", "marketing_manager"],
     page_users: ["superadmin"],
     page_employees: ["superadmin", "manager"],
     page_roles: ["superadmin"],

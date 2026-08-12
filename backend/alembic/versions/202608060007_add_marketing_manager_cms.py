@@ -25,6 +25,7 @@ def upgrade() -> None:
     """))
 
     permissions = [
+        ("page_dashboard", "Dashboard", "General"),
         ("page_content", "Landing Content", "marketing"),
         ("page_announcements", "Announcements", "marketing"),
         ("page_contacts", "Contacts Inbox", "marketing"),
@@ -60,7 +61,7 @@ def upgrade() -> None:
         if row:
             perm_ids[codename] = row[0]
 
-    for codename in ["page_content", "page_announcements", "page_contacts", "page_bookings"]:
+    for codename in ["page_dashboard", "page_content", "page_announcements", "page_contacts", "page_bookings"]:
         perm_id = perm_ids.get(codename)
         if not perm_id:
             continue
