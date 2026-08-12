@@ -2,7 +2,7 @@
 
 import { useParams, useRouter } from "next/navigation";
 
-export default function LandingV2Page() {
+export default function LandingPage() {
   const params = useParams();
   const router = useRouter();
   const locale = (params?.locale as string) === "en" ? "en" : "ar";
@@ -98,7 +98,7 @@ export default function LandingV2Page() {
 
   return (
     <div dir={isAr ? "rtl" : "ltr"} className="min-h-screen bg-[#FFFBF0] text-[#0A0A0A] selection:bg-[#FF3B30] selection:text-white">
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');`}</style>
+      <style dangerouslySetInnerHTML={{ __html: "@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');" }} />
 
       <header className="sticky top-0 z-40 bg-[#FFFBF0]/85 backdrop-blur-xl border-b border-[#0A0A0A]/10">
         <div className="mx-auto max-w-[1280px] px-4 md:px-6 h-[64px] flex items-center justify-between gap-3">
@@ -289,21 +289,23 @@ export default function LandingV2Page() {
 
       <div className="mx-auto max-w-[1280px] px-4 md:px-6 mt-6">
         <div className="rounded-2xl border border-[#0A0A0A]/10 bg-[#0A0A0A] text-white overflow-hidden">
-          <div className="flex animate-[tape2_20s_linear_infinite] whitespace-nowrap">
-            {Array.from({ length: 2 }).map((_, i) => (
-              <div key={i} className="flex items-center gap-3 py-3 ps-3" style={{ fontFamily: "JetBrains Mono, monospace" }}>
-                {(isAr ? ["تعز", "لغات", "برمجة", "شبكات", "دبلومات", "اختبار تحديد مستوى"] : ["Taiz", "Languages", "Coding", "Networks", "Diplomas", "Placement Test"]).map((w) => (
-                  <span key={w + i} className="inline-flex items-center gap-3">
-                    <span className="text-[12px] tracking-[0.14em] font-bold opacity-90">{w.toUpperCase()}</span>
-                    <span className="h-1.5 w-1.5 rounded-full bg-[#FFD60A]" />
-                  </span>
-                ))}
-                <span className="text-[12px] tracking-[0.14em] font-bold opacity-40">{isAr ? "— تعز — ١٩٩٨ → الآن —" : "— TAIZ — 1998 → NOW —"}</span>
-                <span className="h-1.5 w-1.5 rounded-full bg-[#FF3B30]" />
-              </div>
-            ))}
+          <div className="overflow-hidden">
+            <div className="flex w-max animate-[tape2_20s_linear_infinite] will-change-transform whitespace-nowrap">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} aria-hidden={i !== 0} className="flex items-center gap-3 py-3 ps-3 shrink-0" style={{ fontFamily: "JetBrains Mono, monospace" }}>
+                  {(isAr ? ["تعز", "لغات", "برمجة", "شبكات", "دبلومات", "اختبار تحديد مستوى"] : ["Taiz", "Languages", "Coding", "Networks", "Diplomas", "Placement Test"]).map((w) => (
+                    <span key={`${w}-${i}`} className="inline-flex items-center gap-3">
+                      <span className="text-[12px] tracking-[0.14em] font-bold opacity-90">{w.toUpperCase()}</span>
+                      <span className="h-1.5 w-1.5 rounded-full bg-[#FFD60A]" />
+                    </span>
+                  ))}
+                  <span className="text-[12px] tracking-[0.14em] font-bold opacity-40">{isAr ? "— تعز — ١٩٩٨ → الآن —" : "— TAIZ — 1998 → NOW —"}</span>
+                  <span className="h-1.5 w-1.5 rounded-full bg-[#FF3B30]" />
+                </div>
+              ))}
+            </div>
           </div>
-          <style>{`@keyframes tape2 { from { transform: translateX(0)} to { transform: translateX(-50%) } }`}</style>
+          <style dangerouslySetInnerHTML={{ __html: "@keyframes tape2 { from { transform: translateX(0)} to { transform: translateX(-25%) } }" }} />
         </div>
       </div>
 

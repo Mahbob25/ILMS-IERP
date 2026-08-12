@@ -94,7 +94,7 @@ export default function BookPage() {
 
   return (
     <div dir={isAr ? "rtl" : "ltr"} className="min-h-screen bg-[#FFFBF0] text-[#0A0A0A] selection:bg-[#FF3B30] selection:text-white">
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');`}</style>
+      <style dangerouslySetInnerHTML={{ __html: "@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');" }} />
 
       <header className="sticky top-0 z-40 bg-[#FFFBF0]/85 backdrop-blur-xl border-b border-[#0A0A0A]/10">
         <div className="mx-auto max-w-[1280px] px-4 md:px-6 h-[56px] flex items-center justify-between">
@@ -138,14 +138,29 @@ export default function BookPage() {
               <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder={t.phonePh} inputMode="tel" dir="ltr" className="h-11 rounded-xl border border-[#0A0A0A]/12 bg-[#FFFBF0]/40 px-3 text-[14px] outline-none focus:border-[#0A0A0A]/25 focus:bg-white transition" />
             </label>
 
-            <label className="grid gap-1.5">
+            <div className="grid gap-1.5">
               <span className="text-[11px] tracking-[0.14em] font-black opacity-60" style={{ fontFamily: "JetBrains Mono, monospace" }}>{t.progL}</span>
-              <select value={program} onChange={(e) => setProgram(e.target.value)} className="h-11 rounded-xl border border-[#0A0A0A]/12 bg-[#FFFBF0]/40 px-3 text-[14px] outline-none focus:border-[#0A0A0A]/25 focus:bg-white transition">
-                {(t.progOpts as readonly string[]).map((v, i) => (
-                  <option key={v || "none"} value={v}>{(t.progLabels as readonly string[])[i]}</option>
-                ))}
-              </select>
-            </label>
+              <div className="grid grid-cols-2 gap-2">
+                {(t.progOpts as readonly string[]).slice(1).map((v, i) => {
+                  const label = (t.progLabels as readonly string[])[i + 1];
+                  const active = program === v;
+                  return (
+                    <button
+                      key={v}
+                      type="button"
+                      onClick={() => setProgram(active ? "" : v)}
+                      className={`h-11 rounded-xl border px-3 text-[13px] font-bold transition text-start flex items-center justify-between gap-2 ${active ? "bg-[#0A0A0A] text-white border-[#0A0A0A] shadow-sm" : "bg-[#FFFBF0]/60 border-[#0A0A0A]/12 hover:bg-white hover:border-[#0A0A0A]/20"}`}
+                    >
+                      <span>{label}</span>
+                      <span className={`h-5 w-5 rounded-full grid place-items-center text-[10px] shrink-0 border ${active ? "bg-white text-[#0A0A0A] border-white" : "bg-white border-[#0A0A0A]/10"}`}>{active ? "✓" : "○"}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              <span className="text-[11px] opacity-40" style={{ fontFamily: "JetBrains Mono, monospace" }}>
+                {isAr ? "اختر واحدًا أو اتركه فارغًا" : "Pick one or leave blank"}
+              </span>
+            </div>
 
             <label className="grid gap-1.5">
               <span className="text-[11px] tracking-[0.14em] font-black opacity-60" style={{ fontFamily: "JetBrains Mono, monospace" }}>{t.msgL}</span>
