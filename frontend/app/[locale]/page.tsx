@@ -306,8 +306,8 @@ export default function LandingPage() {
             </div>
           </div>
 
-          <div className="col-span-12 lg:col-span-5 flex flex-col gap-4">
-            <div className="relative rounded-[24px] bg-white border border-[#0F1B2E]/10 shadow-[0_20px_60px_rgba(15,27,46,0.10)] overflow-hidden">
+          <div className="col-span-12 lg:col-span-5">
+            <div className="relative rounded-[24px] bg-white border border-[#0F1B2E]/10 shadow-[0_20px_60px_rgba(15,27,46,0.10)] overflow-hidden h-full">
               <div className="absolute top-0 start-0 end-0 h-[3px] bg-gradient-to-r from-[#C8A96B] via-[#E76F51] to-[#1E3A8A] opacity-80" />
               <div className="p-6 md:p-7">
                 <div className="flex items-start justify-between gap-4">
@@ -365,30 +365,6 @@ export default function LandingPage() {
               </div>
             </div>
 
-            <div className="rounded-[24px] bg-[#C8A96B] text-[#0F1B2E] p-[1px] overflow-hidden shadow-[0_12px_40px_rgba(15,27,46,0.08)] flex-1">
-              <div className="rounded-[23px] bg-gradient-to-br from-[#FFFDF5] to-[#FFF7E6] p-6 h-full flex flex-col">
-                <div className="text-[11px] tracking-[0.18em] font-semibold opacity-60" style={{ fontFamily: "JetBrains Mono, monospace" }}>
-                  {isAr ? "دخول الكادر فقط" : "STAFF ONLY"}
-                </div>
-                <h3 className="mt-1 text-[16px] font-extrabold tracking-[-0.03em]" style={{ fontFamily: "Fraunces, serif" }}>
-                  {isAr ? "نظام المعهد داخلي" : "Institute system is internal"}
-                </h3>
-                <p className="mt-2 text-[12.5px] leading-5 opacity-70">
-                  {isAr
-                    ? "هذا الموقع للتعريف بالمعهد. إدارة الطلاب والمالية تتم داخل نظام ERP للكادر فقط."
-                    : "This site is for the institute. Student & finance management lives inside the staff-only ERP."}
-                </p>
-                <button
-                  onClick={goLogin}
-                  className="mt-4 w-full rounded-full bg-[#0F1B2E] text-white py-3 text-[13px] font-bold hover:bg-black transition flex items-center justify-center gap-2"
-                >
-                  {t.staffLogin} <span aria-hidden>→</span>
-                </button>
-                <p className="mt-3 text-[11px] opacity-60 text-center" style={{ fontFamily: "JetBrains Mono, monospace" }}>
-                  {isAr ? "لا يوجد تسجيل ذاتي" : "No self-registration"}
-                </p>
-              </div>
-            </div>
           </div>
         </div>
       </section>
@@ -534,8 +510,8 @@ export default function LandingPage() {
       </section>
 
       <section id="contact" className="mx-auto max-w-[1280px] px-4 md:px-6 mt-6">
-        <div className="rounded-[24px] bg-white border border-[#0F1B2E]/10 p-6 md:p-8 grid grid-cols-12 gap-6">
-          <div className="col-span-12 lg:col-span-7">
+        <div className="rounded-[24px] bg-white border border-[#0F1B2E]/10 p-6 md:p-8">
+          <div>
             <div className="text-[11px] tracking-[0.18em] font-semibold opacity-60" style={{ fontFamily: "JetBrains Mono, monospace" }}>
               {t.contactEyebrow.toUpperCase()}
             </div>
@@ -553,17 +529,6 @@ export default function LandingPage() {
                 <span className="opacity-50">☎</span> <span style={{ fontFamily: "JetBrains Mono, monospace" }}>{t.phone}</span>
               </div>
             </div>
-          </div>
-          <div className="col-span-12 lg:col-span-5 rounded-[16px] bg-[#F2F0E9] border border-[#0F1B2E]/10 p-5">
-            <div className="text-[12px] font-bold" style={{ fontFamily: "JetBrains Mono, monospace" }}>
-              {isAr ? "للكادر" : "For staff"}
-            </div>
-            <p className="mt-1 text-[12.5px] leading-5 opacity-70">
-              {isAr ? "دخول نظام ERP للكادر المصرّح فقط. لا تسجيل ذاتي." : "ERP access is staff-only. No self-registration."}
-            </p>
-            <button onClick={goLogin} className="mt-4 w-full rounded-full bg-[#0F1B2E] text-white py-2.5 text-[13px] font-bold hover:bg-black transition">
-              {t.staffLogin} →
-            </button>
           </div>
         </div>
       </section>
