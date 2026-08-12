@@ -37,6 +37,9 @@ import {
   FolderOpen,
   Bell,
   Workflow,
+  Megaphone,
+  Mail,
+  LayoutDashboard,
 } from "lucide-react";
 import NotificationBell from "@/components/notifications/NotificationBell";
 import GlobalSearch from "@/components/search/GlobalSearch";
@@ -79,9 +82,13 @@ function DashboardLayoutInner({
         manager: "مسؤول النظام",
         secretary: "سكرتير",
         teacher: "معلم",
+        marketing_manager: "مسؤول التسويق",
       },
       menu: {
         dashboard: "لوحة التحكم",
+        content: "محتوى الموقع",
+        announcements: "الإعلانات",
+        contacts: "رسائل التواصل",
         bookings: "الحجوزات",
         employees: "الموظفين",
         roles: "الأدوار",
@@ -120,9 +127,13 @@ function DashboardLayoutInner({
         manager: "Manager",
         secretary: "Secretary",
         teacher: "Teacher",
+        marketing_manager: "Marketing Manager",
       },
       menu: {
         dashboard: "Dashboard",
+        content: "Landing Content",
+        announcements: "Announcements",
+        contacts: "Contacts",
         bookings: "Bookings",
         employees: "Employees",
         roles: "Roles",
@@ -227,7 +238,10 @@ function DashboardLayoutInner({
     page_notifications: ["superadmin", "manager", "secretary", "teacher"],
     page_wizards: ["superadmin", "manager", "secretary"],
     page_search: ["superadmin", "manager", "secretary", "teacher"],
-    page_bookings: ["superadmin", "manager", "secretary"],
+    page_content: ["superadmin", "marketing_manager"],
+    page_announcements: ["superadmin", "marketing_manager"],
+    page_contacts: ["superadmin", "marketing_manager"],
+    page_bookings: ["superadmin", "manager", "secretary", "marketing_manager"],
   };
 
   const hasPageAccess = (permissionCodename: string): boolean => {
@@ -270,6 +284,9 @@ function DashboardLayoutInner({
     "dashboard/notifications": "page_notifications",
     "dashboard/wizards": "page_wizards",
     "dashboard/search": "page_search",
+    "dashboard/content": "page_content",
+    "dashboard/announcements": "page_announcements",
+    "dashboard/contacts": "page_contacts",
     "dashboard/bookings": "page_bookings",
   };
 
@@ -302,6 +319,24 @@ function DashboardLayoutInner({
       href: `/${locale}/dashboard/wizards/student-enrollment`,
       icon: Workflow,
       permission: "page_wizards",
+    },
+    {
+      name: t.menu.content,
+      href: `/${locale}/dashboard/content`,
+      icon: LayoutDashboard,
+      permission: "page_content",
+    },
+    {
+      name: t.menu.announcements,
+      href: `/${locale}/dashboard/announcements`,
+      icon: Megaphone,
+      permission: "page_announcements",
+    },
+    {
+      name: t.menu.contacts,
+      href: `/${locale}/dashboard/contacts`,
+      icon: Mail,
+      permission: "page_contacts",
     },
     {
       name: t.menu.bookings,

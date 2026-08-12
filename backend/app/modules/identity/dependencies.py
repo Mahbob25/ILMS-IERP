@@ -7,7 +7,7 @@ from app.db.session import get_db
 from app.modules.identity.models import User, Role, Permission, RolePermission
 from app.modules.identity.security import decode_token, ExpiredSignatureError, InvalidTokenError
 
-VALID_SYSTEM_ROLES = {"superadmin", "manager", "teacher", "secretary"}
+VALID_SYSTEM_ROLES = {"superadmin", "manager", "teacher", "secretary", "marketing_manager"}
 
 async def get_current_user(
     access_token: Optional[str] = Cookie(None),

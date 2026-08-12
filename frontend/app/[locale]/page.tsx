@@ -1,6 +1,8 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { landingDefaults } from "@/lib/landingDefaults";
 
 export default function LandingPage() {
   const params = useParams();
@@ -10,91 +12,40 @@ export default function LandingPage() {
   const goLogin = () => router.push(`/${locale}/login`);
   const goLang = () => router.push(`/${isAr ? "en" : "ar"}`);
 
-  const t = {
-    ar: {
-      navAI: "الذكاء الاصطناعي",
-      pill: "معهد الدراسات · حلب — لغات وعلوم حاسب وذكاء اصطناعي",
-      navPrograms: "البرامج",
-      navAteliers: "الورش",
-      navCampus: "الحرم",
-      navContact: "العنوان",
-      staffLogin: "دخول الكادر",
-      heroKicker: "مستوى واحد في كل مرة",
-      heroLine1: "تتعلّم",
-      heroLine2: "بمساعدة الذكاء الإصطناعي",
-      heroLine3: "وتطبّق في نفس اليوم.",
-      heroDesc: "فصول 8 طلاب، مختبر يومي، ومساعد ذكاء اصطناعي يرافقك — يصحح نطقك، يراجع كودك، ويبني لك خطة مراجعة. في تعز منذ 1998، بعقل جديد.",
-      ctaPrimary: "شاهد البرامج",
-      ctaGhost: "جولة في الحرم →",
-      micro: "التسجيل حضوري فقط · اختبار تحديد مستوى مجاني",
-      liveLabel: "مباشر من الحرم",
-      liveCardTitle: "جدول اليوم",
-      levels: ["A1", "A2", "B1", "B2", "C1", "C2"],
-      programsEyebrow: "البرامج",
-      programsTitle: "اختر ما تريد أن تتقنه",
-      programsSub: "قائمة مفتوحة — نضيف مسارات جديدة كل فصل. كل برنامج له ورشة، مشروع، وشهادة تُتحقّق.",
-      programs: [
-        { id: "languages", k: "اللغات", d: "محادثة يومية ومخبر صوتي — من الحروف إلى المناظرة.", meta: "A1 → C2" },
-        { id: "computing", k: "علوم الحاسب", d: "بايثون، قواعد بيانات، شبكات وويب — تبني شيئًا يعمل كل أسبوع.", meta: "12 مساقًا" },
-        { id: "ai", k: "الذكاء الاصطناعي", d: "أساسيات عملية — أدوات، بيانات، ومشاريع يمكنك عرضها.", meta: "جديد" },
-        { id: "diplomas", k: "الدبلومات", d: "محاسبة وإدارة وسكرتارية — حالات واقعية وملف إنجاز.", meta: "180 ساعة" },
-      ],
-      ateliersTitle: "الورش — حيث يحدث التعلّم",
-      ateliers: [
-        { k: "مختبر الصوت", v: "60 دقيقة يوميًا", p: "سماعات، تسجيل، وتصحيح نطق فوري. تتكلم أكثر مما تكتب." },
-        { k: "مختبر الكود", v: "حاسوب لكل طالب", p: "بيئة حقيقية، سيرفر محلي، ومشروع يُرفع على رابط." },
-        { k: "ورشة الأعمال", v: "حالات واقعية", p: "فواتير، ميزانيات، ومراسلات — كما في الشركة." },
-      ],
-      contactTitle: "تعال وشاهد حصة",
-      address: "تعز — اليمن — معهد الدراسات",
-      hours: "السبت – الخميس · 08:30 — 19:30",
-      phone: "04 — 123 456",
-      footer: "© معهد الدراسات — تعز. التسجيل حضوري.",
-      lang: "English",
-    },
-    en: {
-      navAI: "AI",
-      pill: "Al-Drasat · Aleppo — Languages, Computing & AI",
-      navPrograms: "Programs",
-      navAteliers: "Ateliers",
-      navCampus: "Campus",
-      navContact: "Visit",
-      staffLogin: "Staff login",
-      heroKicker: "One level at a time",
-      heroLine1: "Learn it",
-      heroLine2: "with AI",
-      heroLine3: "ship it same day.",
-      heroDesc:
-        "8 max per section, daily lab, QR-verifiable certificate — plus an AI companion that tunes your pronunciation, reviews your code, and builds your revision plan. Since 1998, now AI-forward.",
-      ctaPrimary: "See programs",
-      ctaGhost: "Tour campus →",
-      micro: "On-campus enrolment · Free placement test",
-      liveLabel: "Live from campus",
-      liveCardTitle: "Today",
-      levels: ["A1", "A2", "B1", "B2", "C1", "C2"],
-      programsEyebrow: "Programs",
-      programsTitle: "Choose what you want to master",
-      programsSub: "Open list — we add tracks each term. Every program has an atelier, a project, and a verifiable certificate.",
-      programs: [
-        { id: "languages", k: "Languages", d: "Daily conversation & audio lab — letters to debate.", meta: "A1 → C2" },
-        { id: "computing", k: "Computing", d: "Python, DB, networks & web — ship something every week.", meta: "12 courses" },
-        { id: "ai", k: "Artificial Intelligence", d: "Practical AI — tools, data and projects you can demo.", meta: "New" },
-        { id: "diplomas", k: "Diplomas", d: "Accounting, management, secretarial — real cases & portfolio.", meta: "180 hrs" },
-      ],
-      ateliersTitle: "Ateliers — where learning happens",
-      ateliers: [
-        { k: "Sound Lab", v: "60 min daily", p: "Headsets, recording, instant correction. You speak more than you write." },
-        { k: "Code Lab", v: "1 machine per student", p: "Real env, local server, deploy link for your project." },
-        { k: "Business Atelier", v: "Real cases", p: "Invoices, budgets, letters — as in a company." },
-      ],
-      contactTitle: "Come watch a class",
-      address: "Taiz — Yemen — Al-Drasat Institute",
-      hours: "Sat–Thu · 08:30 — 19:30",
-      phone: "04 — 123 456",
-      footer: "© Al-Drasat Institute — Taiz. On-campus enrolment.",
-      lang: "العربية",
-    },
-  }[isAr ? "ar" : "en"];
+  const defaults = landingDefaults[isAr ? "ar" : "en"] as any;
+  const [override, setOverride] = useState<any>(null);
+  const [announcements, setAnnouncements] = useState<{ text_ar: string; text_en: string }[]>([]);
+  const [contactName, setContactName] = useState("");
+  const [contactPhone, setContactPhone] = useState("");
+  const [contactMsg, setContactMsg] = useState("");
+  const [contactDone, setContactDone] = useState(false);
+  const [contactErr, setContactErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch(`/api/v1/public/landing?locale=${locale}`).then((r) => r.json()).then((d) => { if (d && Object.keys(d).length) setOverride(d); }).catch(() => {});
+    fetch(`/api/v1/public/announcements`).then((r) => r.json()).then((d) => { if (Array.isArray(d) && d.length) setAnnouncements(d); }).catch(() => {});
+  }, [locale]);
+
+  const t: any = override ? { ...defaults, ...override, programs: override.programs || defaults.programs, ateliers: override.ateliers || defaults.ateliers, levels: defaults.levels, liveLabel: defaults.liveLabel, liveCardTitle: defaults.liveCardTitle, lang: defaults.lang, navAI: override.navAI || defaults.navAI, navPrograms: override.navPrograms || defaults.navPrograms, navAteliers: override.navAteliers || defaults.navAteliers, navCampus: override.navCampus || defaults.navCampus, navContact: override.navContact || defaults.navContact, staffLogin: override.staffLogin || defaults.staffLogin } : defaults;
+  (t as any).levels = defaults.levels;
+  (t as any).liveLabel = defaults.liveLabel;
+  (t as any).liveCardTitle = defaults.liveCardTitle;
+  (t as any).lang = defaults.lang;
+
+  async function submitContact(e: React.FormEvent) {
+    e.preventDefault();
+    setContactErr(null);
+    const digits = contactPhone.replace(/\D/g, "");
+    if (contactName.trim().length < 2 || digits.length < 7) { setContactErr(isAr ? "الاسم أو الهاتف غير كافٍ" : "Name or phone too short"); return; }
+    try {
+      const csrf = document.cookie.match(/csrf_token=([^;]+)/)?.[1];
+      if (!csrf) await fetch("/api/v1/auth/csrf", { credentials: "include" });
+      const csrf2 = document.cookie.match(/csrf_token=([^;]+)/)?.[1];
+      const res = await fetch("/api/v1/public/contacts", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json", ...(csrf2 ? { "X-CSRF-Token": decodeURIComponent(csrf2) } : {}) }, body: JSON.stringify({ name: contactName.trim(), phone: contactPhone.trim(), message: contactMsg.trim() || null, locale }) });
+      if (!res.ok) throw new Error((await res.json()).detail || "failed");
+      setContactDone(true);
+    } catch (err: any) { setContactErr(err?.message || "failed"); }
+  }
 
   return (
     <div dir={isAr ? "rtl" : "ltr"} className="min-h-screen bg-[#FFFBF0] text-[#0A0A0A] selection:bg-[#FF3B30] selection:text-white">
@@ -203,7 +154,7 @@ export default function LandingPage() {
                 LEVELS
               </span>
               <div className="flex items-center gap-1.5">
-                {t.levels.map((lv, i) => (
+                {(t.levels as string[]).map((lv: string, i: number) => (
                   <span
                     key={lv}
                     className="h-6 px-2 rounded-full border text-[11px] font-bold grid place-items-center"
@@ -293,7 +244,7 @@ export default function LandingPage() {
             <div className="flex w-max animate-[tape2_20s_linear_infinite] will-change-transform whitespace-nowrap">
               {Array.from({ length: 4 }).map((_, i) => (
                 <div key={i} aria-hidden={i !== 0} className="flex items-center gap-3 py-3 ps-3 shrink-0" style={{ fontFamily: "JetBrains Mono, monospace" }}>
-                  {(isAr ? ["تعز", "لغات", "برمجة", "شبكات", "دبلومات", "اختبار تحديد مستوى"] : ["Taiz", "Languages", "Coding", "Networks", "Diplomas", "Placement Test"]).map((w) => (
+                  {(announcements.length ? announcements.map((a) => (isAr ? a.text_ar : a.text_en)) : isAr ? ["تعز", "لغات", "برمجة", "شبكات", "دبلومات", "اختبار تحديد مستوى"] : ["Taiz", "Languages", "Coding", "Networks", "Diplomas", "Placement Test"]).map((w) => (
                     <span key={`${w}-${i}`} className="inline-flex items-center gap-3">
                       <span className="text-[12px] tracking-[0.14em] font-bold opacity-90">{w.toUpperCase()}</span>
                       <span className="h-1.5 w-1.5 rounded-full bg-[#FFD60A]" />
@@ -466,7 +417,7 @@ export default function LandingPage() {
               </p>
             </div>
             <div className="col-span-12 lg:col-span-8 p-4 md:p-6 grid grid-cols-1 md:grid-cols-3 gap-4 bg-[#FFFBF0]/40">
-              {t.ateliers.map((a) => (
+              {(t.ateliers as any[]).map((a: any) => (
                 <div key={a.k} className="rounded-2xl bg-white border border-[#0A0A0A]/10 p-5">
                   <div className="text-[11px] tracking-[0.16em] font-black opacity-60" style={{ fontFamily: "JetBrains Mono, monospace" }}>
                     {a.k.toUpperCase()}
@@ -498,15 +449,23 @@ export default function LandingPage() {
             </div>
           </div>
           <div className="col-span-12 lg:col-span-5 rounded-2xl bg-white text-[#0A0A0A] p-5">
-            <div className="text-[12px] font-black" style={{ fontFamily: "JetBrains Mono, monospace" }}>
-              {isAr ? "جرب حصة مجانًا" : "Try a class free"}
-            </div>
-            <p className="mt-1 text-[12.5px] leading-5 opacity-60">
-              {isAr ? "احجز مقعدك — نرسل لك تأكيدًا بالوقت والقاعة." : "Save your seat — we send time & room confirmation."}
-            </p>
-            <a href={`/${locale}/book`} className="mt-4 w-full rounded-full bg-[#FF3B30] text-white py-3 text-[13px] font-bold grid place-items-center hover:bg-[#E3342B] transition">
-              {isAr ? "احجز الآن" : "Book now"} →
-            </a>
+            {!contactDone ? (
+              <form onSubmit={submitContact} className="space-y-3">
+                <div className="text-[12px] font-black" style={{ fontFamily: "JetBrains Mono, monospace" }}>{isAr ? "راسلنا" : "Contact us"}</div>
+                <input value={contactName} onChange={(e) => setContactName(e.target.value)} placeholder={isAr ? "الاسم" : "Name"} className="w-full h-10 rounded-xl border border-[#0A0A0A]/10 bg-[#FFFBF0] px-3 text-sm outline-none focus:border-[#0A0A0A]/20" />
+                <input value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} placeholder={isAr ? "الهاتف" : "Phone"} dir="ltr" className="w-full h-10 rounded-xl border border-[#0A0A0A]/10 bg-[#FFFBF0] px-3 text-sm outline-none focus:border-[#0A0A0A]/20" />
+                <textarea value={contactMsg} onChange={(e) => setContactMsg(e.target.value)} placeholder={isAr ? "رسالتك (اختياري)" : "Message (optional)"} rows={2} className="w-full rounded-xl border border-[#0A0A0A]/10 bg-[#FFFBF0] px-3 py-2 text-sm outline-none focus:border-[#0A0A0A]/20" />
+                {contactErr && <div className="text-xs text-red-600">{contactErr}</div>}
+                <button type="submit" className="w-full rounded-full bg-[#0A0A0A] text-white py-2.5 text-[13px] font-bold hover:bg-black transition">{isAr ? "إرسال" : "Send"} →</button>
+                <a href={`/${locale}/book`} className="block text-center text-xs opacity-60 hover:opacity-100">{isAr ? "أو احجز حصة تجريبية →" : "Or book a trial →"}</a>
+              </form>
+            ) : (
+              <div className="text-center py-6">
+                <div className="text-2xl">✓</div>
+                <div className="mt-2 text-sm font-bold">{isAr ? "تم الإرسال — سنتواصل قريبًا" : "Sent — we'll be in touch soon"}</div>
+                <button onClick={() => setContactDone(false)} className="mt-3 text-xs opacity-60 underline">{isAr ? "إرسال رسالة أخرى" : "Send another"}</button>
+              </div>
+            )}
           </div>
         </div>
       </section>

@@ -43,7 +43,7 @@ async def list_bookings_admin(
     search: Optional[str] = Query(None),
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
-    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])),
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary", "marketing_manager"])),
     db: AsyncSession = Depends(get_db),
 ):
     result = await booking_service.list_bookings(db, status=status, search=search, page=page, per_page=per_page)
@@ -64,7 +64,7 @@ async def patch_booking_status(
     request: Request,
     booking_id: uuid.UUID,
     body: BookingStatusUpdate,
-    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])),
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary", "marketing_manager"])),
     db: AsyncSession = Depends(get_db),
 ):
     b = await booking_service.update_status(db, booking_id, status=body.status, actor_id=current_user.id, notes=body.notes)
