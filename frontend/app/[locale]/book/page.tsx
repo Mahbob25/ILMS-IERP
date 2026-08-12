@@ -118,13 +118,94 @@ export default function BookPage() {
         <p className="mt-2 text-[13px] leading-6 opacity-60">{t.sub}</p>
 
         {done ? (
-          <div className="mt-6 rounded-[24px] bg-white border border-[#0A0A0A]/10 p-6 md:p-8 shadow-sm">
-            <div className="h-10 w-10 rounded-full bg-[#0A0A0A] text-white grid place-items-center">✓</div>
-            <h2 className="mt-4 text-[18px] font-black" style={{ fontFamily: "Space Grotesk, sans-serif" }}>{t.okTitle}</h2>
-            <p className="mt-1 text-[13px] leading-6 opacity-70">{t.okBody}</p>
-            <button onClick={() => router.push(`/${locale}`)} className="mt-6 rounded-full bg-[#FF3B30] text-white px-6 py-3 text-[13px] font-bold hover:bg-[#E3342B] transition">
-              {t.okCta} →
-            </button>
+          <div className="mt-6">
+            <style dangerouslySetInnerHTML={{ __html: "@keyframes bookCheckDraw{0%{stroke-dashoffset:56}100%{stroke-dashoffset:0}}@keyframes bookCardIn{0%{opacity:0;transform:translateY(14px) scale(0.98)}100%{opacity:1;transform:none}}@keyframes bookRing{0%{transform:scale(0.9);opacity:0.5}100%{transform:scale(1.35);opacity:0}}@keyframes bookConfetti{0%{transform:translateY(-8px) rotate(0deg);opacity:0}15%{opacity:1}100%{transform:translateY(28px) rotate(180deg);opacity:0}}@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}" }} />
+            <div className="relative rounded-[28px] bg-[#0A0A0A] p-[1.5px] shadow-[0_20px_60px_rgba(10,10,10,0.12)] animate-[bookCardIn_0.5s_cubic-bezier(0.16,1,0.3,1)]">
+              <div className="rounded-[26px] bg-[#FFFBF0] overflow-hidden">
+                <div className="relative bg-white px-6 md:px-8 pt-7 pb-6 overflow-hidden">
+                  <div aria-hidden className="pointer-events-none absolute inset-0">
+                    <span className="absolute left-[18%] top-5 h-1.5 w-1.5 rounded-full bg-[#FFD60A] animate-[bookConfetti_1.6s_0.2s_both]" />
+                    <span className="absolute left-[42%] top-4 h-1 w-1 rounded-full bg-[#FF3B30] animate-[bookConfetti_1.5s_0.35s_both]" />
+                    <span className="absolute left-[62%] top-6 h-1.5 w-1.5 rounded-full bg-[#0EA5E9] animate-[bookConfetti_1.7s_0.15s_both]" />
+                    <span className="absolute left-[78%] top-5 h-1 w-1 rounded-full bg-[#0A0A0A] animate-[bookConfetti_1.4s_0.45s_both]" />
+                    <span className="absolute -top-3 -end-10 h-40 w-40 rounded-full bg-[#FFD60A]/10 blur-[18px]" />
+                    <span className="absolute -bottom-8 -start-8 h-32 w-32 rounded-full bg-[#0EA5E9]/10 blur-[16px]" />
+                  </div>
+                  <div className="relative flex gap-4 items-start">
+                    <div className="relative h-[56px] w-[56px] shrink-0">
+                      <span className="absolute inset-0 rounded-full bg-[#10B981]/20 animate-[bookRing_1.8s_cubic-bezier(0,0,0.2,1)_infinite]" />
+                      <span className="absolute inset-0 rounded-full bg-[#10B981]/15 animate-[bookRing_1.8s_0.6s_cubic-bezier(0,0,0.2,1)_infinite]" />
+                      <span className="relative grid place-items-center h-[56px] w-[56px] rounded-full bg-[#0A0A0A] text-white shadow-sm">
+                        <svg width="28" height="28" viewBox="0 0 28 28" fill="none" aria-hidden>
+                          <circle cx="14" cy="14" r="11" stroke="white" strokeOpacity="0.18" strokeWidth="1.5" />
+                          <path d="M8.5 14.2L12.1 17.8L19.6 10.3" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="56" strokeDashoffset="56" style={{ animation: "bookCheckDraw 0.6s 0.35s cubic-bezier(0.16,1,0.3,1) forwards" }} />
+                        </svg>
+                      </span>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="inline-flex items-center gap-2 text-[10px] tracking-[0.16em] font-black px-2.5 py-1 rounded-full bg-[#10B981] text-white" style={{ fontFamily: "JetBrains Mono, monospace" }}>
+                        <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" /> {isAr ? "تم تأكيد الحجز" : "BOOKING CONFIRMED"}
+                      </div>
+                      <h2 className="mt-3 text-[22px] md:text-[26px] font-black tracking-[-0.04em] leading-none" style={{ fontFamily: "Space Grotesk, sans-serif" }}>
+                        {isAr ? "مقعدك محجوز — نكلمك اليوم" : "You're in — we call today"}
+                      </h2>
+                      <p className="mt-2 text-[13px] leading-6 opacity-60" style={{ fontFamily: isAr ? "IBM Plex Sans Arabic, Inter" : "Inter" }}>
+                        {isAr ? <>أهلاً <span className="font-bold text-[#0A0A0A]">{name}</span> — وصل طلبك وسنأكد الوقت والقاعة على <span dir="ltr" className="font-bold" style={{ fontFamily: "JetBrains Mono, monospace" }}>{phone}</span> خلال ساعات.</> : <>Thanks <span className="font-bold text-[#0A0A0A]">{name}</span> — we got it and will confirm time & room on <span className="font-bold" style={{ fontFamily: "JetBrains Mono, monospace" }}>{phone}</span> within hours.</>}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="relative mt-6 rounded-2xl bg-[#FFFBF0] border border-dashed border-[#0A0A0A]/15 overflow-hidden">
+                    <div className="absolute top-1/2 -start-2 h-4 w-4 rounded-full bg-[#FFFBF0] border border-[#0A0A0A]/10 -translate-y-1/2" />
+                    <div className="absolute top-1/2 -end-2 h-4 w-4 rounded-full bg-[#FFFBF0] border border-[#0A0A0A]/10 -translate-y-1/2" />
+                    <div className="grid grid-cols-3 divide-x divide-dashed divide-[#0A0A0A]/12">
+                      <div className="px-4 py-3">
+                        <div className="text-[10px] tracking-[0.14em] font-black opacity-40" style={{ fontFamily: "JetBrains Mono, monospace" }}>{isAr ? "الاسم" : "NAME"}</div>
+                        <div className="mt-1 text-[13px] font-bold truncate">{name}</div>
+                      </div>
+                      <div className="px-4 py-3">
+                        <div className="text-[10px] tracking-[0.14em] font-black opacity-40" style={{ fontFamily: "JetBrains Mono, monospace" }}>{isAr ? "الهاتف" : "PHONE"}</div>
+                        <div className="mt-1 text-[13px] font-bold" dir="ltr" style={{ fontFamily: "JetBrains Mono, monospace" }}>{phone}</div>
+                      </div>
+                      <div className="px-4 py-3">
+                        <div className="text-[10px] tracking-[0.14em] font-black opacity-40" style={{ fontFamily: "JetBrains Mono, monospace" }}>{isAr ? "البرنامج" : "TRACK"}</div>
+                        <div className="mt-1 text-[13px] font-bold truncate">{program ? (isAr ? ({ languages: "اللغات", computing: "علوم الحاسب", ai: "الذكاء الاصطناعي", diplomas: "الدبلومات" } as any)[program] : program) : isAr ? "— عام" : "— General"}</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-6 grid grid-cols-3 gap-2">
+                    {[
+                      { n: "01", k: isAr ? "استلمنا" : "Received", d: isAr ? "طلبك عندنا" : "We have it", dot: "#10B981" },
+                      { n: "02", k: isAr ? "نتصل بك" : "We call", d: isAr ? "خلال ساعات" : "Within hours", dot: "#FFD60A" },
+                      { n: "03", k: isAr ? "تأتي للتجربة" : "You visit", d: isAr ? "مجانًا" : "Free trial", dot: "#0EA5E9" },
+                    ].map((s) => (
+                      <div key={s.n} className="rounded-2xl bg-white border border-[#0A0A0A]/10 p-3">
+                        <div className="flex items-center gap-1.5 text-[10px] font-black tracking-[0.12em] opacity-40" style={{ fontFamily: "JetBrains Mono, monospace" }}><span className="h-1.5 w-1.5 rounded-full" style={{ background: s.dot }} /> {s.n}</div>
+                        <div className="mt-1 text-[12.5px] font-black leading-none">{s.k}</div>
+                        <div className="text-[11px] opacity-60">{s.d}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="mt-6 flex flex-wrap gap-3">
+                    <button onClick={() => router.push(`/${locale}`)} className="rounded-full bg-[#0A0A0A] text-white px-6 py-3 text-[13px] font-bold hover:bg-black transition flex items-center gap-2">
+                      {t.okCta} <span aria-hidden>→</span>
+                    </button>
+                    <button onClick={() => setDone(false)} className="rounded-full bg-white border border-[#0A0A0A]/12 px-5 py-3 text-[13px] font-bold hover:bg-[#FFFBF0] transition">
+                      {isAr ? "حجز آخر" : "New booking"}
+                    </button>
+                    <span className="ms-auto hidden md:inline-flex items-center gap-1.5 text-[11px] opacity-50 self-center" style={{ fontFamily: "JetBrains Mono, monospace" }}>
+                      <span className="h-1.5 w-1.5 rounded-full bg-[#10B981] animate-pulse" /> {isAr ? "نرد واتساب على نفس الرقم" : "We reply on WhatsApp too"}
+                    </span>
+                  </div>
+                </div>
+                <div className="bg-[#0A0A0A] text-white px-6 py-3 flex items-center justify-between text-[11px]">
+                  <span className="opacity-70" style={{ fontFamily: "JetBrains Mono, monospace" }}>{isAr ? "مجاني · بلا دفع · اختبار مستوى مجاني" : "Free · No payment · Free placement test"}</span>
+                  <span className="hidden sm:inline opacity-40" style={{ fontFamily: "JetBrains Mono, monospace" }}>ADMIT ONE — {isAr ? "تعز 1998 → الآن" : "TAIZ 1998 → NOW"}</span>
+                </div>
+              </div>
+            </div>
           </div>
         ) : (
           <form onSubmit={submit} className="mt-6 rounded-[28px] bg-white border border-[#0A0A0A]/10 p-6 md:p-7 shadow-sm grid gap-4">

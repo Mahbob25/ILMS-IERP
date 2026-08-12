@@ -473,7 +473,7 @@ export default function LandingPage() {
               <div style={{ fontFamily: "JetBrains Mono, monospace" }}>☎ {t.phone}</div>
             </div>
           </div>
-          <div className="col-span-12 lg:col-span-5 rounded-2xl bg-white text-[#0A0A0A] p-5">
+          <div className="col-span-12 lg:col-span-5 rounded-2xl bg-white text-[#0A0A0A] p-5 overflow-hidden">
             {!contactDone ? (
               <form onSubmit={submitContact} className="space-y-3">
                 <div className="text-[12px] font-black" style={{ fontFamily: "JetBrains Mono, monospace" }}>{isAr ? "راسلنا" : "Contact us"}</div>
@@ -485,10 +485,25 @@ export default function LandingPage() {
                 <a href={`/${locale}/book`} className="block text-center text-xs opacity-60 hover:opacity-100">{isAr ? "أو احجز حصة تجريبية →" : "Or book a trial →"}</a>
               </form>
             ) : (
-              <div className="text-center py-6">
-                <div className="text-2xl">✓</div>
-                <div className="mt-2 text-sm font-bold">{isAr ? "تم الإرسال — سنتواصل قريبًا" : "Sent — we'll be in touch soon"}</div>
-                <button onClick={() => setContactDone(false)} className="mt-3 text-xs opacity-60 underline">{isAr ? "إرسال رسالة أخرى" : "Send another"}</button>
+              <div className="relative text-center py-7 px-2 overflow-hidden">
+                <style dangerouslySetInnerHTML={{ __html: "@keyframes contactCheckDraw{0%{stroke-dashoffset:36}100%{stroke-dashoffset:0}}@keyframes contactRing{0%{transform:scale(0.9);opacity:0.5}100%{transform:scale(1.45);opacity:0}}@keyframes contactIn{0%{opacity:0;transform:translateY(10px)}100%{opacity:1;transform:none}}@media(prefers-reduced-motion:reduce){*{animation:none!important}}" }} />
+                <div className="animate-[contactIn_0.45s_cubic-bezier(0.16,1,0.3,1)]">
+                  <div className="relative mx-auto h-[52px] w-[52px]">
+                    <span className="absolute inset-0 rounded-full bg-[#10B981]/20 animate-[contactRing_1.6s_cubic-bezier(0,0,0.2,1)_infinite]" />
+                    <span className="relative grid place-items-center h-[52px] w-[52px] rounded-full bg-[#0A0A0A] text-white">
+                      <svg width="26" height="26" viewBox="0 0 26 26" fill="none" aria-hidden>
+                        <circle cx="13" cy="13" r="10" stroke="white" strokeOpacity="0.18" strokeWidth="1.4" />
+                        <path d="M7.5 13.2L11 16.7L18.5 9.5" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="36" strokeDashoffset="36" style={{ animation: "contactCheckDraw 0.55s 0.3s cubic-bezier(0.16,1,0.3,1) forwards" }} />
+                      </svg>
+                    </span>
+                  </div>
+                  <div className="mt-3 inline-flex items-center gap-1.5 text-[10px] tracking-[0.14em] font-black px-2.5 py-1 rounded-full bg-[#10B981] text-white" style={{ fontFamily: "JetBrains Mono, monospace" }}>
+                    <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" /> {isAr ? "وصلت رسالتك" : "MESSAGE RECEIVED"}
+                  </div>
+                  <div className="mt-2 text-[15px] font-black tracking-[-0.02em]" style={{ fontFamily: "Space Grotesk, sans-serif" }}>{isAr ? "تم — نكلمك قريبًا" : "Sent — we'll be in touch"}</div>
+                  <div className="mt-1 text-[12px] leading-5 opacity-60">{isAr ? "نرد على نفس الرقم خلال ساعات." : "We reply on the same number within hours."}</div>
+                  <button onClick={() => { setContactDone(false); setContactName(""); setContactPhone(""); setContactMsg(""); }} className="mt-4 text-xs font-bold underline opacity-60 hover:opacity-100">{isAr ? "إرسال رسالة أخرى" : "Send another"}</button>
+                </div>
               </div>
             )}
           </div>
