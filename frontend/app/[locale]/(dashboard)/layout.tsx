@@ -308,6 +308,7 @@ function DashboardLayoutInner({
   }
 
   const navigationItems = [
+    // ── Overview ──
     {
       name: t.menu.dashboard,
       href: `/${locale}/dashboard`,
@@ -321,47 +322,18 @@ function DashboardLayoutInner({
       permission: "page_wizards",
     },
     {
-      name: t.menu.content,
-      href: `/${locale}/dashboard/content`,
-      icon: LayoutDashboard,
-      permission: "page_content",
-    },
-    {
-      name: t.menu.announcements,
-      href: `/${locale}/dashboard/announcements`,
-      icon: Megaphone,
-      permission: "page_announcements",
-    },
-    {
-      name: t.menu.contacts,
-      href: `/${locale}/dashboard/contacts`,
-      icon: Mail,
-      permission: "page_contacts",
-    },
-    {
       name: t.menu.bookings,
       href: `/${locale}/dashboard/bookings`,
       icon: Calendar,
       permission: "page_bookings",
     },
     {
-      name: t.menu.users,
-      href: `/${locale}/dashboard/users`,
-      icon: Users,
-      permission: "page_users",
+      name: t.menu.pos,
+      href: `/${locale}/dashboard/pos`,
+      icon: ShoppingCart,
+      permission: "page_pos",
     },
-    {
-      name: t.menu.employees,
-      href: `/${locale}/dashboard/employees`,
-      icon: Users,
-      permission: "page_employees",
-    },
-    {
-      name: t.menu.roles,
-      href: `/${locale}/dashboard/roles`,
-      icon: ShieldCheck,
-      permission: "page_roles",
-    },
+    // ── Academics ──
     {
       name: t.menu.courses,
       href: `/${locale}/dashboard/courses`,
@@ -375,11 +347,12 @@ function DashboardLayoutInner({
       permission: "page_sections",
     },
     {
-      name: t.menu.certificates,
-      href: `/${locale}/dashboard/certificates`,
-      icon: Award,
-      permission: "page_certificates",
+      name: t.menu.ingestion,
+      href: `/${locale}/dashboard/ingestion`,
+      icon: FileText,
+      permission: "page_ingestion",
     },
+    // ── Students & Learning ──
     {
       name: t.menu.students,
       href: `/${locale}/dashboard/students`,
@@ -405,6 +378,13 @@ function DashboardLayoutInner({
       permission: "page_gradebook",
     },
     {
+      name: t.menu.certificates,
+      href: `/${locale}/dashboard/certificates`,
+      icon: Award,
+      permission: "page_certificates",
+    },
+    // ── Finance & Commerce ──
+    {
       name: t.menu.payments,
       href: `/${locale}/dashboard/payments`,
       icon: DollarSign,
@@ -417,22 +397,10 @@ function DashboardLayoutInner({
       permission: "page_expenses",
     },
     {
-      name: t.menu.financialRecords,
-      href: `/${locale}/dashboard/financial-records`,
-      icon: FolderOpen,
-      permission: "page_financial_records",
-    },
-    {
-      name: t.menu.revenue,
-      href: `/${locale}/dashboard/revenue`,
-      icon: BarChart3,
-      permission: "page_revenue",
-    },
-    {
-      name: t.menu.teacherWallet,
-      href: `/${locale}/dashboard/teacher-wallet`,
-      icon: CreditCard,
-      permission: "page_teacher_wallet",
+      name: t.menu.cashierRefunds,
+      href: `/${locale}/dashboard/cashier/refunds`,
+      icon: HandCoins,
+      permission: "page_cashier_refunds",
     },
     {
       name: t.menu.dailyClosures,
@@ -441,22 +409,85 @@ function DashboardLayoutInner({
       permission: "page_daily_closures",
     },
     {
-      name: t.menu.pos,
-      href: `/${locale}/dashboard/pos`,
-      icon: ShoppingCart,
-      permission: "page_pos",
+      name: t.menu.revenue,
+      href: `/${locale}/dashboard/revenue`,
+      icon: BarChart3,
+      permission: "page_revenue",
     },
     {
-      name: t.menu.cashierRefunds,
-      href: `/${locale}/dashboard/cashier/refunds`,
-      icon: HandCoins,
-      permission: "page_cashier_refunds",
+      name: t.menu.financialRecords,
+      href: `/${locale}/dashboard/financial-records`,
+      icon: FolderOpen,
+      permission: "page_financial_records",
     },
     {
-      name: t.menu.ingestion,
-      href: `/${locale}/dashboard/ingestion`,
-      icon: FileText,
-      permission: "page_ingestion",
+      name: t.menu.teacherWallet,
+      href: `/${locale}/dashboard/teacher-wallet`,
+      icon: CreditCard,
+      permission: "page_teacher_wallet",
+    },
+    {
+      name: t.menu.staffPayroll,
+      href: `/${locale}/dashboard/staff-payroll`,
+      icon: Wallet,
+      permission: "page_staff_payroll",
+    },
+    // ── Team & Access ──
+    {
+      name: t.menu.employees,
+      href: `/${locale}/dashboard/employees`,
+      icon: Users,
+      permission: "page_employees",
+    },
+    {
+      name: t.menu.users,
+      href: `/${locale}/dashboard/users`,
+      icon: Users,
+      permission: "page_users",
+    },
+    {
+      name: t.menu.roles,
+      href: `/${locale}/dashboard/roles`,
+      icon: ShieldCheck,
+      permission: "page_roles",
+    },
+    // ── Engagement & Content ──
+    {
+      name: t.menu.content,
+      href: `/${locale}/dashboard/content`,
+      icon: LayoutDashboard,
+      permission: "page_content",
+    },
+    {
+      name: t.menu.announcements,
+      href: `/${locale}/dashboard/announcements`,
+      icon: Megaphone,
+      permission: "page_announcements",
+    },
+    {
+      name: t.menu.contacts,
+      href: `/${locale}/dashboard/contacts`,
+      icon: Mail,
+      permission: "page_contacts",
+    },
+    {
+      name: t.menu.notifications,
+      href: `/${locale}/dashboard/notifications`,
+      icon: Bell,
+      permission: "page_notifications",
+    },
+    // ── Insights & Administration ──
+    {
+      name: t.menu.reports,
+      href: `/${locale}/dashboard/reports`,
+      icon: FileBarChart2,
+      permission: "page_reports",
+    },
+    {
+      name: t.menu.settings,
+      href: `/${locale}/dashboard/settings`,
+      icon: Settings,
+      permission: "page_settings",
     },
     {
       name: t.menu.systemHealth,
@@ -469,30 +500,6 @@ function DashboardLayoutInner({
       href: `/${locale}/dashboard/backups`,
       icon: Database,
       permission: "page_backups",
-    },
-    {
-      name: t.menu.staffPayroll,
-      href: `/${locale}/dashboard/staff-payroll`,
-      icon: Wallet,
-      permission: "page_staff_payroll",
-    },
-    {
-      name: t.menu.reports,
-      href: `/${locale}/dashboard/reports`,
-      icon: FileBarChart2,
-      permission: "page_reports",
-    },
-    {
-      name: t.menu.notifications,
-      href: `/${locale}/dashboard/notifications`,
-      icon: Bell,
-      permission: "page_notifications",
-    },
-    {
-      name: t.menu.settings,
-      href: `/${locale}/dashboard/settings`,
-      icon: Settings,
-      permission: "page_settings",
     },
   ].filter((item) => hasPageAccess(item.permission));
 
