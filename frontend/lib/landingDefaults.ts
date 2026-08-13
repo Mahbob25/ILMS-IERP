@@ -1,6 +1,6 @@
 export const landingDefaults = {
   ar: {
-    navAI: "الذكاء الاصطلاحي",
+    navAI: "الذكاء الاصطناعي",
     navPrograms: "البرامج",
     navAteliers: "الورش",
     navCampus: "الحرم",
