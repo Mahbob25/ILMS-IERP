@@ -14,6 +14,9 @@ function mergeWithDefaults(v: any): FullValue {
       out[loc] = { ...out[loc], ...v[loc] };
       if (Array.isArray(v[loc].programs)) out[loc].programs = v[loc].programs;
       if (Array.isArray(v[loc].ateliers)) out[loc].ateliers = v[loc].ateliers;
+      if (Array.isArray(v[loc].stats)) out[loc].stats = v[loc].stats;
+      if (Array.isArray(v[loc].testimonials)) out[loc].testimonials = v[loc].testimonials;
+      if (Array.isArray(v[loc].faqs)) out[loc].faqs = v[loc].faqs;
     }
   }
   return out;
@@ -75,6 +78,27 @@ export default function ContentPage() {
       return next;
     });
   }
+  function updateStat(idx: number, field: string, value: string) {
+    setData((prev) => {
+      const next = JSON.parse(JSON.stringify(prev));
+      (next[tab].stats[idx] as any)[field] = value;
+      return next;
+    });
+  }
+  function updateTestimonial(idx: number, field: string, value: string) {
+    setData((prev) => {
+      const next = JSON.parse(JSON.stringify(prev));
+      (next[tab].testimonials[idx] as any)[field] = value;
+      return next;
+    });
+  }
+  function updateFaq(idx: number, field: string, value: string) {
+    setData((prev) => {
+      const next = JSON.parse(JSON.stringify(prev));
+      (next[tab].faqs[idx] as any)[field] = value;
+      return next;
+    });
+  }
 
   const d: any = (data as any)[tab];
   if (loading) return <div className="max-w-5xl mx-auto p-8 text-sm text-slate-400">{isAr ? "جاري التحميل..." : "Loading..."}</div>;
@@ -86,7 +110,7 @@ export default function ContentPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold tracking-tight">{isAr ? "محتوى الموقع" : "Landing Content"}</h1>
-          <p className="text-sm text-slate-500">{isAr ? "تحكم كامل بمحتوى صفحة الهبوط — يحفظ كـ JSON" : "Full CMS for landing page — saved as JSON"}</p>
+          <p className="text-sm text-slate-500">{isAr ? "تحكم كامل بمحتوى صفحة الهبوط — يحفظ كـ JSON (يشمل الثقة، البرامج، والأسئلة الشائعة)" : "Full CMS for landing page — saved as JSON (incl. social proof, program outcomes & FAQ)"}</p>
         </div>
         <div className="flex items-center gap-2">
           <div className="flex p-1 rounded-full bg-slate-100 border border-slate-200">
@@ -108,9 +132,33 @@ export default function ContentPage() {
         </div>
         <Field label="heroDesc" multiline value={d.heroDesc} onChange={(v) => update("heroDesc", v)} />
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <Field label="ctaPrimary" value={d.ctaPrimary} onChange={(v) => update("ctaPrimary", v)} />
+          <Field label="ctaPrimary (should be book link text)" value={d.ctaPrimary} onChange={(v) => update("ctaPrimary", v)} />
           <Field label="ctaGhost" value={d.ctaGhost} onChange={(v) => update("ctaGhost", v)} />
           <Field label="micro" value={d.micro} onChange={(v) => update("micro", v)} />
+        </div>
+      </Section>
+
+      <Section title={label("الثقة — إحصائيات وآراء", "Social Proof — Stats & Testimonials")}>
+        <p className="text-xs text-slate-500">{label("تظهر مباشرة تحت البطل — تبني الثقة", "Shown right under hero — builds trust")}</p>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {d.stats.map((s: any, i: number) => (
+            <div key={i} className="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-2">
+              <div className="text-xs font-bold text-slate-500">#{i + 1}</div>
+              <Field label="value (e.g. 12k+)" value={s.value} onChange={(v) => updateStat(i, "value", v)} />
+              <Field label="label" value={s.label} onChange={(v) => updateStat(i, "label", v)} />
+            </div>
+          ))}
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          {d.testimonials.map((tm: any, i: number) => (
+            <div key={i} className="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-2">
+              <div className="text-xs font-bold text-slate-500">#{i + 1}</div>
+              <Field label="name" value={tm.name} onChange={(v) => updateTestimonial(i, "name", v)} />
+              <Field label="track" value={tm.track} onChange={(v) => updateTestimonial(i, "track", v)} />
+              <Field label="quote" multiline value={tm.quote} onChange={(v) => updateTestimonial(i, "quote", v)} />
+              <Field label="rating (1-5)" value={String(tm.rating)} onChange={(v) => updateTestimonial(i, "rating", v)} />
+            </div>
+          ))}
         </div>
       </Section>
 
@@ -127,6 +175,15 @@ export default function ContentPage() {
               <Field label="k (title)" value={p.k} onChange={(v) => updateProg(i, "k", v)} />
               <Field label="d (desc)" multiline value={p.d} onChange={(v) => updateProg(i, "d", v)} />
               <Field label="meta" value={p.meta} onChange={(v) => updateProg(i, "meta", v)} />
+              <div className="grid grid-cols-2 gap-2">
+                <Field label="outcome" value={p.outcome || ""} onChange={(v) => updateProg(i, "outcome", v)} />
+                <Field label="duration" value={p.duration || ""} onChange={(v) => updateProg(i, "duration", v)} />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <Field label="intake" value={p.intake || ""} onChange={(v) => updateProg(i, "intake", v)} />
+                <Field label="seats" value={p.seats || ""} onChange={(v) => updateProg(i, "seats", v)} />
+              </div>
+              <Field label="priceHint" value={p.priceHint || ""} onChange={(v) => updateProg(i, "priceHint", v)} />
             </div>
           ))}
         </div>
@@ -145,12 +202,28 @@ export default function ContentPage() {
         </div>
       </Section>
 
+      <Section title={label("الأسئلة الشائعة", "FAQ")}>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <Field label="faqTitle" value={d.faqTitle} onChange={(v) => update("faqTitle", v)} />
+          <Field label="faqSub" value={d.faqSub} onChange={(v) => update("faqSub", v)} />
+        </div>
+        <div className="space-y-3">
+          {d.faqs.map((f: any, i: number) => (
+            <div key={i} className="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-2">
+              <div className="text-xs font-bold text-slate-500">#{i + 1}</div>
+              <Field label="q" value={f.q} onChange={(v) => updateFaq(i, "q", v)} />
+              <Field label="a" multiline value={f.a} onChange={(v) => updateFaq(i, "a", v)} />
+            </div>
+          ))}
+        </div>
+      </Section>
+
       <Section title={label("التواصل والفوتر", "Contact & Footer")}>
         <Field label="contactTitle" value={d.contactTitle} onChange={(v) => update("contactTitle", v)} />
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <Field label="address" value={d.address} onChange={(v) => update("address", v)} />
           <Field label="hours" value={d.hours} onChange={(v) => update("hours", v)} />
-          <Field label="phone" value={d.phone} onChange={(v) => update("phone", v)} />
+          <Field label="phone (used for WhatsApp link)" value={d.phone} onChange={(v) => update("phone", v)} />
         </div>
         <Field label="footer" value={d.footer} onChange={(v) => update("footer", v)} />
       </Section>

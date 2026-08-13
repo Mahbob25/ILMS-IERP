@@ -20,6 +20,7 @@ export default function LandingPage() {
 
   const defaults = landingDefaults[isAr ? "ar" : "en"] as any;
   const [override, setOverride] = useState<any>(null);
+  const [landingReady, setLandingReady] = useState(false);
   const [announcements, setAnnouncements] = useState<{ text_ar: string; text_en: string }[]>([]);
   const [contactName, setContactName] = useState("");
   const [contactPhone, setContactPhone] = useState("");
@@ -29,12 +30,37 @@ export default function LandingPage() {
   const [faqOpen, setFaqOpen] = useState<number | null>(0);
 
   useEffect(() => {
+    let hasCache = false;
+    let cachedParsed: any = null;
+    try {
+      const cached = localStorage.getItem(`landing:${locale}`);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed && typeof parsed === "object" && !Array.isArray(parsed) && !("detail" in parsed) && (parsed.programs || parsed.heroKicker || parsed.heroLine1)) {
+          cachedParsed = parsed;
+          hasCache = true;
+        }
+      }
+    } catch {}
+    if (hasCache) {
+      setOverride(cachedParsed);
+      setLandingReady(true);
+    } else {
+      setOverride(null);
+      setLandingReady(false);
+    }
     fetch(`/api/v1/public/landing?locale=${locale}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
-        if (d && typeof d === "object" && !Array.isArray(d) && !("detail" in d) && (d.programs || d.heroKicker || d.heroLine1)) setOverride(d);
+        if (d && typeof d === "object" && !Array.isArray(d) && !("detail" in d) && (d.programs || d.heroKicker || d.heroLine1)) {
+          setOverride(d);
+          try { localStorage.setItem(`landing:${locale}`, JSON.stringify(d)); } catch {}
+        } else if (!d || (typeof d === "object" && Object.keys(d).length === 0)) {
+          try { localStorage.removeItem(`landing:${locale}`); } catch {}
+        }
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => { if (!hasCache) setLandingReady(true); });
     fetch(`/api/v1/public/announcements`)
       .then((r) => (r.ok ? r.json() : []))
       .then((d) => { if (Array.isArray(d)) setAnnouncements(d); })
@@ -107,6 +133,18 @@ export default function LandingPage() {
       item: { "@type": "Course", name: p.k, description: p.d, provider: { "@type": "Organization", name: "Al-Drasat" } },
     })),
   };
+
+  if (!landingReady) {
+    return (
+      <div dir={isAr ? "rtl" : "ltr"} className={`${inter.className} min-h-screen bg-[#FFFBF0] text-[#0A0A0A]`}>
+        <div className="mx-auto max-w-[1280px] px-4 md:px-6 pt-5 md:pt-7">
+          <div className="h-[420px] rounded-[28px] bg-white border border-[#0A0A0A]/10 animate-pulse" />
+          <div className="mt-6 h-[88px] rounded-[22px] bg-white border border-[#0A0A0A]/10 animate-pulse" />
+          <div className="mt-6 h-[96px] rounded-2xl bg-[#0A0A0A]/90 animate-pulse" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div dir={isAr ? "rtl" : "ltr"} className={`${inter.className} min-h-screen bg-[#FFFBF0] text-[#0A0A0A] selection:bg-[#FF3B30] selection:text-white`}>
