@@ -8,9 +8,12 @@ Deployment: cloud VM (AWS EC2 / GCP) behind a Cloudflare Tunnel — no public po
 
 | File | What it covers |
 |------|----------------|
+| `plans/portal-implementation-plan.md` | **Student & Parent Portal — Implementation Plan** — BFF + AI service, phases, file map, risks (implements `portal-architecture.md`) |
+| `plans/ai-pipeline-implementation-plan.md` | AI pipeline — curriculum ingestion + RAG question generation (Lean MVP, updated 2026-08-13 for portal `ai-service` queues) |
 | `plans/current.md` | Current direction: roadmap (deployment → AI pipeline) |
 | `architecture/overview.md` | Tech stack, container layout, modules, auth flow, RBAC, key decisions |
 | `architecture/database-schema.md` | Database tables with columns, types, FKs, relationships |
+| `architecture/portal-architecture.md` | **Student & Parent Portal** — isolated BFF + AI service architecture (recommended). Caddy subdomains, cache, auth isolation, diagrams |
 | `architecture/memory.md` | Immutable rules — MUST be followed by every session |
 | `architecture/frontend-design-rules.md` | Frontend design language: Professional Minimalist, colors, typography |
 | `architecture/templates-design-rules.md` | Receipt / voucher / certificate template design rules |

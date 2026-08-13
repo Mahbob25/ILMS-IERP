@@ -4,6 +4,7 @@
 **Target:** `docs/plans/ai-pipeline-implementation-plan.md` (this file) — English  
 **Status:** Draft for review — no code changes in this PR  
 **Date:** 2026-08-11  
+**Updated:** 2026-08-13 — aligned with `portal-architecture.md` (unified `ai-service`, `ai:ingestion` LOW / `ai:student` HIGH queues, `Queue` interface); Lean MVP `BackgroundTasks` path preserved as adapter. See §3, §4.1, §10 R1.  
 **Author:** Extracted & assessed from v1.6 reference doc
 
 ---
@@ -74,11 +75,13 @@ Backend → in-process asyncio.Queue → SSE /api/v1/notifications/stream → fr
 4 containers only: caddy, frontend, backend, database (lims-internal bridge, no host-exposed DB/API ports)
 ```
 
-**Key v1.6 decisions preserved:**
+**When the portal is deployed (`docs/architecture/portal-architecture.md`):** the Lean `BackgroundTasks` path is preserved as an **adapter**. If `REDIS_URL` is configured (portal compose `ai-service` + `redis` are up), ingestion/question jobs `enqueue("ai:ingestion")` to the unified `ai-service` LOW queue; if not, the original in-process `BackgroundTasks` loop runs — same `ingestion_jobs.current_state JSONB` contract in both modes. Student-facing AI (`portal → ai:student` HIGH queue) only exists when the portal is deployed and never contends with the LOW batch queue. See `docs/plans/portal-implementation-plan.md` §4, §9.
+
+**Key v1.6 decisions preserved (with portal mapping):**
 - `chunks.embedding VECTOR(1536)` + `USING hnsw (embedding vector_cosine_ops)` — no Qdrant
-- `ingestion_jobs.current_state JSONB {last_page, last_successful_chunk_id, processed_count, checkpoint_at}` — no `ingestion_batches`
-- `chunk_id = MD5(content + asset_id)` deterministic PK — no `asset_cache`
-- `asyncio.Queue` per user for SSE — no Redis Pub/Sub (single uvicorn worker in MVP)
+- `ingestion_jobs.current_state JSONB {last_page, last_successful_chunk_id, processed_count, checkpoint_at}` — no `ingestion_batches`; `Queue` interface selects `BackgroundTasks` vs `ai-service` transport without migrating this column
+- `chunk_id = MD5(content + asset_id)` deterministic PK — no `asset_cache`; orphan delete `DELETE FROM chunks WHERE document_id=:id AND chunk_id NOT IN (:new_ids)` on re-upload + single-chunk hotfix `POST /chunks/{id}/hotfix` handle updates (see `portal-architecture.md §12`)
+- `asyncio.Queue` per user for SSE — no Redis Pub/Sub in ERP (single uvicorn worker in MVP); portal/ai use Redis Streams behind a `Queue` interface, upgradeable without API change
 
 ---
 
@@ -86,11 +89,13 @@ Backend → in-process asyncio.Queue → SSE /api/v1/notifications/stream → fr
 
 ### 4.1 Flow (verbatim from §11, translated & annotated)
 
+> **Portal extension (2026-08-13):** The job submit and worker are now branched via a `Queue` interface. ERP enqueues to `ai-service` queue `ai:ingestion` (LOW) when portal compose is up; otherwise the Lean `BackgroundTasks.add(process_ingestion(job_id))` path runs in-process. Worker lifecycle (checkpointing, bulk upsert, DAG, RAGAS) is identical. See `docs/plans/portal-implementation-plan.md §9` for full vectorization-on-update (re-upload orphan delete + hotfix) and `portal-architecture.md §12`.
+
 ```
 POST /api/v1/curriculum/documents (multipart) → 202 Accepted {job_id}
-  → save file via StorageService → BackgroundTasks.add(process_ingestion(job_id))
+  → save file via StorageService → enqueue → (ai-service LOW queue | BackgroundTasks.add(process_ingestion(job_id)))
   → read current_state → Isolate & Resume? → resume from last_page+1 else page 1
-  → [BackgroundTask loop, inside uvicorn event loop]
+  → [Worker loop — either BackgroundTasks in uvicorn OR ai-service LOW worker via Queue interface]
       Layout Analysis (page-by-page) → Semantic Chunking → MD5 chunk_id
       → Gemini Embedding API (batched) → Google ADK extraction & pedagogical tagging
       → Batch Bulk Upsert (50 chunks / batch): INSERT ... ON CONFLICT (chunk_id) DO UPDATE
@@ -99,6 +104,7 @@ POST /api/v1/curriculum/documents (multipart) → 202 Accepted {job_id}
   → Recursive CTE depth<=3 (direct SQL, no cache)
   → RAGAS evaluation → status COMPLETED → SSE notify → Hotfix tool (single-chunk re-embed)
   ── on Gemini Timeout/ConnectionError/CircuitOpen → status FAILED → SSE + Isolate & Resume button
+  ── on queue failure mid-stream → BRPOPLPUSH visibility timeout → retry (or Streams PEL → re-deliver up to 3 → DLQ ai:dlq)
 ```
 
 ### 4.2 Per-Step Implementation Notes
@@ -113,10 +119,10 @@ POST /api/v1/curriculum/documents (multipart) → 202 Accepted {job_id}
 | **Multimodal** | Gemini 1.5 Flash + tenacity + pybreaker | `tenacity.retry(stop=stop_after_attempt(3), wait=exponential)` + `pybreaker.CircuitBreaker(fail_max=5, reset_timeout=60)` per API type |
 | **Extraction/tagging** | ADK, Bloom, prereqs, reading time | Batch 5–10 chunks/call; strict Pydantic output schema; fallback to rule-based tagger if Gemini down |
 | **Embeddings** | Gemini Embedding API, 1536-dim | Batch inputs (up to 50/request), retry with backoff, store directly in `embedding` column in same upsert |
-| **Bulk upsert** | Single INSERT VALUES ... ON CONFLICT DO UPDATE | Use `psycopg` `executemany` or `COPY` staging; update `current_state` in same transaction boundary |
+| **Bulk upsert** | Single INSERT VALUES ... ON CONFLICT DO UPDATE | Use `psycopg` `executemany` or `COPY` staging; update `current_state` in same transaction boundary; unchanged chunks `DO NOTHING` (no re-embed cost); after re-upload: `DELETE FROM chunks WHERE document_id=:id AND chunk_id NOT IN (:new_ids)` to remove orphans so `embedding <=> $1` never returns deleted context |
 | **DAG** | concepts + concept_dependencies | Extract prerequisites as edges; enforce acyclic check; query via `WITH RECURSIVE ... WHERE depth <= 3` |
 | **Evaluation** | RAGAS synthetic QA | 10–20 probes per document; metrics: faithfulness, context recall; gate COMPLETED only if thresholds pass (or warn) |
-| **Hotfix** | single chunk re-embed | `POST /api/v1/curriculum/chunks/{chunk_id}/hotfix` — update content → re-embed → `UPDATE chunks SET embedding = $1 WHERE chunk_id = $2` |
+| **Hotfix** | single chunk re-embed | `POST /api/v1/curriculum/chunks/{chunk_id}/hotfix` — update content → re-embed → `UPDATE chunks SET embedding = $1 WHERE chunk_id = $2` atomically. Portal RAG ranking updates <50ms (HNSW); no bulk re-ingestion. |
 
 ---
 
@@ -344,7 +350,7 @@ All under `/api/v1`, `HttpOnly Secure Cookie` via Caddy Internal CA, RBAC via ex
 
 | # | Risk | Likelihood | Impact | Severity | Mitigation (v1.6 + recommended) |
 |---|---|---|---|---|---|
-| **R1** | **BackgroundTasks durability** — task dies if uvicorn restarts; no persistence, no retry queue; SSE queue lost | High | High | **High** | MVP: single worker + `current_state` JSONB allows manual resume. **Harden:** Add `lifespan` startup scan for `PROCESSING` jobs → auto-resume; write PID + `started_at` to job; add `POST /jobs/{id}/resume` idempotency; document single-worker limit; plan Redis+CELERY behind feature flag if job frequency grows. |
+| **R1** | **BackgroundTasks durability** — task dies if uvicorn restarts; no persistence, no retry queue; SSE queue lost | High | High | **High** | MVP: single worker + `current_state` JSONB allows manual resume. **Harden:** Add `lifespan` startup scan for `PROCESSING` jobs → auto-resume; write PID + `started_at` to job; add `POST /jobs/{id}/resume` idempotency; document single-worker limit. **With portal:** `Queue` interface (`ai:ingestion` LOW queue) + `BRPOPLPUSH` (visibility timeout) / Streams (`XADD/XREADGROUP/XACK` + DLQ) resolves durability without rewriting ERP call sites — see `portal-architecture.md §4.3`. |
 | **R2** | **pgvector scale** — HNSW build time & RAM on large corpora | Medium | Medium | Medium | HNSW is fine to low-millions (institute scale is ~10k–100k chunks). Mitigate: `maintenance_work_mem` tuning, `CREATE INDEX CONCURRENTLY`, monitor `pg_stat_progress_create_index`; escape hatch: add Qdrant in Phase 11+ without rewrite (abstract `VectorStore` interface now). |
 | **R3** | **Gemini egress dependency** — Yemen intermittent internet, rate limits, cost spikes | High | High | **High** | Circuit breaker + tenacity + `FAILED`+resume already in plan. Add: per-user rate limit on AI endpoints, monthly cost cap + warning at 80%, offline banner ("RAG requires internet"), batch embeddings to reduce calls, cache query embeddings for 5 min. |
 | **R4** | **SSE single-process fan-out** — multi-worker breaks notifications | Medium | Medium | Medium | MVP single worker avoids it. Mitigate: document limit; implement `notifications_service` behind interface so Redis Pub/Sub can be swapped in Phase 2 without API change; add polling fallback (`GET /jobs/{id}` polling) if SSE drops. |
