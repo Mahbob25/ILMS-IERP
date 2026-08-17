@@ -85,36 +85,6 @@ services:
           cpus: '2.0'
           memory: 2G
 
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    container_name: lims_frontend
-    restart: always
-    environment:
-      TZ: ${TIMEZONE:-Asia/Riyadh}
-      NEXT_PUBLIC_PORTAL_URL: ${NEXT_PUBLIC_PORTAL_URL:-https://portal.aldirasat.com}
-    # No NEXT_PUBLIC_API_URL on purpose:
-    #   - browsers call the same origin (/api/v1) through Caddy
-    #   - server-side rendering falls back to http://backend:8000/api/v1
-    #   => one image works locally and in production, no rebuilds on domain changes.
-    depends_on:
-      backend:
-        condition: service_healthy
-    networks:
-      - lims-internal
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/ar/login"]
-      interval: 15s
-      timeout: 5s
-      start_period: 30s
-      retries: 5
-    deploy:
-      resources:
-        limits:
-          cpus: '1.0'
-          memory: 1G
-
   caddy:
     image: caddy:latest
     container_name: lims_caddy
@@ -128,15 +98,15 @@ services:
     environment:
       TZ: ${TIMEZONE:-Asia/Riyadh}
       # Service names — valid inside the compose network everywhere.
-      # Caddy proxies /api/v1, /uploads -> backend and everything else -> frontend.
+      # Caddy proxies /api/v1, /uploads -> backend and /api/* -> portal-backend.
       BACKEND_URL: backend:8000
-      FRONTEND_URL: frontend:3000
+      PORTAL_BACKEND_URL: portal-backend:8001
     networks:
       - lims-internal
     depends_on:
       backend:
         condition: service_healthy
-      frontend:
+      database:
         condition: service_healthy
     deploy:
       resources:

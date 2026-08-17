@@ -441,9 +441,8 @@ verify() {
   info "Waiting for the stack to become healthy (up to 90s)..."
   local i=0
   until [ "$i" -ge 90 ]; do
-    if curl -fsS -m 5 http://localhost/api/v1/health >/dev/null 2>&1 \
-       && curl -fsS -m 5 -o /dev/null http://localhost/ar/login; then
-      ok "Frontend and API are reachable through Caddy (http://localhost)"
+    if curl -fsS -m 5 http://localhost/api/v1/health >/dev/null 2>&1; then
+      ok "Backend API is reachable through Caddy (http://localhost/api/v1/health)"
       break
     fi
     i=$((i + 1))
@@ -454,13 +453,11 @@ verify() {
     "${COMPOSE[@]}" -f "$COMPOSE_FILE" ps || true
     warn "backend logs (last 25):"
     "${COMPOSE[@]}" -f "$COMPOSE_FILE" logs --tail=25 backend 2>/dev/null || true
-    warn "frontend logs (last 25):"
-    "${COMPOSE[@]}" -f "$COMPOSE_FILE" logs --tail=25 frontend 2>/dev/null || true
     warn "Most likely causes: .env values, port 80 in use, or a failing migration above."
     return 1
   fi
 
-  # Portal stack — verify the BFF is healthy (portal-frontend depends on it).
+  # Portal stack — verify the BFF is healthy (portal-frontend is on Vercel now).
   if [ -f "$PORTAL_COMPOSE_FILE" ]; then
     info "Waiting for the portal backend to become healthy (up to 60s)..."
     local p=0
@@ -482,18 +479,15 @@ verify() {
 }
 
 print_summary() {
-  printf '\n%s%sLIMS is up%s\n' "$BOLD" "$GREEN" "$RESET"
-  printf '  App       : http://localhost%s\n' "$([ "$MODE" = "prod" ] && echo '  (via Cloudflare: https://aldrasat.edu)')"
+  printf '\n%s%sBackend stack is up%s\n' "$BOLD" "$GREEN" "$RESET"
   printf '  API health: http://localhost/api/v1/health\n'
   printf '  Database  : localhost:5431 (postgres)\n'
   printf '  Logs      : docker compose logs -f backend\n'
   if [ -f "$PORTAL_COMPOSE_FILE" ]; then
-    printf '  Portal    : portal-backend :8001, portal-frontend :3001, ai-service :8002, redis :6379 (on lims-internal)\n'
+    printf '  Portal    : portal-backend :8001, ai-service :8002, redis :6379 (on lims-internal)\n'
     printf '  Portal log: docker compose -f %s logs -f portal-backend\n' "$PORTAL_COMPOSE_FILE"
   fi
-  if [ "$MODE" = "local" ]; then
-    printf '\n  To go live: create a Cloudflare tunnel, put TUNNEL_TOKEN in .env, re-run this script.\n'
-  fi
+  printf '\n  Frontends are hosted on Vercel — this server serves APIs only.\n'
   printf '\n  Next update:  git pull && bash scripts/setup.sh\n'
   printf '  Backups (prod): add to cron: 0 3 * * * /root/lms/scripts/backup.sh >> /var/log/lms/backup.log 2>&1\n'
 }

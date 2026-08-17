@@ -46,32 +46,6 @@ services:
           cpus: '1.0'
           memory: 1G
 
-  portal-frontend:
-    build: ./portal/frontend
-    container_name: portal_frontend
-    restart: always
-    environment:
-      TZ: ${TIMEZONE:-Asia/Riyadh}
-    # No NEXT_PUBLIC_API_URL baked in:
-    #   - browsers call the same origin (/api) through Caddy
-    #   - SSR falls back to http://portal-backend:8001/api
-    depends_on:
-      portal-backend:
-        condition: service_healthy
-    networks:
-      - lims-internal
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3001/ar/login"]
-      interval: 15s
-      timeout: 5s
-      start_period: 30s
-      retries: 5
-    deploy:
-      resources:
-        limits:
-          cpus: '1.0'
-          memory: 1G
-
   ai-service:
     build: ./ai-service
     container_name: ai_service

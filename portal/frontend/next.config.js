@@ -1,16 +1,25 @@
 const path = require("path");
 
+// EC2 portal BFF origin for the Vercel → EC2 API bridge. Path-based routing on
+// Caddy's :80 block, so plain http is fine (TLS terminates at Vercel).
+const API_ORIGIN = process.env.API_ORIGIN || "http://16.192.155.151";
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: "standalone",
   reactStrictMode: true,
-  // Limit build parallelism to keep memory usage low on small instances (EC2)
-  experimental: { cpus: 1 },
   webpack: (config) => {
     // Resolve the @/* alias explicitly — tsconfig paths alone are not always
     // picked up by webpack in this app, which made `@/lib/api` etc. fail.
     config.resolve.alias["@"] = path.join(__dirname);
     return config;
+  },
+  async rewrites() {
+    return [
+      {
+        source: "/api/:path*",
+        destination: `${API_ORIGIN}/api/:path*`,
+      },
+    ];
   },
 };
 

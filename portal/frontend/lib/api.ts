@@ -1,11 +1,11 @@
 import axios, { AxiosError } from "axios";
 
-// Portal BFF — same-origin /api on the portal subdomain; SSR falls back to
-// http://portal-backend:8001/api (compose network, cookie forwarding).
+// Portal BFF — same-origin /api on Vercel (rewritten to the EC2 portal BFF);
+// SSR falls back to the EC2 host directly.
 const API_BASE_URL =
   typeof window !== "undefined"
     ? "/api"
-    : (process.env.NEXT_PUBLIC_API_URL || "http://portal-backend:8001/api");
+    : (process.env.NEXT_PUBLIC_API_URL || "http://16.192.155.151/api");
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,

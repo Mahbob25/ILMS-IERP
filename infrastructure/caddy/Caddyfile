@@ -11,44 +11,38 @@
     }
 }
 
-# Local dev fallback — no DNS required
+# API-only gateway — the frontends are hosted on Vercel and rewrite their
+# /api/* calls to this host (path-based routing on :80, no DNS required).
+#   - /api/v1/*  → ERP backend
+#   - /uploads/* → ERP backend (cert/receipt/attachment files)
+#   - /api/*     → portal BFF (portal routes are /api/auth, /api/me, ...)
 :80 {
     encode gzip
 
-    # API proxy — point to backend service
     reverse_proxy /api/v1/* {env.BACKEND_URL}
     reverse_proxy /uploads/* {env.BACKEND_URL}
-
-    # Frontend fallback
-    reverse_proxy * {env.FRONTEND_URL}
+    reverse_proxy /api/* {env.PORTAL_BACKEND_URL}
 
     import security_headers
 }
 
-# Production — ERP on its own subdomain
-erp.aldrasat.edu {
+# Production hostnames — enable when DNS is pointed at this server (or the
+# tunnel routes to Caddy). Frontends are on Vercel; these serve APIs only.
+erp.aldirasat.edu {
     encode gzip
     reverse_proxy /api/v1/* {env.BACKEND_URL}
     reverse_proxy /uploads/* {env.BACKEND_URL}
-    reverse_proxy * {env.FRONTEND_URL}
-
     import security_headers
 }
 
-# Portal — public-facing (parents), stricter than ERP.
-portal.aldrasat.edu {
+portal.aldirasat.edu {
     encode gzip
 
-    # Cap request sizes (portal accepts phone/OTP JSON, never big uploads).
+    # Cap request sizes (portal accepts JSON, never big uploads).
     request_body {
         max_size 2MB
     }
 
-    # API proxy — portal BFF
-    reverse_proxy /api/* portal-backend:8001
-
-    # Static/frontend — portal web
-    reverse_proxy * portal-frontend:3001
-
+    reverse_proxy /api/* {env.PORTAL_BACKEND_URL}
     import security_headers
 }
