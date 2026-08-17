@@ -5,6 +5,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Response, Request, Cookie, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+from sqlalchemy import text
 from sqlalchemy.orm import joinedload
 from app.db.session import get_db
 from app.modules.identity.models import User, Role, Employee, RefreshToken
@@ -76,7 +77,7 @@ def _clear_auth_cookies(response: Response) -> None:
 
 # --- Auth Endpoints ---
 
-@auth_router.post("/login", response_model=UserResponse)
+@auth_router.post("/login")
 @limiter.limit("3/minute")
 async def login(
     login_data: UserLogin,
@@ -95,6 +96,10 @@ async def login(
         )
 
     if not user or not verify_password(login_data.password, user.password_hash):
+        # Fall back to portal users (students/parents) — same credentials style.
+        portal_user = await _lookup_portal_user(db, login_data.email, login_data.password)
+        if portal_user is not None:
+            return await _issue_portal_sso(response, db, portal_user, request)
         if user:
             user.failed_login_attempts += 1
             if user.failed_login_attempts >= 5:
@@ -148,6 +153,46 @@ async def login(
     )
 
     return user
+
+
+async def _lookup_portal_user(db: AsyncSession, email: str, password: str):
+    """Return the portal.users dict if email+password match a portal account, else None."""
+    from app.modules.portal_accounts import service as portal_accounts_service
+    from app.modules.identity.security import verify_password
+
+    account = await portal_accounts_service.find_portal_user_by_email(db, email)
+    if not account:
+        return None
+    password_hash = (
+        await db.execute(
+            text("SELECT password_hash FROM portal.users WHERE id = :uid"),
+            {"uid": account["id"]},
+        )
+    ).scalar_one_or_none()
+    if not password_hash or not verify_password(password, password_hash):
+        return None
+    if not account.get("is_active", True):
+        return None
+    return account
+
+
+async def _issue_portal_sso(response: Response, db: AsyncSession, portal_user: dict, request: Request):
+    """Issue a one-time SSO ticket for a portal user (student/parent)."""
+    from app.modules.identity.security import create_sso_ticket
+    from app.core.config import settings
+
+    ticket = create_sso_ticket(portal_user["id"])
+    await identity_service.create_audit_log(
+        db=db,
+        action="LOGIN_SUCCESS",
+        payload={"portal_user_id": str(portal_user["id"]), "sso_ticket_issued": True},
+        ip_address=request.client.host if request.client else None,
+    )
+    return {
+        "user_type": "portal",
+        "sso_ticket": ticket,
+        "portal_url": settings.PORTAL_FRONTEND_URL,
+    }
 
 
 @auth_router.post("/refresh")

@@ -333,7 +333,7 @@ Both share the same `pgvector VECTOR(1536) HNSW` store and guardrails, but **HIG
 |---|---|---|---|
 | **Owns** | All academic/financial truth: `courses`, `course_sections`, `students`, `enrollments`, `payments`, `expenses`, `teacher_wallets`, `attendance`, `grades`, `certificates`, `daily_closures`, plus `curriculum_documents/ingestion_jobs/chunks/concepts/questions` | Portal sessions, preferences, device links, parent↔student links, cache, rate limits, portal JWTs | Prompt orchestration, embeddings (Gemini/OpenAI), RAG assembly, streaming responses; consumes both queues |
 | **Writes to DB** | Yes — sole writer to `erp.*` (including vectors) | Only `portal.*` (portal_users, parent_links, etc.) | No direct DB writes except via ERP internal API or append-only `ai_logs`; vectors written only by ERP ingestion path |
-| **Auth** | Staff JWT (`JWT_SECRET_KEY`) — HttpOnly, 15m/7d rotation | Portal JWT (`PORTAL_JWT_SECRET`) — short-lived, OTP/phone, separate secret | No user auth — trusts `ERP_SERVICE_KEY` / mTLS from callers |
+| **Auth** | Staff JWT (`JWT_SECRET_KEY`) — HttpOnly, 15m/7d rotation | Portal JWT (`PORTAL_JWT_SECRET`) — short-lived, separate secret. Login via SSO ticket from the ERP (one-time, 60s, `PORTAL_SSO_SECRET`) or direct email+password | No user auth — trusts `ERP_SERVICE_KEY` / mTLS from callers |
 | **Scale** | Vertical, 2CPU/2GB, stable | Horizontal — `docker compose up --scale portal-backend=3` | Horizontal/GPU — move to larger node or managed inference; HIGH and LOW pools scale independently |
 
 ### Internal API Contract (ERP exposes, Portal + AI consume)
@@ -362,16 +362,21 @@ flowchart LR
         E2[JWT HttpOnly\nSecure Lax 15m/7d\nJWT_SECRET_KEY]
     end
     subgraph PortalAuth[Portal Auth]
-        P1[portal_users\nportal_guardians\nparent_links]
-        P2[Portal JWT HttpOnly\nSecure Lax 10m/30d\nPORTAL_JWT_SECRET\nOTP / Phone verify]
+        P1[portal_users\nportal_student_links\nportal_guardians\nportal_parent_links]
+        P2[Portal JWT HttpOnly\nSecure Lax 10m/30d\nPORTAL_JWT_SECRET]
+        P3[SSO ticket JWT\n60s single-use\nPORTAL_SSO_SECRET]
     end
     E1 -. no sharing .-> P1
     E2 -. different secret .-> P2
+    E2 -. different secret .-> P3
 ```
 
+- **JWT separation is preserved:** staff sessions use `JWT_SECRET_KEY`, portal sessions use `PORTAL_JWT_SECRET`, and the one-time SSO ticket uses `PORTAL_SSO_SECRET` (a third secret shared between ERP and portal BFF). The SSO ticket grants portal access only for 60s — never staff access.
 - Never reuse `users` table or `JWT_SECRET_KEY` for parents/students.
-- Portal login = phone/OTP or email+password with lower friction, separate lockout (5 attempts/15m), separate refresh rotation.
-- Parent can only see linked students via `parent_links(student_id, guardian_id, verified_at)`.
+- **Login flow:** staff, students, and parents all sign in at `aldirasat.com/{ar|en}/login` (email + password). The ERP checks staff `users` first, then `portal.users` (by email, password = the student/parent's phone at creation, bcrypt-hashed, changeable from the portal Settings page). Staff proceed to the ERP dashboard; students/parents are redirected to `portal.aldirasat.com/{locale}/login?ticket=<one-time>` and the portal BFF validates the ticket (`portal.sso_tickets` single-use) then issues portal cookies. No phone/OTP.
+- Portal accounts are auto-provisioned when a student is created in the ERP (username = email, password = phone); optional parent accounts (parent email/phone fields on the student form) are linked via `parent_links` with `verified_at` set.
+- Portal login = email+password with separate lockout (5 attempts/15m), separate refresh rotation.
+- Parent can only see linked students via `parent_links(student_id, guardian_id, verified_at)`; a student sees their own data via `student_links(user_id, student_id)`.
 
 ---
 

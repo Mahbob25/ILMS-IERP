@@ -1,5 +1,4 @@
 import logging
-import secrets
 from typing import Optional
 
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response, status
@@ -11,11 +10,19 @@ from app.db.session import get_db
 
 from . import service as auth_service
 from .dependencies import get_current_portal_user
-from .schemas import OTPRequest, OTPVerifyRequest, PortalUserResponse, ProfileUpdateRequest
+from .schemas import (
+    EmailLoginRequest,
+    SSOLoginRequest,
+    ChangePasswordRequest,
+    PortalUserResponse,
+    ProfileUpdateRequest,
+)
 from .security import (
     create_access_token,
     create_refresh_token,
     decode_token,
+    decode_sso_ticket,
+    verify_password,
     ExpiredSignatureError,
     InvalidTokenError,
 )
@@ -56,54 +63,76 @@ def _clear_auth_cookies(response: Response) -> None:
     response.delete_cookie(key=REFRESH_COOKIE, path="/", secure=secure, httponly=True, samesite="lax")
 
 
-@auth_router.post("/request-otp")
-@limiter.limit("5/minute")
-async def request_otp(
-    body: OTPRequest,
-    request: Request,
-    db: AsyncSession = Depends(get_db),
-):
-    """Send an OTP to the phone. MVP: console-log only (swap to SMS in Phase 4)."""
-    user = await auth_service.get_or_create_user_by_phone(db, body.phone)
-    if not user["is_active"]:
-        raise HTTPException(status_code=403, detail="Account is deactivated")
-    await auth_service.generate_otp(body.phone)
-    # Rate limiting: one OTP per phone per minute (Redis sliding window).
-    return {"detail": "OTP sent (console-logged for MVP)", "ttl_seconds": settings.OTP_TTL_SECONDS}
+async def _issue_portal_session(db: AsyncSession, response: Response, user: dict) -> dict:
+    """Issue portal access/refresh cookies for an authenticated portal user."""
+    payload = {"sub": str(user["id"]), "email": user.get("email")}
+    access_token = create_access_token(payload)
+    refresh_token = create_refresh_token(payload)
+    await auth_service.store_refresh_token(db, str(user["id"]), refresh_token)
+    _set_auth_cookies(response, access_token, refresh_token)
+    return {
+        "id": str(user["id"]),
+        "phone": user.get("phone"),
+        "email": user.get("email"),
+        "full_name": user["full_name"],
+        "locale_pref": user["locale_pref"],
+        "is_active": user["is_active"],
+    }
 
 
-@auth_router.post("/verify-otp")
+@auth_router.post("/login")
 @limiter.limit("10/minute")
-async def verify_otp(
-    body: OTPVerifyRequest,
+async def login(
+    body: EmailLoginRequest,
     request: Request,
     response: Response,
     db: AsyncSession = Depends(get_db),
 ):
-    """Verify OTP → set portal HttpOnly cookies (10m access / 30d refresh)."""
-    user = await auth_service.get_or_create_user_by_phone(db, body.phone)
+    """Email + password login (fallback / direct portal login). Primary path is SSO."""
+    user = await auth_service.find_user_by_email(db, body.email.strip().lower())
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid email or password")
     if not user["is_active"]:
         raise HTTPException(status_code=403, detail="Account is deactivated")
     if await auth_service.is_locked(user):
         raise HTTPException(status_code=401, detail="Account temporarily locked — try again later")
-
-    if not await auth_service._verify_otp_code(body.phone, body.code):
+    if not user.get("password_hash") or not verify_password(body.password, user["password_hash"]):
         await auth_service.record_failed_attempt(db, str(user["id"]))
-        raise HTTPException(status_code=401, detail="Invalid or expired OTP")
+        raise HTTPException(status_code=401, detail="Invalid email or password")
 
     await auth_service.reset_failed_attempts(db, str(user["id"]))
+    return await _issue_portal_session(db, response, user)
 
-    payload = {"sub": str(user["id"]), "phone": body.phone}
-    access_token = create_access_token(payload)
-    refresh_token = create_refresh_token(payload)
-    await auth_service.store_refresh_token(db, str(user["id"]), refresh_token)
 
-    _set_auth_cookies(response, access_token, refresh_token)
-    return {
-        "id": str(user["id"]),
-        "full_name": user["full_name"],
-        "locale_pref": user["locale_pref"],
-    }
+@auth_router.post("/sso")
+@limiter.limit("20/minute")
+async def sso_login(
+    body: SSOLoginRequest,
+    request: Request,
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+):
+    """Validate a one-time SSO ticket issued by the ERP login, then start a portal session."""
+    try:
+        payload = decode_sso_ticket(body.ticket)
+        if payload.get("type") != "sso" or payload.get("aud") != "portal":
+            raise HTTPException(status_code=401, detail="Invalid ticket")
+    except (ExpiredSignatureError, InvalidTokenError):
+        raise HTTPException(status_code=401, detail="Invalid or expired ticket")
+
+    jti = payload.get("jti")
+    user_id = payload.get("sub")
+    if not jti or not user_id:
+        raise HTTPException(status_code=401, detail="Invalid ticket payload")
+
+    if not await auth_service.mark_sso_ticket_consumed(db, jti):
+        raise HTTPException(status_code=401, detail="Ticket already used")
+
+    user = await auth_service.get_user_by_id(db, str(user_id))
+    if not user or not user["is_active"]:
+        raise HTTPException(status_code=401, detail="User not found or deactivated")
+
+    return await _issue_portal_session(db, response, user)
 
 
 @auth_router.post("/refresh")
@@ -132,13 +161,22 @@ async def refresh_token(
         raise HTTPException(status_code=401, detail="Refresh token revoked or expired")
 
     await auth_service.rotate_refresh_token(db, portal_refresh_token)
+    return await _issue_portal_session(db, response, user)
 
-    new_payload = {"sub": str(user["id"]), "phone": user.get("phone")}
-    new_access = create_access_token(new_payload)
-    new_refresh = create_refresh_token(new_payload)
-    await auth_service.store_refresh_token(db, str(user["id"]), new_refresh)
 
-    _set_auth_cookies(response, new_access, new_refresh)
+@auth_router.post("/change-password")
+@limiter.limit("5/minute")
+async def change_password(
+    body: ChangePasswordRequest,
+    request: Request,
+    current_user: dict = Depends(get_current_portal_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Change the current user's password (requires the current password)."""
+    user = await auth_service.get_user_by_id(db, str(current_user["id"]))
+    if not user or not user.get("password_hash") or not verify_password(body.current_password, user["password_hash"]):
+        raise HTTPException(status_code=400, detail="Current password is incorrect")
+    await auth_service.change_password(db, str(current_user["id"]), body.new_password)
     return {"status": "success"}
 
 

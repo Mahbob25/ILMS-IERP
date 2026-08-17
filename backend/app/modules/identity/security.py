@@ -60,3 +60,28 @@ def decode_token(token: str) -> Dict[str, Any]:
 def decode_token_ignore_expiry(token: str) -> Dict[str, Any]:
     """Decode a JWT ignoring expiration. Still verifies signature. Raises InvalidTokenError if malformed."""
     return jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM], options={"verify_exp": False})
+
+def create_sso_ticket(portal_user_id: str) -> str:
+    """Create a one-time portal SSO ticket JWT (60s TTL, aud=portal).
+
+    Signed with PORTAL_SSO_SECRET — a third secret shared with the portal BFF,
+    distinct from JWT_SECRET_KEY (staff sessions) and PORTAL_JWT_SECRET (portal
+    sessions). Grants portal access only; never staff access.
+    """
+    to_encode = {
+        "sub": str(portal_user_id),
+        "aud": "portal",
+        "type": "sso",
+        "jti": uuid.uuid4().hex,
+        "exp": int((datetime.now(timezone.utc) + timedelta(seconds=60)).timestamp()),
+    }
+    return jwt.encode(to_encode, settings.PORTAL_SSO_SECRET, algorithm=settings.JWT_ALGORITHM)
+
+def decode_sso_ticket(token: str) -> Dict[str, Any]:
+    """Verify a portal SSO ticket JWT. Raises PyJWT exceptions if invalid/expired."""
+    return jwt.decode(
+        token,
+        settings.PORTAL_SSO_SECRET,
+        algorithms=[settings.JWT_ALGORITHM],
+        audience="portal",
+    )

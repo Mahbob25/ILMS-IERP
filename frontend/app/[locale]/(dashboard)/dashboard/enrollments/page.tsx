@@ -83,6 +83,12 @@ export default function EnrollmentsPage() {
       studentCodeLabel: "رقم الطالب",
       fullNameLabel: "الاسم الكامل",
       emailLabel: "البريد الإلكتروني",
+      phoneLabel: "رقم الهاتف",
+      parentTitleLabel: "بيانات ولي الأمر (اختياري)",
+      parentFullNameLabel: "اسم ولي الأمر",
+      parentPhoneLabel: "هاتف ولي الأمر",
+      parentEmailLabel: "بريد ولي الأمر",
+      parentRelationshipLabel: "صلة القرابة",
       noResults: "لا توجد نتائج",
       createStudentTitle: "إضافة طالب جديد",
       nameInvalid: "الاسم يحتوي على أحرف غير صالحة",
@@ -126,6 +132,12 @@ export default function EnrollmentsPage() {
       studentCodeLabel: "Student Code",
       fullNameLabel: "Full Name",
       emailLabel: "Email",
+      phoneLabel: "Phone",
+      parentTitleLabel: "Parent Information (optional)",
+      parentFullNameLabel: "Parent Full Name",
+      parentPhoneLabel: "Parent Phone",
+      parentEmailLabel: "Parent Email",
+      parentRelationshipLabel: "Relationship",
       noResults: "No results",
       createStudentTitle: "Add New Student",
       nameInvalid: "Name contains invalid characters",
@@ -140,7 +152,10 @@ export default function EnrollmentsPage() {
   const [showEnrollModal, setShowEnrollModal] = useState(false);
   const [showCreateStudentModal, setShowCreateStudentModal] = useState(false);
   const [form, setForm] = useState({ student_id: "", section_id: "", admin_discount: "" });
-  const [createStudentForm, setCreateStudentForm] = useState({ student_code: "", full_name: "", email: "" });
+  const [createStudentForm, setCreateStudentForm] = useState({
+    student_code: "", full_name: "", email: "", phone: "",
+    parent_full_name: "", parent_phone: "", parent_email: "", parent_relationship: "",
+  });
   const [nameError, setNameError] = useState("");
   const enrollmentFormRef = useRef<EnrollmentFormFieldsHandle>(null);
   const [unenrollTarget, setUnenrollTarget] = useState<Enrollment | null>(null);
@@ -277,15 +292,26 @@ export default function EnrollmentsPage() {
       const payload: Record<string, unknown> = {
         student_code: sanitizeInput(createStudentForm.student_code),
         full_name: sanitizeInput(createStudentForm.full_name),
+        email: createStudentForm.email ? sanitizeInput(createStudentForm.email) : undefined,
+        phone: createStudentForm.phone ? sanitizeInput(createStudentForm.phone) : undefined,
+        parent_full_name: createStudentForm.parent_full_name ? sanitizeInput(createStudentForm.parent_full_name) : undefined,
+        parent_phone: createStudentForm.parent_phone ? sanitizeInput(createStudentForm.parent_phone) : undefined,
+        parent_email: createStudentForm.parent_email ? sanitizeInput(createStudentForm.parent_email) : undefined,
+        parent_relationship: createStudentForm.parent_relationship ? sanitizeInput(createStudentForm.parent_relationship) : undefined,
       };
-      if (createStudentForm.email) payload.email = sanitizeInput(createStudentForm.email);
+      Object.keys(payload).forEach((k) => {
+        if (payload[k] === undefined || payload[k] === "") delete payload[k];
+      });
       const res = await apiClient.post<Student>("/academic/students", payload);
       const newStud = res.data;
       setStudents(prev => [...prev, newStud]);
       setForm(prev => ({ ...prev, student_id: newStud.id }));
       enrollmentFormRef.current?.setSearchText(`${newStud.full_name} (${newStud.student_code})`);
       setShowCreateStudentModal(false);
-      setCreateStudentForm({ student_code: "", full_name: "", email: "" });
+      setCreateStudentForm({
+        student_code: "", full_name: "", email: "", phone: "",
+        parent_full_name: "", parent_phone: "", parent_email: "", parent_relationship: "",
+      });
     } catch (e: any) {
       const detail = e?.response?.data?.detail || e?.message || "Failed to create student";
       setMessage({ type: "error", text: detail });
@@ -387,7 +413,10 @@ export default function EnrollmentsPage() {
             onDiscountChange={(value) => setForm({ ...form, admin_discount: value })}
             students={students}
             onCreateNewStudent={() => {
-              setCreateStudentForm({ student_code: "", full_name: "", email: "" });
+              setCreateStudentForm({
+                student_code: "", full_name: "", email: "", phone: "",
+                parent_full_name: "", parent_phone: "", parent_email: "", parent_relationship: "",
+              });
               setNameError("");
               setShowCreateStudentModal(true);
             }}
@@ -416,7 +445,17 @@ export default function EnrollmentsPage() {
           <StudentFormFields
             values={createStudentForm}
             onChange={(next) => setCreateStudentForm(next)}
-            labels={{ studentCode: t.studentCodeLabel, fullName: t.fullNameLabel, email: t.emailLabel }}
+            labels={{
+              studentCode: t.studentCodeLabel,
+              fullName: t.fullNameLabel,
+              email: t.emailLabel,
+              phone: t.phoneLabel,
+              parentTitle: t.parentTitleLabel,
+              parentFullName: t.parentFullNameLabel,
+              parentPhone: t.parentPhoneLabel,
+              parentEmail: t.parentEmailLabel,
+              parentRelationship: t.parentRelationshipLabel,
+            }}
             nameError={nameError}
             onClearNameError={() => setNameError("")}
             autoFocusCode

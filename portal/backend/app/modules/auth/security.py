@@ -55,3 +55,13 @@ def decode_token(token: str) -> Dict[str, Any]:
         settings.PORTAL_JWT_SECRET,
         algorithms=[settings.PORTAL_JWT_ALGORITHM],
     )
+
+
+def decode_sso_ticket(token: str) -> Dict[str, Any]:
+    """Verify an ERP-issued SSO ticket JWT (signed with the shared PORTAL_SSO_SECRET)."""
+    return jwt.decode(
+        token,
+        settings.PORTAL_SSO_SECRET,
+        algorithms=[settings.PORTAL_JWT_ALGORITHM],
+        audience="portal",
+    )

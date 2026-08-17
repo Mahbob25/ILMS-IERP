@@ -104,6 +104,12 @@ export default function StudentEnrollmentWizard({
       studentCode: "رقم الطالب",
       fullName: "الاسم الكامل",
       email: "البريد الإلكتروني",
+      phone: "رقم الهاتف",
+      parentTitle: "بيانات ولي الأمر (اختياري)",
+      parentFullName: "اسم ولي الأمر",
+      parentPhone: "هاتف ولي الأمر",
+      parentEmail: "بريد ولي الأمر",
+      parentRelationship: "صلة القرابة",
       nameInvalid: "الاسم يحتوي على أحرف غير صالحة",
       saveStudent: "حفظ الطالب",
       backToSearch: "رجوع للبحث",
@@ -164,6 +170,12 @@ export default function StudentEnrollmentWizard({
       studentCode: "Student Code",
       fullName: "Full Name",
       email: "Email",
+      phone: "Phone",
+      parentTitle: "Parent Information (optional)",
+      parentFullName: "Parent Full Name",
+      parentPhone: "Parent Phone",
+      parentEmail: "Parent Email",
+      parentRelationship: "Relationship",
       nameInvalid: "Name contains invalid characters",
       saveStudent: "Save Student",
       backToSearch: "Back to Search",
@@ -342,10 +354,28 @@ useEffect(() => {
       const payload: Record<string, unknown> = {
         student_code: sanitizeInput(state.createStudentForm.student_code),
         full_name: sanitizeInput(state.createStudentForm.full_name),
+        email: state.createStudentForm.email
+          ? sanitizeInput(state.createStudentForm.email)
+          : undefined,
+        phone: state.createStudentForm.phone
+          ? sanitizeInput(state.createStudentForm.phone)
+          : undefined,
+        parent_full_name: state.createStudentForm.parent_full_name
+          ? sanitizeInput(state.createStudentForm.parent_full_name)
+          : undefined,
+        parent_phone: state.createStudentForm.parent_phone
+          ? sanitizeInput(state.createStudentForm.parent_phone)
+          : undefined,
+        parent_email: state.createStudentForm.parent_email
+          ? sanitizeInput(state.createStudentForm.parent_email)
+          : undefined,
+        parent_relationship: state.createStudentForm.parent_relationship
+          ? sanitizeInput(state.createStudentForm.parent_relationship)
+          : undefined,
       };
-      if (state.createStudentForm.email) {
-        payload.email = sanitizeInput(state.createStudentForm.email);
-      }
+      Object.keys(payload).forEach((k) => {
+        if (payload[k] === undefined || payload[k] === "") delete payload[k];
+      });
       const res = await apiClient.post<{
         id: string;
         full_name: string;
@@ -553,6 +583,12 @@ useEffect(() => {
     studentCode: t.studentCode,
     fullName: t.fullName,
     email: t.email,
+    phone: t.phone,
+    parentTitle: t.parentTitle,
+    parentFullName: t.parentFullName,
+    parentPhone: t.parentPhone,
+    parentEmail: t.parentEmail,
+    parentRelationship: t.parentRelationship,
     nameInvalid: t.nameInvalid,
     saveStudent: t.saveStudent,
     backToSearch: t.backToSearch,

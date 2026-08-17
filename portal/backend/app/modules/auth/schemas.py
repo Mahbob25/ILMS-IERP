@@ -1,17 +1,21 @@
 import uuid
-from datetime import datetime
 from typing import Optional
 
 from pydantic import BaseModel, Field
 
 
-class OTPRequest(BaseModel):
-    phone: str = Field(..., min_length=8, max_length=32, description="E.164 phone number")
+class EmailLoginRequest(BaseModel):
+    email: str = Field(..., min_length=3, max_length=255)
+    password: str = Field(..., min_length=1, max_length=128)
 
 
-class OTPVerifyRequest(BaseModel):
-    phone: str = Field(..., min_length=8, max_length=32)
-    code: str = Field(..., min_length=4, max_length=8)
+class SSOLoginRequest(BaseModel):
+    ticket: str = Field(..., min_length=10, max_length=512)
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str = Field(..., min_length=1, max_length=128)
+    new_password: str = Field(..., min_length=8, max_length=128)
 
 
 class PortalUserResponse(BaseModel):

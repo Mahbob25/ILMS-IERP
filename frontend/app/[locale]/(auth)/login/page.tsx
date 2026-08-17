@@ -65,7 +65,16 @@ export default function LoginPage() {
 
     setSubmitting(true);
     try {
-      await login(sanitizeInput(email), password);
+      const res = await login(sanitizeInput(email), password);
+
+      // Students/parents are authenticated by the ERP but land on the portal
+      // subdomain — hand off with a one-time SSO ticket.
+      if ((res as any)?.user_type === "portal" && (res as any)?.sso_ticket) {
+        const portalBase = process.env.NEXT_PUBLIC_PORTAL_URL || "https://portal.aldirasat.com";
+        window.location.href = `${portalBase}/${locale}/login?ticket=${encodeURIComponent((res as any).sso_ticket)}`;
+        return;
+      }
+
       router.replace(`/${locale}/dashboard`);
     } catch (err: any) {
       const detail = err.response?.data?.detail;

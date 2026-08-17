@@ -1,6 +1,6 @@
 # Current Direction — Roadmap
 
-**Status as of:** 2026-08-14
+**Status as of:** 2026-08-17
 
 ## Done
 
@@ -11,13 +11,14 @@
 - Cloud deployment prep: Cloudflare Tunnel ingress, prod compose ready, deploy/backup scripts
 - **Settings — Phases 1, 3, 4 shipped** — self-service password/language (Phase 1, no migration) + superadmin System tab with `system_settings` KV (institute profile + runtime defaults, migration `202608060005`) + Coming soon for notifications/logo upload + bilingual polish; Phase 2 (notifications) remains Coming soon per v1 decision (see `archive/plans/settings-page.md`)
 - **Student & Parent Portal — Phases 0–3 shipped** (2026-08-14) — portal BFF (`portal/backend`, isolated OTP auth + JWT cookies + read-through Redis cache), portal web (`portal/frontend`, Next.js 14 standalone, bilingual RTL, grades/attendance/fees/settings), Redis Streams + DLQ queue (`ai:student`/`ai:ingestion`), Playwright E2E suite green, backup/DR (redis snapshot + restore-drill), Caddy hardening (2MB body cap). **AI is deferred** — student AI features labeled "coming soon"; the real `ai-service` + teacher ingestion ship later (portal plan Phase 4)
+- **Unified login + auto-generated portal credentials shipped** (2026-08-17) — single email/password login at `aldirasat.com/{ar|en}/login` for staff, students, and parents; students/parents are redirected to `portal.aldirasat.com` with a one-time SSO ticket (60s, single-use, `PORTAL_SSO_SECRET`). Phone/OTP removed from the portal. Students created via the ERP now auto-provision `portal.users` accounts (username = email, password = phone, bcrypt) plus an optional parent account (parent email/phone fields on the student form) with a verified `parent_links` row. Portal users can change their password from the Settings page.
 
 ## Now
 
 **1. Cloud deployment (AWS EC2 / GCP VM)**
 - Provision VM per `operations/cloud-deploy.md`, install Docker, create `.env`, run tunnel + `deploy.sh`
-- Gate: `https://aldrasat.edu` live behind Cloudflare Tunnel
-- Include the portal: `docker compose -f docker-compose.portal.yml up -d` on the VM, `portal.aldrasat.edu` subdomain DNS + Caddy
+- Gate: `https://aldirasat.com` live behind Cloudflare Tunnel
+- Include the portal: `docker compose -f docker-compose.portal.yml up -d` on the VM, `portal.aldirasat.com` subdomain DNS + Caddy
 
 **2. Post-launch reliability**
 - Backup verification (restore drill from pg_dump), Sentry alerting tuned, load smoke test
@@ -27,7 +28,7 @@
 - Playwright E2E specs written (`frontend/tests/e2e/reports-export.spec.ts`, `browser/features/reports-export-ui.spec.ts`) but not yet exercised against a live stack — needs `docker compose up` + seeded users
 
 **4. Portal prod gate (pending DNS/hosts)**
-- `portal.aldrasat.edu` serves the portal; OTP login → dashboard works; cookies subdomain-isolated; `nmap` shows only 80/tcp open
+- `portal.aldirasat.com` serves the portal; SSO login → dashboard works; cookies subdomain-isolated; `nmap` shows only 80/tcp open
 
 ## Next
 

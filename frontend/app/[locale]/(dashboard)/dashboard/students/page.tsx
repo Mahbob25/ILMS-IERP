@@ -17,6 +17,7 @@ interface Student {
   student_code: string;
   full_name: string;
   email: string | null;
+  phone: string | null;
 }
 
 export default function StudentsPage() {
@@ -33,6 +34,12 @@ export default function StudentsPage() {
       studentCode: "رقم الطالب",
       fullName: "الاسم الكامل",
       email: "البريد الإلكتروني",
+      phone: "رقم الهاتف",
+      parentTitle: "بيانات ولي الأمر (اختياري)",
+      parentFullName: "اسم ولي الأمر",
+      parentPhone: "هاتف ولي الأمر",
+      parentEmail: "بريد ولي الأمر",
+      parentRelationship: "صلة القرابة",
       actions: "الإجراءات",
       add: "إضافة طالب",
       quickEnroll: "تسجيل سريع",
@@ -54,6 +61,13 @@ export default function StudentsPage() {
       confirmDelete: "هل أنت متأكد من حذف هذا الطالب؟",
       yes: "نعم",
       no: "لا",
+      credentialsTitle: "بيانات الدخول إلى البوابة",
+      credentialsHint: "سجّل الدخول من aldirasat.com بهذه البيانات:",
+      studentCreds: "حساب الطالب",
+      parentCreds: "حساب ولي الأمر",
+      copy: "نسخ",
+      copied: "تم النسخ",
+      close: "إغلاق",
     },
     en: {
       title: "Students",
@@ -61,6 +75,12 @@ export default function StudentsPage() {
       studentCode: "Student Code",
       fullName: "Full Name",
       email: "Email",
+      phone: "Phone",
+      parentTitle: "Parent Information (optional)",
+      parentFullName: "Parent Full Name",
+      parentPhone: "Parent Phone",
+      parentEmail: "Parent Email",
+      parentRelationship: "Relationship",
       actions: "Actions",
       add: "Add Student",
       quickEnroll: "Quick Enroll",
@@ -82,6 +102,13 @@ export default function StudentsPage() {
       confirmDelete: "Are you sure you want to delete this student?",
       yes: "Yes",
       no: "No",
+      credentialsTitle: "Portal Credentials",
+      credentialsHint: "Sign in at aldirasat.com with these credentials:",
+      studentCreds: "Student account",
+      parentCreds: "Parent account",
+      copy: "Copy",
+      copied: "Copied",
+      close: "Close",
     },
   }[locale === "en" ? "en" : "ar"];
 
@@ -89,7 +116,16 @@ export default function StudentsPage() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState({ student_code: "", full_name: "", email: "" });
+  const [form, setForm] = useState({
+    student_code: "",
+    full_name: "",
+    email: "",
+    phone: "",
+    parent_full_name: "",
+    parent_phone: "",
+    parent_email: "",
+    parent_relationship: "",
+  });
   const [deleteTarget, setDeleteTarget] = useState<Student | null>(null);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [search, setSearch] = useState("");
@@ -97,6 +133,7 @@ export default function StudentsPage() {
   const [totalCount, setTotalCount] = useState(0);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [portalCreds, setPortalCreds] = useState<any>(null);
   const limit = 15;
 
   const fetchStudents = useCallback(async (searchTerm = "", pageNum = 1) => {
@@ -147,7 +184,16 @@ export default function StudentsPage() {
   const canDelete = user?.is_superadmin;
 
   const openCreate = () => {
-    setForm({ student_code: "", full_name: "", email: "" });
+    setForm({
+      student_code: "",
+      full_name: "",
+      email: "",
+      phone: "",
+      parent_full_name: "",
+      parent_phone: "",
+      parent_email: "",
+      parent_relationship: "",
+    });
     setEditingId(null);
     setShowForm(true);
   };
@@ -157,6 +203,11 @@ export default function StudentsPage() {
       student_code: student.student_code,
       full_name: student.full_name,
       email: student.email || "",
+      phone: student.phone || "",
+      parent_full_name: "",
+      parent_phone: "",
+      parent_email: "",
+      parent_relationship: "",
     });
     setEditingId(student.id);
     setShowForm(true);
@@ -173,20 +224,31 @@ export default function StudentsPage() {
         student_code: sanitizeInput(form.student_code),
         full_name: sanitizeInput(form.full_name),
         email: form.email ? sanitizeInput(form.email) : undefined,
+        phone: form.phone ? sanitizeInput(form.phone) : undefined,
+        parent_full_name: form.parent_full_name ? sanitizeInput(form.parent_full_name) : undefined,
+        parent_phone: form.parent_phone ? sanitizeInput(form.parent_phone) : undefined,
+        parent_email: form.parent_email ? sanitizeInput(form.parent_email) : undefined,
+        parent_relationship: form.parent_relationship ? sanitizeInput(form.parent_relationship) : undefined,
       };
-      if (!payload.email) delete payload.email;
+      Object.keys(payload).forEach((k) => {
+        if (payload[k] === undefined || payload[k] === "") delete payload[k];
+      });
       if (editingId) {
-        const cleaned: Record<string, unknown> = {};
-        Object.entries(payload).forEach(([k, v]) => { if (v !== "" && v !== null) cleaned[k] = v; });
-        await apiClient.put(`/academic/students/${editingId}`, cleaned);
+        await apiClient.put(`/academic/students/${editingId}`, payload);
       } else {
-        await apiClient.post("/academic/students", payload);
+        const res = await apiClient.post("/academic/students", payload);
+        const created = res.data as any;
+        if (created?.portal_credentials) {
+          setPortalCreds(created.portal_credentials);
+        }
       }
       setShowForm(false);
       setEditingId(null);
       fetchStudents(search, page);
     } catch (e: any) {
-      setMessage({ type: "error", text: e.message || "Failed to save student" });
+      const detail = e?.response?.data?.detail;
+      const text = Array.isArray(detail) ? detail.map((d: any) => d.msg).join("; ") : (detail || e.message || "Failed to save student");
+      setMessage({ type: "error", text });
     } finally {
       setSubmitting(false);
     }
@@ -280,7 +342,17 @@ export default function StudentsPage() {
           <StudentFormFields
             values={form}
             onChange={setForm}
-            labels={{ studentCode: t.studentCode, fullName: t.fullName, email: t.email }}
+            labels={{
+              studentCode: t.studentCode,
+              fullName: t.fullName,
+              email: t.email,
+              phone: t.phone,
+              parentTitle: t.parentTitle,
+              parentFullName: t.parentFullName,
+              parentPhone: t.parentPhone,
+              parentEmail: t.parentEmail,
+              parentRelationship: t.parentRelationship,
+            }}
           />
           <div className="flex gap-3 pt-2">
             <button onClick={handleSave} disabled={submitting} className="btn-primary">{submitting ? "..." : t.save}</button>
@@ -300,6 +372,7 @@ export default function StudentsPage() {
                 <th>{t.studentCode}</th>
                 <th>{t.fullName}</th>
                 <th>{t.email}</th>
+                <th>{t.phone}</th>
                 {(canEdit || canDelete) && <th>{t.actions}</th>}
               </tr>
             </thead>
@@ -316,6 +389,7 @@ export default function StudentsPage() {
                       </button>
                     </td>
                     <td className="text-slate-600">{student.email || "—"}</td>
+                    <td className="text-slate-600">{student.phone || "—"}</td>
                     {(canEdit || canDelete) && (
                       <td>
                         <div className="flex items-center gap-2">
@@ -372,6 +446,34 @@ export default function StudentsPage() {
         onConfirm={() => deleteTarget && handleDelete(deleteTarget.id)}
         onCancel={() => setDeleteTarget(null)}
       />
+
+      <Modal
+        open={portalCreds !== null}
+        onClose={() => setPortalCreds(null)}
+        title={t.credentialsTitle}
+      >
+        <div className="space-y-4 text-sm">
+          <p className="text-xs text-slate-500">{t.credentialsHint}</p>
+
+          <div className="p-4 rounded-lg bg-slate-50 border border-slate-200 space-y-2">
+            <p className="text-xs font-semibold text-slate-700">{t.studentCreds}</p>
+            <p className="text-xs text-slate-600">Email: <span dir="ltr" className="font-mono">{portalCreds?.student_email}</span></p>
+            <p className="text-xs text-slate-600">Password: <span dir="ltr" className="font-mono">{portalCreds?.student_password}</span></p>
+          </div>
+
+          {portalCreds?.parent_email && (
+            <div className="p-4 rounded-lg bg-slate-50 border border-slate-200 space-y-2">
+              <p className="text-xs font-semibold text-slate-700">{t.parentCreds}</p>
+              <p className="text-xs text-slate-600">Email: <span dir="ltr" className="font-mono">{portalCreds.parent_email}</span></p>
+              <p className="text-xs text-slate-600">Password: <span dir="ltr" className="font-mono">{portalCreds.parent_password}</span></p>
+            </div>
+          )}
+
+          <div className="flex justify-end pt-2">
+            <button onClick={() => setPortalCreds(null)} className="btn-primary">{t.close}</button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

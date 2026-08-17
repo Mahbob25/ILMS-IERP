@@ -44,6 +44,11 @@ export interface Wizard1State {
     student_code: string;
     full_name: string;
     email: string;
+    phone: string;
+    parent_full_name: string;
+    parent_phone: string;
+    parent_email: string;
+    parent_relationship: string;
   };
   nameError: string;
   sectionId: string;
@@ -78,6 +83,11 @@ export type Wizard1Action =
         student_code: string;
         full_name: string;
         email: string;
+        phone: string;
+        parent_full_name: string;
+        parent_phone: string;
+        parent_email: string;
+        parent_relationship: string;
       }>;
     }
   | { type: "SET_NAME_ERROR"; nameError: string }
@@ -113,7 +123,16 @@ export const createInitialWizard1State = (): Wizard1State => ({
   mode: "select",
   student: null,
   isExistingStudent: false,
-  createStudentForm: { student_code: "", full_name: "", email: "" },
+  createStudentForm: {
+    student_code: "",
+    full_name: "",
+    email: "",
+    phone: "",
+    parent_full_name: "",
+    parent_phone: "",
+    parent_email: "",
+    parent_relationship: "",
+  },
   nameError: "",
   sectionId: "",
   discount: "",

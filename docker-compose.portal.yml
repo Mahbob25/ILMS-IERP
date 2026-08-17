@@ -19,6 +19,7 @@ services:
       TIMEZONE: ${TIMEZONE:-Asia/Riyadh}
       ENVIRONMENT: ${ENVIRONMENT:-development}
       PORTAL_JWT_SECRET: ${PORTAL_JWT_SECRET:-}
+      PORTAL_SSO_SECRET: ${PORTAL_SSO_SECRET:-}
       # Same PG host as the ERP — the BFF only reads/writes portal.* directly
       # (portal.users, portal.refresh_tokens) and reaches erp.* via the ERP
       # internal API (http://backend:8000). search_path defaults to the public

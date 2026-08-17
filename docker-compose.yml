@@ -53,13 +53,15 @@ services:
       ENVIRONMENT: ${ENVIRONMENT:-development}
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-lims}:${POSTGRES_PASSWORD:-lims_secure_pass}@database:5432/${POSTGRES_DB:-lims}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-local_dev_only_insecure_change_me}
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:80,http://localhost:3000,https://aldrasat.edu}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:80,http://localhost:3000,https://aldirasat.com,https://portal.aldirasat.com}
       SENTRY_DSN: ${SENTRY_DSN:-}
       ERP_SERVICE_KEY: ${ERP_SERVICE_KEY:-}
       REDIS_URL: ${REDIS_URL:-}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       PORTAL_JWT_SECRET: ${PORTAL_JWT_SECRET:-}
+      PORTAL_SSO_SECRET: ${PORTAL_SSO_SECRET:-}
+      PORTAL_FRONTEND_URL: ${PORTAL_FRONTEND_URL:-https://portal.aldirasat.com}
       TEMPLATES_DIR: /app/cert&recept
       BACKUP_DIR: /app/backups
     depends_on:
@@ -91,6 +93,7 @@ services:
     restart: always
     environment:
       TZ: ${TIMEZONE:-Asia/Riyadh}
+      NEXT_PUBLIC_PORTAL_URL: ${NEXT_PUBLIC_PORTAL_URL:-https://portal.aldirasat.com}
     # No NEXT_PUBLIC_API_URL on purpose:
     #   - browsers call the same origin (/api/v1) through Caddy
     #   - server-side rendering falls back to http://backend:8000/api/v1

@@ -14,6 +14,7 @@ from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 
 TEST_JWT_SECRET = "test_portal_jwt_secret_12345678901234567890123456789012"
+TEST_SSO_SECRET = "test_sso_secret_12345678901234567890123456789012"
 
 
 @pytest.fixture(autouse=True)
@@ -21,12 +22,17 @@ def _test_secret():
     from app.core.config import settings
 
     settings.PORTAL_JWT_SECRET = TEST_JWT_SECRET
+    settings.PORTAL_SSO_SECRET = TEST_SSO_SECRET
     settings.ENVIRONMENT = "development"
     settings.REDIS_URL = ""  # force in-memory/noop paths
     settings.ERP_SERVICE_KEY = "test_service_key"
     settings.ERP_INTERNAL_URL = ""  # never touch the network in unit tests
+    # Keep sentry out of unit tests — the local env has a stale dist that
+    # crashes sentry_sdk's module scan at import time.
+    settings.SENTRY_DSN = ""
     yield
     settings.PORTAL_JWT_SECRET = TEST_JWT_SECRET
+    settings.PORTAL_SSO_SECRET = TEST_SSO_SECRET
 
 
 @pytest.fixture
@@ -77,58 +83,40 @@ def client(portal_app):
     return AsyncClient(transport=transport, base_url="http://test")
 
 
-# ── Auth: OTP flow ───────────────────────────────────────────────────────
+# ── Auth: email + password, SSO, change-password ─────────────────────────
 
 
-@pytest.mark.asyncio
-async def test_request_otp_creates_user(client):
-    from app.modules.auth import service as auth_service
+def _portal_user_row() -> dict:
+    from app.modules.auth.security import get_password_hash
 
-    fake_user = {
+    return {
         "id": "11111111-1111-1111-1111-111111111111",
         "phone": "+966500000000",
+        "email": "student@aldirasat.com",
+        "password_hash": get_password_hash("secret-pass-1"),
         "is_active": True,
-        "full_name": "Portal User",
+        "full_name": "Student One",
         "locale_pref": "ar",
         "failed_login_attempts": 0,
         "locked_until": None,
     }
-    with (
-        patch.object(auth_service, "get_or_create_user_by_phone", new_callable=AsyncMock) as m_get,
-        patch.object(auth_service, "generate_otp", new_callable=AsyncMock) as m_otp,
-    ):
-        m_get.return_value = fake_user
-        m_otp.return_value = "123456"
-        resp = await client.post(
-            "/api/auth/request-otp", json={"phone": "+966500000000"}
-        )
-        assert resp.status_code == 200
-        assert "OTP sent" in resp.json()["detail"]
 
 
 @pytest.mark.asyncio
-async def test_verify_otp_sets_portal_cookies(client):
+async def test_email_login_sets_portal_cookies(client):
     from app.modules.auth import service as auth_service
 
-    fake_user = {
-        "id": "11111111-1111-1111-1111-111111111111",
-        "phone": "+966500000000",
-        "is_active": True,
-        "full_name": "Parent One",
-        "locale_pref": "ar",
-        "failed_login_attempts": 0,
-        "locked_until": None,
-    }
     with (
-        patch.object(auth_service, "get_or_create_user_by_phone", new_callable=AsyncMock) as m_get,
-        patch.object(auth_service, "_verify_otp_code", new_callable=AsyncMock) as m_verify,
+        patch.object(auth_service, "find_user_by_email", new_callable=AsyncMock) as m_find,
+        patch.object(auth_service, "is_locked", new_callable=AsyncMock) as m_locked,
         patch.object(auth_service, "reset_failed_attempts", new_callable=AsyncMock),
         patch.object(auth_service, "store_refresh_token", new_callable=AsyncMock),
     ):
-        m_get.return_value = fake_user
-        m_verify.return_value = True
+        m_find.return_value = _portal_user_row()
+        m_locked.return_value = False
         resp = await client.post(
-            "/api/auth/verify-otp", json={"phone": "+966500000000", "code": "123456"}
+            "/api/auth/login",
+            json={"email": "student@aldirasat.com", "password": "secret-pass-1"},
         )
         assert resp.status_code == 200
         set_cookie = resp.headers.get("set-cookie", "")
@@ -137,30 +125,131 @@ async def test_verify_otp_sets_portal_cookies(client):
 
 
 @pytest.mark.asyncio
-async def test_verify_otp_wrong_code_locks_after_5(client):
+async def test_email_login_wrong_password(client):
     from app.modules.auth import service as auth_service
 
-    fake_user = {
-        "id": "11111111-1111-1111-1111-111111111111",
-        "phone": "+966500000000",
-        "is_active": True,
-        "full_name": "Parent One",
-        "locale_pref": "ar",
-        "failed_login_attempts": 0,
-        "locked_until": None,
-    }
     with (
-        patch.object(auth_service, "get_or_create_user_by_phone", new_callable=AsyncMock) as m_get,
-        patch.object(auth_service, "_verify_otp_code", new_callable=AsyncMock) as m_verify,
+        patch.object(auth_service, "find_user_by_email", new_callable=AsyncMock) as m_find,
+        patch.object(auth_service, "is_locked", new_callable=AsyncMock) as m_locked,
         patch.object(auth_service, "record_failed_attempt", new_callable=AsyncMock) as m_record,
     ):
-        m_get.return_value = fake_user
-        m_verify.return_value = False
+        m_find.return_value = _portal_user_row()
+        m_locked.return_value = False
         resp = await client.post(
-            "/api/auth/verify-otp", json={"phone": "+966500000000", "code": "000000"}
+            "/api/auth/login",
+            json={"email": "student@aldirasat.com", "password": "wrong-password"},
         )
         assert resp.status_code == 401
         m_record.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_sso_login_valid_ticket_sets_cookies(client):
+    import jwt
+    from app.modules.auth import service as auth_service
+
+    ticket = jwt.encode(
+        {
+            "sub": "11111111-1111-1111-1111-111111111111",
+            "aud": "portal",
+            "type": "sso",
+            "jti": "abc123",
+            "exp": 9999999999,
+        },
+        TEST_SSO_SECRET,
+        algorithm="HS256",
+    )
+    with (
+        patch.object(auth_service, "mark_sso_ticket_consumed", new_callable=AsyncMock) as m_consume,
+        patch.object(auth_service, "get_user_by_id", new_callable=AsyncMock) as m_get,
+        patch.object(auth_service, "store_refresh_token", new_callable=AsyncMock),
+    ):
+        m_consume.return_value = True
+        m_get.return_value = _portal_user_row()
+        resp = await client.post("/api/auth/sso", json={"ticket": ticket})
+        assert resp.status_code == 200
+        set_cookie = resp.headers.get("set-cookie", "")
+        assert "portal_access_token=" in set_cookie
+        assert "portal_refresh_token=" in set_cookie
+        from unittest.mock import ANY
+
+        m_consume.assert_awaited_once_with(ANY, "abc123")
+
+
+@pytest.mark.asyncio
+async def test_sso_login_ticket_replay_rejected(client):
+    import jwt
+    from app.modules.auth import service as auth_service
+
+    ticket = jwt.encode(
+        {
+            "sub": "11111111-1111-1111-1111-111111111111",
+            "aud": "portal",
+            "type": "sso",
+            "jti": "abc123",
+            "exp": 9999999999,
+        },
+        TEST_SSO_SECRET,
+        algorithm="HS256",
+    )
+    with patch.object(auth_service, "mark_sso_ticket_consumed", new_callable=AsyncMock) as m_consume:
+        m_consume.return_value = False  # already used
+        resp = await client.post("/api/auth/sso", json={"ticket": ticket})
+        assert resp.status_code == 401
+        assert "already used" in resp.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_sso_login_bad_signature_rejected(client):
+    import jwt
+
+    ticket = jwt.encode(
+        {
+            "sub": "11111111-1111-1111-1111-111111111111",
+            "aud": "portal",
+            "type": "sso",
+            "jti": "abc123",
+            "exp": 9999999999,
+        },
+        "wrong-secret-1234567890",
+        algorithm="HS256",
+    )
+    resp = await client.post("/api/auth/sso", json={"ticket": ticket})
+    assert resp.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_change_password(authed_client):
+    from app.modules.auth import service as auth_service
+
+    with (
+        patch.object(auth_service, "get_user_by_id", new_callable=AsyncMock) as m_get,
+        patch.object(auth_service, "change_password", new_callable=AsyncMock) as m_change,
+    ):
+        m_get.return_value = _portal_user_row()
+        resp = await authed_client.post(
+            "/api/auth/change-password",
+            json={"current_password": "secret-pass-1", "new_password": "new-pass-123"},
+        )
+        assert resp.status_code == 200
+        m_change.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_change_password_wrong_current(authed_client):
+    from app.modules.auth import service as auth_service
+
+    with (
+        patch.object(auth_service, "get_user_by_id", new_callable=AsyncMock) as m_get,
+        patch.object(auth_service, "change_password", new_callable=AsyncMock) as m_change,
+    ):
+        m_get.return_value = _portal_user_row()
+        resp = await authed_client.post(
+            "/api/auth/change-password",
+            json={"current_password": "wrong-old", "new_password": "new-pass-123"},
+        )
+        assert resp.status_code == 400
+        m_change.assert_not_awaited()
 
 
 @pytest.mark.asyncio
@@ -378,13 +467,3 @@ def test_cache_key_deterministic():
     k2 = cache_key("grades", "s1", {"x": 1, "student_id": "s1"})
     assert k1 == k2
     assert k1.startswith("cache:grades:s1:")
-
-
-def test_otp_generation_console_log():
-    """MVP OTP generation returns a 6-digit code (in-memory store)."""
-    from app.modules.auth import service as auth_service
-
-    with patch.object(auth_service, "_memory_otps", new={}):
-        code = asyncio.run(auth_service.generate_otp("+966500000000"))
-        assert len(code) == 6
-        assert code.isdigit()

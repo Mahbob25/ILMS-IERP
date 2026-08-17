@@ -23,8 +23,8 @@ export interface PortalUser {
 interface AuthContextType {
   user: PortalUser | null;
   loading: boolean;
-  requestOtp: (phone: string) => Promise<void>;
-  verifyOtp: (phone: string, code: string) => Promise<PortalUser>;
+  login: (email: string, password: string) => Promise<PortalUser>;
+  ssoLogin: (ticket: string) => Promise<PortalUser>;
   logout: () => Promise<void>;
   checkSession: () => Promise<PortalUser | null>;
 }
@@ -69,18 +69,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     checkSession();
   }, [checkSession]);
 
-  const requestOtp = useCallback(async (phone: string): Promise<void> => {
-    await apiClient.post("/auth/request-otp", { phone });
-  }, []);
-
-  const verifyOtp = useCallback(
-    async (phone: string, code: string): Promise<PortalUser> => {
+  const login = useCallback(
+    async (email: string, password: string): Promise<PortalUser> => {
       setLoading(true);
       try {
-        const response = await apiClient.post<PortalUser>("/auth/verify-otp", {
-          phone,
-          code,
+        const response = await apiClient.post<PortalUser>("/auth/login", {
+          email,
+          password,
         });
+        setUser(response.data);
+        return response.data;
+      } catch (error) {
+        setUser(null);
+        throw error;
+      } finally {
+        setLoading(false);
+      }
+    },
+    []
+  );
+
+  const ssoLogin = useCallback(
+    async (ticket: string): Promise<PortalUser> => {
+      setLoading(true);
+      try {
+        const response = await apiClient.post<PortalUser>("/auth/sso", { ticket });
         setUser(response.data);
         return response.data;
       } catch (error) {
@@ -109,8 +122,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const contextValue = useMemo(
-    () => ({ user, loading, requestOtp, verifyOtp, logout, checkSession }),
-    [user, loading, requestOtp, verifyOtp, logout, checkSession]
+    () => ({ user, loading, login, ssoLogin, logout, checkSession }),
+    [user, loading, login, ssoLogin, logout, checkSession]
   );
 
   return (

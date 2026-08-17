@@ -1,45 +1,41 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useAuth } from "@/components/AuthContext";
-import { Globe, ShieldAlert, Smartphone, KeyRound } from "lucide-react";
+import { Globe, ShieldAlert, KeyRound, Mail, LogIn } from "lucide-react";
 import { sanitizeInput } from "@/lib/utils/input";
 
 const t = {
   ar: {
     title: "بوابة Al-Drasat",
-    subtitle: "سجل الدخول برقم الهاتف ورمز التحقق",
-    phone: "رقم الهاتف",
-    phonePlaceholder: "05xxxxxxxx",
-    code: "رمز التحقق",
-    codePlaceholder: "••••••",
-    requestOtp: "إرسال الرمز",
-    verifyBtn: "تسجيل الدخول",
-    resend: "إعادة إرسال الرمز",
+    subtitle: "تسجيل الدخول للطلاب وأولياء الأمور",
+    email: "البريد الإلكتروني",
+    password: "كلمة المرور",
+    emailPlaceholder: "name@aldirasat.com",
+    passwordPlaceholder: "••••••••",
+    signIn: "تسجيل الدخول",
     loading: "جاري التحقق...",
-    otpSent: "تم إرسال رمز التحقق إلى هاتفك (سجل الخادم في الإصدار التجريبي)",
+    ssoNote: "سيتم توجيهك تلقائيًا من نظام Al-Drasat الرئيسي.",
     errorFallback: "فشل تسجيل الدخول. يرجى المحاولة مرة أخرى.",
-    validationError: "يرجى إدخال رقم هاتف صحيح ورمز التحقق.",
+    validationError: "يرجى إدخال البريد الإلكتروني وكلمة المرور.",
     langToggle: "English",
-    footer: "هذه البوابة مستقلة تمامًا عن نظام الموظفين الداخلي.",
+    footer: "للطلاب وأولياء الأمور: سجّل الدخول من aldirasat.com.",
   },
   en: {
     title: "Al-Drasat Portal",
-    subtitle: "Sign in with your phone number and OTP",
-    phone: "Phone Number",
-    phonePlaceholder: "05xxxxxxxx",
-    code: "Verification Code",
-    codePlaceholder: "••••••",
-    requestOtp: "Send Code",
-    verifyBtn: "Sign In",
-    resend: "Resend Code",
-    loading: "Verifying...",
-    otpSent: "A verification code was sent to your phone (console-logged in the MVP)",
+    subtitle: "Sign in for students and parents",
+    email: "Email Address",
+    password: "Password",
+    emailPlaceholder: "name@aldirasat.com",
+    passwordPlaceholder: "••••••••",
+    signIn: "Sign In",
+    loading: "Authenticating...",
+    ssoNote: "You will be redirected automatically from the main Al-Drasat system.",
     errorFallback: "Sign-in failed. Please try again.",
-    validationError: "Please enter a valid phone number and code.",
+    validationError: "Please enter your email and password.",
     langToggle: "العربية",
-    footer: "This portal is fully isolated from the internal staff ERP.",
+    footer: "For students & parents: sign in at aldirasat.com.",
   },
 };
 
@@ -47,53 +43,53 @@ export default function LoginPage() {
   const router = useRouter();
   const params = useParams();
   const locale = (params?.locale as string) || "ar";
-  const { requestOtp, verifyOtp } = useAuth();
+  const { login, ssoLogin } = useAuth();
 
   const s = t[locale === "en" ? "en" : "ar"];
 
-  const [phone, setPhone] = useState("");
-  const [code, setCode] = useState("");
-  const [otpRequested, setOtpRequested] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [sendingOtp, setSendingOtp] = useState(false);
+  const ssoHandledRef = useRef(false);
+
+  // If we landed with an SSO ticket from the main site, exchange it for a
+  // portal session (one-time, short-lived) and go straight to the dashboard.
+  useEffect(() => {
+    if (ssoHandledRef.current) return;
+    const ticket = new URLSearchParams(window.location.search).get("ticket");
+    if (!ticket) return;
+    ssoHandledRef.current = true;
+    setSubmitting(true);
+    setError(null);
+    (async () => {
+      try {
+        await ssoLogin(ticket);
+        router.replace(`/${locale}/dashboard`);
+      } catch (err: any) {
+        const detail = err.response?.data?.detail;
+        setError(detail || s.errorFallback);
+      } finally {
+        setSubmitting(false);
+      }
+    })();
+  }, [ssoLogin, locale, router, s.errorFallback]);
 
   const handleLanguageToggle = () => {
     const targetLocale = locale === "ar" ? "en" : "ar";
     router.push(`/${targetLocale}/login`);
   };
 
-  const handleRequestOtp = async () => {
-    setError(null);
-    setNotice(null);
-    if (!phone.trim()) {
-      setError(s.validationError);
-      return;
-    }
-    setSendingOtp(true);
-    try {
-      await requestOtp(sanitizeInput(phone));
-      setOtpRequested(true);
-      setNotice(s.otpSent);
-    } catch (err: any) {
-      const detail = err.response?.data?.detail;
-      setError(detail || s.errorFallback);
-    } finally {
-      setSendingOtp(false);
-    }
-  };
-
-  const handleVerify = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    if (!phone.trim() || !code.trim()) {
+    if (!email.trim() || !password) {
       setError(s.validationError);
       return;
     }
     setSubmitting(true);
     try {
-      await verifyOtp(sanitizeInput(phone), sanitizeInput(code));
+      await login(sanitizeInput(email).toLowerCase(), password);
       router.replace(`/${locale}/dashboard`);
     } catch (err: any) {
       const detail = err.response?.data?.detail;
@@ -124,7 +120,7 @@ export default function LoginPage() {
 
         <div className="text-center mb-8">
           <div className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-white border border-slate-200 shadow-lg shadow-brand-500/20 flex items-center justify-center mx-auto mb-4 p-2 overflow-hidden">
-            <Smartphone className="w-full h-full text-brand-600" />
+            <KeyRound className="w-full h-full text-brand-600" />
           </div>
           <h1 className="text-xl md:text-2xl font-bold tracking-tight text-slate-900">
             {s.title}
@@ -132,102 +128,69 @@ export default function LoginPage() {
           <p className="text-xs md:text-sm text-slate-500 mt-2">{s.subtitle}</p>
         </div>
 
-        <form onSubmit={handleVerify} className="space-y-5">
+        <form onSubmit={handleSubmit} className="space-y-5">
           {error && (
             <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-red-600 text-xs flex items-start gap-2 animate-fade-in">
               <ShieldAlert className="shrink-0 mt-0.5" size={14} />
               <span>{error}</span>
             </div>
           )}
-          {notice && (
-            <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-600 text-xs flex items-start gap-2 animate-fade-in">
-              <KeyRound className="shrink-0 mt-0.5" size={14} />
-              <span>{notice}</span>
-            </div>
-          )}
 
           <div>
             <label className="block text-xs font-medium text-slate-700 mb-1.5">
-              {s.phone}
+              {s.email}
             </label>
             <input
-              type="tel"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder={s.phonePlaceholder}
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder={s.emailPlaceholder}
               dir="ltr"
               className="input-field"
               required
             />
           </div>
 
-          {otpRequested && (
-            <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1.5">
-                {s.code}
-              </label>
-              <input
-                type="text"
-                inputMode="numeric"
-                value={code}
-                onChange={(e) => setCode(e.target.value)}
-                placeholder={s.codePlaceholder}
-                dir="ltr"
-                className="input-field tracking-[0.4em]"
-                maxLength={8}
-                required
-              />
-            </div>
-          )}
+          <div>
+            <label className="block text-xs font-medium text-slate-700 mb-1.5">
+              {s.password}
+            </label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder={s.passwordPlaceholder}
+              dir="ltr"
+              className="input-field"
+              required
+            />
+          </div>
 
-          {!otpRequested ? (
-            <button
-              type="button"
-              onClick={handleRequestOtp}
-              disabled={sendingOtp}
-              className="w-full py-2.5 px-4 text-sm font-semibold rounded-lg text-white bg-brand-500 hover:bg-brand-600 disabled:bg-brand-500/50 disabled:cursor-not-allowed shadow-lg shadow-brand-500/25 transition-all duration-150 flex items-center justify-center gap-2 active:scale-[0.98]"
-            >
-              {sendingOtp ? (
-                <span className="flex items-center gap-2">
-                  <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                  </svg>
-                  <span>{s.requestOtp}</span>
-                </span>
-              ) : (
-                <span>{s.requestOtp}</span>
-              )}
-            </button>
-          ) : (
-            <>
-              <button
-                type="submit"
-                disabled={submitting}
-                className="w-full py-2.5 px-4 text-sm font-semibold rounded-lg text-white bg-brand-500 hover:bg-brand-600 disabled:bg-brand-500/50 disabled:cursor-not-allowed shadow-lg shadow-brand-500/25 transition-all duration-150 flex items-center justify-center gap-2 active:scale-[0.98]"
-              >
-                {submitting ? (
-                  <>
-                    <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                    </svg>
-                    <span>{s.loading}</span>
-                  </>
-                ) : (
-                  <span>{s.verifyBtn}</span>
-                )}
-              </button>
-              <button
-                type="button"
-                onClick={handleRequestOtp}
-                disabled={sendingOtp}
-                className="w-full text-xs text-brand-600 hover:text-brand-700 py-1.5"
-              >
-                {s.resend}
-              </button>
-            </>
-          )}
+          <button
+            type="submit"
+            disabled={submitting}
+            className="w-full py-2.5 px-4 text-sm font-semibold rounded-lg text-white bg-brand-500 hover:bg-brand-600 disabled:bg-brand-500/50 disabled:cursor-not-allowed shadow-lg shadow-brand-500/25 transition-all duration-150 flex items-center justify-center gap-2 active:scale-[0.98]"
+          >
+            {submitting ? (
+              <>
+                <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+                <span>{s.loading}</span>
+              </>
+            ) : (
+              <>
+                <LogIn size={15} />
+                <span>{s.signIn}</span>
+              </>
+            )}
+          </button>
+
+          <div className="flex items-center gap-2 p-3 rounded-lg bg-slate-50 border border-slate-200 text-[11px] text-slate-500">
+            <Mail size={13} className="shrink-0 text-slate-400" />
+            <span>{s.ssoNote}</span>
+          </div>
         </form>
 
         <div className="mt-8 pt-6 border-t border-slate-200 text-center">

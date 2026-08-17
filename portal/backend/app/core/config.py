@@ -20,6 +20,9 @@ class Settings(BaseSettings):
     PORTAL_JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 10
     REFRESH_TOKEN_EXPIRE_DAYS: int = 30
+    # Shared with the ERP — signs one-time SSO tickets (aud=portal, 60s TTL).
+    # Distinct from PORTAL_JWT_SECRET and the ERP's JWT_SECRET_KEY.
+    PORTAL_SSO_SECRET: str = ""
 
     # ── Service-to-service (ERP internal API) ──────────────
     ERP_INTERNAL_URL: str = "http://backend:8000"
@@ -32,7 +35,7 @@ class Settings(BaseSettings):
 
     # ── App ────────────────────────────────────────────────
     ENVIRONMENT: str = "development"
-    CORS_ORIGINS: str = "https://portal.aldrasat.edu"
+    CORS_ORIGINS: str = "https://aldirasat.com,https://portal.aldirasat.com"
     TIMEZONE: str = "Asia/Riyadh"
     DATABASE_URL: str = ""  # optional — only if the BFF ever needs direct portal.* reads
     OTP_TTL_SECONDS: int = 300

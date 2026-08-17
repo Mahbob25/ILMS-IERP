@@ -19,6 +19,12 @@ export interface StudentStepLabels {
   studentCode: string;
   fullName: string;
   email: string;
+  phone: string;
+  parentTitle: string;
+  parentFullName: string;
+  parentPhone: string;
+  parentEmail: string;
+  parentRelationship: string;
   nameInvalid: string;
   saveStudent: string;
   backToSearch: string;
@@ -107,6 +113,12 @@ export default function StudentStep({
             studentCode: labels.studentCode,
             fullName: labels.fullName,
             email: labels.email,
+            phone: labels.phone,
+            parentTitle: labels.parentTitle,
+            parentFullName: labels.parentFullName,
+            parentPhone: labels.parentPhone,
+            parentEmail: labels.parentEmail,
+            parentRelationship: labels.parentRelationship,
           }}
           nameError={nameError}
           onClearNameError={onClearNameError}

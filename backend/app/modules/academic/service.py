@@ -32,6 +32,7 @@ from app.modules.lms.ledger_service import (
     deactivate_contract as ledger_deactivate_contract,
 )
 from app.core.timezone import get_today
+from app.modules.portal_accounts import service as portal_accounts_service
 
 
 # --- Course CRUD ---
@@ -431,6 +432,9 @@ async def deactivate_section(
 
 
 # --- Student CRUD ---
+_STUDENT_FIELDS = {"student_code", "full_name", "email", "phone"}
+
+
 async def create_student(db: AsyncSession, data: dict) -> Student:
     if "student_code" in data and data["student_code"]:
         existing = await db.execute(
@@ -444,9 +448,44 @@ async def create_student(db: AsyncSession, data: dict) -> Student:
                 status_code=status.HTTP_409_CONFLICT,
                 detail="Student code already exists",
             )
-    student = Student(**data)
+    if not data.get("email"):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Email is required to create a student (used as the portal login).",
+        )
+    if not data.get("phone"):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Phone is required to create a student (used as the initial portal password).",
+        )
+    parent_full_name = data.get("parent_full_name")
+    parent_phone = data.get("parent_phone")
+    parent_email = data.get("parent_email")
+    parent_relationship = data.get("parent_relationship")
+
+    student_data = {k: v for k, v in data.items() if k in _STUDENT_FIELDS}
+    student = Student(**student_data)
     db.add(student)
     await db.flush()
+
+    # Auto-provision portal credentials: username = email, password = phone.
+    await portal_accounts_service.create_student_portal_account(
+        db,
+        student_id=str(student.id),
+        email=data["email"],
+        phone=data["phone"],
+        full_name=data["full_name"],
+    )
+
+    if all((parent_full_name, parent_phone, parent_email)):
+        await portal_accounts_service.create_parent_portal_account(
+            db,
+            student_id=str(student.id),
+            full_name=parent_full_name,
+            email=parent_email,
+            phone=parent_phone,
+            relationship=parent_relationship,
+        )
     return student
 
 
@@ -504,6 +543,17 @@ async def update_student(
     for key, value in data.items():
         setattr(student, key, value)
     await db.flush()
+
+    # Keep the portal account in sync (email/full_name propagate; a phone change
+    # re-seeds the initial password = new phone).
+    if any(k in data for k in ("email", "phone", "full_name")):
+        await portal_accounts_service.sync_student_portal_account(
+            db,
+            student_id=str(student_id),
+            email=data.get("email"),
+            phone=data.get("phone"),
+            full_name=data.get("full_name"),
+        )
     return student
 
 

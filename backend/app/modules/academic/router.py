@@ -428,13 +428,37 @@ async def list_students(
 ):
     return await academic_service.list_students(db, search=search, skip=skip, limit=limit, sort_by=sort_by, sort_order=sort_order)
 
-@academic_router.post("/students", response_model=StudentResponse, status_code=status.HTTP_201_CREATED)
+@academic_router.post("/students", status_code=status.HTTP_201_CREATED)
 async def create_student(
     data: StudentCreate,
     current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])),
     db: AsyncSession = Depends(get_db)
 ):
-    return await academic_service.create_student(db, data.model_dump())
+    student = await academic_service.create_student(db, data.model_dump())
+    # Return the student + the auto-generated portal credentials so the
+    # secretary can hand them to the student/parent.
+    from app.modules.portal_accounts import service as portal_accounts_service
+
+    student_user = await portal_accounts_service.find_portal_user_by_student_id(db, str(student.id))
+    parent_user = None
+    if data.parent_email:
+        parent_user = await portal_accounts_service.find_portal_user_by_email(db, data.parent_email)
+
+    return {
+        "id": student.id,
+        "student_code": student.student_code,
+        "full_name": student.full_name,
+        "email": student.email,
+        "phone": student.phone,
+        "portal_credentials": {
+            "student_email": data.email,
+            "student_password": data.phone,
+            "parent_email": data.parent_email,
+            "parent_password": data.parent_phone,
+            "student_user_id": str(student_user["id"]) if student_user else None,
+            "parent_user_id": str(parent_user["id"]) if parent_user else None,
+        },
+    }
 
 @academic_router.put("/students/{student_id}", response_model=StudentResponse)
 async def update_student(
@@ -535,6 +559,11 @@ async def create_enrollment_with_student(
             "student_code": data.student_code,
             "full_name": data.full_name,
             "email": data.email,
+            "phone": data.phone,
+            "parent_full_name": data.parent_full_name,
+            "parent_phone": data.parent_phone,
+            "parent_email": data.parent_email,
+            "parent_relationship": data.parent_relationship,
         }
     enrollment = await academic_service.create_enrollment(
         db, section_id=data.section_id, student_id=data.student_id,

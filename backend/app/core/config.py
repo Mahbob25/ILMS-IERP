@@ -12,12 +12,12 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     ENVIRONMENT: str = "production"
-    CORS_ORIGINS: str = "https://aldrasat.edu"
+    CORS_ORIGINS: str = "https://aldirasat.com,https://portal.aldirasat.com"
     TEMPLATES_DIR: str = ""
     TIMEZONE: str = "Asia/Riyadh"
     HTTP_PROXY: str = ""
     HTTPS_PROXY: str = ""
-    NO_PROXY: str = "localhost,127.0.0.1,.aldrasat.edu"
+    NO_PROXY: str = "localhost,127.0.0.1,.aldirasat.com"
     NOTIFICATION_RETENTION_DAYS: int = 90
     BACKUP_DIR: str = "/app/backups"
 
@@ -31,6 +31,12 @@ class Settings(BaseSettings):
     GEMINI_API_KEY: str = ""
     OPENAI_API_KEY: str = ""
     PORTAL_JWT_ALGORITHM: str = "HS256"
+    # Shared SSO ticket secret — MUST equal the portal BFF's PORTAL_SSO_SECRET.
+    # Used ONLY to sign one-time login tickets (aud=portal, 60s TTL). Never
+    # used to sign staff JWTs, and distinct from PORTAL_JWT_SECRET.
+    PORTAL_SSO_SECRET: str = ""
+    # Where the ERP frontend sends students/parents after login.
+    PORTAL_FRONTEND_URL: str = "https://portal.aldirasat.com"
 
     @model_validator(mode="after")
     def validate_required_settings(self):
