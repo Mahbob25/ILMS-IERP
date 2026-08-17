@@ -43,8 +43,16 @@ function onRefreshFailed(error: unknown) {
 
 function redirectToLogin() {
   if (typeof window !== "undefined" && !isRedirectingToLogin) {
-    const locale = window.location.pathname.match(/^\/(en|ar)/)?.[1] || "ar";
-    if (!window.location.pathname.endsWith(`/${locale}/login`)) {
+    const pathname = window.location.pathname;
+    const locale = pathname.match(/^\/(en|ar)/)?.[1] || "ar";
+
+    // Never redirect away from public pages (landing page and its locale
+    // variants). A failed /users/me (401, no session) on the public landing
+    // must not yank the visitor to /login.
+    const cleanPath = pathname.replace(`/${locale}`, "") || "/";
+    if (cleanPath === "/") return;
+
+    if (!pathname.endsWith(`/${locale}/login`)) {
       isRedirectingToLogin = true;
       window.location.href = `/${locale}/login`;
       if (redirectTimer) clearTimeout(redirectTimer);
