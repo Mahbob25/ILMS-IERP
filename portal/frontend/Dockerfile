@@ -26,7 +26,7 @@ RUN apk add --no-cache curl
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
-COPY --from=builder /app/public ./public
+RUN test -d /app/public && cp -r /app/public ./public || true
 
 RUN mkdir .next
 RUN chown nextjs:nodejs .next
