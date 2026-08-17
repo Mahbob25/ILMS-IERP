@@ -419,7 +419,7 @@ compose_up() {
   else
     info "Starting services (database, backend, frontend, caddy)"
   fi
-  "${COMPOSE[@]}" -f "$COMPOSE_FILE" "${profile_args[@]}" up -d || fail "Failed to start services — see error above."
+  "${COMPOSE[@]}" -f "$COMPOSE_FILE" "${profile_args[@]}" up -d --force-recreate || fail "Failed to start services — see error above."
 
   # Portal + AI stack (docker-compose.portal.yml) — separate compose file on
   # the same lims-internal network. The ERP must be up first (it owns the
