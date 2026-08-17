@@ -54,6 +54,11 @@ services:
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-local_dev_only_insecure_change_me}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:80,http://localhost:3000,https://aldrasat.edu}
       SENTRY_DSN: ${SENTRY_DSN:-}
+      ERP_SERVICE_KEY: ${ERP_SERVICE_KEY:-}
+      REDIS_URL: ${REDIS_URL:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      PORTAL_JWT_SECRET: ${PORTAL_JWT_SECRET:-}
       TEMPLATES_DIR: /app/cert&recept
       BACKUP_DIR: /app/backups
     depends_on:

@@ -21,6 +21,23 @@ docker compose -f "$COMPOSE_FILE" exec -T database \
   pg_dump -U "${POSTGRES_USER:-lims}" -d "${POSTGRES_DB:-lims}" \
   > "$BACKUP_DIR/db-$STAMP.sql"
 
+echo "==> Dumping portal database (portal.* schema shares the same PG host)"
+# The portal BFF shares the PG host; its schema (portal.users, portal.refresh_tokens)
+# is in the same database as erp.*. If the portal is ever moved to a 2nd PG host,
+# add a dedicated pg_dump for it here.
+
+echo "==> Snapshotting portal Redis (queue + cache)"
+# Redis is portal-owned (docker-compose.portal.yml). RDB snapshot preserves the
+# ai:student/ai:ingestion queues + read-through cache for replay after a restore.
+PORTAL_REDIS="$(docker ps -q -f name=portal_redis 2>/dev/null || true)"
+if [ -n "$PORTAL_REDIS" ]; then
+  docker exec "$PORTAL_REDIS" redis-cli SAVE
+  docker run --rm -v "redis_data:/data:ro" -v "$BACKUP_DIR:/backup" alpine \
+    sh -c 'mkdir -p /tmp/rdb && cp /data/dump.rdb /tmp/rdb/ && tar czf /backup/redis-$STAMP.tar.gz -C /tmp/rdb .'
+else
+  echo "WARN: portal_redis not running — skipping redis snapshot (cache will cold-start)"
+fi
+
 echo "==> Archiving uploads"
 UPLOAD_VOLUME="$(docker volume ls -q -f name=uploads_data || true)"
 if [ -n "$UPLOAD_VOLUME" ]; then
