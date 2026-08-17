@@ -1,0 +1,110 @@
+# Portal + AI compose — joins the ERP `lims-internal` network.
+#   Local:  docker compose -f docker-compose.portal.yml up -d
+#   Prod:   same command on the VM (after `docker compose up -d` for the ERP)
+#
+# Principle: ERP docker-compose.yml NEVER gains a redis service; Redis lives
+# only here. No host `ports:` on portal/ai/redis — Caddy is the sole ingress.
+
+networks:
+  lims-internal:
+    external: true
+
+services:
+  portal-backend:
+    build: ./portal/backend
+    container_name: portal_backend
+    restart: always
+    environment:
+      TZ: ${TIMEZONE:-Asia/Riyadh}
+      TIMEZONE: ${TIMEZONE:-Asia/Riyadh}
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      PORTAL_JWT_SECRET: ${PORTAL_JWT_SECRET:-}
+      # Same PG host as the ERP — the BFF only reads/writes portal.* directly
+      # (portal.users, portal.refresh_tokens) and reaches erp.* via the ERP
+      # internal API (http://backend:8000). search_path defaults to the public
+      # schema; queries are fully qualified (portal.users etc.).
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-lims}:${POSTGRES_PASSWORD:-lims_secure_pass}@database:5432/${POSTGRES_DB:-lims}
+      ERP_INTERNAL_URL: http://backend:8000
+      ERP_SERVICE_KEY: ${ERP_SERVICE_KEY:-}
+      REDIS_URL: redis://redis:6379/0
+      CACHE_TTL_SECONDS: 60
+      SENTRY_DSN: ${SENTRY_DSN:-}
+    depends_on:
+      - redis
+    networks:
+      - lims-internal
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/api/health"]
+      interval: 15s
+      timeout: 5s
+      start_period: 20s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+
+  portal-frontend:
+    build: ./portal/frontend
+    container_name: portal_frontend
+    restart: always
+    environment:
+      TZ: ${TIMEZONE:-Asia/Riyadh}
+    # No NEXT_PUBLIC_API_URL baked in:
+    #   - browsers call the same origin (/api) through Caddy
+    #   - SSR falls back to http://portal-backend:8001/api
+    depends_on:
+      portal-backend:
+        condition: service_healthy
+    networks:
+      - lims-internal
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/ar/login"]
+      interval: 15s
+      timeout: 5s
+      start_period: 30s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+
+  ai-service:
+    build: ./ai-service
+    container_name: ai_service
+    restart: always
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+    networks:
+      - lims-internal
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
+
+  redis:
+    image: redis:7-alpine
+    container_name: portal_redis
+    restart: always
+    volumes:
+      - redis_data:/data
+    networks:
+      - lims-internal
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+
+volumes:
+  redis_data:

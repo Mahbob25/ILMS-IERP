@@ -44,6 +44,7 @@ from app.modules.search.router import search_router
 from app.modules.bookings.router import bookings_router
 from app.modules.content.router import content_router
 from app.modules.contacts.router import contacts_router
+from app.modules.portal_internal.router import internal_router
 from app.middleware.idempotency import IdempotencyMiddleware
 from app.middleware.real_ip import RealIPMiddleware
 from app.middleware.csrf import CSRFMiddleware
@@ -107,6 +108,7 @@ app.include_router(search_router, prefix="/api/v1")
 app.include_router(bookings_router, prefix="/api/v1")
 app.include_router(content_router, prefix="/api/v1")
 app.include_router(contacts_router, prefix="/api/v1")
+app.include_router(internal_router, prefix="/api/v1")
 
 @app.get("/api/v1/health", tags=["system"])
 async def health_check():

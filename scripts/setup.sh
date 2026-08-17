@@ -10,6 +10,7 @@ CYAN='\033[1;36m'
 RESET='\033[0m'
 
 COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.yml}"
+PORTAL_COMPOSE_FILE="docker-compose.portal.yml"
 ENV_FILE=".env"
 FRESH=0
 NO_TUNNEL=0
@@ -322,7 +323,31 @@ ensure_env() {
       fi
       ;;
   esac
-  ok ".env is ready (JWT_SECRET_KEY / POSTGRES_PASSWORD set)"
+
+  # ── Portal (docker-compose.portal.yml) ──────────────────────────────
+  # The portal BFF requires a distinct PORTAL_JWT_SECRET (never reuse
+  # JWT_SECRET_KEY) and an ERP_SERVICE_KEY to authenticate to the ERP
+  # internal API. Generate the portal secret if missing/placeholder.
+  local pjs
+  pjs=$(get_env PORTAL_JWT_SECRET)
+  case "$pjs" in
+    ""|"change_me_portal_jwt_secret_48_chars")
+      new=$(generate_secret)
+      info "Generating a strong PORTAL_JWT_SECRET (distinct from JWT_SECRET_KEY)"
+      set_env PORTAL_JWT_SECRET "$new"
+      ;;
+  esac
+
+  local esk
+  esk=$(get_env ERP_SERVICE_KEY)
+  case "$esk" in
+    ""|"change_me_service_key_32_chars")
+      new=$(generate_secret)
+      info "Generating a strong ERP_SERVICE_KEY (portal → ERP internal API)"
+      set_env ERP_SERVICE_KEY "$new"
+      ;;
+  esac
+  ok ".env is ready (JWT_SECRET_KEY / POSTGRES_PASSWORD / PORTAL_JWT_SECRET / ERP_SERVICE_KEY set)"
 }
 
 detect_mode() {
@@ -395,6 +420,17 @@ compose_up() {
     info "Starting services (database, backend, frontend, caddy)"
   fi
   "${COMPOSE[@]}" -f "$COMPOSE_FILE" "${profile_args[@]}" up -d || fail "Failed to start services — see error above."
+
+  # Portal + AI stack (docker-compose.portal.yml) — separate compose file on
+  # the same lims-internal network. The ERP must be up first (it owns the
+  # database + Caddy); the portal joins after.
+  if [ -f "$PORTAL_COMPOSE_FILE" ]; then
+    info "Starting portal stack ($PORTAL_COMPOSE_FILE: portal-backend, portal-frontend, ai-service, redis)"
+    "${COMPOSE[@]}" -f "$PORTAL_COMPOSE_FILE" build || fail "Portal image build failed — see error above."
+    "${COMPOSE[@]}" -f "$PORTAL_COMPOSE_FILE" up -d || fail "Failed to start portal services — see error above."
+  else
+    warn "$PORTAL_COMPOSE_FILE not found — skipping portal stack."
+  fi
 }
 
 verify() {
@@ -404,19 +440,41 @@ verify() {
     if curl -fsS -m 5 http://localhost/api/v1/health >/dev/null 2>&1 \
        && curl -fsS -m 5 -o /dev/null http://localhost/ar/login; then
       ok "Frontend and API are reachable through Caddy (http://localhost)"
-      return 0
+      break
     fi
     i=$((i + 1))
     sleep 1
   done
-  warn "Services did not become healthy in time. Status:"
-  "${COMPOSE[@]}" -f "$COMPOSE_FILE" ps || true
-  warn "backend logs (last 25):"
-  "${COMPOSE[@]}" -f "$COMPOSE_FILE" logs --tail=25 backend 2>/dev/null || true
-  warn "frontend logs (last 25):"
-  "${COMPOSE[@]}" -f "$COMPOSE_FILE" logs --tail=25 frontend 2>/dev/null || true
-  warn "Most likely causes: .env values, port 80 in use, or a failing migration above."
-  return 1
+  if [ "$i" -ge 90 ]; then
+    warn "Services did not become healthy in time. Status:"
+    "${COMPOSE[@]}" -f "$COMPOSE_FILE" ps || true
+    warn "backend logs (last 25):"
+    "${COMPOSE[@]}" -f "$COMPOSE_FILE" logs --tail=25 backend 2>/dev/null || true
+    warn "frontend logs (last 25):"
+    "${COMPOSE[@]}" -f "$COMPOSE_FILE" logs --tail=25 frontend 2>/dev/null || true
+    warn "Most likely causes: .env values, port 80 in use, or a failing migration above."
+    return 1
+  fi
+
+  # Portal stack — verify the BFF is healthy (portal-frontend depends on it).
+  if [ -f "$PORTAL_COMPOSE_FILE" ]; then
+    info "Waiting for the portal backend to become healthy (up to 60s)..."
+    local p=0
+    until [ "$p" -ge 60 ]; do
+      if "${COMPOSE[@]}" -f "$PORTAL_COMPOSE_FILE" exec -T portal-backend \
+           curl -fsS -m 5 http://localhost:8001/api/health >/dev/null 2>&1; then
+        ok "Portal backend healthy (http://localhost:8001/api/health inside the network)"
+        return 0
+      fi
+      p=$((p + 1))
+      sleep 1
+    done
+    warn "Portal backend did not become healthy in time."
+    "${COMPOSE[@]}" -f "$PORTAL_COMPOSE_FILE" ps || true
+    "${COMPOSE[@]}" -f "$PORTAL_COMPOSE_FILE" logs --tail=25 portal-backend 2>/dev/null || true
+    return 1
+  fi
+  return 0
 }
 
 print_summary() {
@@ -425,6 +483,10 @@ print_summary() {
   printf '  API health: http://localhost/api/v1/health\n'
   printf '  Database  : localhost:5431 (postgres)\n'
   printf '  Logs      : docker compose logs -f backend\n'
+  if [ -f "$PORTAL_COMPOSE_FILE" ]; then
+    printf '  Portal    : portal-backend :8001, portal-frontend :3001, ai-service :8002, redis :6379 (on lims-internal)\n'
+    printf '  Portal log: docker compose -f %s logs -f portal-backend\n' "$PORTAL_COMPOSE_FILE"
+  fi
   if [ "$MODE" = "local" ]; then
     printf '\n  To go live: create a Cloudflare tunnel, put TUNNEL_TOKEN in .env, re-run this script.\n'
   fi
@@ -457,6 +519,9 @@ main() {
   if [ "$FRESH" = "1" ]; then
     warn "Wiping ALL containers and volumes (--fresh). Data will be lost."
     "${COMPOSE[@]}" -f "$COMPOSE_FILE" down -v || true
+    if [ -f "$PORTAL_COMPOSE_FILE" ]; then
+      "${COMPOSE[@]}" -f "$PORTAL_COMPOSE_FILE" down -v || true
+    fi
   fi
   pull_code
   compose_up

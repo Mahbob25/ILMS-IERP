@@ -1,3 +1,17 @@
+# Shared security headers
+(security_headers) {
+    header {
+        Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self' https://api.example.com; form-action 'self'"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        Permissions-Policy "camera=(), microphone=(), geolocation=()"
+        X-XSS-Protection "0"
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+    }
+}
+
+# Local dev fallback — no DNS required
 :80 {
     encode gzip
 
@@ -8,14 +22,33 @@
     # Frontend fallback
     reverse_proxy * {env.FRONTEND_URL}
 
-    # Security headers
-    header {
-        Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self' https://api.example.com; form-action 'self'"
-        X-Content-Type-Options "nosniff"
-        X-Frame-Options "DENY"
-        Referrer-Policy "strict-origin-when-cross-origin"
-        Permissions-Policy "camera=(), microphone=(), geolocation=()"
-        X-XSS-Protection "0"
-        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+    import security_headers
+}
+
+# Production — ERP on its own subdomain
+erp.aldrasat.edu {
+    encode gzip
+    reverse_proxy /api/v1/* {env.BACKEND_URL}
+    reverse_proxy /uploads/* {env.BACKEND_URL}
+    reverse_proxy * {env.FRONTEND_URL}
+
+    import security_headers
+}
+
+# Portal — public-facing (parents), stricter than ERP.
+portal.aldrasat.edu {
+    encode gzip
+
+    # Cap request sizes (portal accepts phone/OTP JSON, never big uploads).
+    request_body {
+        max_size 2MB
     }
+
+    # API proxy — portal BFF
+    reverse_proxy /api/* portal-backend:8001
+
+    # Static/frontend — portal web
+    reverse_proxy * portal-frontend:3001
+
+    import security_headers
 }

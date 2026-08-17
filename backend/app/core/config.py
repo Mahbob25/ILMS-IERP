@@ -1,6 +1,9 @@
+import logging
 from pathlib import Path
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+logger = logging.getLogger(__name__)
 
 class Settings(BaseSettings):
     DATABASE_URL: str = ""
@@ -18,6 +21,17 @@ class Settings(BaseSettings):
     NOTIFICATION_RETENTION_DAYS: int = 90
     BACKUP_DIR: str = "/app/backups"
 
+    # ── Portal (Phase 0) ──────────────────────────────────────────
+    # Doc-only in ERP: ERP never signs portal JWTs (portal BFF owns them).
+    PORTAL_JWT_SECRET: str = ""
+    # Service-to-service key for the internal portal API (random 32+ chars).
+    ERP_SERVICE_KEY: str = ""
+    # Portal-owned; ERP never connects at runtime (no-op when empty).
+    REDIS_URL: str = ""
+    GEMINI_API_KEY: str = ""
+    OPENAI_API_KEY: str = ""
+    PORTAL_JWT_ALGORITHM: str = "HS256"
+
     @model_validator(mode="after")
     def validate_required_settings(self):
         if not self.DATABASE_URL:
@@ -29,6 +43,12 @@ class Settings(BaseSettings):
             raise ValueError(
                 "JWT_SECRET_KEY must be set to a secure random value in .env or environment. "
                 "Do NOT use the example default in production."
+            )
+        # ERP must stay bootable without portal env — warn, don't fail.
+        if self.ENVIRONMENT == "production" and not self.ERP_SERVICE_KEY:
+            logger.warning(
+                "ERP_SERVICE_KEY is empty in production: /api/v1/internal/portal/* "
+                "will return 500 until it is configured."
             )
         return self
 

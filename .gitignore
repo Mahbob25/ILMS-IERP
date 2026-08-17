@@ -56,6 +56,11 @@ next_output.txt
 # --- TypeScript ---
 tsconfig.tsbuildinfo
 
+# --- Playwright ---
+test-results/
+playwright-report/
+playwright/.cache/
+
 # --- Cookie debug files ---
 cookie.txt
 cookies*.txt
