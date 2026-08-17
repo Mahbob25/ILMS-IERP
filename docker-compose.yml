@@ -10,6 +10,7 @@
 
 networks:
   lims-internal:
+    name: lims-internal
     driver: bridge
 
 services:
