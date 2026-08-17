@@ -111,7 +111,7 @@ TEMPLATE = """<!DOCTYPE html>
 <header class="cover">
   <h1>دليل اختبار نظام Al-Drasat ERP</h1>
   <div class="sub">فترة الاختبار: أسبوع واحد — دليل شامل لتجربة جميع الميزات</div>
-  <div class="url">http://16.192.155.151/ar/login</div>
+  <div class="url">http://13.50.176.4/ar/login</div>
 </header>
 {body}
 <footer>

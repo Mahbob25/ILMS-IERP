@@ -5,7 +5,7 @@ import axios, { AxiosError } from "axios";
 const API_BASE_URL =
   typeof window !== "undefined"
     ? "/api"
-    : (process.env.NEXT_PUBLIC_API_URL || "http://16.192.155.151/api");
+    : (process.env.NEXT_PUBLIC_API_URL || "http://13.50.176.4/api");
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,

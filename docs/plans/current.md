@@ -18,7 +18,7 @@
 
 **1. Vercel frontends live + EC2 API bridge**
 - Both frontends on Vercel (`*.vercel.app`), EC2 serves APIs only (backend :8000, portal BFF :8001 via Caddy).
-- **Pending (manual AWS):** open port 80 in security group `launch-wizard-1` to `0.0.0.0/0` so Vercel can reach the EC2 APIs; verify `curl http://16.192.155.151/api/v1/health` → 200.
+- **Pending (manual AWS):** open port 80 in security group `launch-wizard-1` to `0.0.0.0/0` so Vercel can reach the EC2 APIs; verify `curl http://13.50.176.4/api/v1/health` → 200.
 - Add custom domain (`aldirasat.com` / `portal.aldirasat.com`) in Vercel when bought; update `NEXT_PUBLIC_*` envs and rewrite origins.
 
 **2. Post-launch reliability**

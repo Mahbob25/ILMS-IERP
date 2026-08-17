@@ -3,7 +3,7 @@ const { withSentryConfig } = require("@sentry/nextjs");
 // EC2 backend origin for the Vercel → EC2 API bridge. Path-based routing on
 // Caddy's :80 block, so plain http is fine (TLS terminates at Vercel; the
 // browser never talks to EC2 directly).
-const API_ORIGIN = process.env.API_ORIGIN || "http://16.192.155.151";
+const API_ORIGIN = process.env.API_ORIGIN || "http://13.50.176.4";
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {

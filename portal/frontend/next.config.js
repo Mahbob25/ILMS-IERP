@@ -2,7 +2,7 @@ const path = require("path");
 
 // EC2 portal BFF origin for the Vercel → EC2 API bridge. Path-based routing on
 // Caddy's :80 block, so plain http is fine (TLS terminates at Vercel).
-const API_ORIGIN = process.env.API_ORIGIN || "http://16.192.155.151";
+const API_ORIGIN = process.env.API_ORIGIN || "http://13.50.176.4";
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {

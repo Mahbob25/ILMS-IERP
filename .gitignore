@@ -13,7 +13,7 @@ env/
 *.log
 backend/backend_err.log
 backend/backend_out.log
-
+SSH-KEY.pem
 # --- Node / Frontend ---
 node_modules/
 .npm-cache/
