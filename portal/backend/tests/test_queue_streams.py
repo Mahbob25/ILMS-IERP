@@ -17,10 +17,12 @@ import os
 
 import pytest
 
+_HAS_REDIS = bool((os.getenv("REDIS_URL") or "").strip())
+
 pytestmark = [
     pytest.mark.asyncio(loop_scope="session"),
     pytest.mark.skipif(
-        os.getenv("REDIS_URL") is None,
+        not _HAS_REDIS,
         reason="Redis integration test requires REDIS_URL",
     ),
 ]

@@ -22,10 +22,12 @@ from httpx import ASGITransport, AsyncClient
 # The module-level `cache` singleton holds a redis connection bound to the
 # loop it was first used on. Function-scoped loops (Windows Proactor) would
 # kill it between tests, so the whole file shares one session loop.
+_HAS_REDIS = bool((os.getenv("REDIS_URL") or "").strip())
+
 pytestmark = [
     pytest.mark.asyncio(loop_scope="session"),
     pytest.mark.skipif(
-        os.getenv("REDIS_URL") is None,
+        not _HAS_REDIS,
         reason="Redis integration test requires REDIS_URL",
     ),
 ]
