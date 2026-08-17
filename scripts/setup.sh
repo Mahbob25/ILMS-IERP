@@ -272,7 +272,11 @@ get_env() {
 }
 
 set_env() {
-  sed -i "s|^$1=.*|$1=$2|" "$ENV_FILE"
+  if grep -qE "^$1=" "$ENV_FILE" 2>/dev/null; then
+    sed -i "s|^$1=.*|$1=$2|" "$ENV_FILE"
+  else
+    printf '\n%s=%s\n' "$1" "$2" >> "$ENV_FILE"
+  fi
 }
 
 generate_secret() {
