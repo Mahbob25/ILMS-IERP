@@ -3,6 +3,41 @@ import type { NextRequest } from 'next/server';
 
 const PUBLIC_FILE = /\.(.*)$/;
 
+// Edge-runtime-safe base64url JWT payload decoder (atob is not available
+// in the Vercel Edge runtime / Next.js middleware).
+function decodeJwtPayload(token: string): Record<string, unknown> | null {
+  const parts = token.split('.');
+  if (parts.length !== 3) return null;
+  const base64Url = parts[1];
+  const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+  const pad = base64.length % 4 === 0 ? '' : '='.repeat(4 - (base64.length % 4));
+  const raw = atobSafe(base64 + pad);
+  try {
+    return JSON.parse(decodeURIComponent(escape(raw)));
+  } catch {
+    return null;
+  }
+}
+
+function atobSafe(b64: string): string {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+  let result = '';
+  let buffer = 0;
+  let bits = 0;
+  for (const c of b64) {
+    if (c === '=') break;
+    const idx = chars.indexOf(c);
+    if (idx === -1) continue;
+    buffer = (buffer << 6) | idx;
+    bits += 6;
+    if (bits >= 8) {
+      bits -= 8;
+      result += String.fromCharCode((buffer >> bits) & 0xff);
+    }
+  }
+  return result;
+}
+
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -57,24 +92,9 @@ export function middleware(request: NextRequest) {
     const refreshToken = request.cookies.get('refresh_token')?.value;
     let isRefreshTokenExpired = true;
     if (refreshToken) {
-      try {
-        const parts = refreshToken.split('.');
-        if (parts.length === 3) {
-          const base64Url = parts[1];
-          const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-          const jsonPayload = decodeURIComponent(
-            atob(base64)
-              .split('')
-              .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
-              .join('')
-          );
-          const payload = JSON.parse(jsonPayload);
-          if (payload.type === 'refresh' && payload.exp && typeof payload.exp === 'number') {
-            isRefreshTokenExpired = payload.exp * 1000 < Date.now();
-          }
-        }
-      } catch {
-        // Invalid JWT - treat as expired
+      const payload = decodeJwtPayload(refreshToken);
+      if (payload && payload.type === 'refresh' && typeof payload.exp === 'number') {
+        isRefreshTokenExpired = payload.exp * 1000 < Date.now();
       }
     }
     if (!isRefreshTokenExpired) {
@@ -84,27 +104,12 @@ export function middleware(request: NextRequest) {
 
   // Protect admin paths strictly for superadmins via JWT claim inspection
   if (isAdminPath && accessToken) {
-    try {
-      const parts = accessToken.split('.');
-      if (parts.length === 3) {
-        // Base64 decode JWT payload string
-        const base64Url = parts[1];
-        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-        const jsonPayload = decodeURIComponent(
-          atob(base64)
-            .split('')
-            .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
-            .join('')
-        );
-        const payload = JSON.parse(jsonPayload);
-        
-        const isSuperAdmin = payload.is_superadmin === true || payload.role === 'superadmin';
-        if (!isSuperAdmin) {
-          return NextResponse.redirect(new URL(`/${pathnameLocale}/dashboard`, request.url));
-        }
+    const payload = decodeJwtPayload(accessToken);
+    if (payload) {
+      const isSuperAdmin = payload.is_superadmin === true || payload.role === 'superadmin';
+      if (!isSuperAdmin) {
+        return NextResponse.redirect(new URL(`/${pathnameLocale}/dashboard`, request.url));
       }
-    } catch (e) {
-      // Decode failed, let API handle signature failures
     }
   }
 
