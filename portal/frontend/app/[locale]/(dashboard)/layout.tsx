@@ -3,6 +3,8 @@
 import React, { useState } from "react";
 import { useRouter, useParams, usePathname } from "next/navigation";
 import { useAuth } from "@/components/AuthContext";
+import MobileTabBar from "@/components/MobileTabBar";
+import OverflowSheet, { MoreHorizontal } from "@/components/OverflowSheet";
 import {
   LayoutDashboard,
   Award,
@@ -11,8 +13,6 @@ import {
   Sparkles,
   LogOut,
   Globe,
-  Menu,
-  X,
   User as UserIcon,
   GraduationCap,
 } from "lucide-react";
@@ -26,7 +26,7 @@ export default function PortalDashboardLayout({
   const params = useParams();
   const pathname = usePathname();
   const { user, loading, logout } = useAuth();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [overflowOpen, setOverflowOpen] = useState(false);
 
   const locale = (params?.locale as string) || "ar";
   const isRtl = locale === "ar";
@@ -127,6 +127,11 @@ export default function PortalDashboardLayout({
       icon: Sparkles,
     },
     {
+      name: t.aiRevision,
+      href: `/${locale}/dashboard/ai/revision`,
+      icon: CalendarRangeIcon,
+    },
+    {
       name: t.settings,
       href: `/${locale}/dashboard/settings`,
       icon: UserIcon,
@@ -197,12 +202,6 @@ export default function PortalDashboardLayout({
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         <header className="h-16 bg-white shadow-sm border-x-0 border-b border-slate-200 flex items-center justify-between px-4 md:px-6 relative z-10 shrink-0">
           <div className="flex items-center gap-4">
-            <button
-              onClick={() => setSidebarOpen(true)}
-              className="md:hidden p-2 rounded-lg bg-slate-50 text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-slate-200"
-            >
-              <Menu size={20} />
-            </button>
             <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-brand-50 text-brand-600 border border-brand-100 text-xs font-semibold">
               <GraduationCap size={14} />
               <span>{t.portalLabel}</span>
@@ -211,10 +210,18 @@ export default function PortalDashboardLayout({
           <div className="flex items-center gap-3">
             <button
               onClick={handleLanguageToggle}
-              className="flex items-center gap-1.5 text-xs text-slate-600 hover:text-slate-900 transition-colors duration-150 py-1.5 px-3 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200"
+              className="btn-touch gap-1.5 text-xs text-slate-600 hover:text-slate-900 transition-colors duration-150 py-1.5 px-3 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200"
             >
               <Globe size={13} />
               <span>{t.langToggle}</span>
+            </button>
+            {/* Overflow trigger — desktop only; mobile uses the bottom bar + this sheet */}
+            <button
+              onClick={() => setOverflowOpen(true)}
+              aria-label={t.fees}
+              className="md:hidden btn-touch justify-center p-2 rounded-lg bg-slate-50 text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-slate-200"
+            >
+              <MoreHorizontal size={20} />
             </button>
           </div>
         </header>
@@ -222,58 +229,19 @@ export default function PortalDashboardLayout({
         <main className="flex-1 overflow-y-auto p-4 md:p-6 min-w-0">{children}</main>
       </div>
 
-      {/* Mobile Drawer */}
-      {sidebarOpen && (
-        <div className="fixed inset-0 z-50 md:hidden flex">
-          <div
-            className="absolute inset-0 bg-slate-50/80 backdrop-blur-sm"
-            onClick={() => setSidebarOpen(false)}
-          />
-          <div
-            className={`relative w-64 max-w-xs bg-white border-slate-200 shadow-xl flex flex-col z-10 h-full ${
-              isRtl ? "mr-0 ml-auto border-l" : "ml-0 mr-auto border-r"
-            } transition-transform duration-300`}
-          >
-            <div className="h-16 flex items-center justify-between px-6 border-b border-slate-200">
-              <div className="flex items-center gap-2.5">
-                <GraduationCap size={20} className="text-brand-600" />
-                <span className="text-lg font-bold tracking-tight text-slate-900">
-                  Al-Drasat
-                </span>
-              </div>
-              <button
-                onClick={() => setSidebarOpen(false)}
-                className="text-slate-500 hover:text-slate-900"
-              >
-                <X size={20} />
-              </button>
-            </div>
-            <nav className="flex-1 px-4 py-6 space-y-1.5 overflow-y-auto">
-              {navigationItems.map((item) => {
-                const isActive = pathname === item.href;
-                const Icon = item.icon;
-                return (
-                  <button
-                    key={item.name}
-                    onClick={() => {
-                      router.push(item.href);
-                      setSidebarOpen(false);
-                    }}
-                    className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 ${
-                      isActive
-                        ? "bg-brand-50 text-brand-600 border border-brand-100"
-                        : "text-slate-500 hover:text-slate-900 hover:bg-slate-50 border border-transparent"
-                    }`}
-                  >
-                    <Icon size={18} />
-                    <span>{item.name}</span>
-                  </button>
-                );
-              })}
-            </nav>
-          </div>
-        </div>
-      )}
+      {/* Floating bottom nav (mobile only) */}
+      <MobileTabBar locale={isRtl ? "ar" : "en"} />
+
+      {/* Header overflow sheet/dropdown */}
+      <OverflowSheet
+        open={overflowOpen}
+        onClose={() => setOverflowOpen(false)}
+        user={user}
+        onLogout={logout}
+      />
     </div>
   );
 }
+
+// Revision Plan uses the CalendarRange icon (matches the page itself).
+import { CalendarRange as CalendarRangeIcon } from "lucide-react";

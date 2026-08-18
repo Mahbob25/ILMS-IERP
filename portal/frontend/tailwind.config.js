@@ -32,6 +32,22 @@ module.exports = {
           800: '#115e59',
           900: '#134e4a',
           950: '#042f2e',
+        },
+        // Semantic alias — the nav bar spec calls for bg-primary / text-primary
+        // tokens. Mapped to the brand ramp (deep sapphire) so nothing hardcodes hex.
+        primary: {
+          50: '#eef2ff',
+          100: '#e0e7ff',
+          200: '#c7d2fe',
+          300: '#a5b4fc',
+          400: '#818cf8',
+          500: '#1E3A8A',
+          600: '#1E3A8A',
+          700: '#4338ca',
+          800: '#3730a3',
+          900: '#312e81',
+          950: '#1e1b4b',
+          DEFAULT: '#1E3A8A',
         }
       },
       fontFamily: {

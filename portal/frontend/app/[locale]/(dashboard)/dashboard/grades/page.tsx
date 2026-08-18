@@ -3,10 +3,13 @@
 import React, { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { apiClient } from "@/lib/api";
-import { Loader2, Award } from "lucide-react";
+import { Award } from "lucide-react";
 import StudentSelector from "@/components/StudentSelector";
 import RefreshButton from "@/components/RefreshButton";
 import { useLinkedStudents } from "@/components/useLinkedStudents";
+import DataCards from "@/components/DataCards";
+import Skeleton from "@/components/Skeleton";
+import EmptyState from "@/components/EmptyState";
 
 interface Grade {
   section_id: string;
@@ -121,45 +124,76 @@ export default function GradesPage() {
       )}
 
       {busy ? (
-        <div className="flex items-center justify-center py-20 text-slate-400">
-          <Loader2 className="animate-spin mr-2" size={20} />
-          <span className="text-sm">{s.loading}</span>
+        <div className="space-y-3">
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
         </div>
       ) : grades.length === 0 ? (
-        <div className="card p-8 text-center">
-          <p className="text-sm text-slate-500">{s.none}</p>
-        </div>
+        <EmptyState icon={Award} title={s.none} />
       ) : (
-        <div className="card overflow-hidden">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>{s.course}</th>
-                <th>{s.score}</th>
-                <th>{s.date}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {grades.map((g) => (
-                <tr key={g.section_id}>
-                  <td className="font-medium text-slate-900">{g.course_name}</td>
-                  <td>
-                    {g.final_score !== null ? (
-                      <span className="badge badge-success">{g.final_score}</span>
-                    ) : (
-                      <span className="badge badge-muted">—</span>
-                    )}
-                  </td>
-                  <td className="text-slate-500 text-xs">
-                    {g.graded_at
-                      ? new Date(g.graded_at).toLocaleDateString(locale === "ar" ? "ar-SA" : "en-GB")
-                      : "—"}
-                  </td>
+        <>
+          <div className="hidden md:block card overflow-hidden">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>{s.course}</th>
+                  <th>{s.score}</th>
+                  <th>{s.date}</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {grades.map((g) => (
+                  <tr key={g.section_id}>
+                    <td className="font-medium text-slate-900">{g.course_name}</td>
+                    <td>
+                      {g.final_score !== null ? (
+                        <span className="badge badge-success">{g.final_score}</span>
+                      ) : (
+                        <span className="badge badge-muted">—</span>
+                      )}
+                    </td>
+                    <td className="text-slate-500 text-xs">
+                      {g.graded_at
+                        ? new Date(g.graded_at).toLocaleDateString(locale === "ar" ? "ar-SA" : "en-GB")
+                        : "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <DataCards
+            items={grades}
+            keyOf={(g) => g.section_id}
+            renderRow={(g) => (
+              <div className="space-y-3">
+                <p className="font-semibold text-slate-900 text-sm">{g.course_name}</p>
+                <div className="grid grid-cols-2 gap-3 text-xs">
+                  <div>
+                    <p className="text-slate-400">{s.score}</p>
+                    <p className="mt-0.5 font-medium text-slate-700">
+                      {g.final_score !== null ? (
+                        <span className="badge badge-success">{g.final_score}</span>
+                      ) : (
+                        <span className="badge badge-muted">—</span>
+                      )}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-slate-400">{s.date}</p>
+                    <p className="mt-0.5 text-slate-700">
+                      {g.graded_at
+                        ? new Date(g.graded_at).toLocaleDateString(locale === "ar" ? "ar-SA" : "en-GB")
+                        : "—"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+          />
+        </>
       )}
     </div>
   );

@@ -4,7 +4,9 @@ import React, { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { apiClient } from "@/lib/api";
 import { useAuth } from "@/components/AuthContext";
-import { Award, CalendarCheck, Wallet, Sparkles, Users, Loader2 } from "lucide-react";
+import { Award, CalendarCheck, Wallet, Sparkles, Users } from "lucide-react";
+import Skeleton from "@/components/Skeleton";
+import EmptyState from "@/components/EmptyState";
 
 interface LinkedStudent {
   student_id: string;
@@ -84,15 +86,12 @@ export default function DashboardHome() {
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center py-20 text-slate-400">
-          <Loader2 className="animate-spin mr-2" size={20} />
-          <span className="text-sm">{s.loading}</span>
+        <div className="space-y-3">
+          <Skeleton className="h-28 w-full" />
+          <Skeleton className="h-28 w-full" />
         </div>
       ) : students.length === 0 ? (
-        <div className="card p-8 text-center">
-          <Users className="mx-auto text-slate-300 mb-3" size={40} />
-          <p className="text-sm text-slate-500">{s.noStudents}</p>
-        </div>
+        <EmptyState icon={Users} title={s.noStudents} />
       ) : (
         <>
           {/* Linked students */}

@@ -28,7 +28,7 @@ export default function StudentSelector({
     const only = students[0];
     if (!only) return null;
     return (
-      <span className="inline-flex items-center gap-2 text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-full px-3 py-1.5">
+      <span className="btn-touch inline-flex items-center gap-2 text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-full px-3 py-1.5">
         <Users size={14} className="text-brand-600" />
         {only.full_name}
         <span className="text-slate-400 text-[10px]" dir="ltr">
@@ -46,7 +46,7 @@ export default function StudentSelector({
           value={selectedId || ""}
           onChange={(e) => onSelect(e.target.value)}
           disabled={disabled}
-          className="appearance-none bg-white border border-slate-200 rounded-full pl-3 pr-8 py-1.5 text-xs font-medium text-slate-700 hover:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-200 disabled:opacity-60 cursor-pointer"
+          className="btn-touch appearance-none bg-white border border-slate-200 rounded-full pl-3 pr-8 py-1.5 text-xs font-medium text-slate-700 hover:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-200 disabled:opacity-60 cursor-pointer"
         >
           {students.map((s) => (
             <option key={s.student_id} value={s.student_id}>

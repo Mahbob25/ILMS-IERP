@@ -34,7 +34,7 @@ export default function RefreshButton({ locale, refreshing, onRefresh, asOf }: P
       <button
         onClick={onRefresh}
         disabled={refreshing}
-        className="inline-flex items-center gap-1.5 text-xs font-medium text-brand-700 hover:text-brand-800 disabled:opacity-50 transition-colors"
+        className="btn-touch gap-1.5 text-xs font-medium text-brand-700 hover:text-brand-800 disabled:opacity-50 transition-colors"
       >
         {refreshing ? (
           <Loader2 size={14} className="animate-spin" />

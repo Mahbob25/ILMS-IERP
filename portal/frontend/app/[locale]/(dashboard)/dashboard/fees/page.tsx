@@ -3,10 +3,13 @@
 import React, { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { apiClient } from "@/lib/api";
-import { Loader2, Wallet, Receipt } from "lucide-react";
+import { Wallet, Receipt } from "lucide-react";
 import StudentSelector from "@/components/StudentSelector";
 import RefreshButton from "@/components/RefreshButton";
 import { useLinkedStudents } from "@/components/useLinkedStudents";
+import DataCards from "@/components/DataCards";
+import Skeleton from "@/components/Skeleton";
+import EmptyState from "@/components/EmptyState";
 
 interface Payment {
   id: string;
@@ -125,46 +128,79 @@ export default function FeesPage() {
       </div>
 
       {busy ? (
-        <div className="flex items-center justify-center py-20 text-slate-400">
-          <Loader2 className="animate-spin mr-2" size={20} />
-          <span className="text-sm">{s.loading}</span>
+        <div className="space-y-3">
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
         </div>
       ) : payments.length === 0 ? (
-        <div className="card p-8 text-center">
-          <p className="text-sm text-slate-500">{s.none}</p>
-        </div>
+        <EmptyState icon={Wallet} title={s.none} />
       ) : (
-        <div className="card overflow-hidden">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>{s.course}</th>
-                <th>{s.amount}</th>
-                <th>{s.date}</th>
-                <th>{s.receipt}</th>
-                <th>{s.method}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {payments.map((p) => (
-                <tr key={p.id}>
-                  <td className="font-medium text-slate-900">{p.course_name}</td>
-                  <td>
-                    <span className="badge badge-success">{fmt(p.amount)}</span>
-                  </td>
-                  <td className="text-slate-500 text-xs">
-                    {new Date(p.date).toLocaleDateString(locale === "ar" ? "ar-SA" : "en-GB")}
-                  </td>
-                  <td className="text-slate-500 text-xs flex items-center gap-1" dir="ltr">
-                    <Receipt size={12} />
-                    {p.receipt_number}
-                  </td>
-                  <td className="text-xs text-slate-500">{p.payment_method}</td>
+        <>
+          <div className="hidden md:block card overflow-hidden">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>{s.course}</th>
+                  <th>{s.amount}</th>
+                  <th>{s.date}</th>
+                  <th>{s.receipt}</th>
+                  <th>{s.method}</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {payments.map((p) => (
+                  <tr key={p.id}>
+                    <td className="font-medium text-slate-900">{p.course_name}</td>
+                    <td>
+                      <span className="badge badge-success">{fmt(p.amount)}</span>
+                    </td>
+                    <td className="text-slate-500 text-xs">
+                      {new Date(p.date).toLocaleDateString(locale === "ar" ? "ar-SA" : "en-GB")}
+                    </td>
+                    <td className="text-slate-500 text-xs flex items-center gap-1" dir="ltr">
+                      <Receipt size={12} />
+                      {p.receipt_number}
+                    </td>
+                    <td className="text-xs text-slate-500">{p.payment_method}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <DataCards
+            items={payments}
+            keyOf={(p) => p.id}
+            renderRow={(p) => (
+              <div className="space-y-3">
+                <div className="flex items-start justify-between gap-3">
+                  <p className="font-semibold text-slate-900 text-sm">{p.course_name}</p>
+                  <span className="badge badge-success shrink-0">{fmt(p.amount)}</span>
+                </div>
+                <div className="grid grid-cols-2 gap-3 text-xs">
+                  <div>
+                    <p className="text-slate-400">{s.date}</p>
+                    <p className="mt-0.5 text-slate-700">
+                      {new Date(p.date).toLocaleDateString(locale === "ar" ? "ar-SA" : "en-GB")}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-slate-400">{s.method}</p>
+                    <p className="mt-0.5 text-slate-700">{p.payment_method}</p>
+                  </div>
+                  <div>
+                    <p className="text-slate-400">{s.receipt}</p>
+                    <p className="mt-0.5 text-slate-700 flex items-center gap-1" dir="ltr">
+                      <Receipt size={12} />
+                      {p.receipt_number}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+          />
+        </>
       )}
     </div>
   );

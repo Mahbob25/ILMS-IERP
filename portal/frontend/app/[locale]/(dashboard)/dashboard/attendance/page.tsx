@@ -3,10 +3,13 @@
 import React, { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { apiClient } from "@/lib/api";
-import { Loader2, CalendarCheck } from "lucide-react";
+import { CalendarCheck } from "lucide-react";
 import StudentSelector from "@/components/StudentSelector";
 import RefreshButton from "@/components/RefreshButton";
 import { useLinkedStudents } from "@/components/useLinkedStudents";
+import DataCards from "@/components/DataCards";
+import Skeleton from "@/components/Skeleton";
+import EmptyState from "@/components/EmptyState";
 
 interface AttendanceRecord {
   date: string;
@@ -124,50 +127,86 @@ export default function AttendancePage() {
       </div>
 
       {busy ? (
-        <div className="flex items-center justify-center py-20 text-slate-400">
-          <Loader2 className="animate-spin mr-2" size={20} />
-          <span className="text-sm">{s.loading}</span>
+        <div className="space-y-3">
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
         </div>
       ) : records.length === 0 ? (
-        <div className="card p-8 text-center">
-          <p className="text-sm text-slate-500">{s.none}</p>
-        </div>
+        <EmptyState icon={CalendarCheck} title={s.none} />
       ) : (
-        <div className="card overflow-hidden">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>{s.course}</th>
-                <th>{s.date}</th>
-                <th>{s.status}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {records.map((r, i) => {
-                const label =
-                  STATUS_LABEL[r.status] ||
-                  STATUS_LABEL[r.status?.toLowerCase()] || {
-                    ar: r.status,
-                    en: r.status,
-                    cls: "badge-muted",
-                  };
-                return (
-                  <tr key={i}>
-                    <td className="font-medium text-slate-900">{r.course_name}</td>
-                    <td className="text-slate-500 text-xs">
-                      {new Date(r.date).toLocaleDateString(locale === "ar" ? "ar-SA" : "en-GB")}
-                    </td>
-                    <td>
-                      <span className={`badge ${label.cls}`}>
-                        {locale === "ar" ? label.ar : label.en}
-                      </span>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+        <>
+          <div className="hidden md:block card overflow-hidden">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>{s.course}</th>
+                  <th>{s.date}</th>
+                  <th>{s.status}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {records.map((r, i) => {
+                  const label =
+                    STATUS_LABEL[r.status] ||
+                    STATUS_LABEL[r.status?.toLowerCase()] || {
+                      ar: r.status,
+                      en: r.status,
+                      cls: "badge-muted",
+                    };
+                  return (
+                    <tr key={i}>
+                      <td className="font-medium text-slate-900">{r.course_name}</td>
+                      <td className="text-slate-500 text-xs">
+                        {new Date(r.date).toLocaleDateString(locale === "ar" ? "ar-SA" : "en-GB")}
+                      </td>
+                      <td>
+                        <span className={`badge ${label.cls}`}>
+                          {locale === "ar" ? label.ar : label.en}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          <DataCards
+            items={records}
+            keyOf={(r) => `${r.date}-${r.course_name}`}
+            renderRow={(r) => {
+              const label =
+                STATUS_LABEL[r.status] ||
+                STATUS_LABEL[r.status?.toLowerCase()] || {
+                  ar: r.status,
+                  en: r.status,
+                  cls: "badge-muted",
+                };
+              return (
+                <div className="space-y-3">
+                  <p className="font-semibold text-slate-900 text-sm">{r.course_name}</p>
+                  <div className="grid grid-cols-2 gap-3 text-xs">
+                    <div>
+                      <p className="text-slate-400">{s.date}</p>
+                      <p className="mt-0.5 text-slate-700">
+                        {new Date(r.date).toLocaleDateString(locale === "ar" ? "ar-SA" : "en-GB")}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-slate-400">{s.status}</p>
+                      <p className="mt-0.5">
+                        <span className={`badge ${label.cls}`}>
+                          {locale === "ar" ? label.ar : label.en}
+                        </span>
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              );
+            }}
+          />
+        </>
       )}
     </div>
   );
