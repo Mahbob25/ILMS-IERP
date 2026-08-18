@@ -78,13 +78,16 @@ export default function MobileTabBar({ locale }: Props) {
           size={22}
           className={`transition-colors duration-200 ${active ? "text-primary" : "text-slate-400"}`}
         />
-        {/* Small circular active dot — keyed on pathname so it re-pops on route change */}
-        {active && (
-          <span
-            key={pathname}
-            className="w-1 h-1 rounded-full bg-primary animate-dot-pop"
-          />
-        )}
+        {/* Active dot slot — always h-1 so the bar height never changes when
+            the active tab moves (e.g. navigating to the AI page clears it) */}
+        <span className="h-1 flex items-center justify-center">
+          {active && (
+            <span
+              key={pathname}
+              className="w-1 h-1 rounded-full bg-primary animate-dot-pop"
+            />
+          )}
+        </span>
       </button>
     );
   };
