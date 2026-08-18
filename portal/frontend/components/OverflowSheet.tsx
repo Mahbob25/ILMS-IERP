@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { Wallet, CalendarRange, LogOut, MoreHorizontal, User as UserIcon, X } from "lucide-react";
+import { Wallet, CalendarRange, LogOut, Bell, User as UserIcon, X } from "lucide-react";
 import type { PortalUser } from "@/components/AuthContext";
 
 interface Props {
@@ -29,13 +29,15 @@ export default function OverflowSheet({ open, onClose, user, onLogout }: Props) 
           fees: "الرسوم الدراسية",
           revision: "خطة المذاكرة (قريبًا)",
           logout: "تسجيل الخروج",
-          more: "المزيد",
+          notifications: "الإشعارات",
+          more: "القائمة",
         }
       : {
           fees: "Tuition Fees",
           revision: "Revision Plan (soon)",
           logout: "Log Out",
-          more: "More",
+          notifications: "Notifications",
+          more: "Menu",
         };
 
   useEffect(() => {
@@ -102,6 +104,13 @@ export default function OverflowSheet({ open, onClose, user, onLogout }: Props) 
 
         {/* Overflow nav */}
         <div className="p-2 flex flex-col gap-0.5">
+          <button
+            onClick={onClose}
+            className="btn-touch w-full gap-3 px-4 py-2.5 rounded-xl text-sm font-medium text-slate-700 hover:text-slate-900 hover:bg-slate-50 transition-colors duration-150 text-start md:hidden"
+          >
+            <Bell size={18} className="text-slate-400 shrink-0" />
+            <span>{s.notifications}</span>
+          </button>
           {items.map((item) => {
             const Icon = item.icon;
             return (
@@ -134,6 +143,3 @@ export default function OverflowSheet({ open, onClose, user, onLogout }: Props) 
     </div>
   );
 }
-
-// Re-export the trigger icon so the header can use the same visual affordance.
-export { MoreHorizontal };

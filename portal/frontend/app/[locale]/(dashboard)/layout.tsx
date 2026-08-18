@@ -4,7 +4,8 @@ import React, { useState } from "react";
 import { useRouter, useParams, usePathname } from "next/navigation";
 import { useAuth } from "@/components/AuthContext";
 import MobileTabBar from "@/components/MobileTabBar";
-import OverflowSheet, { MoreHorizontal } from "@/components/OverflowSheet";
+import OverflowSheet from "@/components/OverflowSheet";
+import DashboardHeader from "@/components/DashboardHeader";
 import {
   LayoutDashboard,
   Award,
@@ -191,24 +192,11 @@ export default function PortalDashboardLayout({
 
       {/* Main Column */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-        <header className="h-16 bg-white shadow-sm border-x-0 border-b border-slate-200 flex items-center justify-between px-4 md:px-6 relative z-10 shrink-0">
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-brand-50 text-brand-600 border border-brand-100 text-xs font-semibold">
-              <GraduationCap size={14} />
-              <span>{t.portalLabel}</span>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            {/* Overflow trigger — mobile only; desktop uses the sidebar footer */}
-            <button
-              onClick={() => setOverflowOpen(true)}
-              aria-label={t.fees}
-              className="md:hidden btn-touch justify-center p-2 rounded-lg bg-slate-50 text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-slate-200"
-            >
-              <MoreHorizontal size={20} />
-            </button>
-          </div>
-        </header>
+        <DashboardHeader
+          locale={isRtl ? "ar" : "en"}
+          user={user}
+          onOpenOverflow={() => setOverflowOpen(true)}
+        />
 
         <main className="flex-1 overflow-y-auto p-4 md:p-6 min-w-0">{children}</main>
       </div>
