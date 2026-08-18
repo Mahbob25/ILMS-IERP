@@ -12,7 +12,6 @@ import {
   Wallet,
   Sparkles,
   LogOut,
-  Globe,
   User as UserIcon,
   GraduationCap,
 } from "lucide-react";
@@ -42,7 +41,6 @@ export default function PortalDashboardLayout({
       aiRevision: "خطة المذاكرة (قريبًا)",
       settings: "الإعدادات",
       loading: "جاري تحميل بيانات الجلسة...",
-      langToggle: "English",
       portalLabel: "بوابة الطلاب",
     },
     en: {
@@ -55,16 +53,9 @@ export default function PortalDashboardLayout({
       aiRevision: "Revision Plan (soon)",
       settings: "Settings",
       loading: "Loading session data...",
-      langToggle: "العربية",
       portalLabel: "Student Portal",
     },
   }[locale === "en" ? "en" : "ar"];
-
-  const handleLanguageToggle = () => {
-    const targetLocale = locale === "ar" ? "en" : "ar";
-    const newPath = pathname.replace(`/${locale}`, `/${targetLocale}`);
-    router.push(newPath);
-  };
 
   if (loading) {
     return (
@@ -208,14 +199,7 @@ export default function PortalDashboardLayout({
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <button
-              onClick={handleLanguageToggle}
-              className="btn-touch gap-1.5 text-xs text-slate-600 hover:text-slate-900 transition-colors duration-150 py-1.5 px-3 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200"
-            >
-              <Globe size={13} />
-              <span>{t.langToggle}</span>
-            </button>
-            {/* Overflow trigger — desktop only; mobile uses the bottom bar + this sheet */}
+            {/* Overflow trigger — mobile only; desktop uses the sidebar footer */}
             <button
               onClick={() => setOverflowOpen(true)}
               aria-label={t.fees}

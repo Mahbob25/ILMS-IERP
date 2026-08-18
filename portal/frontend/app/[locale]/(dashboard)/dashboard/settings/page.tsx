@@ -5,13 +5,18 @@ import { useParams } from "next/navigation";
 import { apiClient } from "@/lib/api";
 import { useAuth } from "@/components/AuthContext";
 import { useLinkedStudents } from "@/components/useLinkedStudents";
-import { Settings, Bell, Loader2, KeyRound } from "lucide-react";
+import { Settings, Bell, Loader2, KeyRound, Globe } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 const t = {
   ar: {
     title: "الإعدادات",
     subtitle: "تفضيلات البوابة",
     notification: "الإشعارات مفعلة (قريبًا)",
+    language: "اللغة",
+    languageHint: "اختر لغة البوابة",
+    arabic: "العربية",
+    english: "English",
     saving: "جاري الحفظ...",
     saved: "تم حفظ التفضيلات",
     failed: "تعذر الحفظ. حاول مرة أخرى.",
@@ -30,6 +35,10 @@ const t = {
     title: "Settings",
     subtitle: "Portal preferences",
     notification: "Notifications enabled (coming soon)",
+    language: "Language",
+    languageHint: "Choose the portal language",
+    arabic: "العربية",
+    english: "English",
     saving: "Saving...",
     saved: "Preferences saved",
     failed: "Could not save. Please try again.",
@@ -47,6 +56,7 @@ const t = {
 };
 
 export default function SettingsPage() {
+  const router = useRouter();
   const params = useParams();
   const locale = (params?.locale as string) === "en" ? "en" : "ar";
   const s = t[locale];
@@ -154,6 +164,43 @@ export default function SettingsPage() {
           />
           <div className="w-10 h-5 bg-slate-200 peer-checked:bg-brand-500 rounded-full after:content-[''] after:absolute after:top-0.5 after:start-0.5 after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full peer-checked:rtl:after:-translate-x-full" />
         </label>
+      </div>
+
+      {/* Language preference */}
+      <div className="card p-5">
+        <div className="flex items-center gap-2 mb-3">
+          <Globe className="text-brand-600" size={18} />
+          <h2 className="text-sm font-semibold text-slate-900">{s.language}</h2>
+          <p className="text-xs text-slate-500 ms-1">{s.languageHint}</p>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          {(
+            [
+              { value: "ar" as const, label: s.arabic },
+              { value: "en" as const, label: s.english },
+            ]
+          ).map((lang) => {
+            const active = locale === lang.value;
+            return (
+              <button
+                key={lang.value}
+                type="button"
+                onClick={() => {
+                  if (!active) router.push(`/${lang.value}/dashboard/settings`);
+                }}
+                aria-pressed={active}
+                className={`btn-touch justify-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-semibold transition-all duration-150 ${
+                  active
+                    ? "bg-brand-50 text-brand-600 border-brand-200"
+                    : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                }`}
+              >
+                {lang.label}
+                {active && <span className="w-1.5 h-1.5 rounded-full bg-brand-600" />}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       <form onSubmit={handleChangePassword} className="card p-5 space-y-4">
