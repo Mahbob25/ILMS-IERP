@@ -18,9 +18,10 @@ export default function PortalSsoPage() {
     if (handledRef.current) return;
     handledRef.current = true;
     const ticket = new URLSearchParams(window.location.search).get("ticket");
+    const erpBase = process.env.NEXT_PUBLIC_ERP_URL || window.location.origin;
     if (!ticket) {
       // No ticket — redirect to the unified login on the main site.
-      window.location.href = `https://aldirasat.com/${locale}/login`;
+      window.location.href = `${erpBase}/${locale}/login`;
       return;
     }
     (async () => {
@@ -28,7 +29,7 @@ export default function PortalSsoPage() {
         await ssoLogin(ticket);
         router.replace(`/${locale}/dashboard`);
       } catch {
-        window.location.href = `https://aldirasat.com/${locale}/login`;
+        window.location.href = `${erpBase}/${locale}/login`;
       }
     })();
   }, [ssoLogin, locale, router]);

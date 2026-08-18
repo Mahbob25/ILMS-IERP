@@ -45,7 +45,7 @@ export function middleware(request: NextRequest) {
   // unified login on the main site (aldirasat.com).
   if (isDashboardPath) {
     if (!hasRefreshToken) {
-      const erpBase = process.env.NEXT_PUBLIC_ERP_URL || "https://aldirasat.com";
+      const erpBase = process.env.NEXT_PUBLIC_ERP_URL || request.nextUrl.origin;
       return NextResponse.redirect(`${erpBase}/${pathnameLocale}/login`);
     }
   }

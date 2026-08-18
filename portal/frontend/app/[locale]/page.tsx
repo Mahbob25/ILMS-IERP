@@ -23,6 +23,7 @@ export default function PortalStatusPage() {
   const router = useRouter();
   const locale = (params?.locale as string) === "en" ? "en" : "ar";
   const s = t[locale];
+  const erpBase = process.env.NEXT_PUBLIC_ERP_URL || (typeof window !== "undefined" ? window.location.origin : "");
 
   return (
     <div className="relative min-h-screen flex items-center justify-center overflow-hidden bg-slate-50 p-4 md:p-8">
@@ -59,7 +60,7 @@ export default function PortalStatusPage() {
         </p>
 
         <a
-          href={`https://aldirasat.com/${locale}/login`}
+          href={`${erpBase}/${locale}/login`}
           className="mt-6 inline-flex items-center gap-2 w-full justify-center py-2.5 px-4 text-sm font-semibold rounded-lg text-white bg-brand-500 hover:bg-brand-600 shadow-lg shadow-brand-500/25 transition-all duration-150"
         >
           {s.login}

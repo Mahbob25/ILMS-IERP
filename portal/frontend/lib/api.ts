@@ -46,7 +46,7 @@ function onRefreshFailed(error: unknown) {
 function redirectToLogin() {
   if (typeof window !== "undefined" && !isRedirectingToLogin) {
     const locale = window.location.pathname.match(/^\/(en|ar)/)?.[1] || "ar";
-    const erpBase = process.env.NEXT_PUBLIC_ERP_URL || "https://aldirasat.com";
+    const erpBase = process.env.NEXT_PUBLIC_ERP_URL || window.location.origin;
     if (!window.location.pathname.endsWith(`/${locale}/login`)) {
       isRedirectingToLogin = true;
       window.location.href = `${erpBase}/${locale}/login`;

@@ -95,7 +95,7 @@ export default function PortalDashboardLayout({
 
   if (!user) {
     if (typeof window !== "undefined") {
-      window.location.href = `https://aldirasat.com/${locale}/login`;
+      window.location.href = `${process.env.NEXT_PUBLIC_ERP_URL || window.location.origin}/${locale}/login`;
     }
     return null;
   }
