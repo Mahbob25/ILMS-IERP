@@ -17,28 +17,16 @@ _ACTIVE_SECTION = "cs.deleted_at IS NULL"
 
 
 async def get_linked_students(db: AsyncSession, actor_id: str) -> list[dict[str, Any]]:
-    """Return students linked to the actor.
-
-    Covers both kinds of portal links:
-    - parents via `portal.parent_links` (verified guardian links)
-    - students' own accounts via `portal.student_links`
-    """
+    """Return students linked to a verified parent link for the actor."""
     rows = await db.execute(
         text(
             f"""
             SELECT s.id AS student_id, s.full_name, s.student_code
-            FROM students s
-            WHERE {_ACTIVE_STUDENT}
-              AND (
-                s.id IN (
-                  SELECT pl.student_id FROM portal.parent_links pl
-                  WHERE pl.guardian_id = :actor_id AND pl.verified_at IS NOT NULL
-                )
-                OR s.id IN (
-                  SELECT sl.student_id FROM portal.student_links sl
-                  WHERE sl.user_id = :actor_id
-                )
-              )
+            FROM portal.parent_links pl
+            JOIN students s ON s.id = pl.student_id
+            WHERE pl.guardian_id = :actor_id
+              AND pl.verified_at IS NOT NULL
+              AND {_ACTIVE_STUDENT}
             ORDER BY s.full_name
             """
         ),
@@ -192,28 +180,16 @@ async def update_profile(
 
 
 async def student_is_linked(db: AsyncSession, actor_id: str, student_id: str) -> bool:
-    """True if the actor can access this student — via a verified parent link
-    or as the student's own portal account (portal.student_links)."""
     row = await db.execute(
         text(
             """
             SELECT 1
-            FROM students s
-            WHERE s.id = :student_id
+            FROM portal.parent_links pl
+            JOIN students s ON s.id = pl.student_id
+            WHERE pl.guardian_id = :actor_id
+              AND pl.student_id = :student_id
+              AND pl.verified_at IS NOT NULL
               AND s.deleted_at IS NULL
-              AND (
-                EXISTS (
-                  SELECT 1 FROM portal.parent_links pl
-                  WHERE pl.guardian_id = :actor_id
-                    AND pl.student_id = :student_id
-                    AND pl.verified_at IS NOT NULL
-                )
-                OR EXISTS (
-                  SELECT 1 FROM portal.student_links sl
-                  WHERE sl.user_id = :actor_id
-                    AND sl.student_id = :student_id
-                )
-              )
             """
         ),
         {"actor_id": actor_id, "student_id": student_id},
