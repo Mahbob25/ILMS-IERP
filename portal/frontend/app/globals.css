@@ -80,19 +80,20 @@
 }
 
 /* True inverted notch for the bottom nav pill.
-   The pill background is two mask layers XOR'd together:
-   1. radial-gradient — a 32px circle at the top center (transparent inside)
-   2. linear-gradient — a solid rectangle covering the whole bar
+   Two mask layers XOR'd together (mask-composite: exclude / -webkit xor):
+   1. radial-gradient — SOLID BLACK inside the 32px circle at the top center,
+      transparent outside (this is the shape being punched out)
+   2. linear-gradient — solid black rectangle covering the whole bar
    XOR removes the circle from the rectangle, so the notch is real transparent
    negative space that curves around the bottom half of the elevated FAB.
    `circle at 50% 0px` keeps it centered and perfectly circular at any width. */
 .navbar-notch {
   -webkit-mask-image:
-    radial-gradient(circle 32px at 50% 0px, transparent 0px, transparent 31.5px, #000 32px),
+    radial-gradient(circle 32px at 50% 0px, #000 0px, #000 31.5px, transparent 32px),
     linear-gradient(#000, #000);
   -webkit-mask-composite: xor;
   mask-image:
-    radial-gradient(circle 32px at 50% 0px, transparent 0px, transparent 31.5px, #000 32px),
+    radial-gradient(circle 32px at 50% 0px, #000 0px, #000 31.5px, transparent 32px),
     linear-gradient(#000, #000);
   mask-composite: exclude;
 }

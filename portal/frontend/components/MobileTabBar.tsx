@@ -20,11 +20,12 @@ interface Props {
  * Structure: two standard icon buttons on the left, an elevated circular FAB
  * in a true center cutout, two standard icon buttons on the right.
  *
- * The notch is REAL negative space, not an overlap: the pill's background is
- * clipped with `.navbar-notch` (a radial-gradient circle XOR'd out of the
- * solid pill via mask-composite), so the white bar curves inward around the
- * bottom half of the FAB. The FAB sits in the flow at the top center,
- * overflow-visible, so the bar's masked edge wraps it seamlessly.
+ * The notch is REAL negative space: the pill's white background is clipped
+ * with `.navbar-notch` (a solid circle XOR'd out of the bar via
+ * mask-composite), so the bar curves inward around the FAB. The FAB is a
+ * SIBLING of the masked pill (not a child), positioned at the top center so
+ * the mask can never clip it, and the whole assembly uses `drop-shadow` so
+ * the shadow follows the notch curve instead of being cut by the mask.
  *
  * Theming is semantic only — bg-white / bg-primary / text-primary /
  * text-slate-400 — no hardcoded hex.
@@ -94,33 +95,35 @@ export default function MobileTabBar({ locale }: Props) {
       className="fixed bottom-0 inset-x-0 z-40 md:hidden pb-[env(safe-area-inset-bottom)] pointer-events-none"
     >
       <div className="pointer-events-auto mx-auto mb-4 w-[calc(100%-2rem)] max-w-md">
-        <div className="relative overflow-visible animate-slide-up">
-          {/* Masked pill — the notch is carved out of this background */}
-          <div className="navbar-notch relative rounded-full bg-white border border-slate-200 shadow-lg shadow-slate-900/5 px-4 pt-4 pb-2 flex items-center">
+        <div className="relative flex items-end drop-shadow-lg shadow-slate-900/5 animate-slide-up">
+          {/* Masked pill — the notch is carved out of this background.
+              Sibling of the FAB so the mask only affects the bar itself. */}
+          <div className="navbar-notch relative flex-1 rounded-full bg-white border border-slate-200 px-4 pt-4 pb-2 flex items-center">
             {/* Left group */}
             <div className="flex flex-1 items-center">
               {leftItems.map((item) => renderItem(item, isActive(item.href)))}
             </div>
 
-            {/* Center FAB — in flow at the top center; the mask curves around it */}
-            <div className="relative w-14 h-0 shrink-0 flex justify-center">
-              <button
-                onClick={() => router.push(fabHref)}
-                aria-label={s.ai}
-                aria-current={isFabActive ? "page" : undefined}
-                className={`absolute top-0 -translate-y-1/2 w-14 h-14 rounded-full bg-primary text-white flex items-center justify-center shadow-lg shadow-primary/30 transition-transform duration-150 active:scale-90 ${
-                  isFabActive ? "ring-4 ring-primary/20" : ""
-                }`}
-              >
-                <Sparkles size={24} />
-              </button>
-            </div>
+            {/* Center FAB slot (empty in the pill — the button sits above) */}
+            <div className="w-14 shrink-0" />
 
             {/* Right group */}
             <div className="flex flex-1 items-center">
               {rightItems.map((item) => renderItem(item, isActive(item.href)))}
             </div>
           </div>
+
+          {/* Elevated FAB — centered on the notch, overhanging the bar's top edge */}
+          <button
+            onClick={() => router.push(fabHref)}
+            aria-label={s.ai}
+            aria-current={isFabActive ? "page" : undefined}
+            className={`absolute left-1/2 top-0 -translate-x-1/2 -translate-y-1/2 w-14 h-14 rounded-full bg-primary text-white flex items-center justify-center shadow-lg shadow-primary/30 transition-transform duration-150 active:scale-90 ${
+              isFabActive ? "ring-4 ring-primary/20" : ""
+            }`}
+          >
+            <Sparkles size={24} />
+          </button>
         </div>
       </div>
     </nav>
