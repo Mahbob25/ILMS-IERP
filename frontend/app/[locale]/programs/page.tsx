@@ -125,7 +125,7 @@ export default function ProgramsPage() {
               {isAr ? "معهد الدراسات · تعز" : "AL-DRASAT · TAIZ"}
             </div>
             <button onClick={() => router.push(`/${locale}/login`)} className="text-[12px] font-bold px-4 py-2 rounded-full bg-[#0A0A0A] text-white hover:bg-black transition">
-              {isAr ? "دخول الكادر" : "Staff login"} →
+              {isAr ? "تسجيل الدخول" : "Login"} →
             </button>
           </div>
         </div>

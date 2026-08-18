@@ -41,16 +41,13 @@ export function middleware(request: NextRequest) {
 
   const isDashboardPath = cleanPath.startsWith('/dashboard');
 
-  // Protect dashboard without active portal refresh token
+  // Protect dashboard without active portal refresh token — send users to the
+  // unified login on the main site (aldirasat.com).
   if (isDashboardPath) {
     if (!hasRefreshToken) {
-      return NextResponse.redirect(new URL(`/${pathnameLocale}/login`, request.url));
+      const erpBase = process.env.NEXT_PUBLIC_ERP_URL || "https://aldirasat.com";
+      return NextResponse.redirect(`${erpBase}/${pathnameLocale}/login`);
     }
-  }
-
-  // Redirect logged-in users away from login
-  if (cleanPath === '/login' && hasRefreshToken) {
-    return NextResponse.redirect(new URL(`/${pathnameLocale}/dashboard`, request.url));
   }
 
   return NextResponse.next();

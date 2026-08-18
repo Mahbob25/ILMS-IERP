@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test'
 
-// Portal E2E — OTP login → dashboard → grades → attendance → fees → settings.
+// Portal E2E — status page → SSO ticket exchange → dashboard → grades → attendance → fees → settings.
 //
 // Runs against the portal frontend (:3001) with the BFF API mocked at the
 // network layer (route interception) so it needs no live backend/database.
@@ -9,9 +9,9 @@ import { test, expect, type Page } from '@playwright/test'
 
 const API = process.env.PORTAL_API_URL || '/api'
 
-// ── Mocks (in-memory OTP store, auth cookies, linked student data) ────────
+// ── Mocks (in-memory SSO store, auth cookies, linked student data) ────────
 
-const OTP = '123456'
+const SSO_TICKET = 'sso-ticket-123'
 let accessTokenIssued = false
 
 const mePayload = {
@@ -66,17 +66,10 @@ async function mockPortalApi(page: Page) {
     const url = new URL(req.url())
     const path = url.pathname
 
-    // Auth
-    if (path.endsWith('/auth/request-otp') && req.method() === 'POST') {
-      return route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ detail: 'OTP sent', ttl_seconds: 300 }),
-      })
-    }
-    if (path.endsWith('/auth/verify-otp') && req.method() === 'POST') {
+    // Auth — SSO ticket exchange
+    if (path.endsWith('/auth/sso') && req.method() === 'POST') {
       const body = JSON.parse(req.postData() || '{}')
-      if (body.code === OTP) {
+      if (body.ticket === SSO_TICKET) {
         accessTokenIssued = true
         return route.fulfill({
           status: 200,
@@ -90,7 +83,7 @@ async function mockPortalApi(page: Page) {
           },
         })
       }
-      return route.fulfill({ status: 401, body: JSON.stringify({ detail: 'Invalid OTP' }) })
+      return route.fulfill({ status: 401, body: JSON.stringify({ detail: 'Invalid ticket' }) })
     }
     if (path.endsWith('/auth/me') && req.method() === 'GET') {
       if (!accessTokenIssued) {
@@ -146,16 +139,10 @@ async function mockPortalApi(page: Page) {
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 
-async function login(page: Page) {
-  await page.goto('/ar/login')
-  await page.getByPlaceholder('05xxxxxxxx').fill('+966500000000')
-  await page.getByRole('button', { name: 'إرسال الرمز' }).click()
-  await page.getByRole('button', { name: 'تسجيل الدخول' }).click() // verify step revealed
-  await page.getByPlaceholder('••••••').fill(OTP)
-  await page.getByRole('button', { name: 'تسجيل الدخول' }).click()
-  // The verify mock only sets the access token via set-cookie (Playwright
-  // drops subsequent set-cookie headers). Add the refresh cookie so the
-  // middleware lets the dashboard render.
+async function ssoLogin(page: Page) {
+  // Simulate the unified ERP login handoff: land on the SSO exchange page
+  // with a ticket, then let the refresh cookie pass the middleware.
+  await page.goto(`/ar/login?ticket=${SSO_TICKET}`)
   await page.context().addCookies([
     {
       name: 'portal_refresh_token',
@@ -166,6 +153,7 @@ async function login(page: Page) {
       sameSite: 'Lax',
     },
   ])
+  await page.waitForURL(/\/ar\/dashboard/)
 }
 
 // ── Specs ─────────────────────────────────────────────────────────────────
@@ -176,35 +164,21 @@ test.describe('Portal flow (mocked BFF)', () => {
     await mockPortalApi(page)
   })
 
-  test('OTP login reaches the dashboard', async ({ page }) => {
-    await page.goto('/ar/login')
-    await page.getByPlaceholder('05xxxxxxxx').fill('+966500000000')
-    await page.getByRole('button', { name: 'إرسال الرمز' }).click()
+  test('portal root shows the status page (no login form)', async ({ page }) => {
+    await page.goto('/ar')
+    await expect(page.getByText('بوابة الطلاب تعمل')).toBeVisible()
+    await expect(page.getByText('تسجيل الدخول')).toBeVisible()
+    // No login form on the root — the unified login lives on the main site.
+    await expect(page.getByPlaceholder('05xxxxxxxx')).toHaveCount(0)
+  })
 
-    // Second step appears
-    await expect(page.getByPlaceholder('••••••')).toBeVisible()
-    await page.getByPlaceholder('••••••').fill(OTP)
-    await page.getByRole('button', { name: 'تسجيل الدخول' }).click()
-
-    // Refresh cookie lets the middleware reach the dashboard.
-    await page.context().addCookies([
-      {
-        name: 'portal_refresh_token',
-        value: 'test-refresh',
-        domain: 'localhost',
-        path: '/',
-        httpOnly: true,
-        sameSite: 'Lax',
-      },
-    ])
-
-    // Lands on dashboard
-    await expect(page).toHaveURL(/\/ar\/dashboard/)
+  test('SSO ticket exchange reaches the dashboard', async ({ page }) => {
+    await ssoLogin(page)
     await expect(page.getByText('Student One')).toBeVisible()
   })
 
   test('grades page shows course scores', async ({ page }) => {
-    await login(page)
+    await ssoLogin(page)
     await page.getByRole('navigation').getByRole('button', { name: 'الدرجات' }).click()
     await expect(page).toHaveURL(/\/ar\/dashboard\/grades/)
     await expect(page.getByText('Mathematics')).toBeVisible()
@@ -213,7 +187,7 @@ test.describe('Portal flow (mocked BFF)', () => {
   })
 
   test('attendance page shows status badges', async ({ page }) => {
-    await login(page)
+    await ssoLogin(page)
     await page.getByRole('navigation').getByRole('button', { name: 'الحضور' }).click()
     await expect(page).toHaveURL(/\/ar\/dashboard\/attendance/)
     await expect(page.getByText('Mathematics')).toBeVisible()
@@ -221,7 +195,7 @@ test.describe('Portal flow (mocked BFF)', () => {
   })
 
   test('fees page shows payments', async ({ page }) => {
-    await login(page)
+    await ssoLogin(page)
     await page.getByRole('navigation').getByRole('button', { name: 'الرسوم الدراسية' }).click()
     await expect(page).toHaveURL(/\/ar\/dashboard\/fees/)
     await expect(page.getByText('RCP-2026-0001')).toBeVisible()
@@ -229,15 +203,15 @@ test.describe('Portal flow (mocked BFF)', () => {
   })
 
   test('settings page loads and shows profile', async ({ page }) => {
-    await login(page)
+    await ssoLogin(page)
     await page.getByRole('navigation').getByRole('button', { name: 'الإعدادات' }).click()
     await expect(page).toHaveURL(/\/ar\/dashboard\/settings/)
     await expect(page.getByText('تفضيلات البوابة')).toBeVisible()
-    await expect(page.getByText('Parent One')).toBeVisible() // from the login response user
+    await expect(page.getByText('Parent One')).toBeVisible() // from the SSO response user
   })
 
   test('language toggle switches to English', async ({ page }) => {
-    await login(page)
+    await ssoLogin(page)
     await page.getByRole('button', { name: 'English' }).click()
     await expect(page).toHaveURL(/\/en\/dashboard/)
     await expect(page.getByRole('main').getByText('Overview')).toBeVisible()

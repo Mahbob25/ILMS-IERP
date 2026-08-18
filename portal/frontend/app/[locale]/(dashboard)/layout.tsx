@@ -95,7 +95,7 @@ export default function PortalDashboardLayout({
 
   if (!user) {
     if (typeof window !== "undefined") {
-      router.push(`/${locale}/login`);
+      window.location.href = `https://aldirasat.com/${locale}/login`;
     }
     return null;
   }

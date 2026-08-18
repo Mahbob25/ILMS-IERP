@@ -19,7 +19,11 @@ async def get_public_landing(locale: str = Query("ar", pattern="^(ar|en)$"), db:
         return {}
     val = row.value
     if locale in val and isinstance(val[locale], dict):
-        return val[locale]
+        val = val[locale]
+    # Legacy key from the pre-unified-login CMS — never expose it. The login
+    # button is unified ("Login" / "تسجيل الدخول") via the frontend defaults.
+    if isinstance(val, dict) and "staffLogin" in val:
+        val = {k: v for k, v in val.items() if k != "staffLogin"}
     return val
 
 

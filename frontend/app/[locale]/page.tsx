@@ -30,14 +30,27 @@ export default function LandingPage() {
   const [faqOpen, setFaqOpen] = useState<number | null>(0);
 
   useEffect(() => {
+    // Strip the legacy pre-unified-login key so a stale cache/CMS override
+    // can never render "Staff login" — the button is unified via defaults.
+    const sanitize = (o: any) => {
+      if (!o || typeof o !== "object" || Array.isArray(o) || "detail" in o) return null;
+      if (typeof o.staffLogin === "string") {
+        const clean = { ...o };
+        delete clean.staffLogin;
+        return clean;
+      }
+      return o;
+    };
+
     let hasCache = false;
     let cachedParsed: any = null;
     try {
       const cached = localStorage.getItem(`landing:${locale}`);
       if (cached) {
         const parsed = JSON.parse(cached);
-        if (parsed && typeof parsed === "object" && !Array.isArray(parsed) && !("detail" in parsed) && (parsed.programs || parsed.heroKicker || parsed.heroLine1)) {
-          cachedParsed = parsed;
+        const clean = sanitize(parsed);
+        if (clean && (clean.programs || clean.heroKicker || clean.heroLine1)) {
+          cachedParsed = clean;
           hasCache = true;
         }
       }
@@ -52,9 +65,10 @@ export default function LandingPage() {
     fetch(`/api/v1/public/landing?locale=${locale}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
-        if (d && typeof d === "object" && !Array.isArray(d) && !("detail" in d) && (d.programs || d.heroKicker || d.heroLine1)) {
-          setOverride(d);
-          try { localStorage.setItem(`landing:${locale}`, JSON.stringify(d)); } catch {}
+        const clean = d && typeof d === "object" && !Array.isArray(d) ? sanitize(d) : null;
+        if (clean && (clean.programs || clean.heroKicker || clean.heroLine1)) {
+          setOverride(clean);
+          try { localStorage.setItem(`landing:${locale}`, JSON.stringify(clean)); } catch {}
         } else if (!d || (typeof d === "object" && Object.keys(d).length === 0)) {
           try { localStorage.removeItem(`landing:${locale}`); } catch {}
         }

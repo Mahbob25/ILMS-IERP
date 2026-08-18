@@ -28,8 +28,7 @@ export default function LoginPage() {
   const t = {
     ar: {
       title: "Al-Drasat",
-      subtitle: "سجّل الدخول إلى بوابة الموظفين",
-      portal: "بوابة الموظفين",
+      subtitle: "سجّل الدخول إلى حسابك",
       email: "البريد الإلكتروني",
       password: "كلمة المرور",
       emailPlaceholder: "name@aldrasat.com",
@@ -44,8 +43,7 @@ export default function LoginPage() {
     },
     en: {
       title: "Al-Drasat",
-      subtitle: "Sign in to the staff portal",
-      portal: "Staff Portal",
+      subtitle: "Sign in to your account",
       email: "Email Address",
       password: "Password",
       emailPlaceholder: "name@aldrasat.com",
@@ -161,12 +159,6 @@ export default function LoginPage() {
           >
             {t.title}
           </h1>
-          <div
-            className="mt-2 text-[10px] tracking-[0.16em] font-bold uppercase opacity-60"
-            style={{ fontFamily: jetbrains.style.fontFamily }}
-          >
-            {t.portal}
-          </div>
           <p
             className="text-[12.5px] leading-6 opacity-60 mt-3"
             style={{ fontFamily: isAr ? ibmArabic.style.fontFamily : inter.style.fontFamily }}
