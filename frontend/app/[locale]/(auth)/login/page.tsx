@@ -2,14 +2,21 @@
 
 import React, { useState } from "react";
 import { useRouter, useParams } from "next/navigation";
+import { Space_Grotesk, IBM_Plex_Sans_Arabic, Inter, JetBrains_Mono } from "next/font/google";
 import { useAuth } from "@/components/AuthContext";
 import { Globe, ShieldAlert } from "lucide-react";
 import { sanitizeInput } from "@/lib/utils/input";
+
+const spaceGrotesk = Space_Grotesk({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
+const ibmArabic = IBM_Plex_Sans_Arabic({ subsets: ["arabic"], weight: ["400", "500", "600", "700"] });
+const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
+const jetbrains = JetBrains_Mono({ subsets: ["latin"], weight: ["400", "500", "700"] });
 
 export default function LoginPage() {
   const router = useRouter();
   const params = useParams();
   const locale = (params?.locale as string) || "ar";
+  const isAr = locale === "ar";
   const { login } = useAuth();
 
   const [email, setEmail] = useState("");
@@ -20,8 +27,9 @@ export default function LoginPage() {
   // Simple translations dictionary for login page
   const t = {
     ar: {
-      title: "Al-Drasat ERP",
-      subtitle: "سجل الدخول للمتابعة إلى Al-Drasat ERP",
+      title: "Al-Drasat",
+      subtitle: "سجّل الدخول إلى بوابة الموظفين",
+      portal: "بوابة الموظفين",
       email: "البريد الإلكتروني",
       password: "كلمة المرور",
       emailPlaceholder: "name@aldrasat.com",
@@ -29,13 +37,15 @@ export default function LoginPage() {
       submitBtn: "تسجيل الدخول",
       loading: "جاري التحقق...",
       langToggle: "English",
+      backToSite: "العودة إلى الموقع",
       footer: "تأكد من الحفاظ على سرية بيانات اعتمادك.",
       errorFallback: "فشل تسجيل الدخول. يرجى التحقق من صحة البيانات.",
       validationError: "يرجى ملء جميع الحقول المطلوبة."
     },
     en: {
-      title: "Al-Drasat ERP",
-      subtitle: "Sign in to access your ERP portal",
+      title: "Al-Drasat",
+      subtitle: "Sign in to the staff portal",
+      portal: "Staff Portal",
       email: "Email Address",
       password: "Password",
       emailPlaceholder: "name@aldrasat.com",
@@ -43,7 +53,8 @@ export default function LoginPage() {
       submitBtn: "Sign In",
       loading: "Authenticating...",
       langToggle: "العربية",
-      footer: "Ensure your login credentials remain secure and confidential.",
+      backToSite: "Back to site",
+      footer: "Keep your login credentials secure and confidential.",
       errorFallback: "Authentication failed. Please verify your credentials.",
       validationError: "Please fill in all required fields."
     }
@@ -91,21 +102,43 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="relative min-h-screen flex items-center justify-center overflow-hidden bg-slate-50 p-4 md:p-8">
-      {/* Background Decorative Blur Spheres */}
-      <div className="absolute top-1/4 left-1/4 -translate-x-1/2 -translate-y-1/2 w-72 md:w-96 h-72 md:h-96 rounded-full bg-brand-500/10 blur-[80px] md:blur-[120px] animate-pulse-slow pointer-events-none" />
-      <div className="absolute bottom-1/4 right-1/4 translate-x-1/2 translate-y-1/2 w-72 md:w-96 h-72 md:h-96 rounded-full bg-indigo-500/10 blur-[80px] md:blur-[120px] animate-pulse-slow pointer-events-none" />
+    <div
+      dir={isAr ? "rtl" : "ltr"}
+      className={`${inter.className} relative min-h-screen flex items-center justify-center overflow-hidden bg-[#FFFBF0] text-[#0A0A0A] selection:bg-[#FF3B30] selection:text-white p-4 md:p-8`}
+    >
+      {/* Dot-grid overlay */}
+      <div
+        className="absolute inset-0 pointer-events-none opacity-[0.04]"
+        style={{ backgroundImage: "radial-gradient(#0A0A0A 1px, transparent 1px)", backgroundSize: "16px 16px" }}
+      />
 
-      {/* Floating Card container */}
-      <div className="w-full max-w-md bg-white border border-slate-200 rounded-2xl shadow-xl p-6 md:p-8 relative z-10 transition-all duration-300 animate-slide-up">
+      {/* Background Decorative Blur Orbs — landing palette */}
+      <div className="absolute top-[15%] start-[12%] -translate-x-1/2 -translate-y-1/2 w-72 md:w-96 h-72 md:h-96 rounded-full bg-[#FFD60A]/20 blur-[80px] md:blur-[120px] animate-pulse-slow motion-reduce:animate-none pointer-events-none" />
+      <div className="absolute bottom-[15%] end-[12%] translate-x-1/2 translate-y-1/2 w-72 md:w-96 h-72 md:h-96 rounded-full bg-[#0EA5E9]/15 blur-[80px] md:blur-[120px] animate-pulse-slow motion-reduce:animate-none pointer-events-none" />
+
+      {/* Outlined wordmark watermark */}
+      <span
+        aria-hidden
+        className="absolute inset-0 grid place-items-center pointer-events-none select-none overflow-hidden text-[86px] md:text-[132px] font-black tracking-[-0.06em] leading-none opacity-[0.03]"
+        style={{ fontFamily: spaceGrotesk.style.fontFamily, WebkitTextStroke: "1px #0A0A0A" as any }}
+      >
+        {isAr ? "الدراسات" : "AL-DRASAT"}
+      </span>
+
+      {/* Floating Card container — landing card recipe */}
+      <div className="w-full max-w-md relative rounded-[28px] bg-white border border-[#0A0A0A]/10 overflow-hidden shadow-[0_16px_50px_rgba(10,10,10,0.08)] p-6 md:p-8 z-10 animate-slide-up motion-reduce:animate-none">
         {/* Language & Info Header */}
         <div className="flex justify-between items-center mb-8">
-          <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-brand-50 text-brand-600 border border-brand-200">
+          <span
+            className="text-[10px] tracking-[0.16em] font-bold px-3 py-1.5 rounded-full bg-[#FFFBF0] border border-[#0A0A0A]/10 uppercase"
+            style={{ fontFamily: jetbrains.style.fontFamily }}
+          >
             v1.6 Core Auth
           </span>
           <button
             onClick={handleLanguageToggle}
-            className="flex items-center gap-1.5 text-xs text-slate-600 hover:text-slate-900 transition-colors duration-150 py-1.5 px-3 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200"
+            className="flex items-center gap-1.5 text-[12px] font-semibold text-[#0A0A0A] hover:border-[#0A0A0A]/20 transition-colors duration-150 py-2 px-3.5 rounded-full bg-white border border-[#0A0A0A]/12"
+            style={{ fontFamily: inter.style.fontFamily }}
           >
             <Globe size={13} />
             <span>{t.langToggle}</span>
@@ -114,17 +147,30 @@ export default function LoginPage() {
 
         {/* Branding & Subtitle */}
         <div className="text-center mb-8">
-          <div className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-white border border-slate-200 shadow-lg shadow-brand-500/20 flex items-center justify-center mx-auto mb-4 p-2 overflow-hidden">
+          <div className="h-14 w-14 rounded-[16px] bg-[#FFFBF0] border border-[#0A0A0A]/10 grid place-items-center overflow-hidden mx-auto mb-4 p-1.5 shadow-sm">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/logo.jpeg"
-              alt="Al-Drasat ERP Logo"
-              className="w-full h-full object-contain"
+              alt="Al-Drasat Logo"
+              className="h-full w-full object-contain"
             />
           </div>
-          <h1 className="text-xl md:text-2xl font-bold tracking-tight text-slate-900">
+          <h1
+            className="text-[20px] font-black tracking-[-0.04em] leading-none"
+            style={{ fontFamily: isAr ? ibmArabic.style.fontFamily : spaceGrotesk.style.fontFamily }}
+          >
             {t.title}
           </h1>
-          <p className="text-xs md:text-sm text-slate-500 mt-2">
+          <div
+            className="mt-2 text-[10px] tracking-[0.16em] font-bold uppercase opacity-60"
+            style={{ fontFamily: jetbrains.style.fontFamily }}
+          >
+            {t.portal}
+          </div>
+          <p
+            className="text-[12.5px] leading-6 opacity-60 mt-3"
+            style={{ fontFamily: isAr ? ibmArabic.style.fontFamily : inter.style.fontFamily }}
+          >
             {t.subtitle}
           </p>
         </div>
@@ -133,14 +179,17 @@ export default function LoginPage() {
         <form onSubmit={handleSubmit} className="space-y-5">
           {/* Error Banner */}
           {error && (
-            <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-red-600 text-xs flex items-start gap-2 animate-fade-in">
+            <div className="p-3 rounded-xl bg-[#FF3B30]/8 border border-[#FF3B30]/20 text-[#C2271D] text-xs flex items-start gap-2 animate-fade-in motion-reduce:animate-none">
               <ShieldAlert className="shrink-0 mt-0.5" size={14} />
               <span>{error}</span>
             </div>
           )}
 
           <div>
-            <label className="block text-xs font-medium text-slate-700 mb-1.5">
+            <label
+              className="block text-[10px] tracking-[0.16em] font-bold uppercase opacity-70 mb-2"
+              style={{ fontFamily: jetbrains.style.fontFamily }}
+            >
               {t.email}
             </label>
             <input
@@ -149,24 +198,27 @@ export default function LoginPage() {
               onChange={(e) => setEmail(e.target.value)}
               placeholder={t.emailPlaceholder}
               dir="ltr"
-              className="w-full text-sm px-4 py-2.5 rounded-lg bg-white border border-slate-300 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all duration-150"
+              className="w-full h-10 rounded-xl border border-[#0A0A0A]/10 bg-[#FFFBF0] px-3 text-sm outline-none focus:border-[#0A0A0A]/20 transition-colors duration-150 placeholder:text-[#0A0A0A]/35"
+              style={{ fontFamily: inter.style.fontFamily }}
               required
             />
           </div>
 
           <div>
-            <div className="flex justify-between items-center mb-1.5">
-              <label className="block text-xs font-medium text-slate-700">
-                {t.password}
-              </label>
-            </div>
+            <label
+              className="block text-[10px] tracking-[0.16em] font-bold uppercase opacity-70 mb-2"
+              style={{ fontFamily: jetbrains.style.fontFamily }}
+            >
+              {t.password}
+            </label>
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder={t.passwordPlaceholder}
               dir="ltr"
-              className="w-full text-sm px-4 py-2.5 rounded-lg bg-white border border-slate-300 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all duration-150"
+              className="w-full h-10 rounded-xl border border-[#0A0A0A]/10 bg-[#FFFBF0] px-3 text-sm outline-none focus:border-[#0A0A0A]/20 transition-colors duration-150 placeholder:text-[#0A0A0A]/35"
+              style={{ fontFamily: inter.style.fontFamily }}
               required
             />
           </div>
@@ -174,7 +226,8 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={submitting}
-            className="w-full py-2.5 px-4 text-sm font-semibold rounded-lg text-white bg-brand-500 hover:bg-brand-600 disabled:bg-brand-500/50 disabled:cursor-not-allowed shadow-lg shadow-brand-500/25 transition-all duration-150 flex items-center justify-center gap-2 hover:shadow-brand-500/35 active:scale-[0.98]"
+            className="w-full rounded-full bg-[#0A0A0A] text-white py-3 text-[13px] font-bold hover:bg-black transition shadow-[0_10px_30px_rgba(10,10,10,0.18)] disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98] flex items-center justify-center gap-2"
+            style={{ fontFamily: inter.style.fontFamily }}
           >
             {submitting ? (
               <>
@@ -188,11 +241,26 @@ export default function LoginPage() {
               <span>{t.submitBtn}</span>
             )}
           </button>
+
+          {/* Back to site */}
+          <div className="text-center">
+            <button
+              onClick={() => router.push(`/${locale}`)}
+              className="inline-flex items-center gap-1.5 text-[12px] font-bold px-5 py-2 rounded-full bg-white border border-[#0A0A0A]/12 hover:border-[#0A0A0A]/20 hover:bg-[#FFFBF0] transition active:scale-[0.98]"
+              style={{ fontFamily: inter.style.fontFamily }}
+            >
+              <span aria-hidden>←</span>
+              {t.backToSite}
+            </button>
+          </div>
         </form>
 
         {/* Footer info */}
-        <div className="mt-8 pt-6 border-t border-slate-200 text-center">
-          <p className="text-[10px] text-slate-500">
+        <div className="mt-8 pt-6 border-t border-[#0A0A0A]/10 text-center">
+          <p
+            className="text-[10px] opacity-50 tracking-wide"
+            style={{ fontFamily: jetbrains.style.fontFamily }}
+          >
             {t.footer}
           </p>
         </div>
