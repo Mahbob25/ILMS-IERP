@@ -166,10 +166,33 @@ async def login(
     )
 
     # Browser form POST → follow the redirect so cookies stay first-party.
+    # The auth cookies MUST be set on the RedirectResponse itself — setting
+    # them on the FastAPI `response` param is lost when a RedirectResponse is
+    # returned (FastAPI builds a new response).
     if "application/x-www-form-urlencoded" in content_type:
         locale = (locale or "ar") if locale in {"ar", "en"} else "ar"
         redirect_url = f"{settings.ERP_FRONTEND_URL}/{locale}/dashboard"
-        return RedirectResponse(url=redirect_url, status_code=status.HTTP_307_TEMPORARY_REDIRECT)
+        redirect = RedirectResponse(url=redirect_url, status_code=status.HTTP_307_TEMPORARY_REDIRECT)
+        secure = settings.ENVIRONMENT != "development"
+        redirect.set_cookie(
+            key="access_token",
+            value=access_token,
+            httponly=True,
+            secure=secure,
+            samesite="lax",
+            path="/",
+            max_age=15 * 60,
+        )
+        redirect.set_cookie(
+            key="refresh_token",
+            value=refresh_token,
+            httponly=True,
+            secure=secure,
+            samesite="lax",
+            path="/",
+            max_age=7 * 24 * 60 * 60,
+        )
+        return redirect
 
     return user
 
