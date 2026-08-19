@@ -71,7 +71,7 @@ CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
 Add a Content-Security-Policy header to both the API and frontend routes:
 
 ```
-aldrasat.edu {
+aldirasat.edu {
     # Frontend reverse proxy
     handle_path /api/v1/* {
         reverse_proxy backend:8000 {
@@ -553,10 +553,10 @@ Before declaring MVP launched, verify all of these:
 
 - [ ] `docker ps` shows 4 containers: database, backend, frontend, caddy
 - [ ] Backend health check returns 200: `curl http://localhost:8000/api/v1/health`
-- [ ] Frontend loads in browser: `https://aldrasat.edu`
+- [ ] Frontend loads in browser: `https://aldirasat.edu`
 - [ ] Login works end-to-end (credentials → cookie → dashboard)
 - [ ] Backend container runs as non-root: `docker exec lims_backend whoami` → `lims`
-- [ ] CSP headers present: `curl -I https://aldrasat.edu | grep -i content-security`
+- [ ] CSP headers present: `curl -I https://aldirasat.edu | grep -i content-security`
 - [ ] Backup script runs: `bash /opt/lims/scripts/backup.sh` produces `.sql.gz`
 - [ ] Sentry test error appears in sentry.io dashboard
 - [ ] GitHub Actions runner shows "Idle" with green light

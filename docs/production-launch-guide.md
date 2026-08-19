@@ -16,12 +16,12 @@ git pull --ff-only
 ./scripts/deploy.sh        # build → alembic upgrade head → up -d → healthcheck wait
 ```
 
-Deploy steps in order: Cloudflare tunnel token in `.env` → Public Hostname `aldrasat.edu` → `HTTP` → `caddy:80`.
+Deploy steps in order: Cloudflare tunnel token in `.env` → Public Hostname `aldirasat.edu` → `HTTP` → `caddy:80`.
 
 ## 3. Verify
 
-- [ ] `https://aldrasat.edu/ar/login` loads (frontend)
-- [ ] `curl -fsS https://aldrasat.edu/api/v1/health` returns OK (backend)
+- [ ] `https://aldirasat.edu/ar/login` loads (frontend)
+- [ ] `curl -fsS https://aldirasat.edu/api/v1/health` returns OK (backend)
 - [ ] `docker compose -f docker-compose.prod.yml ps` — all 5 services healthy
 - [ ] Login smoke test with seeded accounts; process a test payment → receipt prints
 

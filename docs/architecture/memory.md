@@ -72,7 +72,7 @@ This document stores the immutable architectural constraints, technical rules, a
 ## 13. Development Session: Resolved Issues (June 2026)
 
 - **Caddy image exec format error**: `caddy:2.7-alpine` produced "exec format error" on amd64. Fixed by using `caddy:latest` (v2.11.4).
-- **Hosts file**: Added `127.0.0.1 aldrasat.edu` to Windows hosts file for local access.
+- **Hosts file**: Added `127.0.0.1 aldirasat.edu` to Windows hosts file for local access.
 - **Frontend infinite redirect loop**: Removed `i18n` config block from `next.config.js` — it conflicted with App Router middleware-based locale detection.
 - **Frontend 401 redirect loop**: In `lib/api.ts`, 401 interceptor redirected to `/login` (no locale prefix), causing middleware to re-add locale and loop. Fixed with locale-aware redirect and login-page guard.
 - **Backend circular import**: Model imports in `app/db/base.py` caused circular imports. Moved to `alembic/env.py` instead.

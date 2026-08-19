@@ -318,7 +318,7 @@ def run_phase2():
     # --- /auth/me endpoint ---
     print('--- /auth/me Endpoint ---')
     try:
-        client, token = login('superadmin@aldrasat.com', 'admin123')
+        client, token = login('superadmin@aldirasat.com', 'admin123')
         test('Login as superadmin succeeds', token is not None)
         if token:
             aclient = authed_client(token)
@@ -326,7 +326,7 @@ def run_phase2():
             test('/auth/me returns 200', r.status_code == 200, f'got {r.status_code}')
             data = r.json()
             test('/auth/me has id', 'id' in data)
-            test('/auth/me has email', data.get('email') == 'superadmin@aldrasat.com')
+            test('/auth/me has email', data.get('email') == 'superadmin@aldirasat.com')
             test('/auth/me has role superadmin', data.get('role') == 'superadmin')
             test('/auth/me has is_superadmin', 'is_superadmin' in data)
             aclient.close()
@@ -339,7 +339,7 @@ def run_phase2():
     print('--- Role Gate Enforcement ---')
     try:
         # Login as teacher
-        client, token = login('teacher.ee3f04@aldrasat.com', 'teacher123')
+        client, token = login('teacher.ee3f04@aldirasat.com', 'teacher123')
         test('Login as teacher succeeds', token is not None)
 
         if token:
@@ -414,7 +414,7 @@ def run_phase3():
     print()
 
     try:
-        client, token = login('superadmin@aldrasat.com', 'admin123')
+        client, token = login('superadmin@aldirasat.com', 'admin123')
         test('Login as superadmin succeeds', token is not None)
         if not token:
             print('  SKIP — cannot log in')
@@ -545,7 +545,7 @@ def run_phase3():
         print()
         print('--- Secretary Registration ---')
         # Test that secretary can register a student
-        sec_client, sec_token = login('secretary@aldrasat.com', 'secretary123')
+        sec_client, sec_token = login('secretary@aldirasat.com', 'secretary123')
         if sec_token:
             sec_ac = authed_client(sec_token)
             r = sec_ac.post('/api/v1/academic/students', json={
@@ -593,7 +593,7 @@ def run_phase4():
     print()
 
     try:
-        client, token = login('superadmin@aldrasat.com', 'admin123')
+        client, token = login('superadmin@aldirasat.com', 'admin123')
         test('Login as superadmin succeeds', token is not None)
         if not token:
             print('  SKIP — cannot log in')
@@ -807,7 +807,7 @@ def run_phase4():
         # --- Manager can create payment ---
         print()
         print('--- Manager Permissions ---')
-        m_client, m_token = login('manager@aldrasat.com', 'manager123')
+        m_client, m_token = login('manager@aldirasat.com', 'manager123')
         if m_token:
             m_ac = authed_client(m_token)
             r = m_ac.post('/api/v1/lms/payments', json={
@@ -820,7 +820,7 @@ def run_phase4():
         m_client.close()
 
         # --- Secretary can create payment ---
-        s_client, s_token = login('secretary@aldrasat.com', 'secretary123')
+        s_client, s_token = login('secretary@aldirasat.com', 'secretary123')
         if s_token:
             s_ac = authed_client(s_token)
             r = s_ac.post('/api/v1/lms/payments', json={
@@ -869,7 +869,7 @@ def run_phase5():
     print()
 
     try:
-        client, token = login('superadmin@aldrasat.com', 'admin123')
+        client, token = login('superadmin@aldirasat.com', 'admin123')
         test('Login as superadmin succeeds', token is not None)
         if not token:
             print('  SKIP — cannot log in')
@@ -953,7 +953,7 @@ def run_phase6():
     print()
 
     try:
-        client, token = login('superadmin@aldrasat.com', 'admin123')
+        client, token = login('superadmin@aldirasat.com', 'admin123')
         test('Login as superadmin succeeds', token is not None)
         if not token:
             print('  SKIP — cannot log in')
@@ -1185,7 +1185,7 @@ def run_phase7():
         # --- Student detail page ---
         print()
         print('--- Student Detail Page ---')
-        be_client, token = login('superadmin@aldrasat.com', 'admin123')
+        be_client, token = login('superadmin@aldirasat.com', 'admin123')
         test('Login for student detail test succeeds', token is not None)
         if token:
             ac = authed_client(token)
@@ -1216,7 +1216,7 @@ def run_phase7():
         print()
         print('--- Role-Based Sidebar (API check) ---')
         # Verify that auth/me returns proper role info for frontend filtering
-        be_client2, token2 = login('superadmin@aldrasat.com', 'admin123')
+        be_client2, token2 = login('superadmin@aldirasat.com', 'admin123')
         if token2:
             ac2 = authed_client(token2)
             r = ac2.get('/api/v1/auth/me')
@@ -1261,7 +1261,7 @@ def run_phase8():
 
     print('--- Auth/me has is_superadmin ---')
     try:
-        client, token = login('superadmin@aldrasat.com', 'admin123')
+        client, token = login('superadmin@aldirasat.com', 'admin123')
         test('Login as superadmin succeeds', token is not None)
         if token:
             ac = authed_client(token)
@@ -1271,7 +1271,7 @@ def run_phase8():
                 data = r.json()
                 test('/auth/me has is_superadmin key', 'is_superadmin' in data, f'keys: {list(data.keys())}')
                 test('/auth/me has role field', data.get('role') == 'superadmin')
-                test('/auth/me has email', data.get('email') == 'superadmin@aldrasat.com')
+                test('/auth/me has email', data.get('email') == 'superadmin@aldirasat.com')
             ac.close()
 
             # --- JWT still has is_superadmin in claims ---
@@ -1293,7 +1293,7 @@ def run_phase8():
     print('--- Role-based auth enforcement ---')
     try:
         # Superadmin can access manager-only endpoints
-        client, token = login('superadmin@aldrasat.com', 'admin123')
+        client, token = login('superadmin@aldirasat.com', 'admin123')
         test('Superadmin login for role test succeeds', token is not None)
         if token:
             ac = authed_client(token)
@@ -1309,7 +1309,7 @@ def run_phase8():
     print()
     print('--- Teacher scoping (role-based, no is_superadmin) ---')
     try:
-        client, token = login('teacher.ee3f04@aldrasat.com', 'teacher123')
+        client, token = login('teacher.ee3f04@aldirasat.com', 'teacher123')
         test('Teacher login succeeds', token is not None)
         if token:
             ac = authed_client(token)
@@ -1328,7 +1328,7 @@ def run_phase8():
     print('--- superadmin_gate enforcement ---')
     try:
         # Teacher cannot access superadmin-only endpoint (delete course-section)
-        client, token = login('teacher.ee3f04@aldrasat.com', 'teacher123')
+        client, token = login('teacher.ee3f04@aldirasat.com', 'teacher123')
         if token:
             ac = authed_client(token)
             # Try deleting a non-existent section — should still fail at gate, not at DB
@@ -1339,7 +1339,7 @@ def run_phase8():
         client.close()
 
         # Superadmin CAN access the same endpoint (gate passes, error is 404 not 403)
-        client, token = login('superadmin@aldrasat.com', 'admin123')
+        client, token = login('superadmin@aldirasat.com', 'admin123')
         if token:
             ac = authed_client(token)
             r = ac.delete(f'/api/v1/academic/course-sections/{fake_id}')
@@ -1354,13 +1354,13 @@ def run_phase8():
     print('--- require_role enforcement ---')
     try:
         # Teacher tries to create a student (requires secretary+)
-        client, token = login('teacher.ee3f04@aldrasat.com', 'teacher123')
+        client, token = login('teacher.ee3f04@aldirasat.com', 'teacher123')
         if token:
             ac = authed_client(token)
             r = ac.post('/api/v1/academic/students', json={
                 'first_name': 'Test',
                 'last_name': 'Student',
-                'email': 'test.phase8@aldrasat.com',
+                'email': 'test.phase8@aldirasat.com',
                 'phone': '12345678',
                 'grade_level': 1
             })
@@ -1401,7 +1401,7 @@ def run_phase9():
     print()
     print('--- Enrollments student_id filter ---')
     try:
-        client, token = login('superadmin@aldrasat.com', 'admin123')
+        client, token = login('superadmin@aldirasat.com', 'admin123')
         test('Login for enrollment test succeeds', token is not None)
         if token:
             ac = authed_client(token)
@@ -1429,7 +1429,7 @@ def run_phase9():
     print()
     print('--- POS Payment Flow ---')
     try:
-        client, token = login('superadmin@aldrasat.com', 'admin123')
+        client, token = login('superadmin@aldirasat.com', 'admin123')
         test('Login for POS flow succeeds', token is not None)
         if token:
             ac = authed_client(token)

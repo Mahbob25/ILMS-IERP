@@ -14,7 +14,7 @@ test.describe('Token Refresh Flow', () => {
 
   test('should login then refresh token successfully', async ({ request }) => {
     const loginRes = await request.post(`${BASE_URL}/auth/login`, {
-      data: { email: 'superadmin@aldrasat.com', password: 'admin123' },
+      data: { email: 'superadmin@aldirasat.com', password: 'admin123' },
     })
     expect([200, 429]).toContain(loginRes.status())
 

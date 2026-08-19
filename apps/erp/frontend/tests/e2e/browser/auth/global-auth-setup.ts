@@ -12,7 +12,7 @@ const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000'
 const STORAGE_PATH = path.join(__dirname, '..', '.browser-auth.json')
 
 const CREDENTIALS: Record<string, { email: string; password: string }> = {
-  superadmin: { email: 'superadmin@aldrasat.com', password: 'admin123' },
+  superadmin: { email: 'superadmin@aldirasat.com', password: 'admin123' },
 }
 
 async function globalSetup(config: FullConfig) {

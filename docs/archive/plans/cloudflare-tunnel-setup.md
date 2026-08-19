@@ -64,7 +64,7 @@ Replace the domain-based config with a port-80 listener:
 }
 ```
 
-Changes: `:80` replaces `aldrasat.edu { tls internal }`. Routing and headers preserved.
+Changes: `:80` replaces `aldirasat.edu { tls internal }`. Routing and headers preserved.
 
 ### 4. `.env` — Add tunnel token
 
@@ -77,7 +77,7 @@ TUNNEL_TOKEN=your_cloudflare_tunnel_token_here
 1. Go to Cloudflare Zero Trust → Networks → Tunnels
 2. Create a new tunnel
 3. Copy the tunnel token to `.env`
-4. Configure Public Hostname: `aldrasat.edu` → Service: `HTTP` → URL: `caddy:80`
+4. Configure Public Hostname: `aldirasat.edu` → Service: `HTTP` → URL: `caddy:80`
 
 ### 6. Cloudflare IP Forwarding (optional follow-up)
 

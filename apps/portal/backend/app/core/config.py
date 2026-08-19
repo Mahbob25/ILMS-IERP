@@ -35,7 +35,7 @@ class Settings(BaseSettings):
 
     # ── App ────────────────────────────────────────────────
     ENVIRONMENT: str = "development"
-    CORS_ORIGINS: str = "https://aldirasat.com,https://portal.aldirasat.com"
+    CORS_ORIGINS: str = "https://aldirasat.com,https://portal.aldirasat.com,https://aldirasat.vercel.app,https://aldirasat-portal.vercel.app"
     TIMEZONE: str = "Asia/Riyadh"
     DATABASE_URL: str = ""  # optional — only if the BFF ever needs direct portal.* reads
     OTP_TTL_SECONDS: int = 300

@@ -11,8 +11,8 @@ const ibmArabic = IBM_Plex_Sans_Arabic({ subsets: ["arabic"], weight: ["400", "5
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 const jetbrains = JetBrains_Mono({ subsets: ["latin"], weight: ["400", "500", "700"] });
 
-const ERP_URL = process.env.NEXT_PUBLIC_ERP_URL || "https://erp.aldirasat.com";
-const PORTAL_URL = process.env.NEXT_PUBLIC_PORTAL_URL || "https://portal.aldirasat.com";
+const ERP_URL = process.env.NEXT_PUBLIC_ERP_URL || "https://aldirasat-erp.vercel.app";
+const PORTAL_URL = process.env.NEXT_PUBLIC_PORTAL_URL || "https://aldirasat-portal.vercel.app";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -32,7 +32,7 @@ export default function LoginPage() {
       subtitle: "سجّل الدخول إلى حسابك",
       email: "البريد الإلكتروني",
       password: "كلمة المرور",
-      emailPlaceholder: "name@aldrasat.com",
+      emailPlaceholder: "name@aldirasat.com",
       passwordPlaceholder: "••••••••",
       submitBtn: "تسجيل الدخول",
       loading: "جاري التحقق...",
@@ -47,7 +47,7 @@ export default function LoginPage() {
       subtitle: "Sign in to your account",
       email: "Email Address",
       password: "Password",
-      emailPlaceholder: "name@aldrasat.com",
+      emailPlaceholder: "name@aldirasat.com",
       passwordPlaceholder: "••••••••",
       submitBtn: "Sign In",
       loading: "Authenticating...",

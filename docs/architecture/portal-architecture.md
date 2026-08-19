@@ -94,10 +94,10 @@ flowchart TB
 
     Internet --> CF --> CADDY
 
-    CADDY -- "erp.aldrasat.edu /*" --> FE
-    CADDY -- "erp.aldrasat.edu /api/v1/*" --> BE
-    CADDY -- "portal.aldrasat.edu /*" --> PFE
-    CADDY -- "portal.aldrasat.edu /api/*" --> PBE
+    CADDY -- "erp.aldirasat.edu /*" --> FE
+    CADDY -- "erp.aldirasat.edu /api/v1/*" --> BE
+    CADDY -- "portal.aldirasat.edu /*" --> PFE
+    CADDY -- "portal.aldirasat.edu /api/*" --> PBE
 
     PBE -- "private: http://backend:8000/api/v1/internal/*\nservice JWT (mTLS/ServiceKey)" --> BE
     PBE <--> REDIS
@@ -180,12 +180,12 @@ volumes:
 
 ```caddy
 # infrastructure/caddy/Caddyfile — add subdomains
-erp.aldrasat.edu {
+erp.aldirasat.edu {
     reverse_proxy /api/v1/* {env.BACKEND_URL}      # backend:8000
     reverse_proxy /uploads/* {env.BACKEND_URL}
     reverse_proxy * {env.FRONTEND_URL}              # frontend:3000
 }
-portal.aldrasat.edu {
+portal.aldirasat.edu {
     reverse_proxy /api/* portal-backend:8001
     reverse_proxy * portal-frontend:3001
 }
@@ -208,7 +208,7 @@ sequenceDiagram
     participant EB as lims_backend (ERP)
     participant DB as Postgres (erp schema)
 
-    S->>PF: GET portal.aldrasat.edu/dashboard
+    S->>PF: GET portal.aldirasat.edu/dashboard
     PF->>PB: GET /api/me/grades (portal JWT cookie)
     PB->>R: GET cache:grades:{userId}
     alt cache hit (90%+ with TTL 60s)
@@ -293,7 +293,7 @@ sequenceDiagram
 ```mermaid
 flowchart LR
     subgraph ERPWriter[ERP — Sole Writer]
-        U[Teacher uploads<br/>curriculum PDF/DOCX<br/>in erp.aldrasat.edu]
+        U[Teacher uploads<br/>curriculum PDF/DOCX<br/>in erp.aldirasat.edu]
         J[ingestion_jobs<br/>current_state JSONB]
     end
     subgraph AIPlane[ai-service — One Codebase, Two Queues]
@@ -395,7 +395,7 @@ flowchart LR
 
 ## 8. Security Boundaries
 
-- Subdomain isolation: `erp.aldrasat.edu` vs `portal.aldrasat.edu` — cookies scoped per host, CSP per app.
+- Subdomain isolation: `erp.aldirasat.edu` vs `portal.aldirasat.edu` — cookies scoped per host, CSP per app.
 - Caddy is still the sole host-port exposure. Portal/AI/Redis have no `ports:` mapping.
 - WAF (Cloudflare) on `portal.*` — stricter rate limits (parents are public, staff are allowlisted).
 - Service-to-service auth: `ERP_SERVICE_KEY` rotated via `.env`, never exposed to browsers. Optionally mTLS between `portal-backend` ↔ `backend`.
@@ -461,7 +461,7 @@ flowchart LR
 
 ```mermaid
 flowchart TB
-    T[Teacher in erp.aldrasat.edu\nUpload PDF/DOCX or Edit]
+    T[Teacher in erp.aldirasat.edu\nUpload PDF/DOCX or Edit]
     API[POST /api/v1/curriculum/documents\nmultipart → 202 {job_id}]
     JOB[(ingestion_jobs\ncurrent_state JSONB\n{last_page, last_chunk_id, phase})]
     REDIS[(Redis\nai:ingestion queue)]

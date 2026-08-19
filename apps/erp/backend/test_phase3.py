@@ -39,7 +39,7 @@ def test(name, method, url, client, **kwargs):
 
 with httpx.Client(base_url=BASE) as c:
     r = c.post('/api/v1/auth/login',
-               json={'email': 'superadmin@aldrasat.com', 'password': 'admin123'})
+               json={'email': 'superadmin@aldirasat.com', 'password': 'admin123'})
     token = c.cookies.get('access_token')
     h = {'Cookie': f'access_token={token}'}
 
@@ -95,7 +95,7 @@ with httpx.Client(base_url=BASE) as c:
     print()
     print('--- Teacher Scoping ---')
     r = c.post('/api/v1/auth/login',
-               json={'email': 'teacher.ee3f04@aldrasat.com', 'password': 'teacher123'})
+               json={'email': 'teacher.ee3f04@aldirasat.com', 'password': 'teacher123'})
     teacher_h = {'Cookie': f'access_token={c.cookies.get("access_token")}'}
 
     test('Teacher list assignments', 'GET', '/api/v1/lms/assignments', c, headers=teacher_h)
@@ -108,7 +108,7 @@ with httpx.Client(base_url=BASE) as c:
          json={'section_id': TEACHER_SECTION, 'date': d2}, expect=201)
 
     r = c.post('/api/v1/auth/login',
-               json={'email': 'teacher.test@aldrasat.com', 'password': 'teacher123'})
+               json={'email': 'teacher.test@aldirasat.com', 'password': 'teacher123'})
     wrong_h = {'Cookie': f'access_token={c.cookies.get("access_token")}'}
     d3 = unique_date()
     test('Teacher blocked from wrong section', 'POST', '/api/v1/lms/attendance/sessions', c, headers=wrong_h,

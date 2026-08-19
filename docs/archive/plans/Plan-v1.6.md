@@ -274,7 +274,7 @@ flowchart TB
 - **Caddy هو البوابة الوحيدة على LAN.** يستمع على `0.0.0.0:80` و `0.0.0.0:443`، ويوزّع الحركة:
     - `/` و `/ar/*` و `/en/*` → حاوية `frontend` (Next.js Standalone).
     - `/api/v1/*` و `/uploads/*` → حاوية `backend` (FastAPI).
-- **Caddy Internal CA:** يستخرج Root CA محلي ويوقّع شهادات HTTPS لـ `aldrasat.edu`. يُصدِّر Root CA إلى أجهزة العميل عبر صفحة تنزيل مؤمَّنة (أو توزيع يدوي). هذا يُفعّل `Secure` على الكوكيز ويُنهي الحاجة لأي استثناء متصفح.
+- **Caddy Internal CA:** يستخرج Root CA محلي ويوقّع شهادات HTTPS لـ `aldirasat.edu`. يُصدِّر Root CA إلى أجهزة العميل عبر صفحة تنزيل مؤمَّنة (أو توزيع يدوي). هذا يُفعّل `Secure` على الكوكيز ويُنهي الحاجة لأي استثناء متصفح.
 - **عزل الشبكة (LAN Bypass Fix):** الخدمات الخلفية (FastAPI على 8000، PostgreSQL على 5432) **لا تستمع على `0.0.0.0`** في `docker-compose.yml`؛ فقط على شبكة `lims-internal` الداخلية. لا يمكن لأي جهاز على LAN الوصول إليها مباشرة. اختبار التحقق: `nmap 192.168.x.x -p 5432` يجب أن يُظهر الفلترة فقط.
 - **Cloudflare Access (Zero Trust):** الوصول عن بُعد محمي بمجموعة قواعد Zero Trust: قائمة بريدية مُعتمدة + MFA (TOTP) + Email OTP. **حتى لو سُرّب Tunnel Token**، المهاجم لا يستطيع الدخول بدون OTP.
 - **🆕 البحث الدلالي RAG** ينفَّذ كاستعلام SQL واحد على PostgreSQL باستخدام عامل cosine distance (`<=>`) المدمج في pgvector. لا توجد شبكة داخلية إضافية.
@@ -352,7 +352,7 @@ flowchart TB
 **آلية المصادقة في الفرونت اند (نهائي ومبسَّط):**
 - الباك اند يضع الـ Access/Refresh Tokens في `HttpOnly Secure Cookies` عند تسجيل الدخول.
 - الفرونت اند يعتمد على إرسال الكوكيز تلقائياً مع كل طلب عبر `credentials: 'include'`.
-- **السبب التقني:** Caddy يعمل كـ **Internal CA** ويوقّع شهادات HTTPS موثوقة محلياً لـ `aldrasat.edu` (مع تصدير Root CA لأجهزة العميل). النتيجة:
+- **السبب التقني:** Caddy يعمل كـ **Internal CA** ويوقّع شهادات HTTPS موثوقة محلياً لـ `aldirasat.edu` (مع تصدير Root CA لأجهزة العميل). النتيجة:
     - **HTTPS مفعَّل على LAN** → علم `Secure` على الكوكيز **يعمل بشكل قاطع**.
     - لا حاجة لأي `SameSite=None; Secure` أو workaround.
     - الإعداد `Secure + SameSite=Lax + HttpOnly` كافٍ تماماً وآمن.
@@ -371,7 +371,7 @@ sequenceDiagram
     participant DB as PostgreSQL
     participant Caddy as Caddy (Internal CA)
 
-    U->>F: إدخال بيانات الدخول (https://aldrasat.edu)
+    U->>F: إدخال بيانات الدخول (https://aldirasat.edu)
     Note over U,Caddy: TLS handshake - شهادة موثّقة من Caddy Internal CA
     F->>B: POST /api/v1/auth/login (credentials: include)
     B->>DB: التحقق من المستخدم
@@ -407,7 +407,7 @@ sequenceDiagram
     - `Secure`: ✅ (يعمل 100% على LAN بفضل Caddy Internal CA)
     - `SameSite=Lax`: ✅
     - `Path=/`: ✅
-    - `Domain`: يُترك فارغاً (الكوكيز خاصة بنطاق LAN المحلي، `aldrasat.edu`).
+    - `Domain`: يُترك فارغاً (الكوكيز خاصة بنطاق LAN المحلي، `aldirasat.edu`).
 - **CSRF Protection:** `SameSite=Lax` للعمليات العادية + Origin/Referer check في الباك اند للعمليات الحساسة.
 
 ### هيكل الصلاحيات — ثلاثي المستويات
@@ -1050,7 +1050,7 @@ flowchart LR
     }
 }
 
-aldrasat.edu {
+aldirasat.edu {
     tls internal               # شهادة موقّعة من Caddy Internal CA
     encode gzip
 
@@ -1165,7 +1165,7 @@ credentials-file: /etc/cloudflared/<tunnel-id>.json
 
 ingress:
   # 1. Remote Admin (Zero Trust protected)
-  - hostname: admin.aldrasat.edu
+  - hostname: admin.aldirasat.edu
     service: http://caddy:443
     originRequest:
       noTLSVerify: false
@@ -1174,7 +1174,7 @@ ingress:
 ```
 
 **Zero Trust Rules (في Cloudflare Dashboard):**
-- التطبيق: `admin.aldrasat.edu`
+- التطبيق: `admin.aldirasat.edu`
 - Policy: `Allow` للمستخدمين في `superadmin@institute.local` و `dev@institute.local`
 - Authentication: **Email OTP + MFA (TOTP)**
 - Session duration: 1 ساعة
@@ -1287,7 +1287,7 @@ ingress:
 - **Caddy Production:**
     - `Caddyfile` النهائي مع Internal CA.
     - تصدير Root CA على صفحة setup مؤمَّنة.
-- **Cloudflare Access (Zero Trust):** إعداد Tunnel + Policies (Email OTP + MFA) لـ `admin.aldrasat.edu`.
+- **Cloudflare Access (Zero Trust):** إعداد Tunnel + Policies (Email OTP + MFA) لـ `admin.aldirasat.edu`.
 - **🆕 micro-backup مبسَّط:** نشر `micro-backup.sh` + إضافة cron entry، اختبار استعادة (يحتوي على بيانات + متجهات).
 - **🆕 اختبارات قبول v1.6:**
     - **Offline 100%:** فصل الإنترنت، التأكد من SIS/LMS يعمل.

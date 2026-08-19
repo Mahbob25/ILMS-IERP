@@ -102,7 +102,7 @@ class Settings(BaseSettings):
     TIMEZONE: str = "Asia/Riyadh"
     HTTP_PROXY: str = ""
     HTTPS_PROXY: str = ""
-    NO_PROXY: str = "localhost,127.0.0.1,.aldrasat.edu"
+    NO_PROXY: str = "localhost,127.0.0.1,.aldirasat.edu"
 ```
 
 ### 2. `apps/erp/backend/app/core/timezone.py` (NEW)
@@ -179,7 +179,7 @@ services:
       TIMEZONE: Asia/Riyadh
       HTTP_PROXY: "${HTTP_PROXY:-}"
       HTTPS_PROXY: "${HTTPS_PROXY:-}"
-      NO_PROXY: "${NO_PROXY:-localhost,127.0.0.1,.aldrasat.edu,database}"
+      NO_PROXY: "${NO_PROXY:-localhost,127.0.0.1,.aldirasat.edu,database}"
       # ... existing ...
 
   frontend:
@@ -209,7 +209,7 @@ services:
     }
 }
 
-aldrasat.edu {
+aldirasat.edu {
     tls internal
     encode gzip
 
@@ -228,9 +228,9 @@ aldrasat.edu {
 | `TIMEZONE` | `Asia/Riyadh` | `Asia/Riyadh` |
 | `BACKEND_URL` | `host.docker.internal:8000` | `backend:8000` |
 | `FRONTEND_URL` | `host.docker.internal:3000` | `frontend:3000` |
-| `HTTP_PROXY` | (empty — no proxy) | `http://proxy.aldrasat.edu:3128` |
-| `HTTPS_PROXY` | (empty — no proxy) | `http://proxy.aldrasat.edu:3128` |
-| `NO_PROXY` | defaults | `localhost,127.0.0.1,.aldrasat.edu,database` |
+| `HTTP_PROXY` | (empty — no proxy) | `http://proxy.aldirasat.edu:3128` |
+| `HTTPS_PROXY` | (empty — no proxy) | `http://proxy.aldirasat.edu:3128` |
+| `NO_PROXY` | defaults | `localhost,127.0.0.1,.aldirasat.edu,database` |
 
 ---
 

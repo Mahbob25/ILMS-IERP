@@ -11,9 +11,9 @@
 - [ ] Provision VM (2 vCPU / 4 GB, Ubuntu 24.04) — see `docs/operations/cloud-deploy.md`
 - [ ] Install Docker Engine + compose plugin
 - [ ] `git clone` repo, create `.env` from `.env.example` with real secrets
-- [ ] Create Cloudflare tunnel, set `TUNNEL_TOKEN`, Public Hostname `aldrasat.edu` → `caddy:80`
+- [ ] Create Cloudflare tunnel, set `TUNNEL_TOKEN`, Public Hostname `aldirasat.edu` → `caddy:80`
 - [ ] `./scripts/deploy.sh` (build → `alembic upgrade head` → up)
-- [ ] Verify `https://aldrasat.edu/ar/login` + `/api/v1/health`
+- [ ] Verify `https://aldirasat.edu/ar/login` + `/api/v1/health`
 - [ ] Backup cron: `scripts/backup.sh` daily + EBS snapshots
 - [ ] Firewall: SSH only; ports 80/443 closed (tunnel-only ingress)
 

@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     ENVIRONMENT: str = "production"
-    CORS_ORIGINS: str = "https://aldirasat.com,https://www.aldirasat.com,https://portal.aldirasat.com"
+    CORS_ORIGINS: str = "https://aldirasat.com,https://www.aldirasat.com,https://portal.aldirasat.com,https://aldirasat.vercel.app,https://aldirasat-erp.vercel.app,https://aldirasat-portal.vercel.app"
     TEMPLATES_DIR: str = ""
     TIMEZONE: str = "Asia/Riyadh"
     HTTP_PROXY: str = ""

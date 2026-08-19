@@ -36,7 +36,7 @@
 
 Ship an **external high-traffic portal** for students/parents without destabilizing the internal ERP (`lims`). The ERP stays the **System of Record** (sole writer to `erp.*`). The portal is **two new deployables** (`portal_frontend` + `portal_backend` BFF) plus a **unified stateless `ai-service`** that serves both the internal curriculum ingestion and future student-facing AI (pronunciation coach, code reviewer, revision plan, Arabic tutor). They share one `ai-service` image but run on **separate Redis queues** (`ai:student` HIGH / `ai:ingestion` LOW) so batch ingestion never starves streaming answers.
 
-All three stacks share **one Docker network** (`lims-internal`) and **one Caddy** ingress with **subdomain isolation** (`erp.aldrasat.edu` vs `portal.aldrasat.edu`). Two compose files keep the `memory.md` 4-container ERP limit intact.
+All three stacks share **one Docker network** (`lims-internal`) and **one Caddy** ingress with **subdomain isolation** (`erp.aldirasat.edu` vs `portal.aldirasat.edu`). Two compose files keep the `memory.md` 4-container ERP limit intact.
 
 ---
 
@@ -66,7 +66,7 @@ All three stacks share **one Docker network** (`lims-internal`) and **one Caddy*
 |---|---|---|
 | ERP 4-container stack (`docker-compose.yml`) | Done | `caddy` :80, `frontend` :3000, `backend` :8000, `database` pg16+pgvector. `lims-internal` bridge. |
 | `pgvector` extension + HNSW | Done | `infrastructure/postgres/init.sql` already `CREATE EXTENSION vector`. |
-| Cloudflare Tunnel (`cloudflared` profile) | Done / extend | Add portal public hostname `portal.aldrasat.edu → caddy:80` (see §10). |
+| Cloudflare Tunnel (`cloudflared` profile) | Done / extend | Add portal public hostname `portal.aldirasat.edu → caddy:80` (see §10). |
 | `docs/plans/ai-pipeline-implementation-plan.md` tables (§6) | Plan only | `curriculum_documents`, `ingestion_jobs`, `chunks VECTOR(1536) HNSW`, `concepts`, `concept_dependencies`, `questions`, `ai_usage_logs` — migration lands before portal reads RAG. |
 | Design system (`frontend-design-rules.md`) | Done | Professional Minimalist, `slate-50` bg, `brand-500 #1E3A8A`, `ai-500 #0D9488`, `lucide-react`, `.card` primitives. Reuse for portal web. |
 
@@ -144,12 +144,12 @@ volumes:
 Caddy subdomain blocks (extend `infrastructure/caddy/Caddyfile`):
 
 ```caddy
-erp.aldrasat.edu {
+erp.aldirasat.edu {
     reverse_proxy /api/v1/* {env.BACKEND_URL}
     reverse_proxy /uploads/* {env.BACKEND_URL}
     reverse_proxy * {env.FRONTEND_URL}
 }
-portal.aldrasat.edu {
+portal.aldirasat.edu {
     reverse_proxy /api/* portal-backend:8001
     reverse_proxy * portal-frontend:3001
 }
@@ -315,7 +315,7 @@ apps/portal/apps/erp/backend/app/
 
 - `portal.users` + `portal.refresh_tokens`, `PORTAL_JWT_SECRET` (distinct from `JWT_SECRET_KEY`), `HttpOnly Secure Lax 10m/30d`.
 - Login = **phone/OTP** (primary) or email+password with lower friction, separate lockout (5 attempts/15m), separate rotation.
-- Cookies **subdomain-scoped** (`Domain=portal.aldrasat.edu` vs `Domain=erp.aldrasat.edu`) — no cross-leak.
+- Cookies **subdomain-scoped** (`Domain=portal.aldirasat.edu` vs `Domain=erp.aldirasat.edu`) — no cross-leak.
 - `POST /api/auth/verify-otp` → sets portal cookies; `POST /api/auth/refresh` rotates; `POST /api/auth/logout` revokes.
 - `parent_links` gate: guardian sees only linked `student_id`(s).
 
@@ -343,7 +343,7 @@ Browser → portal_frontend → portal_backend (portal JWT cookie)
 - `GET /api/ai/jobs/{job_id}` polls `GET ai:result:{job_id}` (TTL 1h) or SSE.
 - Never writes `chunks`/`concepts`; enqueues only to `ai:student` HIGH queue.
 
-**Rate limiting & WAF:** `slowapi` (or Redis sliding window) on all `/api/*`; stricter on `portal.*` than `erp.*` (public parents vs allowlisted staff). Cloudflare WAF on `portal.aldrasat.edu`.
+**Rate limiting & WAF:** `slowapi` (or Redis sliding window) on all `/api/*`; stricter on `portal.*` than `erp.*` (public parents vs allowlisted staff). Cloudflare WAF on `portal.aldirasat.edu`.
 
 ---
 
@@ -415,13 +415,13 @@ Student: Pronunciation/Code Review/Revision ──→ ai:student HIGH ──┘ 
 |---|---|---|
 | Compose | `docker-compose.yml` (4 services, `lims-internal` bridge) | `docker-compose.portal.yml` (external `lims-internal`, 4 services: portal-backend, portal-frontend, ai-service, redis) |
 | Caddy | Sole host-port `:80` (`:443` via Cloudflare) | Two subdomain blocks (see §4) — no `ports:` on portal/ai/redis |
-| Hostnames | `erp.aldrasat.edu` → `frontend:3000` + `backend:8000` | `portal.aldrasat.edu` → `portal-frontend:3001` + `portal-backend:8001` |
+| Hostnames | `erp.aldirasat.edu` → `frontend:3000` + `backend:8000` | `portal.aldirasat.edu` → `portal-frontend:3001` + `portal-backend:8001` |
 | DB | `database:5432` — `erp.*` + `portal.*` schemas on same host initially | `redis:6379` portal-only; ERP never connects |
 | Auth secrets | `JWT_SECRET_KEY` (`erp.*` users) | `PORTAL_JWT_SECRET` + `ERP_SERVICE_KEY` (service-to-service, rotated via `.env`) |
 | AI egress | Cloudflare Tunnel egress allowlist for Gemini/OpenAI | No inbound to `ai-service` except via `portal_backend`/`backend` |
-| Cookies/CSP | `Domain=erp.aldrasat.edu`, CSP per app | `Domain=portal.aldrasat.edu`, stricter WAF/rate limits |
+| Cookies/CSP | `Domain=erp.aldirasat.edu`, CSP per app | `Domain=portal.aldirasat.edu`, stricter WAF/rate limits |
 
-**Local dev:** `docker compose up -d && docker compose -f docker-compose.portal.yml up -d` (auto-joins `lims-internal`). No DNS: `hosts` entry `127.0.0.1 erp.aldrasat.local portal.aldrasat.local` + Caddy `:80` fallback still serves both.
+**Local dev:** `docker compose up -d && docker compose -f docker-compose.portal.yml up -d` (auto-joins `lims-internal`). No DNS: `hosts` entry `127.0.0.1 erp.aldirasat.local portal.aldirasat.local` + Caddy `:80` fallback still serves both.
 
 **Prod deploy — same VM, second compose:**
 
@@ -433,8 +433,8 @@ GEMINI_API_KEY=...
 OPENAI_API_KEY=...
 
 # Cloudflare — Zero Trust → Tunnel → Public Hostnames
-portal.aldrasat.edu → HTTP → caddy:80
-erp.aldrasat.edu    → HTTP → caddy:80   # was aldrasat.edu, now subdomain
+portal.aldirasat.edu → HTTP → caddy:80
+erp.aldirasat.edu    → HTTP → caddy:80   # was aldirasat.edu, now subdomain
 
 # Deploy (both composes)
 docker compose up -d
@@ -451,7 +451,7 @@ No `NEXT_PUBLIC_API_URL` is baked into either frontend image (same-origin `/api/
 
 All under `/api/v1/internal/*`, `X-Service-Key` + `X-Actor-Id` + `audit_logs`. See §6 table.
 
-### Portal BFF (`portal_backend` :8001, public via `portal.aldrasat.edu/api/*`)
+### Portal BFF (`portal_backend` :8001, public via `portal.aldirasat.edu/api/*`)
 
 | Group | Method & Path | Auth | Notes |
 |---|---|---|---|
@@ -559,7 +559,7 @@ Bilingual: `ar` default, RTL, header `Globe` toggle persists via `PATCH /api/me`
 - `apps/ai-service/` — minimal FastAPI stub :8002 (health + `/internal/enqueue` 501) so compose boots; queues/LLM/RAG ship in Phase 3.
 
 **Gate (local):** ✅ `apps/portal/backend` tests pass (11/11 in `apps/portal/backend/tests/test_portal_bff.py` — OTP flow, cookie flags, cache hit/miss headers, ERP-down 502, queue enqueue); `apps/portal/frontend` builds standalone; ERP regression tests green (`test_portal_internal_routes.py` + `test_csrf_and_rate_limit.py`).
-**Gate (prod, pending DNS/hosts):** `portal.aldrasat.edu` serves portal landing; portal OTP login → dashboard; `erp.aldrasat.edu` still serves ERP; cookies are subdomain-isolated in DevTools.
+**Gate (prod, pending DNS/hosts):** `portal.aldirasat.edu` serves portal landing; portal OTP login → dashboard; `erp.aldirasat.edu` still serves ERP; cookies are subdomain-isolated in DevTools.
 
 ### Phase 2 — Read Paths + Cache — ✅ DONE
 
@@ -591,7 +591,7 @@ Bilingual: `ar` default, RTL, header `Globe` toggle persists via `PATCH /api/me`
 
 - **Queue → Redis Streams + DLQ** — `apps/portal/apps/erp/backend/app/services/queue.py` + `apps/erp/backend/app/core/queue.py` both promoted from BRPOPLPUSH to `RedisStreamsQueue` (XADD/XREADGROUP/XACK, 30s visibility, 3-attempt max → `ai:dlq`); `RedisBrpopQueue` kept for rollback; `NoopQueue` fallback preserved. `get_queue()` now returns Streams when `REDIS_URL` is set.
 - **Rate limits (app layer)** — portal default 30/min (ERP 100/min), auth 5–10/min, AI 10/min, force-refresh 1/s. Slowapi is the defense-in-depth layer.
-- **Caddy hardening** — `portal.aldrasat.edu` block caps request bodies at 2MB; `caddy validate` passes. (Edge `rate_limit` directive needs a plugin image, so edge limits stay app-level.)
+- **Caddy hardening** — `portal.aldirasat.edu` block caps request bodies at 2MB; `caddy validate` passes. (Edge `rate_limit` directive needs a plugin image, so edge limits stay app-level.)
 - **Audit logs review** — `portal_internal` writes audit rows with `actor_id` in the JSONB payload + null `user_id` (portal actor ids don't exist in the ERP `users` FK) — no change needed.
 - **Backup/DR** — `scripts/backup.sh` now snapshots portal Redis (`redis_data` RDB: queues + cache replay); `scripts/restore-drill.sh` (new) restores the PG dump into a throwaway DB, verifies the `portal` schema/tables, validates the redis archive, drops the temp DB.
 - **Playwright E2E** — `apps/portal/apps/erp/frontend/playwright.config.ts` + `tests/e2e/portal.spec.ts` (6 tests: OTP login → dashboard, grades, attendance, fees, settings, language toggle) with the BFF API mocked at the network layer; runs against `next start` with no live backend needed. All 6 green.
@@ -683,9 +683,9 @@ No schema change in that file — the SQL (§6) is canonical; this plan only add
 |---|---|---|
 | 1 | OTP provider | **MVP: console-log OTP** (copy to parent for E2E); swap to SMS gateway (e.g. local SMS provider) in Phase 4 if needed |
 | 2 | `parent_links` verification | **MVP: manual secretary verification** in ERP (`dashboard/users` → link student); later add self-serve invite |
-| 3 | `ai:student` rate limit | **Per-student 10 req/min**, global 100 req/s on `portal.aldrasat.edu` (Cloudflare + Redis sliding window) |
+| 3 | `ai:student` rate limit | **Per-student 10 req/min**, global 100 req/s on `portal.aldirasat.edu` (Cloudflare + Redis sliding window) |
 | 4 | `ai-service` deployment target for v1 | **Same VM, same `lims-internal`** (simple); move HIGH pool to GPU VM / Cloud Run only if latency >2s under load |
-| 5 | Portal subdomains in prod | `erp.aldrasat.edu` + `portal.aldrasat.edu` (requires Cloudflare public hostnames — see §10); keep `aldrasat.edu` as redirect to portal landing if desired |
+| 5 | Portal subdomains in prod | `erp.aldirasat.edu` + `portal.aldirasat.edu` (requires Cloudflare public hostnames — see §10); keep `aldirasat.edu` as redirect to portal landing if desired |
 
 ---
 

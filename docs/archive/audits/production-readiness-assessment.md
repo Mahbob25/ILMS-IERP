@@ -266,7 +266,7 @@ cat > /opt/lims/.env << 'EOF'
 DATABASE_URL=postgresql+asyncpg://lims:your_password@database:5432/lims
 JWT_SECRET_KEY=your_secure_random_64char_hex
 ENVIRONMENT=production
-CORS_ORIGINS=https://aldrasat.edu
+CORS_ORIGINS=https://aldirasat.edu
 EOF
 ```
 

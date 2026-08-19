@@ -854,7 +854,7 @@ engine = create_async_engine(
 
 Edit `infrastructure/caddy/Caddyfile`:
 
-- For **public domain** (aldrasat.edu resolves publicly): replace `tls internal` with Let's Encrypt
+- For **public domain** (aldirasat.edu resolves publicly): replace `tls internal` with Let's Encrypt
 - For **private LAN** (no public DNS): keep `tls internal`, add a comment
 
 ```caddyfile
@@ -868,7 +868,7 @@ Edit `infrastructure/caddy/Caddyfile`:
     }
 }
 
-aldrasat.edu {
+aldirasat.edu {
     # For public domain: tls { issuer acme }
     # For private LAN: tls internal (distribute root CA to clients)
     tls internal
@@ -912,7 +912,7 @@ git commit -m "feat: add Sentry, CI/CD, Docker security, backup script, structur
 
 ### 💻 8.1 Security Headers in Caddyfile (I-05)
 
-Edit `infrastructure/caddy/Caddyfile` — append inside the `aldrasat.edu` block:
+Edit `infrastructure/caddy/Caddyfile` — append inside the `aldirasat.edu` block:
 
 ```caddyfile
 header {
@@ -1299,7 +1299,7 @@ services:
       ENVIRONMENT: production
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER?err}:${POSTGRES_PASSWORD?err}@database:5432/${POSTGRES_DB:-lims}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY?err}
-      CORS_ORIGINS: ${CORS_ORIGINS:-https://aldrasat.edu}
+      CORS_ORIGINS: ${CORS_ORIGINS:-https://aldirasat.edu}
       SENTRY_DSN: ${SENTRY_DSN:-}
     depends_on:
       database: { condition: service_healthy }
@@ -1323,7 +1323,7 @@ services:
     restart: always
     environment:
       TZ: Asia/Riyadh
-      NEXT_PUBLIC_API_URL: https://aldrasat.edu/api/v1
+      NEXT_PUBLIC_API_URL: https://aldirasat.edu/api/v1
     depends_on:
       backend: { condition: service_healthy }
     networks:
@@ -1589,7 +1589,7 @@ JWT_SECRET_KEY=R26KSNDzRHt32mLYDUK3PMiNIW80xj4KNO7YTXYjwzs=
 
 # ── Application ───────────────────────────────────────
 ENVIRONMENT=production
-CORS_ORIGINS=https://aldrasat.edu
+CORS_ORIGINS=https://aldirasat.edu
 TIMEZONE=Asia/Riyadh
 BACKEND_URL=backend:8000
 FRONTEND_URL=frontend:3000
@@ -1758,8 +1758,8 @@ curl -sf http://localhost:8000/api/v1/health
 curl -sf -o /dev/null -w "%{http_code}" http://localhost:3000/ar/login
 
 # 10. Check via Caddy proxy
-curl -sf -o /dev/null -w "%{http_code}" https://aldrasat.edu/api/v1/health
-curl -sf -o /dev/null -w "%{http_code}" https://aldrasat.edu/ar/login
+curl -sf -o /dev/null -w "%{http_code}" https://aldirasat.edu/api/v1/health
+curl -sf -o /dev/null -w "%{http_code}" https://aldirasat.edu/ar/login
 ```
 
 ### 🖥️ Troubleshooting Deployment
@@ -1776,8 +1776,8 @@ curl -sf -o /dev/null -w "%{http_code}" https://aldrasat.edu/ar/login
 
 ```bash
 # Create a comprehensive test
-curl -sf https://aldrasat.edu/api/v1/health && echo " Backend OK"
-curl -sf -o /dev/null -w "Frontend: %{http_code}\n" https://aldrasat.edu/ar/login
+curl -sf https://aldirasat.edu/api/v1/health && echo " Backend OK"
+curl -sf -o /dev/null -w "Frontend: %{http_code}\n" https://aldirasat.edu/ar/login
 docker compose ps --format "table {{.Name}}\t{{.Status}}\t{{.Ports}}"
 ```
 
@@ -1792,8 +1792,8 @@ docker compose ps --format "table {{.Name}}\t{{.Status}}\t{{.Ports}}"
 - [ ] `JWT_SECRET_KEY` is a 64-char random hex (not the default)
 - [ ] `POSTGRES_PASSWORD` is a 32+ char random password (not default)
 - [ ] Sentry DSN is configured in `.env` and verified
-- [ ] CSP headers are being served: `curl -sI https://aldrasat.edu | grep -i content-security-policy`
-- [ ] HSTS headers are being served: `curl -sI https://aldrasat.edu | grep -i strict-transport`
+- [ ] CSP headers are being served: `curl -sI https://aldirasat.edu | grep -i content-security-policy`
+- [ ] HSTS headers are being served: `curl -sI https://aldirasat.edu | grep -i strict-transport`
 - [ ] Backend Dockerfile has `USER appuser` (non-root)
 - [ ] No database port exposed to host (5440 is internal only)
 - [ ] Backup script is executable and cron is configured
@@ -1867,8 +1867,8 @@ docker compose -f docker-compose.prod.yml exec backend alembic upgrade head
 
 # Verify
 docker compose -f docker-compose.prod.yml ps
-curl -sf https://aldrasat.edu/api/v1/health
-curl -sf -o /dev/null -w "%{http_code}" https://aldrasat.edu/ar/login
+curl -sf https://aldirasat.edu/api/v1/health
+curl -sf -o /dev/null -w "%{http_code}" https://aldirasat.edu/ar/login
 ```
 
 ### 🖥️ Post-Launch Verification

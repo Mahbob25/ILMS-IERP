@@ -52,7 +52,7 @@ Edit `.env`:
 - `JWT_SECRET_KEY` — generate: `python3 -c "import secrets; print(secrets.token_urlsafe(48))"`
 - `TUNNEL_TOKEN` — from step 4
 - `ENVIRONMENT=production`
-- `CORS_ORIGINS=https://aldrasat.edu`
+- `CORS_ORIGINS=https://aldirasat.edu`
 - `SENTRY_DSN` — leave empty if not used
 
 `scripts/deploy.sh` refuses to start if `JWT_SECRET_KEY` or `TUNNEL_TOKEN` are still the insecure defaults.
@@ -62,10 +62,10 @@ Edit `.env`:
 1. Cloudflare dashboard — **Zero Trust** — **Networks** — **Tunnels** — **Create a tunnel**
 2. Choose **Cloudflared**; copy the token into `.env` — `TUNNEL_TOKEN`
 3. Add a **Public Hostname**:
-   - Subdomain/domain: `aldrasat.edu`
+   - Subdomain/domain: `aldirasat.edu`
    - Service type: `HTTP`
    - URL: `caddy:80` (Docker service name)
-4. Ensure `aldrasat.edu` is on Cloudflare DNS (orange-cloud / proxied)
+4. Ensure `aldirasat.edu` is on Cloudflare DNS (orange-cloud / proxied)
 
 ## 5. Deploy
 
@@ -79,11 +79,11 @@ This pulls the code, builds images, and starts the stack with the `tunnel` profi
 ## 6. Verify
 
 ```bash
-curl -fsS https://aldrasat.edu/api/v1/health      # backend health
+curl -fsS https://aldirasat.edu/api/v1/health      # backend health
 docker compose ps                                 # all containers Up
 ```
 
-- Frontend: `https://aldrasat.edu/ar/login`
+- Frontend: `https://aldirasat.edu/ar/login`
 - Uploads survive container recreation (named volume `uploads_data` — `/app/uploads`)
 
 ## 7. Backups

@@ -9,10 +9,10 @@ const BASE_URL = process.env.BASE_URL || 'http://localhost:8000/api/v1'
 const TOKEN_FILE = path.join(__dirname, '.auth-tokens.json')
 
 const ROLES = [
-  { role: 'superadmin', email: 'superadmin@aldrasat.com', password: 'admin123' },
-  { role: 'manager', email: 'manager@aldrasat.com', password: 'manager123' },
-  { role: 'secretary', email: 'secretary@aldrasat.com', password: 'secretary123' },
-  { role: 'teacher', email: 'teacher@aldrasat.com', password: 'teacher123' },
+  { role: 'superadmin', email: 'superadmin@aldirasat.com', password: 'admin123' },
+  { role: 'manager', email: 'manager@aldirasat.com', password: 'manager123' },
+  { role: 'secretary', email: 'secretary@aldirasat.com', password: 'secretary123' },
+  { role: 'teacher', email: 'teacher@aldirasat.com', password: 'teacher123' },
 ]
 
 async function loginAs(email: string, password: string): Promise<string> {

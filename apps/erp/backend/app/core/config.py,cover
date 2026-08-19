@@ -10,12 +10,12 @@
 >     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
 >     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 >     ENVIRONMENT: str = "production"
->     CORS_ORIGINS: str = "https://aldrasat.edu"
+>     CORS_ORIGINS: str = "https://aldirasat.edu"
 >     TEMPLATES_DIR: str = ""
 >     TIMEZONE: str = "Asia/Riyadh"
 >     HTTP_PROXY: str = ""
 >     HTTPS_PROXY: str = ""
->     NO_PROXY: str = "localhost,127.0.0.1,.aldrasat.edu"
+>     NO_PROXY: str = "localhost,127.0.0.1,.aldirasat.edu"
   
 >     @model_validator(mode="after")
 >     def validate_required_settings(self):
