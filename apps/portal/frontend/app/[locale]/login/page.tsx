@@ -25,12 +25,21 @@ export default function PortalSsoPage() {
       return;
     }
     (async () => {
-      try {
-        await ssoLogin(ticket);
-        router.replace(`/${locale}/dashboard`);
-      } catch {
-        window.location.href = `${marketingBase}/${locale}/login`;
+      // The single-use ticket can fail on the first attempt if a concurrent
+      // /auth/me check from the AuthProvider races it (401 → refresh → fail).
+      // Retry the SSO exchange once before giving up.
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          await ssoLogin(ticket);
+          router.replace(`/${locale}/dashboard`);
+          return;
+        } catch {
+          if (attempt === 0) {
+            await new Promise((r) => setTimeout(r, 600));
+          }
+        }
       }
+      window.location.href = `${marketingBase}/${locale}/login`;
     })();
   }, [ssoLogin, locale, router]);
 

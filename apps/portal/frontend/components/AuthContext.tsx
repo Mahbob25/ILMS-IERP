@@ -35,6 +35,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<PortalUser | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const isLoggingOut = useRef(false);
+  const isSsoInProgress = useRef(false);
   const pendingCheckSession = useRef<Promise<PortalUser | null> | null>(null);
 
   const checkSession = useCallback(async (): Promise<PortalUser | null> => {
@@ -52,7 +53,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
         return response.data;
       } catch {
-        if (!isLoggingOut.current) {
+        // Don't clear the user if an SSO exchange is mid-flight — the
+        // mount-time /auth/me (no cookies yet) would otherwise race the SSO
+        // POST, wipe the just-authenticated user, and bounce back to login.
+        if (!isLoggingOut.current && !isSsoInProgress.current) {
           setUser(null);
         }
         return null;
@@ -91,6 +95,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const ssoLogin = useCallback(
     async (ticket: string): Promise<PortalUser> => {
+      isSsoInProgress.current = true;
       setLoading(true);
       try {
         const response = await apiClient.post<PortalUser>("/auth/sso", { ticket });
@@ -100,6 +105,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(null);
         throw error;
       } finally {
+        isSsoInProgress.current = false;
         setLoading(false);
       }
     },

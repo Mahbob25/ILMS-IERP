@@ -75,7 +75,12 @@ export default function LoginPage() {
 
     setSubmitting(true);
     try {
-      const res = await api.post("/auth/login", { email, password });
+      // POST directly to the ERP origin (NOT through the Vercel rewrite) so
+      // the ERP's Set-Cookie for access_token/refresh_token lands on the ERP
+      // origin (aldirasat-erp.vercel.app). Through the rewrite the cookies
+      // would be stored on the marketing origin and the ERP middleware would
+      // never see them.
+      const res = await api.post(`${ERP_URL}/api/v1/auth/login`, { email, password });
 
       const data = res.data;
       // Students/parents get a one-time SSO ticket → portal subdomain.
