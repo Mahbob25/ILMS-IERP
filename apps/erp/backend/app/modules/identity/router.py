@@ -172,7 +172,7 @@ async def login(
     if "application/x-www-form-urlencoded" in content_type:
         locale = (locale or "ar") if locale in {"ar", "en"} else "ar"
         redirect_url = f"{settings.ERP_FRONTEND_URL}/{locale}/dashboard"
-        redirect = RedirectResponse(url=redirect_url, status_code=status.HTTP_307_TEMPORARY_REDIRECT)
+        redirect = RedirectResponse(url=redirect_url, status_code=status.HTTP_303_SEE_OTHER)
         secure = settings.ENVIRONMENT != "development"
         redirect.set_cookie(
             key="access_token",
@@ -235,7 +235,7 @@ async def _issue_portal_sso(response: Response, db: AsyncSession, portal_user: d
     if "application/x-www-form-urlencoded" in content_type:
         locale = (locale or "ar") if locale in {"ar", "en"} else "ar"
         ticket_url = f"{settings.PORTAL_FRONTEND_URL}/{locale}/login?ticket={ticket}"
-        return RedirectResponse(url=ticket_url, status_code=status.HTTP_307_TEMPORARY_REDIRECT)
+        return RedirectResponse(url=ticket_url, status_code=status.HTTP_303_SEE_OTHER)
 
     return {
         "user_type": "portal",
