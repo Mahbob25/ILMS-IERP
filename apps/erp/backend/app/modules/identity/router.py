@@ -2,7 +2,8 @@ import uuid
 import hashlib
 from datetime import datetime, timezone, timedelta
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, status, Response, Request, Cookie, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Response, Request, Cookie, Query, Form
+from fastapi.responses import RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import text
@@ -80,11 +81,23 @@ def _clear_auth_cookies(response: Response) -> None:
 @auth_router.post("/login")
 @limiter.limit("3/minute")
 async def login(
-    login_data: UserLogin,
     request: Request,
     response: Response,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    email: Optional[str] = Form(None),
+    password: Optional[str] = Form(None),
+    locale: Optional[str] = Form(None),
 ):
+    # Accept both JSON (axios/api clients) and form-encoded (browser form POST
+    # from the marketing login). Form POSTs are top-level navigations, so the
+    # browser stores the ERP auth cookies as first-party (third-party cookie
+    # blocking would otherwise discard them).
+    content_type = request.headers.get("content-type", "")
+    if "application/x-www-form-urlencoded" in content_type:
+        login_data = UserLogin(email=email or "", password=password or "")
+    else:
+        login_data = UserLogin.model_validate(await request.json())
+
     query = select(User).options(joinedload(User.role), joinedload(User.employee)).where(User.email == login_data.email)
     result = await db.execute(query)
     user = result.scalar_one_or_none()
@@ -99,7 +112,7 @@ async def login(
         # Fall back to portal users (students/parents) — same credentials style.
         portal_user = await _lookup_portal_user(db, login_data.email, login_data.password)
         if portal_user is not None:
-            return await _issue_portal_sso(response, db, portal_user, request)
+            return await _issue_portal_sso(response, db, portal_user, request, locale)
         if user:
             user.failed_login_attempts += 1
             if user.failed_login_attempts >= 5:
@@ -152,6 +165,12 @@ async def login(
         ip_address=request.client.host if request.client else None
     )
 
+    # Browser form POST → follow the redirect so cookies stay first-party.
+    if "application/x-www-form-urlencoded" in content_type:
+        locale = (locale or "ar") if locale in {"ar", "en"} else "ar"
+        redirect_url = f"{settings.ERP_FRONTEND_URL}/{locale}/dashboard"
+        return RedirectResponse(url=redirect_url, status_code=status.HTTP_307_TEMPORARY_REDIRECT)
+
     return user
 
 
@@ -176,7 +195,7 @@ async def _lookup_portal_user(db: AsyncSession, email: str, password: str):
     return account
 
 
-async def _issue_portal_sso(response: Response, db: AsyncSession, portal_user: dict, request: Request):
+async def _issue_portal_sso(response: Response, db: AsyncSession, portal_user: dict, request: Request, locale: Optional[str] = None):
     """Issue a one-time SSO ticket for a portal user (student/parent)."""
     from app.modules.identity.security import create_sso_ticket
     from app.core.config import settings
@@ -188,6 +207,13 @@ async def _issue_portal_sso(response: Response, db: AsyncSession, portal_user: d
         payload={"portal_user_id": str(portal_user["id"]), "sso_ticket_issued": True},
         ip_address=request.client.host if request.client else None,
     )
+
+    content_type = request.headers.get("content-type", "")
+    if "application/x-www-form-urlencoded" in content_type:
+        locale = (locale or "ar") if locale in {"ar", "en"} else "ar"
+        ticket_url = f"{settings.PORTAL_FRONTEND_URL}/{locale}/login?ticket={ticket}"
+        return RedirectResponse(url=ticket_url, status_code=status.HTTP_307_TEMPORARY_REDIRECT)
+
     return {
         "user_type": "portal",
         "sso_ticket": ticket,

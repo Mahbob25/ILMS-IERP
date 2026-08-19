@@ -47,6 +47,8 @@ class Settings(BaseSettings):
     PORTAL_SSO_SECRET: str = ""
     # Where the ERP frontend sends students/parents after login.
     PORTAL_FRONTEND_URL: str = "https://portal.aldirasat.com"
+    # Where staff land after login (browser form POST path).
+    ERP_FRONTEND_URL: str = "https://aldirasat-erp.vercel.app"
 
     @model_validator(mode="after")
     def validate_required_settings(self):

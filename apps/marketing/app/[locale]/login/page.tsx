@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { Space_Grotesk, IBM_Plex_Sans_Arabic, Inter, JetBrains_Mono } from "next/font/google";
 import { Globe, ShieldAlert } from "lucide-react";
-import { api } from "@/lib/api";
+import LoginLoadingOverlay from "@/components/LoginLoadingOverlay";
 
 const spaceGrotesk = Space_Grotesk({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 const ibmArabic = IBM_Plex_Sans_Arabic({ subsets: ["arabic"], weight: ["400", "500", "600", "700"] });
@@ -12,7 +12,6 @@ const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] }
 const jetbrains = JetBrains_Mono({ subsets: ["latin"], weight: ["400", "500", "700"] });
 
 const ERP_URL = process.env.NEXT_PUBLIC_ERP_URL || "https://aldirasat-erp.vercel.app";
-const PORTAL_URL = process.env.NEXT_PUBLIC_PORTAL_URL || "https://aldirasat-portal.vercel.app";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -35,7 +34,7 @@ export default function LoginPage() {
       emailPlaceholder: "name@aldirasat.com",
       passwordPlaceholder: "••••••••",
       submitBtn: "تسجيل الدخول",
-      loading: "جاري التحقق...",
+      loading: "جاري تسجيل الدخول...",
       langToggle: "English",
       backToSite: "العودة إلى الموقع",
       footer: "تأكد من الحفاظ على سرية بيانات اعتمادك.",
@@ -50,7 +49,7 @@ export default function LoginPage() {
       emailPlaceholder: "name@aldirasat.com",
       passwordPlaceholder: "••••••••",
       submitBtn: "Sign In",
-      loading: "Authenticating...",
+      loading: "Signing you in...",
       langToggle: "العربية",
       backToSite: "Back to site",
       footer: "Keep your login credentials secure and confidential.",
@@ -74,36 +73,37 @@ export default function LoginPage() {
     }
 
     setSubmitting(true);
-    try {
-      // POST directly to the ERP origin (NOT through the Vercel rewrite) so
-      // the ERP's Set-Cookie for access_token/refresh_token lands on the ERP
-      // origin (aldirasat-erp.vercel.app). Through the rewrite the cookies
-      // would be stored on the marketing origin and the ERP middleware would
-      // never see them.
-      const res = await api.post(`${ERP_URL}/api/v1/auth/login`, { email, password });
 
-      const data = res.data;
-      // Students/parents get a one-time SSO ticket → portal subdomain.
-      if (data?.user_type === "portal" && data?.sso_ticket) {
-        window.location.href = `${PORTAL_URL}/${locale}/login?ticket=${encodeURIComponent(data.sso_ticket)}`;
-        return;
-      }
-      // Staff get ERP cookies set on the ERP origin by the login response —
-      // a cross-origin redirect lands them on the ERP dashboard where the
-      // middleware sees the cookie.
-      window.location.href = `${ERP_URL}/${locale}/dashboard`;
-    } catch (err: any) {
-      const detail = err.response?.data?.detail;
-      if (err.response?.status === 401) {
-        setError(t.errorFallback);
-      } else if (Array.isArray(detail)) {
-        setError(detail.map((d: any) => d.msg).join("; ") || t.errorFallback);
-      } else {
-        setError(detail || t.errorFallback);
-      }
-    } finally {
-      setSubmitting(false);
-    }
+    // Top-level form POST to the ERP origin — NOT an XHR. The browser treats
+    // this as a full-page navigation, so the ERP's Set-Cookie for
+    // access_token/refresh_token is stored as first-party on the ERP origin.
+    // (An XHR to a different origin gets its cookies discarded by Chrome's
+    // third-party cookie blocking, which broke staff login.)
+    const form = document.createElement("form");
+    form.method = "POST";
+    form.action = `${ERP_URL}/api/v1/auth/login`;
+    form.style.display = "none";
+
+    const emailInput = document.createElement("input");
+    emailInput.type = "hidden";
+    emailInput.name = "email";
+    emailInput.value = email;
+    form.appendChild(emailInput);
+
+    const passwordInput = document.createElement("input");
+    passwordInput.type = "hidden";
+    passwordInput.name = "password";
+    passwordInput.value = password;
+    form.appendChild(passwordInput);
+
+    const localeInput = document.createElement("input");
+    localeInput.type = "hidden";
+    localeInput.name = "locale";
+    localeInput.value = locale;
+    form.appendChild(localeInput);
+
+    document.body.appendChild(form);
+    form.submit();
   };
 
   return (
@@ -264,6 +264,11 @@ export default function LoginPage() {
           </p>
         </div>
       </div>
+
+      {/* Full-screen loading overlay while the login request is in flight */}
+      {submitting && (
+        <LoginLoadingOverlay text={t.loading} dir={isAr ? "rtl" : "ltr"} />
+      )}
     </div>
   );
 }
