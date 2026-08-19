@@ -46,7 +46,7 @@ class Settings(BaseSettings):
     # used to sign staff JWTs, and distinct from PORTAL_JWT_SECRET.
     PORTAL_SSO_SECRET: str = ""
     # Where the ERP frontend sends students/parents after login.
-    PORTAL_FRONTEND_URL: str = "https://portal.aldirasat.com"
+    PORTAL_FRONTEND_URL: str = "https://aldirasat-portal.vercel.app"
     # Where staff land after login (browser form POST path).
     ERP_FRONTEND_URL: str = "https://aldirasat-erp.vercel.app"
 

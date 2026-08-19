@@ -61,7 +61,7 @@ services:
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       PORTAL_JWT_SECRET: ${PORTAL_JWT_SECRET:-}
       PORTAL_SSO_SECRET: ${PORTAL_SSO_SECRET:-}
-      PORTAL_FRONTEND_URL: ${PORTAL_FRONTEND_URL:-https://portal.aldirasat.com}
+      PORTAL_FRONTEND_URL: ${PORTAL_FRONTEND_URL:-https://aldirasat-portal.vercel.app}
       BACKUP_DIR: /app/backups
     depends_on:
       database:
