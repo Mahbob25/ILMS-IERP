@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import { useRouter, useParams, usePathname } from "next/navigation";
 import { useAuth } from "@/components/AuthContext";
 import MobileTabBar from "@/components/MobileTabBar";
@@ -27,6 +27,7 @@ export default function PortalDashboardLayout({
   const pathname = usePathname();
   const { user, loading, logout } = useAuth();
   const [overflowOpen, setOverflowOpen] = useState(false);
+  const mainRef = useRef<HTMLElement>(null);
 
   const locale = (params?.locale as string) || "ar";
   const isRtl = locale === "ar";
@@ -193,13 +194,17 @@ export default function PortalDashboardLayout({
 
       {/* Main Column */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+        {/* Spacer for the fixed header (see DashboardHeader) */}
+        <div className="h-16 shrink-0" />
+
         <DashboardHeader
           locale={isRtl ? "ar" : "en"}
           user={user}
           onOpenOverflow={() => setOverflowOpen(true)}
+          scrollRef={mainRef}
         />
 
-        <main className="flex-1 overflow-y-auto p-4 md:p-6 min-w-0">{children}</main>
+        <main ref={mainRef} className="flex-1 overflow-y-auto p-4 md:p-6 min-w-0">{children}</main>
       </div>
 
       {/* Floating bottom nav (mobile only) */}

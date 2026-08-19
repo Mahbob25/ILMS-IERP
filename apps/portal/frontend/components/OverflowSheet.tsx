@@ -73,7 +73,7 @@ export default function OverflowSheet({ open, onClose, user, onLogout }: Props) 
       <div
         ref={sheetRef}
         className={`absolute bg-white shadow-xl border-slate-200 overflow-hidden flex flex-col ${
-          "bottom-0 inset-x-0 rounded-t-2xl border-t md:bottom-auto md:top-16 md:start-auto md:end-4 md:w-72 md:rounded-2xl md:border"
+          "bottom-0 inset-x-0 rounded-t-2xl border-t md:bottom-auto md:top-14 md:start-auto md:end-4 md:w-72 md:rounded-2xl md:border"
         }`}
       >
         <div className="flex items-center justify-between px-5 h-14 border-b border-slate-100 md:hidden">
