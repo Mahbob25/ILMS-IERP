@@ -19,7 +19,7 @@
 
 ## Tasks
 
-### 2.1 Create `backend/app/modules/academic/section_startup_checks.py`
+### 2.1 Create `apps/erp/backend/app/modules/academic/section_startup_checks.py`
 
 ```python
 from app.core.timezone import get_today
@@ -110,7 +110,7 @@ WHERE e.section_id = :sid
 
 The lifespan event fires when the uvicorn process starts. Since the server is manually booted each morning, this is the only trigger needed. There are no timers, no background loops, no "wait until midnight" logic — the checks run immediately and exit.
 
-In `backend/app/main.py`:
+In `apps/erp/backend/app/main.py`:
 
 ```python
 from contextlib import asynccontextmanager
@@ -150,8 +150,8 @@ async def _get_config_value(db: AsyncSession, key: str, default: str) -> str:
 
 | File | Action |
 |------|--------|
-| `backend/app/modules/academic/section_startup_checks.py` | **CREATE** — all check logic |
-| `backend/app/main.py` | **EDIT** — call `run_daily_section_checks()` inside lifespan |
+| `apps/erp/backend/app/modules/academic/section_startup_checks.py` | **CREATE** — all check logic |
+| `apps/erp/backend/app/main.py` | **EDIT** — call `run_daily_section_checks()` inside lifespan |
 
 ## Independent Boundary
 

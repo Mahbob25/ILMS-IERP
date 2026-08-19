@@ -28,7 +28,7 @@
 
 ### 9.1 Fix Hung Promise (F04, S05)
 
-In `frontend/lib/api.ts` at line 45:
+In `apps/erp/frontend/lib/api.ts` at line 45:
 
 ```typescript
 // Current:
@@ -40,7 +40,7 @@ return Promise.reject(new Error("Session expired — please log in again"))
 
 ### 9.2 Fix isRedirectingToLogin Never-Reset (S18)
 
-In `frontend/lib/api.ts` at ~line 16:
+In `apps/erp/frontend/lib/api.ts` at ~line 16:
 
 ```typescript
 // Current:
@@ -63,7 +63,7 @@ if (!isRedirectingToLogin) {
 
 ### 9.3 Fix Error Discrimination (F09)
 
-In `frontend/lib/api.ts`, modify the response interceptor to distinguish error types:
+In `apps/erp/frontend/lib/api.ts`, modify the response interceptor to distinguish error types:
 
 ```typescript
 api.interceptors.response.use(
@@ -93,7 +93,7 @@ api.interceptors.response.use(
 
 ### 9.4 Fix Logout Error Handling (F05)
 
-In `frontend/components/AuthContext.tsx` at lines 85-96:
+In `apps/erp/frontend/components/AuthContext.tsx` at lines 85-96:
 
 ```typescript
 // Current:
@@ -206,7 +206,7 @@ This prevents the browser back-button from resubmitting the form.
 
 ### 9.9 Add Input Sanitization (S02, S03)
 
-Create `frontend/lib/utils/input.ts`:
+Create `apps/erp/frontend/lib/utils/input.ts`:
 
 ```typescript
 export function sanitizeInput(value: string): string {
@@ -267,7 +267,7 @@ if (!data || data.length === 0) {
 For the dashboard route group:
 
 ```typescript
-// frontend/app/dashboard/error.tsx
+// apps/erp/frontend/app/dashboard/error.tsx
 'use client'
 export default function DashboardError({ error, reset }) {
   return (
@@ -279,7 +279,7 @@ export default function DashboardError({ error, reset }) {
   )
 }
 
-// frontend/app/dashboard/loading.tsx
+// apps/erp/frontend/app/dashboard/loading.tsx
 export default function DashboardLoading() {
   return <div>Loading dashboard...</div>
 }
@@ -289,22 +289,22 @@ export default function DashboardLoading() {
 
 | File | Purpose |
 |------|---------|
-| `frontend/lib/utils/input.ts` | Input sanitization utilities |
-| `frontend/components/AccessDenied.tsx` | Permission denied component |
-| `frontend/components/EmptyState.tsx` | Empty data state component |
-| `frontend/app/dashboard/error.tsx` | Dashboard error boundary |
-| `frontend/app/dashboard/loading.tsx` | Dashboard loading state |
+| `apps/erp/frontend/lib/utils/input.ts` | Input sanitization utilities |
+| `apps/erp/frontend/components/AccessDenied.tsx` | Permission denied component |
+| `apps/erp/frontend/components/EmptyState.tsx` | Empty data state component |
+| `apps/erp/frontend/app/dashboard/error.tsx` | Dashboard error boundary |
+| `apps/erp/frontend/app/dashboard/loading.tsx` | Dashboard loading state |
 | (Various page error components) | Per-page error display |
 
 ## Files to EDIT
 
 | File | Changes |
 |------|---------|
-| `frontend/lib/api.ts:45` | Fix F04 — `Promise.reject()` instead of `new Promise<never>(() => {})` |
-| `frontend/lib/api.ts:16` | Fix S18 — reset `isRedirectingToLogin` |
-| `frontend/lib/api.ts` | Fix F09 — error discrimination (401 vs network vs 500) |
-| `frontend/components/AuthContext.tsx:85` | Fix F05 — logout error handling |
-| `frontend/components/AuthContext.tsx` | Fix S22 — refresh+logout coordination |
+| `apps/erp/frontend/lib/api.ts:45` | Fix F04 — `Promise.reject()` instead of `new Promise<never>(() => {})` |
+| `apps/erp/frontend/lib/api.ts:16` | Fix S18 — reset `isRedirectingToLogin` |
+| `apps/erp/frontend/lib/api.ts` | Fix F09 — error discrimination (401 vs network vs 500) |
+| `apps/erp/frontend/components/AuthContext.tsx:85` | Fix F05 — logout error handling |
+| `apps/erp/frontend/components/AuthContext.tsx` | Fix S22 — refresh+logout coordination |
 | Students page component | Fix F06 — user-facing error on save/delete failure |
 | Sections page component | Fix F07, F08 — proper error UI for lookups |
 | All form page components | Add `submitting` state + `disabled` on buttons |
@@ -320,7 +320,7 @@ export default function DashboardLoading() {
 - Do NOT modify DB schema or create migrations
 - Do NOT modify Caddyfile or infrastructure
 - Do NOT add rate limiting or CSRF middleware (Phase 8 concern)
-- **In `frontend/lib/api.ts`, do NOT touch the idempotency-key interceptor (Phase 5 concern) — only edit lines 16, 45, and the response error handler**
+- **In `apps/erp/frontend/lib/api.ts`, do NOT touch the idempotency-key interceptor (Phase 5 concern) — only edit lines 16, 45, and the response error handler**
 
 ## Acceptance Criteria
 

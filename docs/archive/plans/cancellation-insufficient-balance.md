@@ -122,7 +122,7 @@ COMMIT → lock released        →    Acquires lock
 
 ### 4.1 Add `force` Parameter + Row Lock to `cancel_contract()` in Ledger Service
 
-File: `backend/app/modules/lms/ledger_service.py`
+File: `apps/erp/backend/app/modules/lms/ledger_service.py`
 
 ```python
 async def cancel_contract(
@@ -180,7 +180,7 @@ if total_to_reverse > 0:
 
 ### 4.2 Add Row Lock + `force` Parameter to `record()` in Ledger Service
 
-File: `backend/app/modules/lms/ledger_service.py`
+File: `apps/erp/backend/app/modules/lms/ledger_service.py`
 
 Add row-level lock on the wallet select and accept `force`:
 
@@ -221,7 +221,7 @@ if not force and wallet.frozen_balance > wallet.balance:
 
 ### 4.3 Pass `force_cancellation` Through `cancel_section()`
 
-File: `backend/app/modules/academic/cancellation_service.py`
+File: `apps/erp/backend/app/modules/academic/cancellation_service.py`
 
 ```python
 async def cancel_section(
@@ -248,7 +248,7 @@ await ledger_cancel_contract(
 
 ### 4.4 Update Preview to Show Wallet Balance + Shortfall
 
-File: `backend/app/modules/academic/cancellation_service.py`
+File: `apps/erp/backend/app/modules/academic/cancellation_service.py`
 
 Extend `ImpactPreview`:
 
@@ -282,7 +282,7 @@ if section.contract and section.contract.teacher_id:
 
 ### 4.5 Accept `force_cancellation` in Router Endpoint
 
-File: `backend/app/modules/academic/router.py`
+File: `apps/erp/backend/app/modules/academic/router.py`
 
 ```python
 @academic_router.post("/course-sections/{section_id}/cancel")
@@ -324,7 +324,7 @@ return {
 
 ### 4.6 Add Row Lock + Withdrawal Guard
 
-File: `backend/app/modules/lms/financial_service.py`
+File: `apps/erp/backend/app/modules/lms/financial_service.py`
 
 Inside `record_expense()`, before the WITHDRAWAL ledger entry — load wallet with row lock:
 
@@ -351,7 +351,7 @@ if expense_type == "teacher_withdrawal" and recipient_id:
 
 ### 4.7 Frontend: Update CancelSectionModal to Show Wallet Info + Force Toggle
 
-File: `frontend/components/sections/CancelSectionModal.tsx`
+File: `apps/erp/frontend/components/sections/CancelSectionModal.tsx`
 
 Extend `CancelPreview` interface with wallet fields:
 
@@ -447,7 +447,7 @@ await apiClient.post(`/academic/course-sections/${sectionId}/cancel`, {
 
 ### 4.8 Frontend: Add Translation Keys
 
-File: `frontend/components/sections/CancelSectionModal.tsx`
+File: `apps/erp/frontend/components/sections/CancelSectionModal.tsx`
 
 Add to the inline translation objects:
 
@@ -529,11 +529,11 @@ ORDER BY tw.balance ASC;
 
 | File | Action |
 |------|--------|
-| `backend/app/modules/lms/ledger_service.py` | **EDIT** — `get_or_create_wallet()` gains `lock` param; `record()` gains row lock + `force` param; `cancel_contract()` gains row lock + `force` param + balance check |
-| `backend/app/modules/academic/cancellation_service.py` | **EDIT** — `cancel_section()` accepts `force_cancellation`; preview returns wallet fields; `ImpactPreview` extended |
-| `backend/app/modules/lms/financial_service.py` | **EDIT** — `record_expense()` gains row lock on wallet load + withdrawal guard |
-| `backend/app/modules/academic/router.py` | **EDIT** — cancel endpoint accepts `force_cancellation` body field; preview returns wallet fields |
-| `frontend/components/sections/CancelSectionModal.tsx` | **EDIT** — `CancelPreview` interface extended with wallet fields; Step 1 adds wallet balance/shortfall cards, insufficient balance warning, and force cancellation checkbox; `handleConfirm()` sends `force_cancellation` in POST body |
+| `apps/erp/backend/app/modules/lms/ledger_service.py` | **EDIT** — `get_or_create_wallet()` gains `lock` param; `record()` gains row lock + `force` param; `cancel_contract()` gains row lock + `force` param + balance check |
+| `apps/erp/backend/app/modules/academic/cancellation_service.py` | **EDIT** — `cancel_section()` accepts `force_cancellation`; preview returns wallet fields; `ImpactPreview` extended |
+| `apps/erp/backend/app/modules/lms/financial_service.py` | **EDIT** — `record_expense()` gains row lock on wallet load + withdrawal guard |
+| `apps/erp/backend/app/modules/academic/router.py` | **EDIT** — cancel endpoint accepts `force_cancellation` body field; preview returns wallet fields |
+| `apps/erp/frontend/components/sections/CancelSectionModal.tsx` | **EDIT** — `CancelPreview` interface extended with wallet fields; Step 1 adds wallet balance/shortfall cards, insufficient balance warning, and force cancellation checkbox; `handleConfirm()` sends `force_cancellation` in POST body |
 
 ---
 

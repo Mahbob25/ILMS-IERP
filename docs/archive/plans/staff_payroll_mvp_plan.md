@@ -13,7 +13,7 @@
 The `employees` table (not `users`) already carries the salary field:
 
 ```sql
--- backend/app/modules/identity/models.py:57
+-- apps/erp/backend/app/modules/identity/models.py:57
 default_salary: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
 ```
 
@@ -27,7 +27,7 @@ The MVP eliminates the split between `secretary_advance` and `salary_payment` by
 
 #### Migration: Alembic revision
 
-File: `backend/alembic/versions/202607200000_add_salary_draw_expense_type.py`
+File: `apps/erp/backend/alembic/versions/202607200000_add_salary_draw_expense_type.py`
 
 ```python
 """add salary_draw to expensetype enum
@@ -59,7 +59,7 @@ def downgrade() -> None:
 
 #### Model Update
 
-Add `salary_draw` to the `Expense.type` enum in `backend/app/modules/lms/models.py`:
+Add `salary_draw` to the `Expense.type` enum in `apps/erp/backend/app/modules/lms/models.py`:
 
 ```python
 type: Mapped[str] = mapped_column(
@@ -99,7 +99,7 @@ def upgrade() -> None:
 
 ## 2. Backend Layer (FastAPI)
 
-### 2.1 New File: `backend/app/modules/lms/staff_payroll_service.py`
+### 2.1 New File: `apps/erp/backend/app/modules/lms/staff_payroll_service.py`
 
 Contains all business logic for the staff payroll feature, keeping `financial_service.py` focused on its existing concerns.
 
@@ -264,7 +264,7 @@ async def process_salary_withdrawal(
 - Error messages include context (monthly ceiling, already drawn) for easier debugging.
 - Reuses the existing `get_next_voucher_number()` from `financial_service.py`.
 
-### 2.2 New Router: `backend/app/modules/lms/staff_payroll_router.py`
+### 2.2 New Router: `apps/erp/backend/app/modules/lms/staff_payroll_router.py`
 
 ```python
 import uuid
@@ -395,7 +395,7 @@ async def process_withdrawal(
 
 ### 2.3 Registration in the FastAPI app
 
-Add to `backend/app/modules/lms/router.py` (or the main app `__init__.py` depending on current structure):
+Add to `apps/erp/backend/app/modules/lms/router.py` (or the main app `__init__.py` depending on current structure):
 
 ```python
 from app.modules.lms.staff_payroll_router import router as staff_payroll_router
@@ -464,7 +464,7 @@ def upgrade() -> None:
     op.create_index("ix_idempotency_keys_created_at", "idempotency_keys", ["created_at"])
 ```
 
-#### Service Layer — `backend/app/modules/lms/idempotency_service.py`
+#### Service Layer — `apps/erp/backend/app/modules/lms/idempotency_service.py`
 
 ```python
 import json
@@ -552,7 +552,7 @@ async def process_withdrawal(
 
 #### Frontend — already wired
 
-The `apiClient` interceptor in `frontend/lib/api.ts` (lines 74–80) already auto-generates a UUID and attaches it as `Idempotency-Key` for every POST/PATCH/PUT request. **No frontend changes needed for idempotency.**
+The `apiClient` interceptor in `apps/erp/frontend/lib/api.ts` (lines 74–80) already auto-generates a UUID and attaches it as `Idempotency-Key` for every POST/PATCH/PUT request. **No frontend changes needed for idempotency.**
 
 #### Key Cleanup
 
@@ -567,7 +567,7 @@ DELETE FROM idempotency_keys WHERE created_at < now() - INTERVAL '24 hours';
 
 ## 3. Frontend Layer (Next.js)
 
-### 3.1 Server Component: `frontend/app/[locale]/(dashboard)/dashboard/staff-payroll/page.tsx`
+### 3.1 Server Component: `apps/erp/frontend/app/[locale]/(dashboard)/dashboard/staff-payroll/page.tsx`
 
 ```typescript
 // This is the entry page — it is a Server Component that fetches
@@ -609,7 +609,7 @@ export default async function StaffPayrollPage({
 
 ### 3.2 Client Component: `StaffPayrollClient.tsx`
 
-Create at `frontend/app/[locale]/(dashboard)/dashboard/staff-payroll/StaffPayrollClient.tsx`.
+Create at `apps/erp/frontend/app/[locale]/(dashboard)/dashboard/staff-payroll/StaffPayrollClient.tsx`.
 
 ```typescript
 "use client";
@@ -1021,18 +1021,18 @@ The plan uses Option A for correctness.
 - [ ] **1.2** Create the partial index `ix_expenses_salary_draw_month` on `expenses(recipient_id, date, type WHERE type = 'salary_draw')`.
 - [ ] **1.3** Create Alembic migration `202607210000_add_idempotency_keys.py` that creates the `idempotency_keys` table with unique index on `key` and index on `created_at`.
 - [ ] **1.4** Run `alembic upgrade head` and verify both migrations applied cleanly.
-- [ ] **1.5** Update `Expense.type` enum definition in `backend/app/modules/lms/models.py` to include `salary_draw`.
+- [ ] **1.5** Update `Expense.type` enum definition in `apps/erp/backend/app/modules/lms/models.py` to include `salary_draw`.
 
 ### Phase 2: Backend (3 files, 1 modification)
 
-- [ ] **2.1** Create `backend/app/modules/lms/staff_payroll_service.py` with:
+- [ ] **2.1** Create `apps/erp/backend/app/modules/lms/staff_payroll_service.py` with:
   - `list_staff_for_payroll(db)` — bulk query, monthly aggregation, returns list of dicts.
   - `process_salary_withdrawal(db, employee_id, amount, created_by, ...)` — validation + insert with `with_for_update()` pessimistic lock.
-- [ ] **2.2** Create `backend/app/modules/lms/idempotency_service.py` with:
+- [ ] **2.2** Create `apps/erp/backend/app/modules/lms/idempotency_service.py` with:
   - `extract_idempotency_key(request)` — reads `Idempotency-Key` header.
   - `find_idempotent_response(db, key)` — returns cached response if key exists.
   - `save_idempotent_response(db, key, status_code, body)` — persists key on success.
-- [ ] **2.3** Create `backend/app/modules/lms/staff_payroll_router.py` with:
+- [ ] **2.3** Create `apps/erp/backend/app/modules/lms/staff_payroll_router.py` with:
   - Pydantic schemas (`StaffPayrollMember`, `WithdrawRequest`, `WithdrawResponse`).
   - `GET /staff-payroll` endpoint.
   - `POST /staff-payroll/{employee_id}/withdraw` endpoint with idempotency check, date-closure validation, row lock, and balance validation.
@@ -1059,7 +1059,7 @@ The plan uses Option A for correctness.
 
 ### Phase 3: Frontend (2 files, 1 modification)
 
-- [ ] **3.1** Create `frontend/app/[locale]/(dashboard)/dashboard/staff-payroll/page.tsx` (Server Component).
+- [ ] **3.1** Create `apps/erp/frontend/app/[locale]/(dashboard)/dashboard/staff-payroll/page.tsx` (Server Component).
 - [ ] **3.2** Create `.../staff-payroll/StaffPayrollClient.tsx` (Client Component with table + modal).
   - **No optimistic UI updates** — financial data is re-fetched from the server after every successful withdrawal.
   - Remove the unused `useOptimistic` import.

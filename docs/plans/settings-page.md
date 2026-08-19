@@ -11,13 +11,13 @@
 
 | Area | Today | Gap |
 |---|---|---|
-| Route | `frontend/app/[locale]/(dashboard)/dashboard/settings/page.tsx` exists | Stub — centered `Construction` icon + "Coming soon" |
+| Route | `apps/erp/frontend/app/[locale]/(dashboard)/dashboard/settings/page.tsx` exists | Stub — centered `Construction` icon + "Coming soon" |
 | Nav | Sidebar entry `Settings` (`Settings` icon, `page_settings`) + route guard in `layout.tsx:261` | Guard allows all 4 roles — correct for personal settings, but no tab-level gating for admin sections |
 | Personal profile | `GET /users/me`, `GET /auth/me`, `GET /auth/me/permissions` under `AuthContext` | Read-only in header/sidebar; no self-service edit |
 | Password change | `PUT /users/{id}` (admin-only, `RoleChecker(["superadmin","manager"])`) hashes via `identity/service.py:update_user` | No self-service `POST /auth/change-password` — users must ask an admin to reset |
 | Language | `User.locale_pref` (`ar`/`en`) persisted in DB, toggled via header `Globe` button (`layout.tsx:156`) | Toggle writes via `PUT /users/{id}` (admin path) — no direct user-facing preference control + no persistence feedback |
 | Notifications | `notifications` module + `NotificationBell` in header | No per-user preference (mute, retention) UI |
-| Institute / system config | `backend/app/core/config.py` Settings are env-only (`DATABASE_URL`, `JWT_SECRET_KEY`, `CORS_ORIGINS`, `TIMEZONE`, etc.) | No DB-backed institute profile (name, logo, address, contact), no runtime-editable defaults |
+| Institute / system config | `apps/erp/backend/app/core/config.py` Settings are env-only (`DATABASE_URL`, `JWT_SECRET_KEY`, `CORS_ORIGINS`, `TIMEZONE`, etc.) | No DB-backed institute profile (name, logo, address, contact), no runtime-editable defaults |
 
 **User-facing symptom:** Every role sees "Coming soon" under Settings. Changing a password or language preference requires an admin. No place to manage institute branding or notification preferences.
 
@@ -73,7 +73,7 @@ Design notes:
 
 ### 4.2 Phase 1 — Self-service account endpoints (no migration)
 
-Add to `backend/app/modules/identity/router.py` (or a new `settings_router` mounted at `/api/v1`):
+Add to `apps/erp/backend/app/modules/identity/router.py` (or a new `settings_router` mounted at `/api/v1`):
 
 | Endpoint | Method | Auth | Purpose |
 |---|---|---|---|
@@ -123,7 +123,7 @@ CREATE TABLE system_settings (
 -- Seed: ('defaults', {"timezone":"Asia/Riyadh","default_teacher_percentage":null,"backup_retention_days":null})
 ```
 
-Module `backend/app/modules/settings/` (mirror `reports/` layout):
+Module `apps/erp/backend/app/modules/settings/` (mirror `reports/` layout):
 
 ```
 settings/
@@ -140,7 +140,7 @@ Endpoints (superadmin-only per 2026-08-11 decision):
 | `/settings/system` | `GET` | `RoleChecker(["superadmin"])` | Return all settings KV (institute profile + defaults) |
 | `/settings/system` | `PUT` | `RoleChecker(["superadmin"])` | Upsert one or more keys, audit `SYSTEM_SETTINGS_UPDATED` |
 
-Registration in `backend/app/main.py`:
+Registration in `apps/erp/backend/app/main.py`:
 
 ```python
 from app.modules.settings.router import settings_router
@@ -160,7 +160,7 @@ Migration: `alembic/versions/<ts>_add_system_settings.py` — create table + see
 
 ### 5.1 Route
 
-Keep single file `frontend/app/[locale]/(dashboard)/dashboard/settings/page.tsx` (no sub-routes). Mark `"use client"`.
+Keep single file `apps/erp/frontend/app/[locale]/(dashboard)/dashboard/settings/page.tsx` (no sub-routes). Mark `"use client"`.
 
 Tabs via local `useState<"profile"|"security"|"preferences"|"system">`. `System` tab rendered only if `user.is_superadmin` (superadmin-only per 2026-08-11 decision). Direct-URL to `#system` still blocked by conditional render — backend is authoritative. Logo edit in System tab is a static preview + "Coming soon" placeholder (upload deferred).
 
@@ -169,7 +169,7 @@ Tabs via local `useState<"profile"|"security"|"preferences"|"system">`. `System`
 Reuse `globals.css` primitives; new small components colocated:
 
 ```
-frontend/app/[locale]/(dashboard)/dashboard/settings/
+apps/erp/frontend/app/[locale]/(dashboard)/dashboard/settings/
   page.tsx                 # tab switcher + data fetching via apiClient
   components/
     ProfileCard.tsx        # reads useAuth().user, GET /users/me — email read-only
@@ -295,13 +295,13 @@ Deferred items are labeled **"Coming soon"** in the UI and listed as such in §6
 
 | File | Phase | Action |
 |---|---|---|
-| `frontend/app/[locale]/(dashboard)/dashboard/settings/page.tsx` | 1 | Rewrite — tabs + components |
-| `backend/app/modules/identity/router.py` | 1 | Add 2 endpoints |
-| `backend/app/modules/identity/schemas.py` | 1 | Add 2 schemas |
-| `backend/app/modules/identity/service.py` | 1 | (no change — reuse `update_user`) |
-| `backend/app/modules/settings/*` | 3 | New module (only if Phase 3 approved) |
-| `backend/alembic/versions/*_add_system_settings.py` | 3 | New migration (only Phase 3) |
-| `backend/app/main.py` | 3 | Register `settings_router` (only Phase 3) |
+| `apps/erp/frontend/app/[locale]/(dashboard)/dashboard/settings/page.tsx` | 1 | Rewrite — tabs + components |
+| `apps/erp/backend/app/modules/identity/router.py` | 1 | Add 2 endpoints |
+| `apps/erp/backend/app/modules/identity/schemas.py` | 1 | Add 2 schemas |
+| `apps/erp/backend/app/modules/identity/service.py` | 1 | (no change — reuse `update_user`) |
+| `apps/erp/backend/app/modules/settings/*` | 3 | New module (only if Phase 3 approved) |
+| `apps/erp/backend/alembic/versions/*_add_system_settings.py` | 3 | New migration (only Phase 3) |
+| `apps/erp/backend/app/main.py` | 3 | Register `settings_router` (only Phase 3) |
 | `docs/plans/current.md` | 4 | Mark Settings Done, archive this plan |
 
 ---

@@ -133,7 +133,7 @@ Before proceeding with completion:
 
 ### 3.5 Router Changes
 
-In `backend/app/modules/academic/router.py`, update the complete endpoint:
+In `apps/erp/backend/app/modules/academic/router.py`, update the complete endpoint:
 
 ```python
 @router.post("/course-sections/{id}/complete")
@@ -169,8 +169,8 @@ async def delete_section(
 
 | File | Action |
 |------|--------|
-| `backend/app/modules/academic/service.py` | **EDIT** — rewrite `complete_section()` with grade check, payment check, override audit, daily closure |
-| `backend/app/modules/academic/router.py` | **EDIT** — add `force`/`reason` params to complete endpoint; restrict DELETE to superadmin |
+| `apps/erp/backend/app/modules/academic/service.py` | **EDIT** — rewrite `complete_section()` with grade check, payment check, override audit, daily closure |
+| `apps/erp/backend/app/modules/academic/router.py` | **EDIT** — add `force`/`reason` params to complete endpoint; restrict DELETE to superadmin |
 
 ## Independent Boundary
 

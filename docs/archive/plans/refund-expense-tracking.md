@@ -20,7 +20,7 @@ Refunds are invisible in financial reporting. The `Refund` table exists and is c
 
 ### 1. Revenue Overview — subtract refunds, don't add expenses
 
-**`backend/app/modules/lms/financial_service.py` `get_revenue_overview()`**
+**`apps/erp/backend/app/modules/lms/financial_service.py` `get_revenue_overview()`**
 
 Add a refund aggregation alongside the expense summation:
 
@@ -45,7 +45,7 @@ Also include `total_refunds` in the monthly trend SQL (UNION or separate CTE).
 
 ### 2. Daily Ledger — add refunds as a third section
 
-**`backend/app/modules/lms/financial_service.py` `get_daily_ledger()`**
+**`apps/erp/backend/app/modules/lms/financial_service.py` `get_daily_ledger()`**
 
 Add a refund aggregation block:
 
@@ -69,7 +69,7 @@ Include a refund detail query (joined with PendingRefund → Enrollment → Stud
 
 ### 3. Closures List — add Refund.date to the union
 
-**`backend/app/modules/lms/financial_service.py` `list_closures()`**
+**`apps/erp/backend/app/modules/lms/financial_service.py` `list_closures()`**
 
 ```python
 refunds_dates = select(func.date(Refund.disbursed_at).label("date")).subquery()
@@ -81,14 +81,14 @@ Also add a refund total subquery alongside the existing payment/expense subqueri
 
 ### 4. Dashboard — include refunds in outflows
 
-**`backend/app/modules/lms/dashboard/service.py`**
+**`apps/erp/backend/app/modules/lms/dashboard/service.py`**
 
 - **Secretary dashboard** (`get_secretary_dashboard`): Add today's refunds to `today_expenses_count` and `today_expenses_total` (or to a new field; depends on frontend expectations). Better: add a separate `today_refunds_total` field.
 - **Manager dashboard** (`get_manager_dashboard`): Include refund amounts in the outflows.
 
 ### 5. New Endpoint: GET /lms/refunds/{refund_id}/preview
 
-**`backend/app/modules/lms/financial_service.py`**
+**`apps/erp/backend/app/modules/lms/financial_service.py`**
 
 Add `get_refund_voucher_html_content()`:
 
@@ -101,7 +101,7 @@ async def get_refund_voucher_html_content(db: AsyncSession, refund_id: uuid.UUID
 
 Add `_generate_refund_voucher_html()` — similar to `_generate_voucher_html()` but with refund-specific labels ("سند استرداد" / "Refund Voucher" instead of "سند صرف" / "Payment Voucher").
 
-**`backend/app/modules/lms/router.py`**
+**`apps/erp/backend/app/modules/lms/router.py`**
 
 ```python
 @lms_router.get("/cashier/refunds/{refund_id}/preview")
@@ -119,7 +119,7 @@ async def preview_refund_voucher(
 
 ### 6. Revenue Overview Schema update
 
-**`backend/app/modules/lms/schemas.py`**
+**`apps/erp/backend/app/modules/lms/schemas.py`**
 
 Add `total_refunds: float = 0` to `RevenueOverviewResponse`. Update the `meta` or response dict to include the new field.
 
@@ -134,14 +134,14 @@ Add `total_refunds: float = 0` to `RevenueOverviewResponse`. Update the `meta` o
 
 | File | Change |
 |---|---|
-| `backend/app/modules/lms/schemas.py` | Add `RefundDetailItem`, add `total_refunds` to revenue response |
-| `backend/app/modules/lms/financial_service.py` | `get_revenue_overview()` — add refund aggregation |
+| `apps/erp/backend/app/modules/lms/schemas.py` | Add `RefundDetailItem`, add `total_refunds` to revenue response |
+| `apps/erp/backend/app/modules/lms/financial_service.py` | `get_revenue_overview()` — add refund aggregation |
 | | `get_daily_ledger()` — add refund section |
 | | `list_closures()` — include refund dates |
 | | New `get_refund_voucher_html_content()`, `_generate_refund_voucher_html()` |
-| `backend/app/modules/lms/router.py` | New `GET /lms/cashier/refunds/{refund_id}/preview` |
-| `backend/app/modules/lms/cashier_service.py` | No changes needed |
-| `backend/app/modules/dashboard/service.py` | Include refunds in outflows |
+| `apps/erp/backend/app/modules/lms/router.py` | New `GET /lms/cashier/refunds/{refund_id}/preview` |
+| `apps/erp/backend/app/modules/lms/cashier_service.py` | No changes needed |
+| `apps/erp/backend/app/modules/dashboard/service.py` | Include refunds in outflows |
 | Test files | New tests for each change |
 
 ## What Does NOT Change

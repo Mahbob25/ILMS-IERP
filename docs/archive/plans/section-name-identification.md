@@ -34,43 +34,43 @@ Add an optional `name` field to `CourseSection` (user-friendly label like "Morni
 
 | Task | Files | Estimate |
 |------|-------|----------|
-| Create Alembic migration adding `name` (nullable VARCHAR(255)) and `section_number` (nullable VARCHAR(50)) to `course_sections` | `backend/alembic/versions/` | 30 min |
-| Add `name: Mapped[Optional[str]]` and `section_number: Mapped[Optional[str]]` to `CourseSection` model | `backend/app/modules/academic/models.py` | 15 min |
-| Add `name`, `section_number` to `CourseSectionCreate`, `CourseSectionUpdate`, `CourseSectionResponse` schemas | `backend/app/modules/academic/schemas.py` | 15 min |
+| Create Alembic migration adding `name` (nullable VARCHAR(255)) and `section_number` (nullable VARCHAR(50)) to `course_sections` | `apps/erp/backend/alembic/versions/` | 30 min |
+| Add `name: Mapped[Optional[str]]` and `section_number: Mapped[Optional[str]]` to `CourseSection` model | `apps/erp/backend/app/modules/academic/models.py` | 15 min |
+| Add `name`, `section_number` to `CourseSectionCreate`, `CourseSectionUpdate`, `CourseSectionResponse` schemas | `apps/erp/backend/app/modules/academic/schemas.py` | 15 min |
 
 ### Phase 2: Backend Logic — Auto-generation & Service Layer
 
 | Task | Files | Estimate |
 |------|-------|----------|
-| Auto-generate `section_number` on create (e.g. `course.code` + sequential count like "CS101-03") | `backend/app/modules/academic/service.py` | 20 min |
-| Auto-generate `name` fallback when not provided (e.g. "Mathematics 101 — Section 1") | `backend/app/modules/academic/service.py` | 15 min |
+| Auto-generate `section_number` on create (e.g. `course.code` + sequential count like "CS101-03") | `apps/erp/backend/app/modules/academic/service.py` | 20 min |
+| Auto-generate `name` fallback when not provided (e.g. "Mathematics 101 — Section 1") | `apps/erp/backend/app/modules/academic/service.py` | 15 min |
 | Include `course_name` in `CourseSectionResponse` (join with Course, avoid N+1) | `schemas.py`, `service.py` | 15 min |
 
 ### Phase 3: Frontend — Main Sections Pages
 
 | Task | Files | Estimate |
 |------|-------|----------|
-| Update sections list table to show section name/number prominently; change "Course" to "Section / Course" | `frontend/app/[locale]/(dashboard)/dashboard/sections/page.tsx` | 30 min |
+| Update sections list table to show section name/number prominently; change "Course" to "Section / Course" | `apps/erp/frontend/app/[locale]/(dashboard)/dashboard/sections/page.tsx` | 30 min |
 | Add `name` text input to create/edit modal (pre-populated with auto-generated suggestion) | Same file as above | 20 min |
-| Update section detail page to show name as primary heading | `frontend/app/[locale]/(dashboard)/dashboard/sections/[sectionId]/page.tsx` | 15 min |
+| Update section detail page to show name as primary heading | `apps/erp/frontend/app/[locale]/(dashboard)/dashboard/sections/[sectionId]/page.tsx` | 15 min |
 
 ### Phase 4: Frontend — Secondary Pages Referencing Sections
 
 | Task | Files | Estimate |
 |------|-------|----------|
-| Enrollments page — show section name in selector and table | `frontend/app/[locale]/(dashboard)/dashboard/enrollments/page.tsx` | 15 min |
-| POS page — show section name in course/section dropdowns | `frontend/app/[locale]/(dashboard)/dashboard/pos/page.tsx` | 15 min |
-| Attendance page — display section name in selector | `frontend/app/[locale]/(dashboard)/dashboard/attendance/page.tsx` | 10 min |
-| Gradebook page — display section name in selector | `frontend/app/[locale]/(dashboard)/dashboard/gradebook/page.tsx` | 10 min |
-| Student detail page — show section name in enrollment list | `frontend/app/[locale]/(dashboard)/dashboard/students/[id]/page.tsx` | 10 min |
-| Payments page — show section name in payment references | `frontend/app/[locale]/(dashboard)/dashboard/payments/page.tsx` | 10 min |
+| Enrollments page — show section name in selector and table | `apps/erp/frontend/app/[locale]/(dashboard)/dashboard/enrollments/page.tsx` | 15 min |
+| POS page — show section name in course/section dropdowns | `apps/erp/frontend/app/[locale]/(dashboard)/dashboard/pos/page.tsx` | 15 min |
+| Attendance page — display section name in selector | `apps/erp/frontend/app/[locale]/(dashboard)/dashboard/attendance/page.tsx` | 10 min |
+| Gradebook page — display section name in selector | `apps/erp/frontend/app/[locale]/(dashboard)/dashboard/gradebook/page.tsx` | 10 min |
+| Student detail page — show section name in enrollment list | `apps/erp/frontend/app/[locale]/(dashboard)/dashboard/students/[id]/page.tsx` | 10 min |
+| Payments page — show section name in payment references | `apps/erp/frontend/app/[locale]/(dashboard)/dashboard/payments/page.tsx` | 10 min |
 
 ### Phase 5: Dashboard Widgets
 
 | Task | Files | Estimate |
 |------|-------|----------|
-| Update ManagerDashboard to use section `name` field | `frontend/components/dashboard/ManagerDashboard.tsx` | 10 min |
-| Update TeacherDashboard to use section `name` field | `frontend/components/dashboard/TeacherDashboard.tsx` | 10 min |
+| Update ManagerDashboard to use section `name` field | `apps/erp/frontend/components/dashboard/ManagerDashboard.tsx` | 10 min |
+| Update TeacherDashboard to use section `name` field | `apps/erp/frontend/components/dashboard/TeacherDashboard.tsx` | 10 min |
 
 ### Phase 6: Testing
 

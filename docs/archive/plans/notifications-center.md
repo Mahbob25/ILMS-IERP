@@ -196,7 +196,7 @@ Mounted in `app/[locale]/(dashboard)/layout.tsx` header, next to the language to
 
 ## Testing Plan
 
-### Backend unit (`backend/tests/unit/notifications/`)
+### Backend unit (`apps/erp/backend/tests/unit/notifications/`)
 
 - `create_notification` inserts row for recipient; params JSONB round-trips.
 - Dedupe: same `(user_id, type, dedupe_key)` twice → 1 row (`ON CONFLICT DO NOTHING`).
@@ -208,7 +208,7 @@ Mounted in `app/[locale]/(dashboard)/layout.tsx` header, next to the language to
 - `delete_expired` removes rows past retention only, in 1,000-row batches: loop
   terminates once a batch returns < 1,000; 2,500+ expired rows all get purged.
 
-### Backend integration (`backend/tests/integration/`)
+### Backend integration (`apps/erp/backend/tests/integration/`)
 
 - 401 without cookie on all three endpoints.
 - Emitters fire on the real flows: create pending refund → manager+secretary rows;
@@ -217,7 +217,7 @@ Mounted in `app/[locale]/(dashboard)/layout.tsx` header, next to the language to
   change any response).
 - Daily job idempotence: run twice → single `unclosed_day:{date}` row.
 
-### Frontend E2E (`frontend/tests/e2e/` — Playwright)
+### Frontend E2E (`apps/erp/frontend/tests/e2e/` — Playwright)
 
 - Bell shows badge count matching `/unread-count`.
 - Open dropdown → items render bilingual; click item → navigates to deep link + badge

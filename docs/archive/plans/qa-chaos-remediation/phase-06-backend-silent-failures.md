@@ -160,13 +160,13 @@ None.
 
 | File | Line(s) | Change |
 |------|---------|--------|
-| `backend/app/modules/academic/service.py` | 352–356 | Add `logger.error()` before `continue` (F01) |
-| `backend/app/modules/academic/service.py` | 754–758 | Add `logger.error()` before `pass` (F02) |
-| `backend/app/modules/academic/service.py` | 404 | `commit()` → `flush()` (F11) |
-| `backend/app/modules/lms/financial_service.py` | 84–86 | Add audit logging for missing enrollment (F03) |
-| `backend/app/modules/academic/cancellation_service.py` | 292 | `commit()` → `flush()` (F10) |
-| `backend/app/modules/academic/service.py` | Attendance handler | Transactional batch (S14) |
-| `backend/app/modules/academic/section_startup_checks.py` | `run_daily_section_checks` | Add idempotency guard (O07) |
+| `apps/erp/backend/app/modules/academic/service.py` | 352–356 | Add `logger.error()` before `continue` (F01) |
+| `apps/erp/backend/app/modules/academic/service.py` | 754–758 | Add `logger.error()` before `pass` (F02) |
+| `apps/erp/backend/app/modules/academic/service.py` | 404 | `commit()` → `flush()` (F11) |
+| `apps/erp/backend/app/modules/lms/financial_service.py` | 84–86 | Add audit logging for missing enrollment (F03) |
+| `apps/erp/backend/app/modules/academic/cancellation_service.py` | 292 | `commit()` → `flush()` (F10) |
+| `apps/erp/backend/app/modules/academic/service.py` | Attendance handler | Transactional batch (S14) |
+| `apps/erp/backend/app/modules/academic/section_startup_checks.py` | `run_daily_section_checks` | Add idempotency guard (O07) |
 | PDF generation service | Receipt/certificate service | Add disk space check (S31) |
 
 ## Independent Boundary
@@ -175,7 +175,7 @@ None.
 - Do NOT add conditional UPDATE patterns (Phase 3 concern)
 - Do NOT add SELECT FOR UPDATE (Phase 4 concern)
 - Do NOT create idempotency key middleware (Phase 5 concern)
-- Do NOT touch `frontend/lib/api.ts` (Phase 9 concern)
+- Do NOT touch `apps/erp/frontend/lib/api.ts` (Phase 9 concern)
 - Do NOT modify any `router.py` files
 - **In `academic/service.py`, only touch lines 352–356, 404, 754–758, and the attendance handler — do NOT touch `complete_section()` business logic, enrollment capacity, or payment functions**
 

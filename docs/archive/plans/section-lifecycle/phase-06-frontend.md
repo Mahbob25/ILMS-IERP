@@ -184,7 +184,7 @@ async function fetchOverdueSummary(): Promise<OverdueSummary> {
 | Student profile | Profile page update |
 | i18n | Translation files (ar, en) |
 
-All files under `frontend/` or equivalent UI directory. No backend files touched.
+All files under `apps/erp/frontend/` or equivalent UI directory. No backend files touched.
 
 ## Independent Boundary
 

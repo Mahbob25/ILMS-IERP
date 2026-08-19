@@ -49,12 +49,12 @@ before Phase 10 begins.
 | 2 | DB Sequences for Numbers | DB Engineer | 1 | Alembic migration only | R01–R04, S29 |
 | 3 | Conditional UPDATE Patterns + Orphaned State Transactions | Backend A | 3 | `academic/service.py`, `academic/cancellation_service.py`, `ledger_service.py`, `lms/cashier_service.py`, `lms/compensation_service.py` | R08–R12, O01–O06, O08, S15, S25, S27 |
 | 4 | SELECT FOR UPDATE + Concurrency Locks | Backend B | 2.5 | `academic/service.py` (enrollment), `lms/financial_service.py`, `ledger_service.py` (amendment) | R05–R07, R13–R14, S16, S19–S20, S23–S24, S26, S30, S32 |
-| 5 | Idempotency Key Middleware | Backend C | 2 | `app/middleware/idempotency.py` (CREATE), `app/modules/models.py` (idempotency_keys table, CREATE), Alembic migration, all `POST` routers (EDIT), `frontend/lib/api.ts` (EDIT — interceptor) | S01, S13 |
+| 5 | Idempotency Key Middleware | Backend C | 2 | `app/middleware/idempotency.py` (CREATE), `app/modules/models.py` (idempotency_keys table, CREATE), Alembic migration, all `POST` routers (EDIT), `apps/erp/frontend/lib/api.ts` (EDIT — interceptor) | S01, S13 |
 | 6 | Backend Silent Failures — Logging & Error Propagation | Backend D | 1.5 | `academic/service.py` (F01, F02, F11), `lms/financial_service.py` (F03), `academic/cancellation_service.py` (F10) | F01–F03, F10–F11, S14, O07 |
-| 7 | Infrastructure & Deployment | DevOps | 2.5 | `Dockerfile`, `.github/workflows/ci.yml` (CREATE), `app/main.py` (EDIT — Sentry), `frontend/app/layout.tsx` (EDIT — Sentry), `infrastructure/caddy/Caddyfile` (EDIT — tls), `backend/scripts/` (backup) | I01–I03, I07, I09–I13 |
+| 7 | Infrastructure & Deployment | DevOps | 2.5 | `Dockerfile`, `.github/workflows/ci.yml` (CREATE), `app/main.py` (EDIT — Sentry), `apps/erp/frontend/app/layout.tsx` (EDIT — Sentry), `infrastructure/caddy/Caddyfile` (EDIT — tls), `apps/erp/backend/scripts/` (backup) | I01–I03, I07, I09–I13 |
 | 8 | Rate Limiting + CSRF + Security Headers | Backend E | 1.5 | `infrastructure/caddy/Caddyfile` (EDIT — headers), `app/middleware/csrf.py` (CREATE), `app/middleware/rate_limit.py` (EDIT), `tests/test_e2e.py` (EDIT — creds removal if I13 not done) | I04–I06, I08 |
-| 9 | Frontend Resilience — UX, Error States, Input Validation | Frontend | 3 | `frontend/lib/api.ts` (EDIT), `frontend/components/AuthContext.tsx` (EDIT), all frontend page components (EDIT — form buttons, error display), `frontend/app/*/error.tsx` (CREATE), `frontend/app/*/loading.tsx` (CREATE) | S02–S06, S09, S11–S12, S17–S18, S22, F04–F09 |
-| 10 | Testing | QA | 5 | `backend/tests/` (CREATE/EDIT), `frontend/tests/` (CREATE/EDIT) | All fix items via tests |
+| 9 | Frontend Resilience — UX, Error States, Input Validation | Frontend | 3 | `apps/erp/frontend/lib/api.ts` (EDIT), `apps/erp/frontend/components/AuthContext.tsx` (EDIT), all frontend page components (EDIT — form buttons, error display), `apps/erp/frontend/app/*/error.tsx` (CREATE), `apps/erp/frontend/app/*/loading.tsx` (CREATE) | S02–S06, S09, S11–S12, S17–S18, S22, F04–F09 |
+| 10 | Testing | QA | 5 | `apps/erp/backend/tests/` (CREATE/EDIT), `apps/erp/frontend/tests/` (CREATE/EDIT) | All fix items via tests |
 
 ## Parallel Schedule
 
@@ -94,7 +94,7 @@ Total effort: ~23 days
 | **File ownership** | Each phase owns specific files. See Agent Assignment table above. |
 | **Shared files: `academic/service.py`** | Phase 3 edits `complete_section()` (line ~300), `set_final_grades_bulk()` (line ~740), `cancel_section()` (~line 400). Phase 4 edits enrollment capacity check (~line 200) and payment remaining-balance check (~line 180). Phase 6 edits lines 352–356 and 754–758 only. **Each edits a different set of functions — no two phases modify the same function.** |
 | **Shared files: `ledger_service.py`** | Phase 3 edits contract status transitions (activate, settle, cancel). Phase 4 edits amendment approval wallet lock (different function). **Different functions — safe.** |
-| **Shared files: `frontend/lib/api.ts`** | Phase 5 adds idempotency-key interceptor (new function). Phase 9 fixes F04 (promise at line 45), F09 (error discrimination), and `isRedirectingToLogin` (line 16). **Different sections — safe.** |
+| **Shared files: `apps/erp/frontend/lib/api.ts`** | Phase 5 adds idempotency-key interceptor (new function). Phase 9 fixes F04 (promise at line 45), F09 (error discrimination), and `isRedirectingToLogin` (line 16). **Different sections — safe.** |
 | **Shared files: `infrastructure/caddy/Caddyfile`** | Phase 7 edits TLS section. Phase 8 adds security headers and rate limiting. **Add headers at the END of the server block — do not edit TLS lines.** |
 | **Migration files** | Phase 1 creates the first migration (head A). Phase 2 migration depends on head A. Phase 5 migration depends on head A (or head B if Phase 2 merged first). **Phase 1 must merge first.** |
 | **No shared branches** | Each phase works on its own branch. No agent commits to another phase's branch. PRs are reviewed and merged by the orchestrator in dependency order. |
@@ -118,6 +118,6 @@ Total effort: ~23 days
 |------|--------|-----------|
 | Alembic migration chain broken if Phase 1 not merged first | Migration fails | Enforce strict merge order: Phase 1 → Phase 2/5 |
 | Phase 3 + Phase 4 both editing `academic/service.py` | Merge conflict | Map specific function ownership. Each owns different functions. |
-| Phase 5 + Phase 9 both editing `frontend/lib/api.ts` | Merge conflict | Phase 5 adds at interceptor section (~end). Phase 9 edits lines 16, 45, and error handler. Different lines. |
+| Phase 5 + Phase 9 both editing `apps/erp/frontend/lib/api.ts` | Merge conflict | Phase 5 adds at interceptor section (~end). Phase 9 edits lines 16, 45, and error handler. Different lines. |
 | Phase 7 + Phase 8 both editing Caddyfile | Merge conflict | Phase 7 edits TLS stanza. Phase 8 appends headers to existing server block. |
 | Testing (Phase 10) depends on ALL fixes merged | Cannot start until Week 3 | Schedule Phase 10 as the final serial phase. |

@@ -15,7 +15,7 @@ Lightweight undo for accidental activation. Returns section from `active` to `pe
 
 ### 5.1 Add `deactivate_contract()` to Ledger Service
 
-In `backend/app/modules/lms/ledger_service.py`:
+In `apps/erp/backend/app/modules/lms/ledger_service.py`:
 
 ```python
 async def deactivate_contract(db: AsyncSession, contract: Contract, reason: str) -> Contract:
@@ -57,7 +57,7 @@ async def deactivate_contract(db: AsyncSession, contract: Contract, reason: str)
 
 ### 5.2 Add `deactivate_section()` to Academic Service
 
-In `backend/app/modules/academic/service.py` (appended as new function, NOT inline edit):
+In `apps/erp/backend/app/modules/academic/service.py` (appended as new function, NOT inline edit):
 
 ```python
 async def deactivate_section(
@@ -102,7 +102,7 @@ async def deactivate_section(
 
 ### 5.3 Add Deactivation Endpoint to Router
 
-Append to `backend/app/modules/academic/router.py`:
+Append to `apps/erp/backend/app/modules/academic/router.py`:
 
 ```python
 @router.post("/course-sections/{id}/deactivate")
@@ -145,9 +145,9 @@ async def _section_has_payments(db: AsyncSession, section_id: UUID) -> bool:
 
 | File | Action |
 |------|--------|
-| `backend/app/modules/lms/ledger_service.py` | **EDIT** — add `deactivate_contract()` function |
-| `backend/app/modules/academic/service.py` | **EDIT** — append `deactivate_section()` and `_section_has_payments()` (new functions, no inline changes) |
-| `backend/app/modules/academic/router.py` | **EDIT** — append deactivate endpoint (new route, no inline changes) |
+| `apps/erp/backend/app/modules/lms/ledger_service.py` | **EDIT** — add `deactivate_contract()` function |
+| `apps/erp/backend/app/modules/academic/service.py` | **EDIT** — append `deactivate_section()` and `_section_has_payments()` (new functions, no inline changes) |
+| `apps/erp/backend/app/modules/academic/router.py` | **EDIT** — append deactivate endpoint (new route, no inline changes) |
 
 ## Independent Boundary
 

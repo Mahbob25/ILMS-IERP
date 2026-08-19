@@ -38,7 +38,7 @@ header Strict-Transport-Security "max-age=31536000; includeSubDomains"
 
 ### 8.2 Fix IP Detection for Rate Limiting (I08)
 
-In the backend, create `backend/app/middleware/real_ip.py`:
+In the backend, create `apps/erp/backend/app/middleware/real_ip.py`:
 
 ```python
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -61,7 +61,7 @@ app.add_middleware(RealIPMiddleware)
 
 ### 8.3 Add CSRF Protection (I04)
 
-Create `backend/app/middleware/csrf.py`:
+Create `apps/erp/backend/app/middleware/csrf.py`:
 
 ```python
 import secrets
@@ -90,7 +90,7 @@ Wire in `main.py`:
 app.add_middleware(CSRFMiddleware)
 ```
 
-**Frontend side:** Add CSRF token to API calls. In `frontend/lib/api.ts`, add a request interceptor that reads the CSRF token from cookie and attaches as header:
+**Frontend side:** Add CSRF token to API calls. In `apps/erp/frontend/lib/api.ts`, add a request interceptor that reads the CSRF token from cookie and attaches as header:
 
 ```typescript
 api.interceptors.request.use((config) => {
@@ -112,7 +112,7 @@ function getCookie(name: string): string | null {
 
 ### 8.4 Add Rate Limiting on All Endpoints (I06)
 
-In `backend/app/core/rate_limit.py`:
+In `apps/erp/backend/app/core/rate_limit.py`:
 
 ```python
 from slowapi import Limiter
@@ -153,20 +153,20 @@ Apply limits to specific endpoints:
 
 | File | Purpose |
 |------|---------|
-| `backend/app/middleware/real_ip.py` | X-Forwarded-For header parsing |
-| `backend/app/middleware/csrf.py` | CSRF token validation middleware |
-| `backend/app/core/rate_limit.py` | Rate limiter config |
+| `apps/erp/backend/app/middleware/real_ip.py` | X-Forwarded-For header parsing |
+| `apps/erp/backend/app/middleware/csrf.py` | CSRF token validation middleware |
+| `apps/erp/backend/app/core/rate_limit.py` | Rate limiter config |
 
 ## Files to EDIT
 
 | File | Changes |
 |------|---------|
 | `infrastructure/caddy/Caddyfile` | Append security headers to server block |
-| `backend/app/main.py` | Wire RealIPMiddleware, CSRFMiddleware, rate limiter |
-| `backend/app/main.py` | Add `app.state.limiter = limiter` |
-| `backend/app/modules/lms/router.py` | Add `@limiter.limit("10/minute")` to payment/expense endpoints |
-| `backend/app/modules/academic/router.py` | Add `@limiter.limit("20/minute")` to enrollment endpoints |
-| `frontend/lib/api.ts` | Add CSRF token request interceptor + `getCookie()` |
+| `apps/erp/backend/app/main.py` | Wire RealIPMiddleware, CSRFMiddleware, rate limiter |
+| `apps/erp/backend/app/main.py` | Add `app.state.limiter = limiter` |
+| `apps/erp/backend/app/modules/lms/router.py` | Add `@limiter.limit("10/minute")` to payment/expense endpoints |
+| `apps/erp/backend/app/modules/academic/router.py` | Add `@limiter.limit("20/minute")` to enrollment endpoints |
+| `apps/erp/frontend/lib/api.ts` | Add CSRF token request interceptor + `getCookie()` |
 
 ## Independent Boundary
 
@@ -177,7 +177,7 @@ Apply limits to specific endpoints:
 - Do NOT create idempotency key middleware (Phase 5 concern)
 - Do NOT modify Dockerfile TLS or health checks (Phase 7 concerns)
 - **In `infrastructure/caddy/Caddyfile`, only add headers — do NOT touch `tls internal` line or TLS config (Phase 7)**
-- **In `frontend/lib/api.ts`, only add the CSRF token interceptor — do NOT touch F04 (promise fix), F09 (error discrimination), `isRedirectingToLogin` fix, or idempotency key interceptor (Phases 5 and 9)**
+- **In `apps/erp/frontend/lib/api.ts`, only add the CSRF token interceptor — do NOT touch F04 (promise fix), F09 (error discrimination), `isRedirectingToLogin` fix, or idempotency key interceptor (Phases 5 and 9)**
 
 ## Acceptance Criteria
 

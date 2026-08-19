@@ -76,7 +76,7 @@ assembled by hand from a different screen.
 
 ## Backend Changes
 
-### 1. New module `backend/app/modules/reports/`
+### 1. New module `apps/erp/backend/app/modules/reports/`
 
 ```
 reports/
@@ -90,7 +90,7 @@ Follow the `dashboard/` module layout exactly. Keep each service function < 50 l
 where a report needs the detail rows its source already computes, delegate to the
 existing service and only reshape.
 
-### 2. Router registration (`backend/app/main.py`)
+### 2. Router registration (`apps/erp/backend/app/main.py`)
 
 Add alongside the existing routers (line ~88):
 
@@ -127,13 +127,13 @@ No new user types, no new tables, no migrations for existing data.
   service function as the JSON endpoint (single source of truth invariant). Add one
   `to_csv_rows()` helper per report.
 - **PDF/print** — no new backend dependency. Follow the existing voucher pattern
-  (`lms/router.py:get_payment_voucher_html`, templates in `cert&recept/`):
+  (`lms/router.py:get_payment_voucher_html`, templates in `templates/`):
   `GET /reports/{report_path}/print` → `HTMLResponse` of a styled, print-ready HTML
   document. PDF generation happens client-side via the already-installed
   `html2pdf.js`/`jspdf` (see Frontend). Keeps the backend dependency-free and matches
   how receipts/vouchers already work.
 
-### 5. Permission seeding migration (`backend/alembic/versions/<new>_reports_permission.py`)
+### 5. Permission seeding migration (`apps/erp/backend/alembic/versions/<new>_reports_permission.py`)
 
 Mirror `202606300100_user_employee_separation.py` lines 215-284:
 
@@ -148,7 +148,7 @@ sufficient; per-report access is enforced server-side regardless.
 
 ## Frontend Changes
 
-### 1. Route + permission wiring (`frontend/app/[locale]/(dashboard)/layout.tsx`)
+### 1. Route + permission wiring (`apps/erp/frontend/app/[locale]/(dashboard)/layout.tsx`)
 
 - Add `page_reports: ["superadmin", "manager", "secretary"]` to `PAGE_PERMISSION_MAP`.
 - Add `"dashboard/reports": "page_reports"` to `ROUTE_PERMISSION_MAP` (line ~204). This
@@ -157,7 +157,7 @@ sufficient; per-report access is enforced server-side regardless.
   `t.menu.reports`, permission `page_reports`).
 - Add `reports:` key to both `ar` and `en` translation blocks (`t.menu`).
 
-### 2. Page scaffold `frontend/app/[locale]/(dashboard)/dashboard/reports/page.tsx`
+### 2. Page scaffold `apps/erp/frontend/app/[locale]/(dashboard)/dashboard/reports/page.tsx`
 
 A single page, modelled on `dashboard/revenue/page.tsx`:
 
@@ -196,7 +196,7 @@ endpoint (defense in depth — the backend check is authoritative).
 
 ## Testing
 
-### Backend (pytest, in `backend/tests/`)
+### Backend (pytest, in `apps/erp/backend/tests/`)
 - **Unit** — each `service.py` aggregation function: happy path, empty range, boundary
   dates, and closed-vs-open daily-closure surface. ≥ 80% coverage on the new module.
 - **Integration** — every `GET /reports/*` endpoint: 200 shape, 401 unauthenticated,
@@ -204,7 +204,7 @@ endpoint (defense in depth — the backend check is authoritative).
 - **Permission** — seed migration adds `page_reports` and grants it to expected roles
   only; verify `role_permissions` counts parity.
 
-### Frontend (Playwright, `frontend/tests/`)
+### Frontend (Playwright, `apps/erp/frontend/tests/`)
 - Reports page renders each category tab; manager can open financial reports.
 - Route guard: secretary is blocked from `teachers/wallets` view, teacher cannot open
   the page at all.

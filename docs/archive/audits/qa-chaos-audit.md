@@ -133,12 +133,12 @@ These are code paths where exceptions are caught and swallowed without:
 | F01 | `academic/service.py:352-356` | `try: await create_certificate(...) except Exception: continue` | Certificate creation failure for individual students | Section completes, but some students never get certificates. **No one knows.** |
 | F02 | `academic/service.py:754-758` | `try: await ledger_finalize_grades(...) except ValueError: pass` | Ledger contract stuck at ACTIVE | Grades saved but contract not moved to GRADES_SUBMITTED. Settlement fails downstream. **No operator alert.** |
 | F03 | `lms/financial_service.py:84-86` | `enrollment = ...scalar_one_or_none() if not enrollment: return None` | Payment attempted on non-existent enrollment | No audit log of failed payment attempt. Could be fraud attempt or data bug. **No forensic trail.** |
-| F04 | `frontend/lib/api.ts:45` | `return new Promise<never>(() => {})` | Token refresh failure | Caller's promise **never settles**. Memory leak, zombie UI. **User sees loading spinner forever.** |
-| F05 | `frontend/components/AuthContext.tsx:85-96` | `catch (error) { // swallowed } finally { window.location.href = ... }` | Logout API failure | Backend session cookie not cleared server-side. **Session lingers.** |
+| F04 | `apps/erp/frontend/lib/api.ts:45` | `return new Promise<never>(() => {})` | Token refresh failure | Caller's promise **never settles**. Memory leak, zombie UI. **User sees loading spinner forever.** |
+| F05 | `apps/erp/frontend/components/AuthContext.tsx:85-96` | `catch (error) { // swallowed } finally { window.location.href = ... }` | Logout API failure | Backend session cookie not cleared server-side. **Session lingers.** |
 | F06 | Students page | `catch (e) { console.error(e) }` | Save/delete API failure | **User sees zero feedback.** UI stays in the same state. |
 | F07 | Sections page | `.catch(() => null)` + `.catch(() => {})` | Course/teacher/student lookup failure | UUIDs leak into UI as student/teacher names. `undefined` values propagate silently. |
 | F08 | Sections page | `try { const contract = ... } catch { /* empty */ }` | Contract fetch failure during edit | Form defaults to teacher_default values instead of actual contract. User edits wrong data. |
-| F09 | `frontend/api.ts` | Cannot distinguish 401 vs network error vs 500 | Auth failure | User redirected to login for a server-down scenario. **No explanation.** |
+| F09 | `apps/erp/frontend/api.ts` | Cannot distinguish 401 vs network error vs 500 | Auth failure | User redirected to login for a server-down scenario. **No explanation.** |
 | F10 | `academic/cancellation_service.py:292` | `await db.commit()` inside service | Premature commit | If caller wraps in transaction, unexpected early commit. Downstream failure cannot roll back. |
 | F11 | `academic/service.py:404` | `await db.commit()` in `deactivate_section` | Same as F10 | Inconsistent with entire codebase which uses `flush()`. Breaks rollback. |
 
@@ -212,7 +212,7 @@ These are race conditions that require specific timing to trigger.
 | 5 | Implement idempotency key support on E-V-E-R-Y financial endpoint | 2 days | All `POST` routers + new `idempotency_keys` table |
 | 6 | Add error monitoring (Sentry) | 0.5 day | `main.py`, `api.ts`, `layout.tsx` |
 | 7 | Fix Caddyfile: add CSP, HSTS, rate limiting headers | 0.5 day | `infrastructure/caddy/Caddyfile` |
-| 8 | Fix `new Promise<never>(() => {})` → `Promise.reject()` in Axios interceptor | 0.1 day | `frontend/lib/api.ts` |
+| 8 | Fix `new Promise<never>(() => {})` → `Promise.reject()` in Axios interceptor | 0.1 day | `apps/erp/frontend/lib/api.ts` |
 | 9 | Add `submitting` + `disabled` to every form submit button | 1 day | All frontend page components |
 | 10 | Add CI/CD pipeline | 1 day | `.github/workflows/` |
 
@@ -255,12 +255,12 @@ These are race conditions that require specific timing to trigger.
 
 ## Appendix A: Quick Wins (Fix These First — Under 1 Hour Each)
 
-1. `frontend/lib/api.ts:45`: `new Promise<never>(() => {})` → `Promise.reject(new Error("Session expired"))`
+1. `apps/erp/frontend/lib/api.ts:45`: `new Promise<never>(() => {})` → `Promise.reject(new Error("Session expired"))`
 2. `academic/service.py:755`: Add `logger.error(...)` before `pass`
 3. `academic/service.py:353`: Add `logger.warning(...)` before `continue`
 4. All form buttons: Add `disabled={submitting}` + `onClick={() => if (submitting) return}`
 5. Caddyfile: Add `header X-Content-Type-Options nosniff` and `header X-Frame-Options DENY`
-6. `frontend/lib/api.ts:16`: Reset `isRedirectingToLogin = false` after `window.location.href = "/login"` resolves
+6. `apps/erp/frontend/lib/api.ts:16`: Reset `isRedirectingToLogin = false` after `window.location.href = "/login"` resolves
 
 ## Appendix B: Attack Surface Summary
 

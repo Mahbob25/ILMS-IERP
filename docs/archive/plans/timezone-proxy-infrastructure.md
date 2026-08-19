@@ -58,7 +58,7 @@ Settings.TIMEZONE = "Asia/Riyadh"
                 fixes func.date() extraction in queries
 ```
 
-**Dev:** `TIMEZONE=Asia/Riyadh` in `backend/.env` — read by Pydantic at startup
+**Dev:** `TIMEZONE=Asia/Riyadh` in `apps/erp/backend/.env` — read by Pydantic at startup
 **Prod:** `TIMEZONE: Asia/Riyadh` in `docker-compose.yml` backend service env — same code, no changes
 
 No conditional logic, no `if ENVIRONMENT == "production"` branches.
@@ -75,18 +75,18 @@ Add optional `HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY` to Settings. Create a proxy
 
 | File | Purpose |
 |------|---------|
-| `backend/app/core/timezone.py` | `get_today()`, `utcnow()`, `localize()` helpers |
-| `backend/app/core/http_client.py` | Proxy-aware `httpx.AsyncClient` factory |
+| `apps/erp/backend/app/core/timezone.py` | `get_today()`, `utcnow()`, `localize()` helpers |
+| `apps/erp/backend/app/core/http_client.py` | Proxy-aware `httpx.AsyncClient` factory |
 
 ### Modified Files
 
 | File | Changes |
 |------|---------|
-| `backend/app/core/config.py` | Add `TIMEZONE`, `HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY` settings |
-| `backend/app/db/session.py` | Add `connect_args` with `server_settings.timezone` |
-| `backend/app/modules/dashboard/service.py` | Replace `date.today()` → `get_today()` (3 locations) |
-| `backend/app/modules/lms/financial_service.py` | Replace `date.today()` → `get_today()` (3 locations); fix line 255 to use `get_today()` instead of `datetime.now(timezone.utc).date()` |
-| `backend/.env` | Add `TIMEZONE=Asia/Riyadh` |
+| `apps/erp/backend/app/core/config.py` | Add `TIMEZONE`, `HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY` settings |
+| `apps/erp/backend/app/db/session.py` | Add `connect_args` with `server_settings.timezone` |
+| `apps/erp/backend/app/modules/dashboard/service.py` | Replace `date.today()` → `get_today()` (3 locations) |
+| `apps/erp/backend/app/modules/lms/financial_service.py` | Replace `date.today()` → `get_today()` (3 locations); fix line 255 to use `get_today()` instead of `datetime.now(timezone.utc).date()` |
+| `apps/erp/backend/.env` | Add `TIMEZONE=Asia/Riyadh` |
 | `docker-compose.yml` | Add `TZ`, `TIMEZONE`, `BACKEND_URL`, `FRONTEND_URL`, proxy env vars |
 | `infrastructure/caddy/Caddyfile` | Replace hardcoded `host.docker.internal` with `{env.BACKEND_URL}` / `{env.FRONTEND_URL}` |
 
@@ -94,7 +94,7 @@ Add optional `HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY` to Settings. Create a proxy
 
 ## Implementation Details
 
-### 1. `backend/app/core/config.py`
+### 1. `apps/erp/backend/app/core/config.py`
 
 ```python
 class Settings(BaseSettings):
@@ -105,7 +105,7 @@ class Settings(BaseSettings):
     NO_PROXY: str = "localhost,127.0.0.1,.aldrasat.edu"
 ```
 
-### 2. `backend/app/core/timezone.py` (NEW)
+### 2. `apps/erp/backend/app/core/timezone.py` (NEW)
 
 ```python
 from zoneinfo import ZoneInfo
@@ -127,7 +127,7 @@ def localize(dt: datetime) -> datetime:
     return dt.astimezone(_tz)
 ```
 
-### 3. `backend/app/db/session.py`
+### 3. `apps/erp/backend/app/db/session.py`
 
 ```python
 engine = create_async_engine(
@@ -137,7 +137,7 @@ engine = create_async_engine(
 )
 ```
 
-### 4. `backend/app/core/http_client.py` (NEW)
+### 4. `apps/erp/backend/app/core/http_client.py` (NEW)
 
 ```python
 import httpx

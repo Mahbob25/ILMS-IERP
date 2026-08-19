@@ -15,7 +15,7 @@ Cross-cutting features that depend on the complete backend: daily reconciliation
 
 ### 7.1 Daily Reconciliation Report
 
-Create `backend/app/modules/academic/reconciliation_service.py`:
+Create `apps/erp/backend/app/modules/academic/reconciliation_service.py`:
 
 ```python
 async def generate_daily_reconciliation_report(db: AsyncSession, report_date: date) -> dict:
@@ -189,10 +189,10 @@ async def check_startup_health(db: AsyncSession):
 
 | File | Action |
 |------|--------|
-| `backend/app/modules/academic/reconciliation_service.py` | **CREATE** — DAILY REPORT |
-| `backend/app/modules/academic/router.py` | **EDIT** — add reconciliation, audit, health endpoints |
-| `backend/app/modules/lms/router.py` | **EDIT** — add refund history audit endpoint |
-| `backend/app/modules/academic/section_startup_checks.py` | **EDIT** — add monitoring alert logging (additive) |
+| `apps/erp/backend/app/modules/academic/reconciliation_service.py` | **CREATE** — DAILY REPORT |
+| `apps/erp/backend/app/modules/academic/router.py` | **EDIT** — add reconciliation, audit, health endpoints |
+| `apps/erp/backend/app/modules/lms/router.py` | **EDIT** — add refund history audit endpoint |
+| `apps/erp/backend/app/modules/academic/section_startup_checks.py` | **EDIT** — add monitoring alert logging (additive) |
 | `docs/plans/section-lifecycle/api-contract.json` | **EDIT** — add all new Phase 7 endpoints |
 
 ## Independent Boundary

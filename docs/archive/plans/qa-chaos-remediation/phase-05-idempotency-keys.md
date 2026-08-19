@@ -30,11 +30,11 @@ CREATE TABLE idempotency_keys (
 CREATE INDEX idx_idempotency_keys_created_at ON idempotency_keys (created_at);
 ```
 
-Add SQLAlchemy model in `backend/app/modules/models.py` (or appropriate models file).
+Add SQLAlchemy model in `apps/erp/backend/app/modules/models.py` (or appropriate models file).
 
 ### 5.2 Create Idempotency Middleware
 
-Create `backend/app/middleware/idempotency.py`:
+Create `apps/erp/backend/app/middleware/idempotency.py`:
 
 ```python
 from fastapi import Request, Response
@@ -89,7 +89,7 @@ app.add_middleware(IdempotencyMiddleware)
 
 ### 5.4 Add Idempotency Key Helper Functions
 
-In `backend/app/modules/lms/idempotency_service.py`:
+In `apps/erp/backend/app/modules/lms/idempotency_service.py`:
 
 - `check_idempotency_key(key, endpoint)` — query DB for existing key
 - `store_idempotency_key(key, endpoint, status, body)` — insert with TTL
@@ -97,7 +97,7 @@ In `backend/app/modules/lms/idempotency_service.py`:
 
 ### 5.5 Add Idempotency Key Generation in Frontend
 
-In `frontend/lib/api.ts`, add an Axios request interceptor that generates and attaches an idempotency key to every POST/PATCH/PUT request:
+In `apps/erp/frontend/lib/api.ts`, add an Axios request interceptor that generates and attaches an idempotency key to every POST/PATCH/PUT request:
 
 ```typescript
 // Generate a UUID for each request
@@ -120,17 +120,17 @@ Add a background task (or cron) that runs daily to purge keys older than 24h.
 
 | File | Purpose |
 |------|---------|
-| `backend/app/middleware/idempotency.py` | FastAPI middleware |
-| `backend/app/modules/lms/idempotency_service.py` | Idempotency key CRUD + cleanup |
+| `apps/erp/backend/app/middleware/idempotency.py` | FastAPI middleware |
+| `apps/erp/backend/app/modules/lms/idempotency_service.py` | Idempotency key CRUD + cleanup |
 | Alembic migration | `idempotency_keys` table |
 
 ## Files to EDIT
 
 | File | Specific Location | Changes |
 |------|-------------------|---------|
-| `backend/app/main.py` | After other middleware | Add `app.add_middleware(IdempotencyMiddleware)` |
-| `backend/app/modules/models.py` | End of models | Add `IdempotencyKey` SQLAlchemy model |
-| `frontend/lib/api.ts` | After existing interceptors | Add request interceptor for idempotency key header |
+| `apps/erp/backend/app/main.py` | After other middleware | Add `app.add_middleware(IdempotencyMiddleware)` |
+| `apps/erp/backend/app/modules/models.py` | End of models | Add `IdempotencyKey` SQLAlchemy model |
+| `apps/erp/frontend/lib/api.ts` | After existing interceptors | Add request interceptor for idempotency key header |
 
 ## Independent Boundary
 

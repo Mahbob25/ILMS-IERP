@@ -30,17 +30,17 @@ jobs:
           python-version: '3.12'
       - name: Install backend dependencies
         run: |
-          pip install -r backend/requirements.txt
+          pip install -r apps/erp/backend/requirements.txt
           pip install pytest pytest-asyncio pytest-cov httpx
       - name: Run alembic migrations
         run: alembic upgrade head
-        working-directory: backend
+        working-directory: apps/erp/backend
         env:
           DATABASE_URL: postgresql+asyncpg://lims:lims_test@localhost:5432/lims_test
           JWT_SECRET_KEY: ci_test_key_not_used_in_production_do_not_use
       - name: Run backend tests
         run: pytest -v --cov=app --cov-report=term-missing
-        working-directory: backend
+        working-directory: apps/erp/backend
         env:
           DATABASE_URL: postgresql+asyncpg://lims:lims_test@localhost:5432/lims_test
           JWT_SECRET_KEY: ci_test_key_not_used_in_production_do_not_use
@@ -49,38 +49,38 @@ jobs:
           node-version: '20'
       - name: Install frontend dependencies
         run: npm ci
-        working-directory: frontend
+        working-directory: apps/erp/frontend
       - name: Run frontend lint
         run: npm run lint
-        working-directory: frontend
+        working-directory: apps/erp/frontend
       - name: Build frontend
         run: npm run build
-        working-directory: frontend
+        working-directory: apps/erp/frontend
         env:
           NEXT_PUBLIC_SENTRY_DSN: ""
 
-      # ── Portal (portal/backend + portal/frontend) ───────────────────
+      # ── Portal (apps/portal/backend + apps/portal/frontend) ─────────
       - name: Install portal backend dependencies
         run: |
           pip install -r requirements.txt
           pip install pytest pytest-asyncio pytest-cov httpx
-        working-directory: portal/backend
+        working-directory: apps/portal/backend
       - name: Run portal backend tests (unit)
         run: pytest -v
-        working-directory: portal/backend
+        working-directory: apps/portal/backend
         env:
           PORTAL_JWT_SECRET: ci_test_portal_jwt_secret_12345678901234567890123456789012
           REDIS_URL: ""
           ERP_SERVICE_KEY: ci_test_service_key
       - name: Install portal frontend dependencies
         run: npm ci
-        working-directory: portal/frontend
+        working-directory: apps/portal/frontend
       - name: Typecheck portal frontend
         run: npx tsc --noEmit
-        working-directory: portal/frontend
+        working-directory: apps/portal/frontend
       - name: Build portal frontend
         run: npm run build
-        working-directory: portal/frontend
+        working-directory: apps/portal/frontend
 
   deploy:
     name: Deploy to EC2

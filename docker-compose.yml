@@ -43,7 +43,7 @@ services:
 
   backend:
     build:
-      context: ./backend
+      context: ./apps/erp/backend
       dockerfile: Dockerfile
     container_name: lims_backend
     restart: always
@@ -62,7 +62,6 @@ services:
       PORTAL_JWT_SECRET: ${PORTAL_JWT_SECRET:-}
       PORTAL_SSO_SECRET: ${PORTAL_SSO_SECRET:-}
       PORTAL_FRONTEND_URL: ${PORTAL_FRONTEND_URL:-https://portal.aldirasat.com}
-      TEMPLATES_DIR: /app/cert&recept
       BACKUP_DIR: /app/backups
     depends_on:
       database:
@@ -70,7 +69,6 @@ services:
     volumes:
       - uploads_data:/app/uploads
       - backups:/app/backups
-      - ./cert&recept:/app/cert&recept:ro
     networks:
       - lims-internal
     healthcheck:

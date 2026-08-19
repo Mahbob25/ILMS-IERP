@@ -88,8 +88,8 @@ For real client IPs in FastAPI logs, Caddy can inject `CF-Connecting-IP` header.
 | File | Status |
 |------|--------|
 | `docker-compose.yml` (dev) | No changes |
-| `backend/Dockerfile` | No changes |
-| `frontend/Dockerfile` | No changes |
+| `apps/erp/backend/Dockerfile` | No changes |
+| `apps/erp/frontend/Dockerfile` | No changes |
 | `infrastructure/postgres/init.sql` | No changes |
 | `infrastructure/logrotate/lms.conf` | No changes |
 | All `.gitignore`, `.dockerignore` | No changes |

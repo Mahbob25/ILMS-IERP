@@ -69,10 +69,10 @@ class Settings(BaseSettings):
         if self.TEMPLATES_DIR:
             return Path(self.TEMPLATES_DIR)
         for parent in Path(__file__).resolve().parents:
-            candidate = parent / "cert&recept"
+            candidate = parent / "templates"
             if candidate.is_dir():
                 return candidate
-        raise FileNotFoundError("cert&recept template directory not found")
+        raise FileNotFoundError("templates directory not found")
 
     @property
     def sync_database_url(self) -> str:

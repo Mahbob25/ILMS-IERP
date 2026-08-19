@@ -134,7 +134,7 @@ All from the operator's Windows machine (source IP observed on server: `95.184.1
    - If it works → the EIP is fine globally; the operator's network/ISP is the problem. No AWS change needed.
 2. **Verify the route table** for `subnet-0849f99c3d4f8aab8` has `0.0.0.0/0 → igw-*` (Internet Gateway), not a NAT gateway or missing route.
 3. **Release and re-allocate the EIP** in `eu-north-1`, associate it to `i-0368e0157637daca9`, and retest IPv4.
-   - If the new EIP works → done; update the frontend rewrite origins + docs from `13.50.176.4` to the new IP (one-line change in `frontend/next.config.js`, `portal/frontend/next.config.js`, `frontend/lib/api.ts`, `portal/frontend/lib/api.ts`, and env vars on Vercel).
+   - If the new EIP works → done; update the frontend rewrite origins + docs from `13.50.176.4` to the new IP (one-line change in `apps/erp/frontend/next.config.js`, `apps/portal/frontend/next.config.js`, `apps/erp/frontend/lib/api.ts`, `apps/portal/frontend/lib/api.ts`, and env vars on Vercel).
 4. If all the above fail, **open a support case with AWS** (EC2 → Support) referencing: account `972472392485`, instance `i-0368e0157637daca9`, EIP `13.50.176.4`, symptom "IPv4 unreachable while IPv6/NAT64 works; SG/NACL/route checks pass."
 
 ---
@@ -167,7 +167,7 @@ aws ec2 describe-addresses --region eu-north-1 --public-ips 13.50.176.4
 
 ## 8. Related Context (if this becomes a deployment doc)
 
-- Frontends now deploy to **Vercel** (ERP: `frontend/` → root dir, Portal: `portal/frontend/` → root dir). Both rewrite `/api/*` to `http://13.50.176.4` in `next.config.js`.
+- Frontends now deploy to **Vercel** (ERP: `apps/erp/frontend/` → root dir, Portal: `apps/portal/frontend/` → root dir). Both rewrite `/api/*` to `http://13.50.176.4` in `next.config.js`.
 - EC2 runs only the backend stack (no frontend containers): `lims_backend` :8000, `portal_backend` :8001, `lims_database`, `lims_caddy` (API gateway on :80), `lims_cloudflared` (tunnel), `portal_redis`, `ai_service`.
 - The app is fully functional when reached locally or over the IPv6 path; only inbound IPv4 to the EIP is broken.
 - Once IPv4 is restored, final verification: `curl http://13.50.176.4/api/v1/health` → `200` from anywhere, then test the live Vercel frontends end-to-end.

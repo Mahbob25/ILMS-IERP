@@ -148,10 +148,10 @@ None.
 
 | File | Specific Functions | Changes |
 |------|-------------------|---------|
-| `backend/app/modules/academic/service.py` | Enrollment function (capacity check) | Add `with_for_update()` before reading section |
-| `backend/app/modules/lms/financial_service.py` | Payment creation (remaining balance) | Add `with_for_update()` on enrollment + payments |
-| `backend/app/modules/lms/ledger_service.py` | `approve_amendment()`, `activate_contract()` | Add `with_for_update()` on wallet/contract |
-| `backend/app/modules/lms/ledger_service.py` | Wallet upsert function | Replace read-check-create with `INSERT ... ON CONFLICT` |
+| `apps/erp/backend/app/modules/academic/service.py` | Enrollment function (capacity check) | Add `with_for_update()` before reading section |
+| `apps/erp/backend/app/modules/lms/financial_service.py` | Payment creation (remaining balance) | Add `with_for_update()` on enrollment + payments |
+| `apps/erp/backend/app/modules/lms/ledger_service.py` | `approve_amendment()`, `activate_contract()` | Add `with_for_update()` on wallet/contract |
+| `apps/erp/backend/app/modules/lms/ledger_service.py` | Wallet upsert function | Replace read-check-create with `INSERT ... ON CONFLICT` |
 | User creation endpoint | `grant_access()` | Add IntegrityError handler for email uniqueness |
 | Closure payment handler | `close_day()`, payment functions | Add advisory lock for TOCTOU |
 | Unlock approval endpoint | Unlock approval handler | Add `SELECT FOR UPDATE` + audit logging |
@@ -161,7 +161,7 @@ None.
 - Do NOT modify DB schema or migrations (Phase 1, 2 concerns)
 - Do NOT modify conditional UPDATE status transitions (Phase 3 concern — the if-check-then-write in Phase 4 functions uses SELECT FOR UPDATE, not the WHERE status pattern of Phase 3)
 - Do NOT create idempotency keys or middleware (Phase 5 concern)
-- Do NOT modify `frontend/` files
+- Do NOT modify `apps/erp/frontend/` files
 - Do NOT modify Caddyfile or infrastructure
 - **In `academic/service.py`, only touch the enrollment capacity function — do NOT touch `complete_section()`, `set_final_grades_bulk()`, or `cancel_section()` (Phase 3 functions)**
 - **In `ledger_service.py`, only touch `approve_amendment()` and wallet functions — do NOT touch contract status transition functions (Phase 3)**

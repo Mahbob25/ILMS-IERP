@@ -11,7 +11,7 @@ networks:
 
 services:
   portal-backend:
-    build: ./portal/backend
+    build: ./apps/portal/backend
     container_name: portal_backend
     restart: always
     environment:
@@ -47,7 +47,7 @@ services:
           memory: 1G
 
   ai-service:
-    build: ./ai-service
+    build: ./apps/ai-service
     container_name: ai_service
     restart: always
     environment:

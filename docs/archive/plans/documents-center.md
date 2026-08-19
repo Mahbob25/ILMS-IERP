@@ -64,7 +64,7 @@ Query parameters (all optional):
 
 ### 5.2 Unified response shape
 
-New Pydantic schemas in `backend/app/modules/lms/schemas.py` (no ORM mapping needed — built from three row mappings):
+New Pydantic schemas in `apps/erp/backend/app/modules/lms/schemas.py` (no ORM mapping needed — built from three row mappings):
 
 ```python
 class DocumentItem(BaseModel):
@@ -85,7 +85,7 @@ class DocumentListResponse(BaseModel):
 
 ### 5.3 Query strategy — follow the existing pattern
 
-`closure_service.get_daily_ledger` (backend/app/modules/lms/closure_service.py:144) already demonstrates the exact joins and shape needed (Payment→Enrollment→Student, Expense→User, Refund→PendingRefund→Enrollment→Student). The new service mirrors it **without** the date-equality constraint:
+`closure_service.get_daily_ledger` (apps/erp/backend/app/modules/lms/closure_service.py:144) already demonstrates the exact joins and shape needed (Payment→Enrollment→Student, Expense→User, Refund→PendingRefund→Enrollment→Student). The new service mirrors it **without** the date-equality constraint:
 
 1. Run **three independent SELECTs** (payments, expenses, refunds), each with the same filter set applied
 2. Map each row to `DocumentItem`
@@ -101,9 +101,9 @@ class DocumentListResponse(BaseModel):
 
 | File | Purpose |
 |---|---|
-| `backend/app/modules/lms/documents_service.py` | `search_documents(db, filters) -> DocumentListResponse` |
-| `backend/app/modules/lms/documents_schemas.py` (or extend `schemas.py`) | `DocumentItem`, `DocumentListResponse` |
-| `backend/app/modules/lms/router.py` | one new GET route (add near `/payments`) |
+| `apps/erp/backend/app/modules/lms/documents_service.py` | `search_documents(db, filters) -> DocumentListResponse` |
+| `apps/erp/backend/app/modules/lms/documents_schemas.py` (or extend `schemas.py`) | `DocumentItem`, `DocumentListResponse` |
+| `apps/erp/backend/app/modules/lms/router.py` | one new GET route (add near `/payments`) |
 
 **No changes** to `voucher_service.py`, `financial_service.py`, `closure_service.py`, or any model.
 
@@ -121,7 +121,7 @@ class DocumentListResponse(BaseModel):
 
 ### 6.1 Page
 
-`frontend/app/[locale]/(dashboard)/dashboard/documents/page.tsx`
+`apps/erp/frontend/app/[locale]/(dashboard)/dashboard/documents/page.tsx`
 
 - Table columns: Type badge (Receipt/Voucher/Refund), receipt number, date, amount, counterparty, created by, actions (Preview/Print)
 - Filters bar: document type select, date range, search box (debounced 300ms — reuse the pattern from `dashboard/payments/page.tsx:170`), name search
@@ -131,16 +131,16 @@ class DocumentListResponse(BaseModel):
 
 ### 6.2 Component reuse (DRY — the whole point)
 
-- **Receipt/Voucher preview/print:** reuse `frontend/components/ReceiptModal.tsx` with the existing `data` shape (it already renders both receipt and voucher titles — see lines 61-62)
-- **Refund preview:** reuse `frontend/components/cashier/RefundReceipt.tsx` (already used by `cashier/refunds/page.tsx`)
-- **PDF download:** reuse `frontend/lib/generatePdfFromHtml.ts` (used by `ReceiptModal.tsx:158`)
-- **API calls:** use the existing `apiClient` from `frontend/lib/api.ts` — no new client, no new fetch wrapper
+- **Receipt/Voucher preview/print:** reuse `apps/erp/frontend/components/ReceiptModal.tsx` with the existing `data` shape (it already renders both receipt and voucher titles — see lines 61-62)
+- **Refund preview:** reuse `apps/erp/frontend/components/cashier/RefundReceipt.tsx` (already used by `cashier/refunds/page.tsx`)
+- **PDF download:** reuse `apps/erp/frontend/lib/generatePdfFromHtml.ts` (used by `ReceiptModal.tsx:158`)
+- **API calls:** use the existing `apiClient` from `apps/erp/frontend/lib/api.ts` — no new client, no new fetch wrapper
 
 **Do NOT** create new receipt/voucher templates, new PDF generation, or new print windows. Everything renders through the existing components.
 
 ## 7. Testing Plan (TDD)
 
-`backend/tests/integration/section_lifecycle/` already has the fixtures/mocks pattern; add `backend/tests/integration/documents/test_documents_center.py`:
+`apps/erp/backend/tests/integration/section_lifecycle/` already has the fixtures/mocks pattern; add `apps/erp/backend/tests/integration/documents/test_documents_center.py`:
 
 1. **Union correctness** — seed 1 payment + 1 expense + 1 refund → endpoint returns 3 items, one per type, correct amounts/numbers
 2. **Filters** — `doc_type=receipt` returns only receipts; `search=RCP-` narrows; `name` matches student vs recipient; date range includes `disbursed_at`-based refunds
@@ -149,7 +149,7 @@ class DocumentListResponse(BaseModel):
 5. **Read-only proof** — response payloads contain no mutation endpoints; assert no new tables exist (query `information_schema.tables` diff or rely on code review — no Alembic revision generated)
 6. **Refund timezone** — refund disbursed at `23:30 UTC` on day X appears under the correct local date (mirrors existing closure tests)
 
-Frontend: Playwright smoke spec `frontend/tests/e2e/browser/features/documents-ui.spec.ts` — page loads, filters render, preview opens existing `ReceiptModal`.
+Frontend: Playwright smoke spec `apps/erp/frontend/tests/e2e/browser/features/documents-ui.spec.ts` — page loads, filters render, preview opens existing `ReceiptModal`.
 
 ## 8. Rollout Phases
 

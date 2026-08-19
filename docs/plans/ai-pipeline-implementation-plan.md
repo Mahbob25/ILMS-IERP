@@ -55,7 +55,7 @@ The design is intentionally **lean**: one DB (PostgreSQL+pgvector), in-process `
 - Multi-tenant, student/parent portal, payments, mobile push, personalized learning paths
 
 **Current codebase gap (as of `docs/plans/current.md` v1.7):**
-- AI modules do **not** exist yet (`backend/app/modules` has academic/backups/dashboard/identity/lms/notifications/reports/search/settings — no `ingestion` or `questions`)
+- AI modules do **not** exist yet (`apps/erp/backend/app/modules` has academic/backups/dashboard/identity/lms/notifications/reports/search/settings — no `ingestion` or `questions`)
 - `pgvector` **ready**: `pgvector/pgvector:pg16` image and `CREATE EXTENSION vector` in `infrastructure/postgres/init.sql`
 - `BackgroundTasks` **not yet used** for long jobs; `tenacity` + `pybreaker` + `psutil` already in `requirements.txt`
 - Frontend has no `ingestion/` or `questions/` routes — to be added under `(dashboard)`
@@ -287,7 +287,7 @@ All under `/api/v1`, `HttpOnly Secure Cookie` via Caddy Internal CA, RBAC via ex
 ### Phase 5.0 — Foundations (1 week, prerequisite)
 
 - **DB:** Alembic migration `add_ai_pipeline_tables` (tables above) + `CREATE EXTENSION vector` verification in CI; create `HNSW` index concurrently.
-- **Backend scaffolding:** `backend/app/modules/ingestion/` and `backend/app/modules/questions/` with `router.py / schemas.py / models.py / service.py / dependencies.py` per project convention.
+- **Backend scaffolding:** `apps/erp/backend/app/modules/ingestion/` and `apps/erp/backend/app/modules/questions/` with `router.py / schemas.py / models.py / service.py / dependencies.py` per project convention.
 - **Config:** Add `GEMINI_API_KEY`, `GEMINI_EMBEDDING_MODEL=text-embedding-004`, `GEMINI_TEXT_MODEL=gemini-1.5-flash`, `AI_BATCH_SIZE=50`, `AI_CHECKPOINT_EVERY_N_PAGES=3`, `AI_MAX_FILE_MB=50` to `Pydantic Settings` + `.env.example`.
 - **StorageService:** Abstract interface (`save`, `get_path`, `delete`) with local-disk impl under `/app/uploads/curriculum`; add MIME/size validation.
 - **Tests:** Migration smoke test + vector round-trip (`INSERT ... '[1,2,3]'::vector` + `<=>` query <50ms).
@@ -470,8 +470,8 @@ LIMIT 10;
 
 - Source doc: `docs/archive/plans/Plan-v1.6.md` (1328 lines, v1.6 Lean MVP — changelog, §3 stack, §6 architecture, §11/12 pipelines, §17 infra, §18 phases, §19 risks)
 - Current roadmap: `docs/plans/current.md` (AI pipeline paused since v1.7, resume after deploy)
-- Existing infra: `docker-compose.yml` (4 services, pgvector/pg16, lims-internal), `infrastructure/postgres/init.sql`, `backend/requirements.txt` (tenacity, pybreaker, psutil already present)
+- Existing infra: `docker-compose.yml` (4 services, pgvector/pg16, lims-internal), `infrastructure/postgres/init.sql`, `apps/erp/backend/requirements.txt` (tenacity, pybreaker, psutil already present)
 
 ---
 
-**Next step:** Review this plan. If approved, I will scaffold `backend/app/modules/ingestion` and `backend/app/modules/questions` per §9 Phase 5.0 and open a follow-up plan for frontend routes. No code is changed by this document.
+**Next step:** Review this plan. If approved, I will scaffold `apps/erp/backend/app/modules/ingestion` and `apps/erp/backend/app/modules/questions` per §9 Phase 5.0 and open a follow-up plan for frontend routes. No code is changed by this document.

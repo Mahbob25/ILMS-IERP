@@ -12,17 +12,17 @@
 All phases completed. Verified artifacts (2026-08-06):
 
 **Backend**
-- `backend/app/modules/lms/financial_records_service.py` — `search_financial_records` (line 305) with three typed SELECTs + COUNTs, `merge_records` pure helper (date desc, then receipt_number)
-- `backend/app/modules/lms/schemas.py` — `FinancialRecordItem` (line 324), `FinancialRecordListResponse` (line 342)
-- `backend/app/modules/lms/router.py:224-247` — `GET /financial-records` with `@limiter.limit("60/minute")`, `doc_type` regex, `limit` 1–200, `RoleChecker(["superadmin","manager","secretary"])`
-- `backend/tests/unit/test_financial_records_service.py` — merge/sort/pagination + SQL-shape tests
-- `backend/tests/integration/financial_records/test_financial_records_endpoint.py` + `conftest.py` — endpoint shape, filters, pagination, role gates (TestClient + monkeypatched service)
-- `backend/pytest.ini:3` — `tests/integration/financial_records` added to `testpaths`
+- `apps/erp/backend/app/modules/lms/financial_records_service.py` — `search_financial_records` (line 305) with three typed SELECTs + COUNTs, `merge_records` pure helper (date desc, then receipt_number)
+- `apps/erp/backend/app/modules/lms/schemas.py` — `FinancialRecordItem` (line 324), `FinancialRecordListResponse` (line 342)
+- `apps/erp/backend/app/modules/lms/router.py:224-247` — `GET /financial-records` with `@limiter.limit("60/minute")`, `doc_type` regex, `limit` 1–200, `RoleChecker(["superadmin","manager","secretary"])`
+- `apps/erp/backend/tests/unit/test_financial_records_service.py` — merge/sort/pagination + SQL-shape tests
+- `apps/erp/backend/tests/integration/financial_records/test_financial_records_endpoint.py` + `conftest.py` — endpoint shape, filters, pagination, role gates (TestClient + monkeypatched service)
+- `apps/erp/backend/pytest.ini:3` — `tests/integration/financial_records` added to `testpaths`
 
 **Frontend**
-- `frontend/app/[locale]/(dashboard)/dashboard/financial-records/page.tsx` — filters bar (doc type, date range, debounced search, name), table, pagination, i18n
-- `frontend/app/[locale]/(dashboard)/layout.tsx` — `ROUTE_PERMISSION_MAP` (line 226), `PAGE_PERMISSION_MAP` (line 187), sidebar entry (lines 337-340), `menu.financialRecords` in `ar`/`en` (lines 74/112)
-- `frontend/tests/e2e/browser/features/financial-records.spec.ts` — Playwright smoke spec
+- `apps/erp/frontend/app/[locale]/(dashboard)/dashboard/financial-records/page.tsx` — filters bar (doc type, date range, debounced search, name), table, pagination, i18n
+- `apps/erp/frontend/app/[locale]/(dashboard)/layout.tsx` — `ROUTE_PERMISSION_MAP` (line 226), `PAGE_PERMISSION_MAP` (line 187), sidebar entry (lines 337-340), `menu.financialRecords` in `ar`/`en` (lines 74/112)
+- `apps/erp/frontend/tests/e2e/browser/features/financial-records.spec.ts` — Playwright smoke spec
 
 **Deviations from plan (minor, no contract change)**
 - Integration test file named `test_financial_records_endpoint.py` (plan said `test_financial_records_center.py`)
@@ -41,7 +41,7 @@ Decided at implementation kickoff (2026-08-05):
 1. **Naming: `financial-records`** — not `documents`, not `receipts-vouchers`.
    - Endpoint: `GET /api/v1/lms/financial-records`
    - Page: `dashboard/financial-records`
-   - Rationale: the AI ingestion pipeline uses `/api/v1/curriculum/documents` + `dashboard/ingestion`, so `/lms/documents` would not collide in URL space either, but `financial-records` is unambiguous and future-proof. Verified by grep: no `documents` route exists in `backend/app` or `frontend/` code.
+   - Rationale: the AI ingestion pipeline uses `/api/v1/curriculum/documents` + `dashboard/ingestion`, so `/lms/documents` would not collide in URL space either, but `financial-records` is unambiguous and future-proof. Verified by grep: no `documents` route exists in `apps/erp/backend/app` or `apps/erp/frontend/` code.
 2. **Schema: extend `DocumentItem`** with optional modal-support fields (`student_code`, `course_name`, `payment_method`, `transaction_number`, `expense_type`, `notes`) so the existing `ReceiptModal` / `RefundReceipt` components render with real data. No new templates, no new PDF generation.
 
 ## 2. Problem
@@ -102,7 +102,7 @@ Query parameters (all optional):
 
 ### 6.2 Unified response shape
 
-New Pydantic schemas added to `backend/app/modules/lms/schemas.py` (extend existing file, no ORM mapping — built from three row mappings):
+New Pydantic schemas added to `apps/erp/backend/app/modules/lms/schemas.py` (extend existing file, no ORM mapping — built from three row mappings):
 
 ```python
 class FinancialRecordItem(BaseModel):
@@ -130,7 +130,7 @@ class FinancialRecordListResponse(BaseModel):
 
 ### 6.3 Query strategy — follow the existing pattern
 
-`closure_service.get_daily_ledger` (backend/app/modules/lms/closure_service.py:144) already demonstrates the exact joins and shape needed (Payment→Enrollment→Student, Expense→User, Refund→PendingRefund→Enrollment→Student). The new service mirrors it **without** the date-equality constraint:
+`closure_service.get_daily_ledger` (apps/erp/backend/app/modules/lms/closure_service.py:144) already demonstrates the exact joins and shape needed (Payment→Enrollment→Student, Expense→User, Refund→PendingRefund→Enrollment→Student). The new service mirrors it **without** the date-equality constraint:
 
 1. Run **three independent SELECTs** (payments, expenses, refunds), each with the same filter set applied, each `.order_by(date DESC, receipt_number)` and `.limit(offset + limit)`
 2. Run three `COUNT(*)` queries with the same filters → sum for `total`
@@ -152,12 +152,12 @@ class FinancialRecordListResponse(BaseModel):
 
 | File | Purpose |
 |---|---|
-| `backend/app/modules/lms/financial_records_service.py` | `search_financial_records(db, filters) -> FinancialRecordListResponse` + pure `merge_records` helper |
-| `backend/app/modules/lms/schemas.py` | add `FinancialRecordItem`, `FinancialRecordListResponse` (extend existing file) |
-| `backend/app/modules/lms/router.py` | one new GET route (add near `/payments`, router.py:205) |
-| `backend/tests/integration/financial_records/test_financial_records_center.py` | endpoint tests (TestClient + monkeypatch pattern) |
-| `backend/tests/unit/test_financial_records_service.py` | pure merge/sort/pagination + SQL-shape unit tests |
-| `backend/pytest.ini` | add `tests/integration/financial_records` to `testpaths` |
+| `apps/erp/backend/app/modules/lms/financial_records_service.py` | `search_financial_records(db, filters) -> FinancialRecordListResponse` + pure `merge_records` helper |
+| `apps/erp/backend/app/modules/lms/schemas.py` | add `FinancialRecordItem`, `FinancialRecordListResponse` (extend existing file) |
+| `apps/erp/backend/app/modules/lms/router.py` | one new GET route (add near `/payments`, router.py:205) |
+| `apps/erp/backend/tests/integration/financial_records/test_financial_records_center.py` | endpoint tests (TestClient + monkeypatch pattern) |
+| `apps/erp/backend/tests/unit/test_financial_records_service.py` | pure merge/sort/pagination + SQL-shape unit tests |
+| `apps/erp/backend/pytest.ini` | add `tests/integration/financial_records` to `testpaths` |
 
 **No changes** to `voucher_service.py`, `financial_service.py`, `closure_service.py`, `cashier_service.py`, or any model.
 
@@ -175,25 +175,25 @@ class FinancialRecordListResponse(BaseModel):
 
 ### 7.1 Page
 
-`frontend/app/[locale]/(dashboard)/dashboard/financial-records/page.tsx`
+`apps/erp/frontend/app/[locale]/(dashboard)/dashboard/financial-records/page.tsx`
 
 - Table columns: Type badge (Receipt/Voucher/Refund), receipt number, date, amount, counterparty, created by, actions (Preview/Print)
 - Filters bar: document type select, date range, search box (debounced 300 ms — reuse the pattern from `dashboard/payments/page.tsx:173`), name search
 - Pagination (offset/limit) + total count ("Showing X of Y")
 - i18n: inline `ar`/`en` dict following the payments/expenses page convention (payments page keeps its labels inline)
-- API calls: existing `apiClient` from `frontend/lib/api.ts` — no new client, no new fetch wrapper
+- API calls: existing `apiClient` from `apps/erp/frontend/lib/api.ts` — no new client, no new fetch wrapper
 
 ### 7.2 Component reuse (DRY — the whole point)
 
-- **Receipt/Voucher preview/print:** reuse `frontend/components/ReceiptModal.tsx` with the existing `data` shape (`type: "payment" | "expense"`, `id: source_id`); it already renders both receipt and voucher titles and calls the real preview endpoints for print/PDF. Copy the small `expenseTypeMeta` mapping from `dashboard/expenses/page.tsx`.
-- **Refund preview:** reuse `frontend/components/cashier/RefundReceipt.tsx` (needs `student_code` + `notes` from the extended schema).
-- **PDF download:** reuse `frontend/lib/generatePdfFromHtml.ts` (used by `ReceiptModal.tsx:158`).
+- **Receipt/Voucher preview/print:** reuse `apps/erp/frontend/components/ReceiptModal.tsx` with the existing `data` shape (`type: "payment" | "expense"`, `id: source_id`); it already renders both receipt and voucher titles and calls the real preview endpoints for print/PDF. Copy the small `expenseTypeMeta` mapping from `dashboard/expenses/page.tsx`.
+- **Refund preview:** reuse `apps/erp/frontend/components/cashier/RefundReceipt.tsx` (needs `student_code` + `notes` from the extended schema).
+- **PDF download:** reuse `apps/erp/frontend/lib/generatePdfFromHtml.ts` (used by `ReceiptModal.tsx:158`).
 
 **Do NOT** create new receipt/voucher templates, new PDF generation, or new print windows. Everything renders through the existing components.
 
 ### 7.3 Nav entry + route guard
 
-`frontend/app/[locale]/(dashboard)/layout.tsx`:
+`apps/erp/frontend/app/[locale]/(dashboard)/layout.tsx`:
 
 - Add `dashboard/financial-records: "page_financial_records"` to `ROUTE_PERMISSION_MAP` (line 233 area)
 - Add `page_financial_records: ["superadmin", "manager", "secretary"]` to `PAGE_PERMISSION_MAP` (line 195 area) — fallback-role path grants access **without** a DB permission row (zero-migration constraint); superadmin bypasses anyway
@@ -217,7 +217,7 @@ Mirror the `test_reports_financial_endpoints.py` pattern (FastAPI TestClient + m
 4. **Role gates** — teacher → 403, anonymous → 401, secretary/manager → 200
 5. **Read-only proof** — response payloads contain no mutation URLs; code review asserts no new Alembic revision exists (`git status` shows no `alembic/versions/*`)
 
-### 8.3 Frontend E2E smoke (`frontend/tests/e2e/browser/features/financial-records.spec.ts`)
+### 8.3 Frontend E2E smoke (`apps/erp/frontend/tests/e2e/browser/features/financial-records.spec.ts`)
 
 Patterned on `payments-ui.spec.ts`: page loads via sidebar link, title + table render, filters render, preview opens existing `ReceiptModal`/`RefundReceipt`.
 
@@ -227,28 +227,28 @@ Each phase ends with its gate (all green) before moving to the next. TDD: write 
 
 ### Phase 1 — Backend: schemas + service + endpoint (gate: unit + integration tests green)
 
-1. **Extend `backend/app/modules/lms/schemas.py`** — add `FinancialRecordItem` and `FinancialRecordListResponse` exactly as in §6.2.
-2. **Write unit tests (RED)** — `backend/tests/unit/test_financial_records_service.py`:
+1. **Extend `apps/erp/backend/app/modules/lms/schemas.py`** — add `FinancialRecordItem` and `FinancialRecordListResponse` exactly as in §6.2.
+2. **Write unit tests (RED)** — `apps/erp/backend/tests/unit/test_financial_records_service.py`:
    - merge helper: 1 payment + 1 expense + 1 refund → 3 items, one per type, correct amounts/numbers/`preview_url`s
    - merge sort order: date desc, then receipt_number; limit/offset slicing; `total`
    - refund query SQL shape: compiled SQL contains `date(refunds.disbursed_at)`
-3. **Implement `backend/app/modules/lms/financial_records_service.py` (GREEN)** — `search_financial_records(db, *, doc_type, date_from, date_to, search, name, limit, offset)` per §6.3:
+3. **Implement `apps/erp/backend/app/modules/lms/financial_records_service.py` (GREEN)** — `search_financial_records(db, *, doc_type, date_from, date_to, search, name, limit, offset)` per §6.3:
    - three typed SELECTs (payments/expenses/refunds) with `.order_by(date DESC, receipt_number)` and `.limit(offset + limit)`
    - three `COUNT(*)` queries → summed `total`
    - pure `merge_records` helper + Python slice for pagination
    - `preview_url` computed server-side per §6.5
-4. **Add the route** in `backend/app/modules/lms/router.py` (near `list_payments`, ~line 205): `GET /financial-records` with `@limiter.limit("60/minute")`, `doc_type` regex validation, `limit` (1–200, default 50), `offset`, and `RoleChecker(allowed_roles=["superadmin","manager","secretary"])`.
-5. **Write integration tests (RED→GREEN)** — `backend/tests/integration/financial_records/test_financial_records_center.py` (+ `__init__.py`), patterned on `test_reports_financial_endpoints.py`:
+4. **Add the route** in `apps/erp/backend/app/modules/lms/router.py` (near `list_payments`, ~line 205): `GET /financial-records` with `@limiter.limit("60/minute")`, `doc_type` regex validation, `limit` (1–200, default 50), `offset`, and `RoleChecker(allowed_roles=["superadmin","manager","secretary"])`.
+5. **Write integration tests (RED→GREEN)** — `apps/erp/backend/tests/integration/financial_records/test_financial_records_center.py` (+ `__init__.py`), patterned on `test_reports_financial_endpoints.py`:
    - endpoint shape 200: `items` + `total`, documented fields only
    - filters pass-through (`doc_type`, `search`, `name`, date range)
    - pagination: `limit`/`offset` accepted, `limit=201` → 422
    - role gates: teacher → 403, anonymous → 401, secretary/manager → 200
-6. **Register tests** — add `tests/integration/financial_records` to `testpaths` in `backend/pytest.ini`.
+6. **Register tests** — add `tests/integration/financial_records` to `testpaths` in `apps/erp/backend/pytest.ini`.
 7. **Gate:** `python -m pytest tests/unit/test_financial_records_service.py tests/integration/financial_records -q` green; `ruff check app/modules/lms` clean; `git status` shows no `alembic/versions/*` file.
 
 ### Phase 2 — Frontend: page + filters + table (gate: manual QA in `ar` and `en`)
 
-1. Create `frontend/app/[locale]/(dashboard)/dashboard/financial-records/page.tsx`:
+1. Create `apps/erp/frontend/app/[locale]/(dashboard)/dashboard/financial-records/page.tsx`:
    - inline `ar`/`en` translation dict (payments page convention)
    - filters bar: doc-type `<Select>` (all/receipt/voucher/refund), `date_from`/`date_to` inputs, debounced (300 ms) receipt-number search using `escapeLikeWildcards`, name search
    - table: type badge, receipt number, date, amount, counterparty, created by, Preview action
@@ -262,16 +262,16 @@ Each phase ends with its gate (all green) before moving to the next. TDD: write 
    - receipt → `ReceiptModal` with `type: "payment"`, `id: source_id` (print/PDF reuse its built-in preview calls)
    - voucher → `ReceiptModal` with `type: "expense"` + `expense_type_label`/`expense_type_variant` (copy `expenseTypeMeta` mapping from `dashboard/expenses/page.tsx`)
    - refund → `RefundReceipt` with `studentCode` + `notes`
-2. Write `frontend/tests/e2e/browser/features/financial-records.spec.ts` (patterned on `payments-ui.spec.ts`): navigate via sidebar, title + table render, filters render, preview opens the modal.
+2. Write `apps/erp/frontend/tests/e2e/browser/features/financial-records.spec.ts` (patterned on `payments-ui.spec.ts`): navigate via sidebar, title + table render, filters render, preview opens the modal.
 3. **Gate:** `npm run test:e2e:browser -- --project=chromium` (or manual verification if env unavailable).
 
 ### Phase 4 — Nav entry + route guard + translations (gate: lint + typecheck + full suite)
 
-1. In `frontend/app/[locale]/(dashboard)/layout.tsx`:
+1. In `apps/erp/frontend/app/[locale]/(dashboard)/layout.tsx`:
    - add `dashboard/financial-records: "page_financial_records"` to `ROUTE_PERMISSION_MAP` (~line 233)
    - add `page_financial_records: ["superadmin", "manager", "secretary"]` to `PAGE_PERMISSION_MAP` (~line 195) — fallback roles, **no DB permission row** (zero-migration)
    - add sidebar nav item near Payments/Expenses with a lucide icon (`FolderOpen`) + `menu.financialRecords` key in both `ar`/`en` `t` dicts
-2. **Gate:** `ruff check backend/app` + `npx tsc --noEmit` (frontend) + full backend pytest suite green; remove any `console.log` leftovers.
+2. **Gate:** `ruff check apps/erp/backend/app` + `npx tsc --noEmit` (frontend) + full backend pytest suite green; remove any `console.log` leftovers.
 
 ## 10. Open Questions (resolved)
 

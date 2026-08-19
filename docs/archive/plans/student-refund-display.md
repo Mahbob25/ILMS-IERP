@@ -13,7 +13,7 @@ Show all refund states (unclaimed, claimed, forfeited) on the student detail pag
 
 ### Phase 1: Backend — New `get_student_refunds()` function
 
-**File:** `backend/app/modules/academic/cancellation_service.py`
+**File:** `apps/erp/backend/app/modules/academic/cancellation_service.py`
 
 Replace `get_student_pending_refunds()` with a new function that returns all statuses with full details:
 
@@ -58,7 +58,7 @@ async def get_student_refunds(
 
 ### Phase 2: Backend — Update Router Endpoint
 
-**File:** `backend/app/modules/lms/router.py`
+**File:** `apps/erp/backend/app/modules/lms/router.py`
 
 Change line 1016 from `GET /students/{student_id}/pending-refunds` to `GET /students/{student_id}/refunds`:
 
@@ -69,7 +69,7 @@ Change line 1016 from `GET /students/{student_id}/pending-refunds` to `GET /stud
 
 ### Phase 3: Frontend — Create `StudentRefundsCard` Component
 
-**New file:** `frontend/components/students/StudentRefundsCard.tsx`
+**New file:** `apps/erp/frontend/components/students/StudentRefundsCard.tsx`
 
 Replace the simple badge with a card that has three sections:
 
@@ -102,7 +102,7 @@ Replace the simple badge with a card that has three sections:
 
 ### Phase 4: Frontend — Wire into Student Detail Page
 
-**File:** `frontend/app/[locale]/dashboard/students/[id]/page.tsx`
+**File:** `apps/erp/frontend/app/[locale]/dashboard/students/[id]/page.tsx`
 
 1. Add refund-related state:
    ```typescript
@@ -134,7 +134,7 @@ Replace the simple badge with a card that has three sections:
 
 ### Phase 5: Delete Old Component
 
-Remove `frontend/components/students/PendingRefundBadge.tsx` once `StudentRefundsCard` replaces all usages.
+Remove `apps/erp/frontend/components/students/PendingRefundBadge.tsx` once `StudentRefundsCard` replaces all usages.
 
 ## Verification
 

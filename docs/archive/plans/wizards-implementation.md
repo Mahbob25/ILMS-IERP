@@ -200,14 +200,14 @@ Skip step 3: advance to "Complete" screen with summary (no payment recorded)
 **Goal**: Build the reusable wizard shell components that both wizards will use.
 
 **Tasks**:
-1. Create `frontend/components/wizards/WizardStepper.tsx` — renders numbered steps with active/completed/pending visual states, supports RTL
-2. Create `frontend/components/wizards/WizardNavigationBar.tsx` — Back/Next/Skip/Finish buttons with proper disabled states
+1. Create `apps/erp/frontend/components/wizards/WizardStepper.tsx` — renders numbered steps with active/completed/pending visual states, supports RTL
+2. Create `apps/erp/frontend/components/wizards/WizardNavigationBar.tsx` — Back/Next/Skip/Finish buttons with proper disabled states
 3. Add CSS for step transitions (fade/slide)
 4. Write translations for wizard UI strings (AR/EN): "Step X of Y", "Back", "Next", "Skip Payment", "Finish", "Student Registered Successfully"
 
 **Files to create**:
-- `frontend/components/wizards/WizardStepper.tsx`
-- `frontend/components/wizards/WizardNavigationBar.tsx`
+- `apps/erp/frontend/components/wizards/WizardStepper.tsx`
+- `apps/erp/frontend/components/wizards/WizardNavigationBar.tsx`
 
 **Files to modify**: None (purely additive)
 
@@ -227,14 +227,14 @@ Skip step 3: advance to "Complete" screen with summary (no payment recorded)
 5. Verify existing pages still work identically after refactor
 
 **Files to create**:
-- `frontend/components/students/StudentFormFields.tsx`
-- `frontend/components/enrollments/EnrollmentFormFields.tsx`
-- `frontend/components/payments/PaymentFormFields.tsx`
+- `apps/erp/frontend/components/students/StudentFormFields.tsx`
+- `apps/erp/frontend/components/enrollments/EnrollmentFormFields.tsx`
+- `apps/erp/frontend/components/payments/PaymentFormFields.tsx`
 
 **Files to modify**:
-- `frontend/app/[locale]/(dashboard)/dashboard/students/page.tsx` (use StudentFormFields)
-- `frontend/app/[locale]/(dashboard)/dashboard/enrollments/page.tsx` (use EnrollmentFormFields)
-- `frontend/app/[locale]/(dashboard)/dashboard/payments/page.tsx` (use PaymentFormFields)
+- `apps/erp/frontend/app/[locale]/(dashboard)/dashboard/students/page.tsx` (use StudentFormFields)
+- `apps/erp/frontend/app/[locale]/(dashboard)/dashboard/enrollments/page.tsx` (use EnrollmentFormFields)
+- `apps/erp/frontend/app/[locale]/(dashboard)/dashboard/payments/page.tsx` (use PaymentFormFields)
 
 **Risk**: This is the highest-risk phase — refactoring existing pages. Mitigate by keeping the refactor minimal (just extract the JSX, don't change logic) and testing each page immediately.
 
@@ -247,7 +247,7 @@ Skip step 3: advance to "Complete" screen with summary (no payment recorded)
 **Goal**: Build the primary wizard page.
 
 **Tasks**:
-1. Create `frontend/app/[locale]/(dashboard)/dashboard/wizards/student-enrollment/page.tsx`
+1. Create `apps/erp/frontend/app/[locale]/(dashboard)/dashboard/wizards/student-enrollment/page.tsx`
 2. Implement `Wizard1State` reducer and all step transitions
 3. **Step 1**: Student selection — searchable picker (reuse enrollment page's student search) OR "Create New" inline form. If creating new, POST student and advance.
 4. **Step 2**: Section picker + discount (reuse EnrollmentFormFields). POST enrollment on submit.
@@ -257,10 +257,10 @@ Skip step 3: advance to "Complete" screen with summary (no payment recorded)
 8. Add a success summary screen after completion (student name, section, amount paid, receipt number)
 
 **Files to create**:
-- `frontend/app/[locale]/(dashboard)/dashboard/wizards/student-enrollment/page.tsx`
+- `apps/erp/frontend/app/[locale]/(dashboard)/dashboard/wizards/student-enrollment/page.tsx`
 
 **Files to modify**:
-- `frontend/app/[locale]/(dashboard)/layout.tsx` — add `page_wizards: ["superadmin", "manager", "secretary"]` permission and navigation item
+- `apps/erp/frontend/app/[locale]/(dashboard)/layout.tsx` — add `page_wizards: ["superadmin", "manager", "secretary"]` permission and navigation item
 - Dashboard page — add a "Quick Registration" card/button linking to the wizard
 
 **Validation**: 
@@ -280,14 +280,14 @@ Skip step 3: advance to "Complete" screen with summary (no payment recorded)
 > and Phase 5 has been revised to remove all dependencies on Wizard 2.
 
 **Tasks**:
-1. Create `frontend/app/[locale]/(dashboard)/dashboard/wizards/course-section/page.tsx`
+1. Create `apps/erp/frontend/app/[locale]/(dashboard)/dashboard/wizards/course-section/page.tsx`
 2. **Step 1**: Course creation form (name, code, description, credits) — reuse course page form logic
 3. **Step 2**: Section creation + teacher assignment (course_id pre-filled from step 1, select teacher, capacity, dates, price, compensation model). Reuse `SectionFormModal` logic.
 4. Handle contract assignment API call integrated into section creation (same as existing sections page)
 5. Success screen with course name, section details, assigned teacher
 
 **Files to create**:
-- `frontend/app/[locale]/(dashboard)/dashboard/wizards/course-section/page.tsx`
+- `apps/erp/frontend/app/[locale]/(dashboard)/dashboard/wizards/course-section/page.tsx`
 
 **Files to modify**:
 - Dashboard layout — ensure the wizard menu item covers this page too
@@ -315,17 +315,17 @@ Skip step 3: advance to "Complete" screen with summary (no payment recorded)
 
 **Files to modify**:
 - `docs/plans/wizards-implementation.md` — this doc (Phase 4 / Phase 5 revised)
-- `frontend/components/dashboard/SecretaryDashboard.tsx` — "Quick Registration" button
-- `frontend/components/dashboard/ManagerDashboard.tsx` — "Quick Registration" card
-- `frontend/app/[locale]/(dashboard)/dashboard/students/page.tsx` — "Quick Enroll" link
-- `frontend/app/[locale]/(dashboard)/dashboard/courses/page.tsx` — "Sections" link
+- `apps/erp/frontend/components/dashboard/SecretaryDashboard.tsx` — "Quick Registration" button
+- `apps/erp/frontend/components/dashboard/ManagerDashboard.tsx` — "Quick Registration" card
+- `apps/erp/frontend/app/[locale]/(dashboard)/dashboard/students/page.tsx` — "Quick Enroll" link
+- `apps/erp/frontend/app/[locale]/(dashboard)/dashboard/courses/page.tsx` — "Sections" link
 
 ---
 
 ## 7. Testing Strategy
 
-**Status:** Implemented (Section 7). Added a Vitest runner (`frontend/vitest.config.ts`,
-`frontend/tests/setup.ts`, `test:unit` script) for unit/integration tests and expanded the
+**Status:** Implemented (Section 7). Added a Vitest runner (`apps/erp/frontend/vitest.config.ts`,
+`apps/erp/frontend/tests/setup.ts`, `test:unit` script) for unit/integration tests and expanded the
 Playwright browser E2E suite with the navigation-abandonment case.
 
 ### Unit/Integration Tests (Vitest — `npm run test:unit`)

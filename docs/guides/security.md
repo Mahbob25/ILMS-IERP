@@ -35,7 +35,7 @@
 
 ### File upload validation
 
-`backend/app/core/storage.py` accepts any file type. Implement:
+`apps/erp/backend/app/core/storage.py` accepts any file type. Implement:
 
 ```python
 ALLOWED_MIME_TYPES = {
@@ -49,7 +49,7 @@ MAX_FILE_SIZE = 10 * 1024 * 1024
 
 ### JWT middleware hardening
 
-`frontend/middleware.ts` decodes JWTs via base64 without signature verification. Acceptable for client-side routing decisions (server enforces auth), but upgrade to `jose` for signature verification if middleware makes security-critical decisions.
+`apps/erp/frontend/middleware.ts` decodes JWTs via base64 without signature verification. Acceptable for client-side routing decisions (server enforces auth), but upgrade to `jose` for signature verification if middleware makes security-critical decisions.
 
 ### `is_superadmin` cleanup
 

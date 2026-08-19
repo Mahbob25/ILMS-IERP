@@ -1,6 +1,6 @@
 # Certificate & Receipt Template Design Rules
 
-Rules for designer agents modifying HTML templates in `cert&recept/` so changes stay compatible with the backend rendering pipeline.
+Rules for designer agents modifying HTML templates in `apps/erp/backend/templates/` so changes stay compatible with the backend rendering pipeline.
 
 ## Files Covered
 
@@ -210,7 +210,7 @@ font-family: 'Traditional Arabic', 'Times New Roman', Times, serif;
 
 ## 9. `fix_templates.py` Is the Migration Script — Don't Revert Its Changes
 
-`cert&recept/fix_templates.py` transforms templates from an English LTR layout to the current Arabic RTL format. The transformations it applies include:
+`apps/erp/backend/templates/fix_templates.py` transforms templates from an English LTR layout to the current Arabic RTL format. The transformations it applies include:
 
 | Transformation | Detail |
 |---------------|--------|
@@ -224,7 +224,7 @@ font-family: 'Traditional Arabic', 'Times New Roman', Times, serif;
 
 If the script needs updating, run it on all three templates:
 ```bash
-python cert&recept/fix_templates.py
+python apps/erp/backend/templates/fix_templates.py
 ```
 
 ---

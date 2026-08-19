@@ -55,7 +55,7 @@ jobs:
 
 ### 7.2 Database Backup Strategy (I02)
 
-Create `backend/scripts/backup.sh`:
+Create `apps/erp/backend/scripts/backup.sh`:
 
 ```bash
 #!/bin/bash
@@ -74,7 +74,7 @@ Create a cron job entry for `pg_dump` runs every 6 hours:
 
 ### 7.3 Backend Container Security (I03)
 
-In `backend/Dockerfile`:
+In `apps/erp/backend/Dockerfile`:
 
 ```dockerfile
 # Add before CMD:
@@ -84,7 +84,7 @@ USER appuser
 
 ### 7.4 Add Sentry Error Monitoring (I07)
 
-**Backend** — in `backend/app/main.py`:
+**Backend** — in `apps/erp/backend/app/main.py`:
 
 ```python
 import sentry_sdk
@@ -98,7 +98,7 @@ sentry_sdk.init(
 )
 ```
 
-**Frontend** — in `frontend/app/layout.tsx` and `frontend/lib/api.ts`:
+**Frontend** — in `apps/erp/frontend/app/layout.tsx` and `apps/erp/frontend/lib/api.ts`:
 
 ```typescript
 import * as Sentry from "@sentry/nextjs"
@@ -115,7 +115,7 @@ Sentry.captureException(error)
 
 ### 7.5 Fix DB Connection Pool (S28)
 
-In `backend/app/core/database.py` (or wherever the engine is created):
+In `apps/erp/backend/app/core/database.py` (or wherever the engine is created):
 
 ```python
 engine = create_async_engine(
@@ -161,10 +161,10 @@ Remove or comment out `tls internal` — Caddy auto-provisions Let's Encrypt cer
 **I11 — Structured logging:**
 - Backend: Replace `print()` with `logging.getLogger(__name__).info()` in all service files
 - Frontend: Replace `console.log()` with structured approach (Sentry breadcrumbs or `logger.info()` wrapper)
-- Create a `backend/app/core/logging.py` module with JSON formatter
+- Create a `apps/erp/backend/app/core/logging.py` module with JSON formatter
 
 **I12 — Docker HEALTHCHECK:**
-In both `backend/Dockerfile` and any service Dockerfile:
+In both `apps/erp/backend/Dockerfile` and any service Dockerfile:
 ```dockerfile
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
   CMD curl -f http://localhost:8000/health || exit 1
@@ -181,18 +181,18 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 | File | Purpose |
 |------|---------|
 | `.github/workflows/ci.yml` | CI/CD pipeline |
-| `backend/scripts/backup.sh` | Database backup script |
-| `backend/app/core/logging.py` | Structured logging config |
+| `apps/erp/backend/scripts/backup.sh` | Database backup script |
+| `apps/erp/backend/app/core/logging.py` | Structured logging config |
 
 ## Files to EDIT
 
 | File | Changes |
 |------|---------|
-| `backend/Dockerfile` | Add `USER appuser`, `HEALTHCHECK` |
-| `backend/app/main.py` | Add Sentry init |
-| `backend/app/core/database.py` | Configure pool_size, max_overflow, pool_timeout |
-| `frontend/app/layout.tsx` | Add Sentry init |
-| `frontend/lib/api.ts` | Add `Sentry.captureException()` |
+| `apps/erp/backend/Dockerfile` | Add `USER appuser`, `HEALTHCHECK` |
+| `apps/erp/backend/app/main.py` | Add Sentry init |
+| `apps/erp/backend/app/core/database.py` | Configure pool_size, max_overflow, pool_timeout |
+| `apps/erp/frontend/app/layout.tsx` | Add Sentry init |
+| `apps/erp/frontend/lib/api.ts` | Add `Sentry.captureException()` |
 | `infrastructure/caddy/Caddyfile` | Replace `tls internal` with Let's Encrypt config |
 | `tests/test_v1_7_full_e2e.py` | Remove hardcoded credentials |
 | Log rotate config | Add logrotate config |

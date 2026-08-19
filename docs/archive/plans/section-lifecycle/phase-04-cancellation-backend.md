@@ -13,7 +13,7 @@ Full cancellation system: impact preview, execute cancellation with financial re
 
 ## Tasks
 
-### 4.1 Create `backend/app/modules/academic/cancellation_service.py`
+### 4.1 Create `apps/erp/backend/app/modules/academic/cancellation_service.py`
 
 #### `can_cancel_section(section: CourseSection) -> ValidationResult`
 
@@ -84,7 +84,7 @@ Orchestrator within a **single DB transaction**:
 
 Return all UNCLAIMED refunds for a student profile view.
 
-### 4.2 Create `backend/app/modules/lms/cashier_service.py`
+### 4.2 Create `apps/erp/backend/app/modules/lms/cashier_service.py`
 
 #### `get_pending_refunds_queue(db, search: str | None) -> list[PendingRefund]`
 
@@ -131,7 +131,7 @@ All disbursements for a cashier's shift.
 
 ### 4.3 Manager API Endpoints
 
-Add to `backend/app/modules/academic/router.py`:
+Add to `apps/erp/backend/app/modules/academic/router.py`:
 
 | Method | Path | Handler | Description |
 |--------|------|---------|-------------|
@@ -141,7 +141,7 @@ Add to `backend/app/modules/academic/router.py`:
 
 ### 4.4 Cashier API Endpoints
 
-Add to `backend/app/modules/lms/router.py`:
+Add to `apps/erp/backend/app/modules/lms/router.py`:
 
 | Method | Path | Handler | Description |
 |--------|------|---------|-------------|
@@ -179,10 +179,10 @@ This can be called from the same startup lifespan after section checks, or as a 
 
 | File | Action |
 |------|--------|
-| `backend/app/modules/academic/cancellation_service.py` | **CREATE** — all cancellation logic |
-| `backend/app/modules/lms/cashier_service.py` | **CREATE** — all disbursement logic |
-| `backend/app/modules/academic/router.py` | **EDIT** — add 3 manager cancellation endpoints (append to end of file) |
-| `backend/app/modules/lms/router.py` | **EDIT** — add 4 cashier endpoints (append to end of file) |
+| `apps/erp/backend/app/modules/academic/cancellation_service.py` | **CREATE** — all cancellation logic |
+| `apps/erp/backend/app/modules/lms/cashier_service.py` | **CREATE** — all disbursement logic |
+| `apps/erp/backend/app/modules/academic/router.py` | **EDIT** — add 3 manager cancellation endpoints (append to end of file) |
+| `apps/erp/backend/app/modules/lms/router.py` | **EDIT** — add 4 cashier endpoints (append to end of file) |
 
 ## Independent Boundary
 

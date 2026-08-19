@@ -28,7 +28,7 @@ docker compose up -d
 
 ### 0.2 — Non-Root User in Backend Dockerfile
 
-**File: `backend/Dockerfile`**
+**File: `apps/erp/backend/Dockerfile`**
 
 Add a non-root user before the `COPY . .` line so the container doesn't run as root:
 
@@ -133,7 +133,7 @@ echo "[$(date)] Backup complete: lims_db_$TIMESTAMP.sql.gz"
 
 Already implemented, but verify these are set correctly:
 
-**`backend/app/modules/identity/security.py`**
+**`apps/erp/backend/app/modules/identity/security.py`**
 - `bcrypt` rounds = 12 (not reduced)
 - Account lockout: 5 failed attempts → 15 min lock
 
@@ -153,12 +153,12 @@ print('Hash rounds:', '$2b$12$' in h)
 
 ### 2.1 — Sentry Error Monitoring
 
-**Step 1:** Add `sentry-sdk[fastapi]` to `backend/requirements.txt`:
+**Step 1:** Add `sentry-sdk[fastapi]` to `apps/erp/backend/requirements.txt`:
 ```
 sentry-sdk[fastapi]==2.13.0
 ```
 
-**Step 2:** Initialize in `backend/app/main.py`:
+**Step 2:** Initialize in `apps/erp/backend/app/main.py`:
 
 ```python
 import sentry_sdk
@@ -178,7 +178,7 @@ sentry_sdk.init(
 )
 ```
 
-**Step 3:** Add `SENTRY_DSN` to `backend/app/core/config.py`:
+**Step 3:** Add `SENTRY_DSN` to `apps/erp/backend/app/core/config.py`:
 
 ```python
 SENTRY_DSN: str = ""
@@ -455,7 +455,7 @@ async def get_eligible_recipients(db: AsyncSession, recipient_type: str) -> list
 
 ### 3.2 — Rate Limiting on Financial Endpoints
 
-**File: `backend/app/modules/lms/router.py`**
+**File: `apps/erp/backend/app/modules/lms/router.py`**
 
 Add a per-user rate limiter for financial write endpoints. Create a key function that uses the authenticated user ID:
 
@@ -483,7 +483,7 @@ async def create_payment_endpoint(...):
 
 ### 3.3 — Token Cleanup & Audit Log Retention (Startup-Driven)
 
-**File: `backend/app/modules/identity/startup_cleanup.py`** (new)
+**File: `apps/erp/backend/app/modules/identity/startup_cleanup.py`** (new)
 
 The server is not online 24/7, so cleanup cannot rely on a cron job. Instead, run cleanup inside the FastAPI `lifespan` startup event — the same pattern as section startup checks.
 
@@ -519,7 +519,7 @@ async def run_startup_cleanup(db: AsyncSession) -> None:
         await db.commit()
 ```
 
-Wire into `backend/app/main.py` inside the existing lifespan event:
+Wire into `apps/erp/backend/app/main.py` inside the existing lifespan event:
 
 ```python
 from app.modules.identity.startup_cleanup import run_startup_cleanup

@@ -38,7 +38,7 @@ The Learning Institution Management System (LIMS) v1.7 is a well-architected bil
 ### CRITICAL Items (Block Launch)
 
 #### C-1: No Error Monitoring / Crash Reporting
-- **Files:** `backend/app/main.py:1-45`
+- **Files:** `apps/erp/backend/app/main.py:1-45`
 - **Issue:** No Sentry, OpenTelemetry, or any crash-reporter. Production errors are invisible. A 500 error spike could go unnoticed for hours.
 - **Remediation:** Add `sentry-sdk` to `requirements.txt`. Initialize in `main.py` with `Sentry.init(dsn=..., traces_sample_rate=0.1)`. Configure performance tracing for FastAPI.
 - **Effort:** 2 hours
@@ -56,13 +56,13 @@ The Learning Institution Management System (LIMS) v1.7 is a well-architected bil
 - **Effort:** 8 hours
 
 #### C-4: Backend Dockerfile Runs as Root
-- **File:** `backend/Dockerfile:1-29`
+- **File:** `apps/erp/backend/Dockerfile:1-29`
 - **Issue:** No `USER` directive. The container runs as root. If compromised, attacker has full container root access.
 - **Remediation:** Add `RUN adduser --system --uid 1001 appuser` and `USER appuser` before the `CMD` line.
 - **Effort:** 15 minutes
 
 #### C-5: No CSRF Protection
-- **Files:** `backend/app/main.py:24-31`
+- **Files:** `apps/erp/backend/app/main.py:24-31`
 - **Issue:** CORS allows any method/header with credentials. There's no CSRF token validation. While SameSite=Lax mitigates some CSRF, it's not sufficient for all browsers/scenarios.
 - **Remediation:** Add CSRF middleware (e.g., `fastapi-csrf-protect`) or implement double-submit cookie pattern.
 - **Effort:** 3 hours
@@ -72,23 +72,23 @@ The Learning Institution Management System (LIMS) v1.7 is a well-architected bil
 ### HIGH Items (Fix Before Launch or Soon After)
 
 #### H-1: Zero Unit Tests
-- **Files:** All `backend/app/modules/*/service.py` and `router.py`
+- **Files:** All `apps/erp/backend/app/modules/*/service.py` and `router.py`
 - **Issue:** No pytest or unit tests exist. Only E2E API tests (`test_v1_7_*.py`). Refactoring or upgrading dependencies is high-risk without a regression safety net.
 - **Remediation:** Write pytest tests for all service-layer functions. Target 80% coverage. Add `pytest`, `pytest-cov`, `pytest-asyncio` to requirements.
 - **Effort:** 40 hours (ongoing)
 
 #### H-2: No Content Security Policy (CSP) Headers
-- **Files:** `infrastructure/caddy/Caddyfile:1-21`, `backend/app/main.py:1-45`
+- **Files:** `infrastructure/caddy/Caddyfile:1-21`, `apps/erp/backend/app/main.py:1-45`
 - **Issue:** No CSP headers configured anywhere (not in Caddy, not in FastAPI, not in Next.js). XSS risk.
 - **Remediation:** Add CSP headers in Caddyfile: `header /api/v1/* Content-Security-Policy "default-src 'self'"` and in Next.js `next.config.js` via `headers()`.
 - **Effort:** 1 hour
 
 #### H-3: N+1 Queries in Multiple Service Functions
 - **Files:**
-  - `backend/app/modules/identity/service.py:33-61` — `get_teachers_with_stats()` loops through teachers with separate queries
-  - `backend/app/modules/identity/service.py:182-224` — `list_employees()` loops through employees for `has_user` check
-  - `backend/app/modules/lms/financial_service.py:214-276` — `get_eligible_recipients()` loops through employees
-  - `backend/app/modules/identity/service.py:64-146` — `get_teacher_detail()` runs multiple separate queries
+  - `apps/erp/backend/app/modules/identity/service.py:33-61` — `get_teachers_with_stats()` loops through teachers with separate queries
+  - `apps/erp/backend/app/modules/identity/service.py:182-224` — `list_employees()` loops through employees for `has_user` check
+  - `apps/erp/backend/app/modules/lms/financial_service.py:214-276` — `get_eligible_recipients()` loops through employees
+  - `apps/erp/backend/app/modules/identity/service.py:64-146` — `get_teacher_detail()` runs multiple separate queries
 - **Issue:** O(N) queries where O(1) would suffice. Performance degrades linearly with data growth.
 - **Remediation:** Replace loop queries with batched/joined queries. Use `selectinload` or `subqueryload` for collections. Use single query with left joins where possible.
 - **Effort:** 6 hours
@@ -100,7 +100,7 @@ The Learning Institution Management System (LIMS) v1.7 is a well-architected bil
 - **Effort:** 8 hours
 
 #### H-5: No Rate Limiting on Financial Endpoints
-- **Files:** `backend/app/modules/lms/router.py:80-96` (payments), `189-208` (expenses)
+- **Files:** `apps/erp/backend/app/modules/lms/router.py:80-96` (payments), `189-208` (expenses)
 - **Issue:** Only login (3/min), refresh (10/min), and user create (10/min) have rate limits. Payment creation, expense creation, and enrollment creation are unprotected — vulnerable to abuse.
 - **Remediation:** Apply `@limiter.limit("30/minute")` to payments, expenses, and enrollment creation endpoints.
 - **Effort:** 30 minutes
@@ -112,13 +112,13 @@ The Learning Institution Management System (LIMS) v1.7 is a well-architected bil
 - **Effort:** 2 hours
 
 #### H-7: No Structured Logging / Observability
-- **Files:** All `backend/app/*.py`
+- **Files:** All `apps/erp/backend/app/*.py`
 - **Issue:** No structured logging (JSON logs), no log levels enforced, no log shipping.
 - **Remediation:** Add `structlog` or `python-json-logger`. Configure structured logging at application startup. Add health endpoint that checks DB connection pool, Redis, storage.
 - **Effort:** 4 hours
 
 #### H-8: Refresh Token + Audit Log Tables Grow Unbounded
-- **Files:** `backend/app/modules/identity/models.py` (RefreshToken, AuditLog)
+- **Files:** `apps/erp/backend/app/modules/identity/models.py` (RefreshToken, AuditLog)
 - **Issue:** No garbage collection for expired/revoked tokens. No retention policy for audit logs. Will impact performance over months.
 - **Remediation:** Add scheduled task (or background job) to delete expired tokens. Implement audit log archiving/rotation (keep 90 days online, archive to cold storage).
 - **Effort:** 3 hours
@@ -134,8 +134,8 @@ The Learning Institution Management System (LIMS) v1.7 is a well-architected bil
 | M-3 | No file upload validation | `core/storage.py:1-37` | Add type/size validation to `save_upload()` | 1h |
 | M-4 | Local filesystem storage | `core/storage.py:4` | Migrate to S3-compatible storage | 8h |
 | M-5 | `is_superadmin` column not dropped | Schema migrations | Drop deprecated column after verifying | 1h |
-| M-6 | No Next.js strict TypeScript | `frontend/tsconfig.json` | Enable `strict: true` | 2h |
-| M-7 | Health check too minimal | `backend/app/main.py:42-45` | Add DB pool, Redis, disk checks | 1h |
+| M-6 | No Next.js strict TypeScript | `apps/erp/frontend/tsconfig.json` | Enable `strict: true` | 2h |
+| M-7 | Health check too minimal | `apps/erp/backend/app/main.py:42-45` | Add DB pool, Redis, disk checks | 1h |
 | M-8 | No pagination on payments/expenses list | `lms/financial_service.py:172-189, 394-411` | Add skip/limit params | 2h |
 | M-9 | Caddy `tls internal` for production | `infrastructure/caddy/Caddyfile:12` | Switch to Let's Encrypt `tls { email }` | 30m |
 
@@ -414,7 +414,7 @@ fi
 |------|-------|----------|----------------|
 | `docker-compose.yml:36-72` | Services commented out | HIGH | Uncomment for production |
 | `Caddyfile:12` | `tls internal` | MEDIUM | Switch to Let's Encrypt |
-| `frontend/Dockerfile:25-26` | Correct non-root user | ✅ GOOD | Pattern for backend Dockerfile |
+| `apps/erp/frontend/Dockerfile:25-26` | Correct non-root user | ✅ GOOD | Pattern for backend Dockerfile |
 | `init.sql:1-2` | Only pgvector | LOW | Add extensions as needed |
 
 ---

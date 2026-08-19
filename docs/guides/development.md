@@ -39,8 +39,8 @@ Runs the whole stack in containers:
 | Run migrations manually | `docker compose exec backend alembic upgrade head` |
 | Create a migration | `docker compose exec backend alembic revision --autogenerate -m "description"` |
 | Backend tests | `docker compose exec backend python -m pytest tests/ -v` |
-| TypeScript check | `npx tsc --noEmit` (in `frontend/`) |
-| Frontend build | `npm run build` (in `frontend/`) |
+| TypeScript check | `npx tsc --noEmit` (in `apps/erp/frontend/`) |
+| Frontend build | `npm run build` (in `apps/erp/frontend/`) |
 
 ---
 
@@ -55,13 +55,13 @@ docker compose up database -d          # only Postgres
 Backend:
 
 ```bash
-cd backend
+cd apps/erp/backend
 python -m venv .venv
 .venv\Scripts\activate                 # Windows
 pip install -r requirements.txt
 ```
 
-Create `backend/.env`:
+Create `apps/erp/backend/.env`:
 
 ```
 DATABASE_URL=postgresql+asyncpg://lims:lims_secure_pass@localhost:5431/lims
@@ -76,7 +76,7 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 Frontend:
 
 ```bash
-cd frontend
+cd apps/erp/frontend
 npm install
 npm run dev                             # http://localhost:3000
 ```

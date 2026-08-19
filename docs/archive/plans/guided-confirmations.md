@@ -66,7 +66,7 @@ Supporting facts that shape the design:
 
 ### Phase 1 — Shared frontend foundation
 
-New building blocks under `frontend/components` and `frontend/lib`.
+New building blocks under `apps/erp/frontend/components` and `apps/erp/frontend/lib`.
 
 1. **`components/GuidedConfirmSection.tsx`** — embeddable, bilingual (AR/EN) block used
    inside all five modals:
@@ -149,11 +149,11 @@ New building blocks under `frontend/components` and `frontend/lib`.
 ## Files Touched (approx)
 
 Backend:
-- `backend/app/modules/lms/models.py` (enum)
-- `backend/app/modules/lms/financial_service.py` (void + cap filters)
-- `backend/app/modules/lms/cashier_service.py` (refund undo)
-- `backend/app/modules/lms/router.py`, `backend/app/modules/lms/schemas.py`
-- `backend/app/modules/lms/staff_payroll_service.py`, `backend/app/modules/lms/ledger_service.py`
+- `apps/erp/backend/app/modules/lms/models.py` (enum)
+- `apps/erp/backend/app/modules/lms/financial_service.py` (void + cap filters)
+- `apps/erp/backend/app/modules/lms/cashier_service.py` (refund undo)
+- `apps/erp/backend/app/modules/lms/router.py`, `apps/erp/backend/app/modules/lms/schemas.py`
+- `apps/erp/backend/app/modules/lms/staff_payroll_service.py`, `apps/erp/backend/app/modules/lms/ledger_service.py`
 - new Alembic revision
 
 Frontend:

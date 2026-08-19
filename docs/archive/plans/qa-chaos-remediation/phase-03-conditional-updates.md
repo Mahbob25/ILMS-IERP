@@ -123,14 +123,14 @@ None.
 
 | File | Specific Functions | Changes |
 |------|-------------------|---------|
-| `backend/app/modules/lms/ledger_service.py` | `activate_contract()`, `settle_contract()`, `cancel_contract()`, `approve_amendment()` | Replace status mutations with conditional UPDATEs |
-| `backend/app/modules/lms/cashier_service.py` | `disburse_refund()` | Conditional UPDATE for PendingRefund status + O02 transaction wrap |
-| `backend/app/modules/academic/cancellation_service.py` | `cancel_section()` | O01 transaction wrap + F10 commit→flush |
-| `backend/app/modules/lms/compensation_service.py` | `approve_amendment()` | R12 conditional UPDATE |
-| `backend/app/modules/academic/service.py` | `complete_section()` | O03 transaction wrap |
-| `backend/app/modules/academic/service.py` | `set_final_grades_bulk()` | O04 transaction wrap + F02 logging |
-| `backend/app/modules/academic/service.py` | `deactivate_section()` | F11 commit→flush |
-| `backend/app/modules/academic/service.py` | Enrollment + payment | O06 transaction wrap |
+| `apps/erp/backend/app/modules/lms/ledger_service.py` | `activate_contract()`, `settle_contract()`, `cancel_contract()`, `approve_amendment()` | Replace status mutations with conditional UPDATEs |
+| `apps/erp/backend/app/modules/lms/cashier_service.py` | `disburse_refund()` | Conditional UPDATE for PendingRefund status + O02 transaction wrap |
+| `apps/erp/backend/app/modules/academic/cancellation_service.py` | `cancel_section()` | O01 transaction wrap + F10 commit→flush |
+| `apps/erp/backend/app/modules/lms/compensation_service.py` | `approve_amendment()` | R12 conditional UPDATE |
+| `apps/erp/backend/app/modules/academic/service.py` | `complete_section()` | O03 transaction wrap |
+| `apps/erp/backend/app/modules/academic/service.py` | `set_final_grades_bulk()` | O04 transaction wrap + F02 logging |
+| `apps/erp/backend/app/modules/academic/service.py` | `deactivate_section()` | F11 commit→flush |
+| `apps/erp/backend/app/modules/academic/service.py` | Enrollment + payment | O06 transaction wrap |
 | Close day handler | `close_day()` | O05 transaction wrap |
 | Refund expense handler | refund expense code | O08 transaction wrap |
 

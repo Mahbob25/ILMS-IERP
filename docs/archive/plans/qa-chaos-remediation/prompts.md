@@ -155,11 +155,11 @@ R08–R12, O01–O06, O08, S15, S25, S27
 - **Estimate:** 3 days
 - **Files to create:** None
 - **Files to edit:**
-  - `backend/app/modules/lms/ledger_service.py` — `activate_contract()`, `settle_contract()`, `cancel_contract()`, `approve_amendment()`
-  - `backend/app/modules/lms/cashier_service.py` — `disburse_refund()`
-  - `backend/app/modules/academic/cancellation_service.py` — `cancel_section()`
-  - `backend/app/modules/lms/compensation_service.py` — amendment approval
-  - `backend/app/modules/academic/service.py` — `complete_section()`, `set_final_grades_bulk()`, `deactivate_section()`, enrollment+payment flow
+  - `apps/erp/backend/app/modules/lms/ledger_service.py` — `activate_contract()`, `settle_contract()`, `cancel_contract()`, `approve_amendment()`
+  - `apps/erp/backend/app/modules/lms/cashier_service.py` — `disburse_refund()`
+  - `apps/erp/backend/app/modules/academic/cancellation_service.py` — `cancel_section()`
+  - `apps/erp/backend/app/modules/lms/compensation_service.py` — amendment approval
+  - `apps/erp/backend/app/modules/academic/service.py` — `complete_section()`, `set_final_grades_bulk()`, `deactivate_section()`, enrollment+payment flow
 
 ## Tasks
 1. **Contract status transitions (R08–R10):** Replace read-then-mutate with `UPDATE ... WHERE status = 'expected' RETURNING *` in all contract status transitions.
@@ -222,9 +222,9 @@ R05–R07, R13–R14, S16, S19–S20, S23–S24, S26, S30, S32
 - **Estimate:** 2.5 days
 - **Files to create:** None
 - **Files to edit:**
-  - `backend/app/modules/academic/service.py` — Enrollment function (capacity check section)
-  - `backend/app/modules/lms/financial_service.py` — Payment creation function (remaining balance)
-  - `backend/app/modules/lms/ledger_service.py` — `approve_amendment()` wallet lock, contract activation lock
+  - `apps/erp/backend/app/modules/academic/service.py` — Enrollment function (capacity check section)
+  - `apps/erp/backend/app/modules/lms/financial_service.py` — Payment creation function (remaining balance)
+  - `apps/erp/backend/app/modules/lms/ledger_service.py` — `approve_amendment()` wallet lock, contract activation lock
   - User creation endpoint — `grant_access()` IntegrityError handler
   - Closure/payment endpoint — advisory lock for TOCTOU
   - Unlock approval endpoint — SELECT FOR UPDATE + audit
@@ -282,18 +282,18 @@ S01, S13
 ## What to Read
 - `docs/qa-chaos-audit.md` (S01, S13 scenario descriptions)
 - `docs/plans/qa-chaos-remediation/phase-05-idempotency-keys.md` (detailed tasks)
-- Read `backend/app/main.py` and a sample `router.py` to understand middleware registration
+- Read `apps/erp/backend/app/main.py` and a sample `router.py` to understand middleware registration
 
 ## Your Phase Details
 - **Estimate:** 2 days
 - **Files to create:**
-  - `backend/app/middleware/idempotency.py` — FastAPI middleware
-  - `backend/app/modules/lms/idempotency_service.py` — CRUD + cleanup
+  - `apps/erp/backend/app/middleware/idempotency.py` — FastAPI middleware
+  - `apps/erp/backend/app/modules/lms/idempotency_service.py` — CRUD + cleanup
   - Alembic migration — `idempotency_keys` table (depends on Phase 1 head)
 - **Files to edit:**
-  - `backend/app/main.py` — wire middleware
-  - `backend/app/modules/models.py` — add `IdempotencyKey` model
-  - `frontend/lib/api.ts` — add idempotency-key request interceptor (NEW interceptor, do NOT modify existing ones)
+  - `apps/erp/backend/app/main.py` — wire middleware
+  - `apps/erp/backend/app/modules/models.py` — add `IdempotencyKey` model
+  - `apps/erp/frontend/lib/api.ts` — add idempotency-key request interceptor (NEW interceptor, do NOT modify existing ones)
 
 ## Tasks
 1. Create `idempotency_keys` table: `id UUID PK`, `idempotency_key VARCHAR(255)`, `endpoint VARCHAR(100)`, `response_status INT`, `response_body JSONB`, `created_at TIMESTAMPTZ`, UNIQUE(key, endpoint).
@@ -304,7 +304,7 @@ S01, S13
    - Stores response after successful processing
    - Does NOT cache 5xx responses
 4. Wire in `main.py` with `app.add_middleware(IdempotencyMiddleware)`.
-5. Add request interceptor in `frontend/lib/api.ts` that generates a UUID and attaches `Idempotency-Key` header to all mutating requests.
+5. Add request interceptor in `apps/erp/frontend/lib/api.ts` that generates a UUID and attaches `Idempotency-Key` header to all mutating requests.
 6. Add cleanup function that deletes keys older than 24h.
 
 ## Key Rules
@@ -357,12 +357,12 @@ F01–F03, F10–F11, S14, O07, S31
 
 | File | Line(s) | Change |
 |------|---------|--------|
-| `backend/app/modules/academic/service.py` | 352–356 | Add `logger.error()` before `continue` (F01) |
-| `backend/app/modules/academic/service.py` | 754–758 | Add `logger.error()` before `pass` (F02) |
-| `backend/app/modules/academic/service.py` | 404 | `commit()` → `flush()` (F11) |
-| `backend/app/modules/lms/financial_service.py` | 84–86 | Add `logger.warning()` for missing enrollment (F03) |
-| `backend/app/modules/academic/cancellation_service.py` | 292 | `commit()` → `flush()` (F10) |
-| `backend/app/modules/academic/service.py` | Attendance handler | Transactional batch save (S14) |
+| `apps/erp/backend/app/modules/academic/service.py` | 352–356 | Add `logger.error()` before `continue` (F01) |
+| `apps/erp/backend/app/modules/academic/service.py` | 754–758 | Add `logger.error()` before `pass` (F02) |
+| `apps/erp/backend/app/modules/academic/service.py` | 404 | `commit()` → `flush()` (F11) |
+| `apps/erp/backend/app/modules/lms/financial_service.py` | 84–86 | Add `logger.warning()` for missing enrollment (F03) |
+| `apps/erp/backend/app/modules/academic/cancellation_service.py` | 292 | `commit()` → `flush()` (F10) |
+| `apps/erp/backend/app/modules/academic/service.py` | Attendance handler | Transactional batch save (S14) |
 | Startup checks file | `run_daily_section_checks()` | Add idempotency guard via `DailyJobsLog` (O07) |
 | PDF/service generation | Receipt/certificate service | Add disk space check before file ops (S31) |
 
@@ -424,14 +424,14 @@ I01–I03, I07, I09–I13, S28
 - **Estimate:** 2.5 days
 - **Files to create:**
   - `.github/workflows/ci.yml` — CI/CD pipeline
-  - `backend/scripts/backup.sh` — pg_dump backup script
-  - `backend/app/core/logging.py` — structured logging config
+  - `apps/erp/backend/scripts/backup.sh` — pg_dump backup script
+  - `apps/erp/backend/app/core/logging.py` — structured logging config
 - **Files to edit:**
-  - `backend/Dockerfile` — add `USER appuser` + `HEALTHCHECK`
-  - `backend/app/main.py` — add Sentry init
-  - `backend/app/core/database.py` — configure pool_size, max_overflow, pool_timeout
-  - `frontend/app/layout.tsx` — add Sentry init
-  - `frontend/lib/api.ts` — add `Sentry.captureException()` in error interceptor
+  - `apps/erp/backend/Dockerfile` — add `USER appuser` + `HEALTHCHECK`
+  - `apps/erp/backend/app/main.py` — add Sentry init
+  - `apps/erp/backend/app/core/database.py` — configure pool_size, max_overflow, pool_timeout
+  - `apps/erp/frontend/app/layout.tsx` — add Sentry init
+  - `apps/erp/frontend/lib/api.ts` — add `Sentry.captureException()` in error interceptor
   - `infrastructure/caddy/Caddyfile` — replace `tls internal` with Let's Encrypt config
   - `tests/test_v1_7_full_e2e.py` — remove hardcoded credentials, use env vars
   - All backend service files — replace `print()` with `logging.info()`
@@ -451,7 +451,7 @@ I01–I03, I07, I09–I13, S28
 
 ## Key Rules
 1. In `infrastructure/caddy/Caddyfile`, ONLY replace `tls internal` — do NOT add header directives (Phase 8).
-2. In `frontend/lib/api.ts`, only add `Sentry.captureException()` — do NOT modify the promise fix (F04), error discrimination (F09), or `isRedirectingToLogin` (Phase 9).
+2. In `apps/erp/frontend/lib/api.ts`, only add `Sentry.captureException()` — do NOT modify the promise fix (F04), error discrimination (F09), or `isRedirectingToLogin` (Phase 9).
 3. Add Sentry init BEFORE other middleware registrations in `main.py`.
 
 ## Independent Boundary
@@ -498,15 +498,15 @@ I04–I06, I08
 ## Your Phase Details
 - **Estimate:** 1.5 days
 - **Files to create:**
-  - `backend/app/middleware/real_ip.py` — X-Forwarded-For parsing
-  - `backend/app/middleware/csrf.py` — CSRF token validation
-  - `backend/app/core/rate_limit.py` — Rate limiter configuration
+  - `apps/erp/backend/app/middleware/real_ip.py` — X-Forwarded-For parsing
+  - `apps/erp/backend/app/middleware/csrf.py` — CSRF token validation
+  - `apps/erp/backend/app/core/rate_limit.py` — Rate limiter configuration
 - **Files to edit:**
   - `infrastructure/caddy/Caddyfile` — APPEND security headers to server block
-  - `backend/app/main.py` — wire RealIP, CSRF, rate limiter
-  - `backend/app/modules/lms/router.py` — add `@limiter.limit("10/minute")` to financial endpoints
-  - `backend/app/modules/academic/router.py` — add `@limiter.limit("20/minute")` to enrollment endpoints
-  - `frontend/lib/api.ts` — add CSRF token interceptor + `getCookie()` utility
+  - `apps/erp/backend/app/main.py` — wire RealIP, CSRF, rate limiter
+  - `apps/erp/backend/app/modules/lms/router.py` — add `@limiter.limit("10/minute")` to financial endpoints
+  - `apps/erp/backend/app/modules/academic/router.py` — add `@limiter.limit("20/minute")` to enrollment endpoints
+  - `apps/erp/frontend/lib/api.ts` — add CSRF token interceptor + `getCookie()` utility
 
 ## Tasks
 1. Add to Caddyfile: CSP, HSTS, X-Content-Type-Options, X-Frame-Options, Referrer-Policy, Permissions-Policy headers.
@@ -557,19 +557,19 @@ S02–S06, S09, S11–S12, S17–S18, S22, F04–F09
 ## What to Read
 - `docs/qa-chaos-audit.md` (Section 2C — F04–F09; Task 1 — S02–S06, S09, S11–S12, S17–S18, S22)
 - `docs/plans/qa-chaos-remediation/phase-09-frontend-resilience.md` (detailed tasks)
-- Read `frontend/lib/api.ts` and `frontend/components/AuthContext.tsx` and relevant page components
+- Read `apps/erp/frontend/lib/api.ts` and `apps/erp/frontend/components/AuthContext.tsx` and relevant page components
 
 ## Your Phase Details
 - **Estimate:** 3 days
 - **Files to create:**
-  - `frontend/lib/utils/input.ts` — sanitization and validation
-  - `frontend/components/AccessDenied.tsx` — permission denied display
-  - `frontend/components/EmptyState.tsx` — empty data display
-  - `frontend/app/dashboard/error.tsx` — error boundary
-  - `frontend/app/dashboard/loading.tsx` — loading state
+  - `apps/erp/frontend/lib/utils/input.ts` — sanitization and validation
+  - `apps/erp/frontend/components/AccessDenied.tsx` — permission denied display
+  - `apps/erp/frontend/components/EmptyState.tsx` — empty data display
+  - `apps/erp/frontend/app/dashboard/error.tsx` — error boundary
+  - `apps/erp/frontend/app/dashboard/loading.tsx` — loading state
 - **Files to edit:**
-  - `frontend/lib/api.ts` — lines 16, 45, response error interceptor
-  - `frontend/components/AuthContext.tsx` — lines 85–96, refresh coordination
+  - `apps/erp/frontend/lib/api.ts` — lines 16, 45, response error interceptor
+  - `apps/erp/frontend/components/AuthContext.tsx` — lines 85–96, refresh coordination
   - All frontend form page components — add `submitting` state + disabled buttons
   - All frontend form page components — add PRG redirect after submit
   - All frontend form page components — apply `sanitizeInput()` on text fields
@@ -663,44 +663,44 @@ All audit items, plus items 24–35 from the priority plan (ongoing improvements
 ## Test Types to Create
 
 ### Unit Tests (pytest)
-- `backend/tests/unit/test_db_constraints.py` — 13 constraint enforcement checks
-- `backend/tests/unit/test_db_sequences.py` — sequence increment + year reset
-- `backend/tests/unit/test_conditional_updates.py` — status transition guards
-- `backend/tests/unit/test_idempotency.py` — key rejection, TTL, replay
-- `backend/tests/unit/test_logging.py` — silent failure logging verification
-- `backend/tests/unit/test_csrf.py` — token validation
-- `backend/tests/unit/test_rate_limit.py` — limit enforcement + IP parsing
+- `apps/erp/backend/tests/unit/test_db_constraints.py` — 13 constraint enforcement checks
+- `apps/erp/backend/tests/unit/test_db_sequences.py` — sequence increment + year reset
+- `apps/erp/backend/tests/unit/test_conditional_updates.py` — status transition guards
+- `apps/erp/backend/tests/unit/test_idempotency.py` — key rejection, TTL, replay
+- `apps/erp/backend/tests/unit/test_logging.py` — silent failure logging verification
+- `apps/erp/backend/tests/unit/test_csrf.py` — token validation
+- `apps/erp/backend/tests/unit/test_rate_limit.py` — limit enforcement + IP parsing
 
 ### Integration Tests (pytest, async)
-- `backend/tests/integration/test_enrollment_concurrency.py` — 10 concurrent enrollments, verify capacity respected
-- `backend/tests/integration/test_payment_concurrency.py` — 10 concurrent payments, verify no overpayment
-- `backend/tests/integration/test_contract_activation.py` — 5 concurrent activations, verify exactly 1 succeeds
-- `backend/tests/integration/test_refund_disbursement.py` — 5 concurrent disbursements, verify exactly 1 succeeds
-- `backend/tests/integration/test_cancel_section_transaction.py` — mock failure, verify rollback
-- `backend/tests/integration/test_orphaned_states.py` — O01–O08, verify no partial writes
-- `backend/tests/integration/test_idempotency_e2e.py` — POST + replay, verify single processing
-- `backend/tests/integration/test_db_constraints_integration.py` — violate each constraint
-- `backend/tests/integration/test_security_headers.py` — CSP, HSTS, XFO verification
-- `backend/tests/integration/test_csrf.py` — CSRF pass/fail
-- `backend/tests/integration/test_rate_limit_headers.py` — rate limit header verification
+- `apps/erp/backend/tests/integration/test_enrollment_concurrency.py` — 10 concurrent enrollments, verify capacity respected
+- `apps/erp/backend/tests/integration/test_payment_concurrency.py` — 10 concurrent payments, verify no overpayment
+- `apps/erp/backend/tests/integration/test_contract_activation.py` — 5 concurrent activations, verify exactly 1 succeeds
+- `apps/erp/backend/tests/integration/test_refund_disbursement.py` — 5 concurrent disbursements, verify exactly 1 succeeds
+- `apps/erp/backend/tests/integration/test_cancel_section_transaction.py` — mock failure, verify rollback
+- `apps/erp/backend/tests/integration/test_orphaned_states.py` — O01–O08, verify no partial writes
+- `apps/erp/backend/tests/integration/test_idempotency_e2e.py` — POST + replay, verify single processing
+- `apps/erp/backend/tests/integration/test_db_constraints_integration.py` — violate each constraint
+- `apps/erp/backend/tests/integration/test_security_headers.py` — CSP, HSTS, XFO verification
+- `apps/erp/backend/tests/integration/test_csrf.py` — CSRF pass/fail
+- `apps/erp/backend/tests/integration/test_rate_limit_headers.py` — rate limit header verification
 
 ### E2E Tests (Playwright)
-- `frontend/tests/e2e/qa-chaos/double-click-prevention.spec.ts`
-- `frontend/tests/e2e/qa-chaos/input-sanitization.spec.ts`
-- `frontend/tests/e2e/qa-chaos/search-wildcards.spec.ts`
-- `frontend/tests/e2e/qa-chaos/permission-denied.spec.ts`
-- `frontend/tests/e2e/qa-chaos/empty-report.spec.ts`
-- `frontend/tests/e2e/qa-chaos/token-refresh.spec.ts`
-- `frontend/tests/e2e/qa-chaos/error-display.spec.ts`
-- `frontend/tests/e2e/qa-chaos/prg-pattern.spec.ts`
-- `frontend/tests/e2e/qa-chaos/visual/error-states.spec.ts`
-- `frontend/tests/e2e/qa-chaos/visual/form-submitting.spec.ts`
-- `frontend/tests/e2e/qa-chaos/a11y/form-errors.spec.ts`
+- `apps/erp/frontend/tests/e2e/qa-chaos/double-click-prevention.spec.ts`
+- `apps/erp/frontend/tests/e2e/qa-chaos/input-sanitization.spec.ts`
+- `apps/erp/frontend/tests/e2e/qa-chaos/search-wildcards.spec.ts`
+- `apps/erp/frontend/tests/e2e/qa-chaos/permission-denied.spec.ts`
+- `apps/erp/frontend/tests/e2e/qa-chaos/empty-report.spec.ts`
+- `apps/erp/frontend/tests/e2e/qa-chaos/token-refresh.spec.ts`
+- `apps/erp/frontend/tests/e2e/qa-chaos/error-display.spec.ts`
+- `apps/erp/frontend/tests/e2e/qa-chaos/prg-pattern.spec.ts`
+- `apps/erp/frontend/tests/e2e/qa-chaos/visual/error-states.spec.ts`
+- `apps/erp/frontend/tests/e2e/qa-chaos/visual/form-submitting.spec.ts`
+- `apps/erp/frontend/tests/e2e/qa-chaos/a11y/form-errors.spec.ts`
 
 ### Load Tests (k6 or Locust)
-- `backend/tests/load/test_enrollment.py` — 50 concurrent enrollments, capacity 20
-- `backend/tests/load/test_payment.py` — 20 concurrent payments, single enrollment
-- `backend/tests/load/test_mixed_workload.py` — mixed enrollments, payments, refunds, searches
+- `apps/erp/backend/tests/load/test_enrollment.py` — 50 concurrent enrollments, capacity 20
+- `apps/erp/backend/tests/load/test_payment.py` — 20 concurrent payments, single enrollment
+- `apps/erp/backend/tests/load/test_mixed_workload.py` — mixed enrollments, payments, refunds, searches
 
 ## Key Rules
 1. Each test file must be independently runnable with clean fixtures.

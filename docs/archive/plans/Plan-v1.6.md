@@ -345,7 +345,7 @@ flowchart TB
 - **PWA**: غير مطلوب الآن، لكن البنية تسمح بإضافته لاحقاً.
 
 **وضع البناء (Build Mode) — Standalone Self-Hosted:**
-- يُبنى الفرونت اند بإعداد `output: 'standalone'` في `next.config.js` ليُنتج حاوية Node.js واحدة صغيرة مستقلة بذاتها، تُوضع داخل `frontend/Dockerfile` (متعدد المراحل: `node:20-alpine` للبناء، ثم نسخة خفيفة للتشغيل).
+- يُبنى الفرونت اند بإعداد `output: 'standalone'` في `next.config.js` ليُنتج حاوية Node.js واحدة صغيرة مستقلة بذاتها، تُوضع داخل `apps/erp/frontend/Dockerfile` (متعدد المراحل: `node:20-alpine` للبناء، ثم نسخة خفيفة للتشغيل).
 - تُشغَّل الحاوية بأمر: `node server.js`.
 - **Caddy** يُوجّه طلبات `/` و `/ar/*` و `/en/*` إلى حاوية `frontend`، وطلبات `/api/v1/*` إلى حاوية `backend`.
 
@@ -921,7 +921,7 @@ sequenceDiagram
 ### Backend
 
 ```
-backend/
+apps/erp/backend/
 ├── app/
 │   ├── main.py
 │   ├── core/            # config, security, dependencies, circuit_breaker, superadmin_gate
@@ -957,7 +957,7 @@ backend/
 ### Frontend
 
 ```
-frontend/
+apps/erp/frontend/
 ├── app/
 │   ├── [locale]/
 │   │   ├── (auth)/login/
@@ -1206,7 +1206,7 @@ ingress:
 - **🆕 pgvector:** اختيار صورة PostgreSQL تدعم الامتداد (مثل `pgvector/pgvector:pg16`)، تفعيله في `init.sql`، اختبار `CREATE EXTENSION vector` و `SELECT '[1,2,3]'::vector`.
 - **Caddy Internal CA:** إعداد `Caddyfile` بـ `pki` block + `tls internal`، توليد Root CA، سكربت تصدير الشهادة.
 - **🆕 ضبط `docker-compose.yml` بـ 4 حاويات فقط** على شبكة `lims-internal` معزولة. التحقق من عدم وجود `ports: "0.0.0.0:..."` على أي حاوية غير Caddy.
-- **🆕 حاوية Next.js Standalone** + `frontend/Dockerfile` متعدد المراحل.
+- **🆕 حاوية Next.js Standalone** + `apps/erp/frontend/Dockerfile` متعدد المراحل.
 - هيكلة FastAPI + health check.
 - هيكلة Next.js + i18n + Standalone build.
 - إدارة الإعدادات (.env + Pydantic Settings).

@@ -19,7 +19,7 @@ def test_templates_dir_env_override(monkeypatch):
 def test_templates_dir_default_resolves_to_repo_dir(monkeypatch):
     settings = make_settings(monkeypatch)
     resolved = settings.templates_dir
-    assert resolved.name == "cert&recept"
+    assert resolved.name == "templates"
     assert resolved.is_dir()
 
 

@@ -128,7 +128,7 @@ docker exec lims_database psql -U lims -d lims -c "\d+ payments"
 ### 📝 Commit
 
 ```bash
-git add backend/alembic/versions/
+git add apps/erp/backend/alembic/versions/
 git commit -m "feat: add 13 DB CHECK constraints and partial unique index for enrollments"
 ```
 
@@ -245,7 +245,7 @@ print(result.scalar())  # Should print 1, 2, 3...
 ### 📝 Commit
 
 ```bash
-git add backend/alembic/versions/ backend/app/modules/lms/financial_service.py backend/app/modules/lms/cashier_service.py backend/app/modules/academic/certificate_service.py
+git add apps/erp/backend/alembic/versions/ apps/erp/backend/app/modules/lms/financial_service.py apps/erp/backend/app/modules/lms/cashier_service.py apps/erp/backend/app/modules/academic/certificate_service.py
 git commit -m "feat: add DB sequences for receipt/voucher/certificate numbering"
 ```
 
@@ -260,7 +260,7 @@ git commit -m "feat: add DB sequences for receipt/voucher/certificate numbering"
 
 Edit the following files, replacing read-then-write patterns with atomic conditional UPDATEs:
 
-**1. `backend/app/modules/lms/ledger_service.py`**
+**1. `apps/erp/backend/app/modules/lms/ledger_service.py`**
 
 `activate_contract()`:
 ```python
@@ -288,7 +288,7 @@ if result.rowcount == 0:
 
 `cancel_contract()` — same pattern with `WHERE status = 'ACTIVE'`.
 
-**2. `backend/app/modules/lms/cashier_service.py`**
+**2. `apps/erp/backend/app/modules/lms/cashier_service.py`**
 
 `disburse_refund()`:
 ```python
@@ -303,11 +303,11 @@ if result.rowcount == 0:
     raise ValueError("Refund not found or already claimed")
 ```
 
-**3. `backend/app/modules/academic/cancellation_service.py`**
+**3. `apps/erp/backend/app/modules/academic/cancellation_service.py`**
 
 `cancel_section()` — wrap ALL writes in a single transaction. Replace `await db.commit()` (F10) with `await db.flush()`.
 
-**4. `backend/app/modules/academic/service.py`**
+**4. `apps/erp/backend/app/modules/academic/service.py`**
 
 - `complete_section()` — make atomic (section status + contract + certificates)
 - `set_final_grades_bulk()` — make atomic (grades + contract + ledger)
@@ -324,7 +324,7 @@ python test_v1_7_full_e2e.py
 ### 📝 Commit
 
 ```bash
-git add backend/app/modules/lms/ledger_service.py backend/app/modules/lms/cashier_service.py backend/app/modules/academic/cancellation_service.py backend/app/modules/academic/service.py backend/app/modules/lms/compensation_service.py
+git add apps/erp/backend/app/modules/lms/ledger_service.py apps/erp/backend/app/modules/lms/cashier_service.py apps/erp/backend/app/modules/academic/cancellation_service.py apps/erp/backend/app/modules/academic/service.py apps/erp/backend/app/modules/lms/compensation_service.py
 git commit -m "fix: add conditional UPDATE patterns and transactional wraps for race conditions"
 ```
 
@@ -412,7 +412,7 @@ python test_v1_7_full_e2e.py
 ### 📝 Commit
 
 ```bash
-git add backend/app/modules/academic/service.py backend/app/modules/lms/financial_service.py backend/app/modules/lms/ledger_service.py backend/app/modules/lms/closure_service.py
+git add apps/erp/backend/app/modules/academic/service.py apps/erp/backend/app/modules/lms/financial_service.py apps/erp/backend/app/modules/lms/ledger_service.py apps/erp/backend/app/modules/lms/closure_service.py
 git commit -m "fix: add SELECT FOR UPDATE locks for enrollment, payment, wallet concurrency"
 ```
 
@@ -426,7 +426,7 @@ git commit -m "fix: add SELECT FOR UPDATE locks for enrollment, payment, wallet 
 
 ### 💻 Steps
 
-**1. Create `backend/app/middleware/idempotency.py`:**
+**1. Create `apps/erp/backend/app/middleware/idempotency.py`:**
 
 ```python
 import hashlib
@@ -489,7 +489,7 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
         return response
 ```
 
-**2. Add `IdempotencyKey` model** to `backend/app/modules/models.py`:
+**2. Add `IdempotencyKey` model** to `apps/erp/backend/app/modules/models.py`:
 
 ```python
 class IdempotencyKey(Base):
@@ -514,7 +514,7 @@ app.add_middleware(IdempotencyMiddleware)
 
 **4. Create Alembic migration** for `idempotency_keys` table.
 
-**5. Frontend interceptor** — in `frontend/lib/api.ts`, add (keep existing interceptors):
+**5. Frontend interceptor** — in `apps/erp/frontend/lib/api.ts`, add (keep existing interceptors):
 
 ```typescript
 apiClient.interceptors.request.use((config) => {
@@ -542,7 +542,7 @@ curl -X POST http://localhost:8000/api/v1/your-endpoint \
 ### 📝 Commit
 
 ```bash
-git add backend/app/middleware/idempotency.py backend/app/modules/models.py backend/app/main.py backend/alembic/versions/ frontend/lib/api.ts
+git add apps/erp/backend/app/middleware/idempotency.py apps/erp/backend/app/modules/models.py apps/erp/backend/app/main.py apps/erp/backend/alembic/versions/ apps/erp/frontend/lib/api.ts
 git commit -m "feat: add idempotency key middleware with frontend interceptor"
 ```
 
@@ -567,7 +567,7 @@ git commit -m "feat: add idempotency key middleware with frontend interceptor"
 ### 📝 Commit
 
 ```bash
-git add backend/app/modules/academic/service.py backend/app/modules/lms/financial_service.py backend/app/modules/academic/cancellation_service.py
+git add apps/erp/backend/app/modules/academic/service.py apps/erp/backend/app/modules/lms/financial_service.py apps/erp/backend/app/modules/academic/cancellation_service.py
 git commit -m "fix: propagate silent failures with proper logging instead of swallowing"
 ```
 
@@ -590,7 +590,7 @@ pip install sentry-sdk[fastapi]
 echo "sentry-sdk[fastapi]" >> requirements.txt
 ```
 
-In `backend/app/main.py`, add **before** `app = FastAPI(...)`:
+In `apps/erp/backend/app/main.py`, add **before** `app = FastAPI(...)`:
 
 ```python
 import sentry_sdk
@@ -605,7 +605,7 @@ if settings.SENTRY_DSN:
     )
 ```
 
-Add `SENTRY_DSN` to `backend/app/core/config.py`:
+Add `SENTRY_DSN` to `apps/erp/backend/app/core/config.py`:
 
 ```python
 SENTRY_DSN: str = ""
@@ -618,7 +618,7 @@ cd frontend
 npm install @sentry/nextjs
 ```
 
-Create `frontend/sentry.client.config.ts`:
+Create `apps/erp/frontend/sentry.client.config.ts`:
 
 ```typescript
 import * as Sentry from "@sentry/nextjs"
@@ -629,7 +629,7 @@ Sentry.init({
 })
 ```
 
-Create `frontend/sentry.server.config.ts`:
+Create `apps/erp/frontend/sentry.server.config.ts`:
 
 ```typescript
 import * as Sentry from "@sentry/nextjs"
@@ -640,7 +640,7 @@ Sentry.init({
 })
 ```
 
-Create `frontend/sentry.edge.config.ts`:
+Create `apps/erp/frontend/sentry.edge.config.ts`:
 
 ```typescript
 import * as Sentry from "@sentry/nextjs"
@@ -653,7 +653,7 @@ Sentry.init({
 
 ### 💻 7a.2 Backend Docker Security (C-4)
 
-Edit `backend/Dockerfile`, add **before** `EXPOSE 8000`:
+Edit `apps/erp/backend/Dockerfile`, add **before** `EXPOSE 8000`:
 
 ```dockerfile
 # Create non-root user
@@ -661,7 +661,7 @@ RUN useradd -m -u 1000 appuser
 USER appuser
 ```
 
-Add HEALTHCHECK in `backend/Dockerfile` **after** `EXPOSE 8000`:
+Add HEALTHCHECK in `apps/erp/backend/Dockerfile` **after** `EXPOSE 8000`:
 
 ```dockerfile
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
@@ -750,7 +750,7 @@ jobs:
 
 ### 💻 7a.4 Database Backup Script (C-2)
 
-Create `backend/scripts/backup.sh`:
+Create `apps/erp/backend/scripts/backup.sh`:
 
 ```bash
 #!/bin/bash
@@ -792,7 +792,7 @@ echo "[$(date)] Backup complete: lms_$TIMESTAMP.dump ($(ls -lh "$BACKUP_DIR/lms_
 
 ### 💻 7a.5 Structured Logging (I-11)
 
-Create `backend/app/core/logging.py`:
+Create `apps/erp/backend/app/core/logging.py`:
 
 ```python
 import json
@@ -834,7 +834,7 @@ setup_logging()
 
 ### 💻 7a.6 DB Pool Timeout (S28)
 
-Verify `backend/app/db/session.py` already has pool_timeout (add if missing):
+Verify `apps/erp/backend/app/db/session.py` already has pool_timeout (add if missing):
 
 ```python
 engine = create_async_engine(
@@ -890,7 +890,7 @@ DB_PASSWORD = os.environ.get("TEST_DB_PASSWORD", "lims_secure_pass")
 
 ### 💻 7a.9 Add SENTRY_DSN to Backend Config
 
-Edit `backend/app/core/config.py` — add field:
+Edit `apps/erp/backend/app/core/config.py` — add field:
 
 ```python
 SENTRY_DSN: str = ""
@@ -899,7 +899,7 @@ SENTRY_DSN: str = ""
 ### 📝 Commit
 
 ```bash
-git add backend/Dockerfile backend/requirements.txt backend/app/main.py backend/app/core/logging.py backend/app/core/config.py backend/app/db/session.py .github/workflows/ci-cd.yml backend/scripts/backup.sh infrastructure/caddy/Caddyfile frontend/sentry.client.config.ts frontend/sentry.server.config.ts frontend/sentry.edge.config.ts frontend/package.json
+git add apps/erp/backend/Dockerfile apps/erp/backend/requirements.txt apps/erp/backend/app/main.py apps/erp/backend/app/core/logging.py apps/erp/backend/app/core/config.py apps/erp/backend/app/db/session.py .github/workflows/ci-cd.yml apps/erp/backend/scripts/backup.sh infrastructure/caddy/Caddyfile apps/erp/frontend/sentry.client.config.ts apps/erp/frontend/sentry.server.config.ts apps/erp/frontend/sentry.edge.config.ts apps/erp/frontend/package.json
 git commit -m "feat: add Sentry, CI/CD, Docker security, backup script, structured logging"
 ```
 
@@ -928,7 +928,7 @@ header {
 
 ### 💻 8.2 Real IP Middleware (I-08)
 
-Create `backend/app/middleware/real_ip.py`:
+Create `apps/erp/backend/app/middleware/real_ip.py`:
 
 ```python
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -955,7 +955,7 @@ app.add_middleware(RealIPMiddleware)
 
 ### 💻 8.3 CSRF Protection (I-04)
 
-Create `backend/app/middleware/csrf.py`:
+Create `apps/erp/backend/app/middleware/csrf.py`:
 
 ```python
 from fastapi import Request, HTTPException
@@ -981,7 +981,7 @@ from app.middleware.csrf import CSRFMiddleware
 app.add_middleware(CSRFMiddleware)  # Add after CORS but before other middleware
 ```
 
-**Frontend side** — in `frontend/lib/api.ts`, add CSRF token interceptor:
+**Frontend side** — in `apps/erp/frontend/lib/api.ts`, add CSRF token interceptor:
 
 ```typescript
 function getCookie(name: string): string | null {
@@ -1000,7 +1000,7 @@ apiClient.interceptors.request.use((config) => {
 
 ### 💻 8.4 Global Rate Limiting (I-06)
 
-Update `backend/app/core/rate_limit.py`:
+Update `apps/erp/backend/app/core/rate_limit.py`:
 
 ```python
 from slowapi import Limiter
@@ -1029,7 +1029,7 @@ Add rate limit decorators to specific router endpoints:
 ### 📝 Commit
 
 ```bash
-git add infrastructure/caddy/Caddyfile backend/app/middleware/real_ip.py backend/app/middleware/csrf.py backend/app/core/rate_limit.py backend/app/main.py frontend/lib/api.ts backend/app/modules/lms/router.py backend/app/modules/academic/router.py backend/app/modules/identity/router.py
+git add infrastructure/caddy/Caddyfile apps/erp/backend/app/middleware/real_ip.py apps/erp/backend/app/middleware/csrf.py apps/erp/backend/app/core/rate_limit.py apps/erp/backend/app/main.py apps/erp/frontend/lib/api.ts apps/erp/backend/app/modules/lms/router.py apps/erp/backend/app/modules/academic/router.py apps/erp/backend/app/modules/identity/router.py
 git commit -m "feat: add CSRF protection, security headers, rate limiting, real IP middleware"
 ```
 
@@ -1042,7 +1042,7 @@ git commit -m "feat: add CSRF protection, security headers, rate limiting, real 
 
 ### 💻 9.1 Fix Hung Promise (F04, S05)
 
-In `frontend/lib/api.ts`, change line ~45:
+In `apps/erp/frontend/lib/api.ts`, change line ~45:
 
 ```typescript
 // FROM:
@@ -1113,7 +1113,7 @@ catch (error) {
 
 ### 💻 9.5 Add Form Submitting States (S01)
 
-Create reusable hook `frontend/hooks/useSubmit.ts`:
+Create reusable hook `apps/erp/frontend/hooks/useSubmit.ts`:
 
 ```typescript
 import { useState, useCallback } from "react"
@@ -1137,7 +1137,7 @@ Apply to every form page. Add `disabled={submitting}` to all submit buttons.
 
 ### 💻 9.6 Add Input Sanitization (S02, S03)
 
-Create `frontend/lib/utils/input.ts`:
+Create `apps/erp/frontend/lib/utils/input.ts`:
 
 ```typescript
 export function sanitizeInput(value: string): string {
@@ -1165,7 +1165,7 @@ router.replace("/dashboard/sections")
 
 ### 💻 9.8 Create Error UI Components
 
-`frontend/components/AccessDenied.tsx`:
+`apps/erp/frontend/components/AccessDenied.tsx`:
 
 ```typescript
 export function AccessDenied({ resourceName }: { resourceName: string }) {
@@ -1178,7 +1178,7 @@ export function AccessDenied({ resourceName }: { resourceName: string }) {
 }
 ```
 
-`frontend/components/EmptyState.tsx`:
+`apps/erp/frontend/components/EmptyState.tsx`:
 
 ```typescript
 export function EmptyState({ message = "No data available" }: { message?: string }) {
@@ -1192,7 +1192,7 @@ export function EmptyState({ message = "No data available" }: { message?: string
 
 ### 💻 9.9 Create error.tsx / loading.tsx
 
-`frontend/app/dashboard/error.tsx`:
+`apps/erp/frontend/app/dashboard/error.tsx`:
 
 ```typescript
 'use client'
@@ -1209,7 +1209,7 @@ export default function DashboardError({
 }
 ```
 
-`frontend/app/dashboard/loading.tsx`:
+`apps/erp/frontend/app/dashboard/loading.tsx`:
 
 ```typescript
 export default function DashboardLoading() {
@@ -1242,7 +1242,7 @@ useEffect(() => {
 ### 📝 Commit
 
 ```bash
-git add frontend/lib/api.ts frontend/components/AuthContext.tsx frontend/lib/utils/input.ts frontend/components/AccessDenied.tsx frontend/components/EmptyState.tsx frontend/hooks/useSubmit.ts frontend/app/dashboard/error.tsx frontend/app/dashboard/loading.tsx
+git add apps/erp/frontend/lib/api.ts apps/erp/frontend/components/AuthContext.tsx apps/erp/frontend/lib/utils/input.ts apps/erp/frontend/components/AccessDenied.tsx apps/erp/frontend/components/EmptyState.tsx apps/erp/frontend/hooks/useSubmit.ts apps/erp/frontend/app/dashboard/error.tsx apps/erp/frontend/app/dashboard/loading.tsx
 git commit -m "fix: frontend resilience - error handling, form states, sanitization, error boundaries"
 ```
 
@@ -1389,7 +1389,7 @@ git commit -m "feat: production docker-compose with healthchecks, resource limit
 
 ### 🧪 10.1 Backend Unit & Integration Tests
 
-Create test files under `backend/tests/`:
+Create test files under `apps/erp/backend/tests/`:
 
 | New File | What It Tests |
 |-----------|--------------|
@@ -1514,11 +1514,11 @@ git log --oneline -20
 # - "test: add unit, integration, and E2E tests for QA remediation phases"
 
 # 3. Ensure .env files are NOT committed
-git check-ignore backend/.env frontend/.env
+git check-ignore apps/erp/backend/.env apps/erp/frontend/.env
 # Should print the paths (they're ignored)
 
 # 4. Ensure all secrets are environment variables (not hardcoded)
-grep -rn "CHANGE_ME" backend/app/ frontend/app/ --include="*.py" --include="*.ts" --include="*.tsx"
+grep -rn "CHANGE_ME" apps/erp/backend/app/ apps/erp/frontend/app/ --include="*.py" --include="*.ts" --include="*.tsx"
 # Expected: no results (if there are any, fix them)
 ```
 
@@ -1653,13 +1653,13 @@ sudo ./svc.sh status
 
 ```bash
 # Make backup script executable
-chmod +x /opt/lims/backend/scripts/backup.sh
+chmod +x /opt/lims/apps/erp/backend/scripts/backup.sh
 
 # Add to crontab (run every 6 hours)
-(crontab -l 2>/dev/null; echo "0 */6 * * * /opt/lims/backend/scripts/backup.sh >> /opt/lims/backups/backup.log 2>&1") | crontab -
+(crontab -l 2>/dev/null; echo "0 */6 * * * /opt/lims/apps/erp/backend/scripts/backup.sh >> /opt/lims/backups/backup.log 2>&1") | crontab -
 
 # Also add the 2-hour micro-backup during working hours
-(crontab -l 2>/dev/null; echo "0 8-20/2 * * 1-6 /opt/lims/backend/scripts/backup.sh >> /opt/lims/backups/backup.log 2>&1") | crontab -
+(crontab -l 2>/dev/null; echo "0 8-20/2 * * 1-6 /opt/lims/apps/erp/backend/scripts/backup.sh >> /opt/lims/backups/backup.log 2>&1") | crontab -
 
 # Verify crontab
 crontab -l
@@ -2016,7 +2016,7 @@ docker compose -f docker-compose.prod.yml ps
 docker compose -f docker-compose.prod.yml logs --tail=50 backend
 
 # Manual backup
-/opt/lims/backend/scripts/backup.sh
+/opt/lims/apps/erp/backend/scripts/backup.sh
 
 # Run migration
 docker compose -f docker-compose.prod.yml exec backend alembic upgrade head

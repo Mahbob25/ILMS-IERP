@@ -125,7 +125,7 @@ INSERT INTO section_lifecycle_config (key, value, description) VALUES
 
 ### 1.4 SQLAlchemy Models
 
-Create new model classes in `backend/app/modules/academic/models.py`:
+Create new model classes in `apps/erp/backend/app/modules/academic/models.py`:
 
 - `SectionCancellation` — Maps to `section_cancellations`
 - `PendingRefund` — Maps to `pending_refunds` (add `pending_refund_status` enum)
@@ -217,8 +217,8 @@ Produce `api-contract.json` in this directory defining every new and modified en
 
 | File | Action |
 |------|--------|
-| `backend/app/modules/academic/models.py` | EDIT — add new models, update CourseSection |
-| `backend/app/modules/lms/models.py` | EDIT — add LedgerEntryType enum values |
+| `apps/erp/backend/app/modules/academic/models.py` | EDIT — add new models, update CourseSection |
+| `apps/erp/backend/app/modules/lms/models.py` | EDIT — add LedgerEntryType enum values |
 | Alembic migration file | CREATE — auto-generated |
 | `docs/plans/section-lifecycle/api-contract.json` | CREATE — shared API contract |
 

@@ -290,7 +290,7 @@ Secretary/Manager clicks "Unenroll"
 
 ### 6.1 New Services
 
-#### `backend/app/modules/academic/unenrollment_service.py`
+#### `apps/erp/backend/app/modules/academic/unenrollment_service.py`
 
 | Function | Description |
 |----------|-------------|
@@ -531,27 +531,27 @@ The existing cashier dashboard already handles `PendingRefund` records regardles
 
 | Task | Files | Estimate |
 |------|-------|----------|
-| Implement `can_unenroll_student()` validation | `backend/app/modules/academic/unenrollment_service.py` | 0.25 day |
+| Implement `can_unenroll_student()` validation | `apps/erp/backend/app/modules/academic/unenrollment_service.py` | 0.25 day |
 | Implement `calculate_reversal_amount()` — sum PAYMENT_SHARE by enrollment payments | `unenrollment_service.py` | 0.25 day |
 | Implement `preview_unenrollment_impact()` — financial snapshot + warnings | `unenrollment_service.py` | 0.5 day |
-| Implement `reverse_teacher_shares()` in ledger service | `backend/app/modules/lms/ledger_service.py` | 0.5 day |
+| Implement `reverse_teacher_shares()` in ledger service | `apps/erp/backend/app/modules/lms/ledger_service.py` | 0.5 day |
 | Implement `unenroll_student()` orchestrator (validate → reverse → PendingRefund → soft-delete → audit) | `unenrollment_service.py` | 1 day |
 | Implement `get_student_unenrollment_history()`, `get_section_unenrollment_history()` | `unenrollment_service.py` | 0.25 day |
-| Write `REFUND_DISBURSEMENT` ledger entry in cashier `disburse_pending_refund()` | `backend/app/modules/lms/cashier_service.py` | 0.25 day |
+| Write `REFUND_DISBURSEMENT` ledger entry in cashier `disburse_pending_refund()` | `apps/erp/backend/app/modules/lms/cashier_service.py` | 0.25 day |
 | **Subtotal** | | **3 days** |
 
 ### Phase 3: Backend — API Endpoints
 
 | Task | Files | Estimate |
 |------|-------|----------|
-| `GET /academic/enrollments/{id}/unenroll-preview` | `backend/app/modules/academic/router.py` | 0.5 day |
+| `GET /academic/enrollments/{id}/unenroll-preview` | `apps/erp/backend/app/modules/academic/router.py` | 0.5 day |
 | `POST /academic/enrollments/{id}/unenroll` | `router.py` | 0.5 day |
 | `GET /academic/enrollments/unenrollment-history` | `router.py` | 0.25 day |
 | `GET /academic/students/{id}/unenrollment-history` | `router.py` | 0.25 day |
 | `GET /academic/sections/{id}/unenrollment-history` | `router.py` | 0.25 day |
 | `GET /academic/unenrollments/{id}` | `router.py` | 0.1 day |
 | Deprecate `DELETE /academic/enrollments/{id}` | `router.py` | 0.25 day |
-| Add `source` filter to cashier pending-refunds endpoint | `backend/app/modules/lms/router.py` | 0.25 day |
+| Add `source` filter to cashier pending-refunds endpoint | `apps/erp/backend/app/modules/lms/router.py` | 0.25 day |
 | **Subtotal** | | **2.35 days** |
 
 ### Phase 4: Frontend — Unenroll Modal

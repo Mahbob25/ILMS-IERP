@@ -78,12 +78,12 @@ Every audit item mapped to exactly one fixing phase. No item is fixed by two pha
 | F01 | `academic/service.py:352` | 6 — Backend Silent Failures | Add `logger.warning()` before `continue` |
 | F02 | `academic/service.py:754` | 6 — Backend Silent Failures | Add `logger.error()` before `pass` |
 | F03 | `lms/financial_service.py:84` | 6 — Backend Silent Failures | Add audit logging for failed payment attempts |
-| F04 | `frontend/lib/api.ts:45` | 9 — Frontend Resilience | `new Promise<never>(() => {})` → `Promise.reject()` |
+| F04 | `apps/erp/frontend/lib/api.ts:45` | 9 — Frontend Resilience | `new Promise<never>(() => {})` → `Promise.reject()` |
 | F05 | `AuthContext.tsx:85` | 9 — Frontend Resilience | Fix logout error handling, clear server session |
 | F06 | Students page | 9 — Frontend Resilience | Add user-facing error toast/alert on API failure |
 | F07 | Sections page | 9 — Frontend Resilience | Replace `.catch(() => null)` with proper error UI |
 | F08 | Sections page | 9 — Frontend Resilience | Handle contract fetch failure, show fallback |
-| F09 | `frontend/lib/api.ts` | 9 — Frontend Resilience | Differentiate 401 vs network error vs 500 |
+| F09 | `apps/erp/frontend/lib/api.ts` | 9 — Frontend Resilience | Differentiate 401 vs network error vs 500 |
 | F10 | `cancellation_service.py:292` | 6 — Backend Silent Failures | `commit()` → `flush()` |
 | F11 | `academic/service.py:404` | 6 — Backend Silent Failures | `commit()` → `flush()` |
 

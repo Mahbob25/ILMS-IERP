@@ -16,8 +16,8 @@
 4. Repo & Compose Layout
 5. Data Model
 6. ERP Changes (Phase 0 — prerequisite)
-7. Portal BFF (`portal/backend`)
-8. Portal Web (`portal/frontend`)
+7. Portal BFF (`apps/portal/backend`)
+8. Portal Web (`apps/portal/frontend`)
 9. AI Service (`ai-service`) — Unified Plane, Isolated Queues
 10. Infra, Networking & Deploy
 11. API Surface (canonical)
@@ -79,12 +79,12 @@ lms/
 ├── docker-compose.yml              # ERP — 4 containers, untouched
 ├── docker-compose.portal.yml       # NEW — portal + ai-service + redis, joins lims-internal
 ├── infrastructure/caddy/Caddyfile  # extend with two subdomain blocks
-├── backend/                        # ERP — System of Record
+├── apps/erp/backend/                        # ERP — System of Record
 │   └── app/modules/portal_internal/  # NEW — thin internal router (Phase 0)
-├── portal/                         # NEW — external portal
-│   ├── backend/                    # FastAPI BFF :8001
-│   └── frontend/                   # Next.js 14 :3001
-├── ai-service/                     # NEW — unified, stateless :8002
+├── apps/portal/                         # NEW — external portal
+│   ├── backend/                         # FastAPI BFF :8001
+│   └── frontend/                        # Next.js 14 :3001
+├── apps/ai-service/                     # NEW — unified, stateless :8002
 │   ├── app/queue/                  # Queue interface + BRPOPLPUSH + Streams impls
 │   ├── app/llm/                    # Gemini/OpenAI gateway
 │   └── app/rag/                    # pgvector lookup (RO via ERP internal API)
@@ -102,7 +102,7 @@ networks:
 
 services:
   portal-backend:
-    build: ./portal/backend
+    build: ./apps/portal/backend
     container_name: portal_backend
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@database:5432/${POSTGRES_DB}
@@ -115,14 +115,14 @@ services:
     deploy: { resources: { limits: { cpus: '1.0', memory: 1G } } }
 
   portal-frontend:
-    build: ./portal/frontend
+    build: ./apps/portal/frontend
     container_name: portal_frontend
     networks: [lims-internal]
     depends_on: [portal-backend]
     deploy: { resources: { limits: { cpus: '1.0', memory: 1G } } }
 
   ai-service:
-    build: ./ai-service
+    build: ./apps/ai-service
     container_name: ai_service
     environment:
       REDIS_URL: redis://redis:6379/0
@@ -229,7 +229,7 @@ CREATE TABLE portal.preferences (
 
 ### 5.2 Migrations
 
-- One Alembic migration for `portal` schema + tables above (reuse `backend/alembic/` — the migration runs against the same PG host regardless of which service triggers it).
+- One Alembic migration for `portal` schema + tables above (reuse `apps/erp/backend/alembic/` — the migration runs against the same PG host regardless of which service triggers it).
 - One migration for AI tables if `ai-pipeline-implementation-plan.md` §6 hasn't landed yet.
 - Down: `DROP SCHEMA portal CASCADE` / drop AI tables. Seed data: optional demo guardian + parent_link for E2E.
 
@@ -239,7 +239,7 @@ CREATE TABLE portal.preferences (
 
 Everything portal needs to read/write does **one thing**: expose a **thin internal router** that the BFF (and `ai-service` for RAG) can call. No direct `erp.*` writes from portal.
 
-**File:** `backend/app/modules/portal_internal/router.py`
+**File:** `apps/erp/backend/app/modules/portal_internal/router.py`
 
 ```python
 internal_router = APIRouter(prefix="/internal/portal", tags=["internal-portal"])
@@ -262,7 +262,7 @@ All require `X-Service-Key: ${ERP_SERVICE_KEY}` + `X-Actor-Id` (portal user → 
 
 **Latency mitigation (§4.1):** handlers use **`asyncpg` direct query** (bypass full SQLAlchemy ORM serialization) + minimal Pydantic DTOs, indexed on `student_id/section_id/enrollment_id`. **Monitoring:** `cache_hit_rate` + `internal_p95`; if miss-rate grows, add a materialized view `portal_read_models` behind the same API (no coupling change).
 
-**Config:** add to `backend/app/core/config.py` + `.env.example`:
+**Config:** add to `apps/erp/backend/app/core/config.py` + `.env.example`:
 
 ```
 PORTAL_JWT_SECRET=           # distinct from JWT_SECRET_KEY
@@ -287,14 +287,14 @@ MVP impl: `BRPOPLPUSH` pattern (`LPUSH ai:jobs` + `BRPOPLPUSH ai:jobs → ai:pro
 
 ---
 
-## 7. Portal BFF (`portal/backend`)
+## 7. Portal BFF (`apps/portal/backend`)
 
-Scaffold: `portal/backend` — **FastAPI (async)**, same patterns as ERP (`app/modules/*`, `app/core/config.py`, `app/db/session.py` if sharing PG, `app/middleware/*`). Keep each function < 50 lines per existing guide.
+Scaffold: `apps/portal/backend` — **FastAPI (async)**, same patterns as ERP (`app/modules/*`, `app/core/config.py`, `app/db/session.py` if sharing PG, `app/middleware/*`). Keep each function < 50 lines per existing guide.
 
 **Module layout:**
 
 ```
-portal/backend/app/
+apps/portal/apps/erp/backend/app/
 ├── core/config.py
 ├── db/session.py          # same PG host, search_path includes portal + erp (RO only for erp)
 ├── middleware/
@@ -347,13 +347,13 @@ Browser → portal_frontend → portal_backend (portal JWT cookie)
 
 ---
 
-## 8. Portal Web (`portal/frontend`)
+## 8. Portal Web (`apps/portal/frontend`)
 
-Scaffold: `portal/frontend` — **Next.js 14 App Router (standalone) :3001**, copy ERP middleware/locale/auth patterns.
+Scaffold: `apps/portal/frontend` — **Next.js 14 App Router (standalone) :3001**, copy ERP middleware/locale/auth patterns.
 
 **Key reuse / divergence:**
 
-- Copy `frontend/middleware.ts` (locale detection, auth redirects), `frontend/lib/api.ts` (axios, CSRF, idempotency, 401 refresh, retries, Sentry), `frontend/app/[locale]/layout.tsx` i18n.
+- Copy `apps/erp/frontend/middleware.ts` (locale detection, auth redirects), `apps/erp/frontend/lib/api.ts` (axios, CSRF, idempotency, 401 refresh, retries, Sentry), `apps/erp/frontend/app/[locale]/layout.tsx` i18n.
 - **Divergence:** `API_BASE_URL` → `/api` (portal BFF), auth cookies are **portal-scoped**, login is OTP flow not password-by-default, dashboard shows **student/parent views** (grades, attendance, fees, revision plan teaser).
 - Design system: same `frontend-design-rules.md` — `slate-50` bg, `brand-500`, `ai-500` accent, `rounded-xl`, `shadow-sm`, `lucide-react` outline, skeleton + Sapphire→Teal glow for AI.
 
@@ -536,29 +536,29 @@ Bilingual: `ar` default, RTL, header `Globe` toggle persists via `PATCH /api/me`
 ### Phase 0 — Prepare ERP (1–2 days) — ✅ DONE
 
 - [x] Alembic migration: `portal` schema + tables (§5.1).
-- [x] `backend/app/modules/portal_internal/` router with `X-Service-Key` gate, thin `asyncpg` handlers (§6 table), `p50 <20ms` target.
+- [x] `apps/erp/backend/app/modules/portal_internal/` router with `X-Service-Key` gate, thin `asyncpg` handlers (§6 table), `p50 <20ms` target.
 - [x] `Queue` interface + enqueue shim (BRPOPLPUSH impl now, Streams impl behind flag).
-- [x] `.env.example` + `backend/app/core/config.py`: `PORTAL_JWT_SECRET`, `ERP_SERVICE_KEY`, `REDIS_URL` (ERP never connects — config only for docs).
+- [x] `.env.example` + `apps/erp/backend/app/core/config.py`: `PORTAL_JWT_SECRET`, `ERP_SERVICE_KEY`, `REDIS_URL` (ERP never connects — config only for docs).
 - [x] `infrastructure/caddy/Caddyfile` subdomain blocks (no-op for local until hostnames exist).
 
-**Gate:** ✅ `GET /api/v1/internal/portal/me` with valid `X-Service-Key` returns linked students; without key → 401; unit tests in `backend/tests/unit/test_portal_internal_routes.py` (service-key gate, actor required, access checks awaited).
+**Gate:** ✅ `GET /api/v1/internal/portal/me` with valid `X-Service-Key` returns linked students; without key → 401; unit tests in `apps/erp/backend/tests/unit/test_portal_internal_routes.py` (service-key gate, actor required, access checks awaited).
 
 ### Phase 1 — Portal BFF + Web (Skeleton, 1–2 weeks) — ✅ DONE
 
-- [x] Scaffold `portal/backend` (FastAPI, `app/modules/*`, `app/core/config.py`, `app/db/session.py` — same PG host).
-- [x] Scaffold `portal/frontend` (Next.js 14 standalone, copy `middleware.ts`/`lib/api.ts`/`layout.tsx` i18n).
+- [x] Scaffold `apps/portal/backend` (FastAPI, `app/modules/*`, `app/core/config.py`, `app/db/session.py` — same PG host).
+- [x] Scaffold `apps/portal/frontend` (Next.js 14 standalone, copy `middleware.ts`/`lib/api.ts`/`layout.tsx` i18n).
 - [x] Portal auth: OTP stub (console log for MVP) + `POST /api/auth/verify-otp` → `HttpOnly Secure Lax 10m/30d` cookies, lockout 5/15m.
 - [x] `GET /api/me` proxied to ERP `GET /internal/portal/me`.
 - [x] Wire `Caddyfile` subdomains + `docker-compose.portal.yml` (joins `lims-internal`).
 
 **Implemented (2026-08-14):**
 
-- `portal/backend` — FastAPI BFF :8001: `app/core/config.py` (isolated `PORTAL_JWT_SECRET` validator), `app/db/session.py` (same PG host, `portal.*` only), middleware (`csrf.py` portal-scoped cookie check, `real_ip.py`), `app/modules/auth/*` (OTP stub with in-memory/Redis fallback, JWT 10m/30d, lockout 5/15m, refresh rotation, `portal_access_token`/`portal_refresh_token` cookies), `app/modules/portal/router.py` (read-through Redis cache + `X-Cache`/`X-Data-As-Of`, write proxy with cache invalidation), `app/modules/ai_proxy/router.py` (enqueue `ai:student` HIGH, poll stub), `app/modules/health/router.py`, `app/services/erp_client.py` (typed `httpx` client with `X-Service-Key` + `X-Actor-Id`), `cache.py`, `queue.py` (shared `Queue` protocol + BRPOPLPUSH). Rate limits via `slowapi` (default 30/min, auth 5–10/min).
-- `portal/frontend` — Next.js 14 standalone :3001: portal-scoped `middleware.ts` (locale redirect + `portal_refresh_token` dashboard gate), `lib/api.ts` (axios, CSRF, 401 refresh with portal cookies), `components/AuthContext.tsx` (OTP flow), routes: `/` landing, `/login` (phone/OTP two-step), `/dashboard` (+ grades/attendance/fees read-only pages, `/ai/explain` + `/ai/revision` stubs, `/settings`). Builds clean (standalone `server.js`), bilingual RTL `ar` default.
+- `apps/portal/backend` — FastAPI BFF :8001: `app/core/config.py` (isolated `PORTAL_JWT_SECRET` validator), `app/db/session.py` (same PG host, `portal.*` only), middleware (`csrf.py` portal-scoped cookie check, `real_ip.py`), `app/modules/auth/*` (OTP stub with in-memory/Redis fallback, JWT 10m/30d, lockout 5/15m, refresh rotation, `portal_access_token`/`portal_refresh_token` cookies), `app/modules/portal/router.py` (read-through Redis cache + `X-Cache`/`X-Data-As-Of`, write proxy with cache invalidation), `app/modules/ai_proxy/router.py` (enqueue `ai:student` HIGH, poll stub), `app/modules/health/router.py`, `app/services/erp_client.py` (typed `httpx` client with `X-Service-Key` + `X-Actor-Id`), `cache.py`, `queue.py` (shared `Queue` protocol + BRPOPLPUSH). Rate limits via `slowapi` (default 30/min, auth 5–10/min).
+- `apps/portal/frontend` — Next.js 14 standalone :3001: portal-scoped `middleware.ts` (locale redirect + `portal_refresh_token` dashboard gate), `lib/api.ts` (axios, CSRF, 401 refresh with portal cookies), `components/AuthContext.tsx` (OTP flow), routes: `/` landing, `/login` (phone/OTP two-step), `/dashboard` (+ grades/attendance/fees read-only pages, `/ai/explain` + `/ai/revision` stubs, `/settings`). Builds clean (standalone `server.js`), bilingual RTL `ar` default.
 - `docker-compose.portal.yml` — 4 services (`portal-backend` :8001, `portal-frontend` :3001, `ai-service` :8002 stub, `redis` :6379) on external `lims-internal`; `DATABASE_URL` points at the shared PG host.
-- `ai-service/` — minimal FastAPI stub :8002 (health + `/internal/enqueue` 501) so compose boots; queues/LLM/RAG ship in Phase 3.
+- `apps/ai-service/` — minimal FastAPI stub :8002 (health + `/internal/enqueue` 501) so compose boots; queues/LLM/RAG ship in Phase 3.
 
-**Gate (local):** ✅ `portal/backend` tests pass (11/11 in `portal/backend/tests/test_portal_bff.py` — OTP flow, cookie flags, cache hit/miss headers, ERP-down 502, queue enqueue); `portal/frontend` builds standalone; ERP regression tests green (`test_portal_internal_routes.py` + `test_csrf_and_rate_limit.py`).
+**Gate (local):** ✅ `apps/portal/backend` tests pass (11/11 in `apps/portal/backend/tests/test_portal_bff.py` — OTP flow, cookie flags, cache hit/miss headers, ERP-down 502, queue enqueue); `apps/portal/frontend` builds standalone; ERP regression tests green (`test_portal_internal_routes.py` + `test_csrf_and_rate_limit.py`).
 **Gate (prod, pending DNS/hosts):** `portal.aldrasat.edu` serves portal landing; portal OTP login → dashboard; `erp.aldrasat.edu` still serves ERP; cookies are subdomain-isolated in DevTools.
 
 ### Phase 2 — Read Paths + Cache — ✅ DONE
@@ -575,7 +575,7 @@ Bilingual: `ar` default, RTL, header `Globe` toggle persists via `PATCH /api/me`
 - Profile write path: `POST /me/profile` + `PATCH /me/profile` alias; on success the BFF invalidates `cache:profile:{student}` + its own `cache:me:{actor}` (proxied write still validated/audited in ERP).
 - Frontend: shared `useLinkedStudents` hook, `StudentSelector` (multi-child guardian dropdown, single-child plain chip), `RefreshButton` + relative "updated a minute ago" (`X-Data-As-Of`), all three read pages (grades/attendance/fees) rebuilt on them; settings page now persists `locale_pref` through the real write path.
 
-**Gate:** ✅ Redis integration smoke test (`portal/backend/tests/test_redis_smoke.py`, needs `REDIS_URL`): cold read `X-Cache: MISS` → warm read `X-Cache: HIT` → `?refresh=1` bypasses cache (MISS again, ERP re-called) → 22-request warm loop reports `hit_rate ≥ 0.9` on `/api/health/cache` at `ttl_seconds=60`; profile write invalidates the `me` cache (next read MISS). No direct `erp.*` write from portal (all writes proxied to the internal API).
+**Gate:** ✅ Redis integration smoke test (`apps/portal/apps/erp/backend/tests/test_redis_smoke.py`, needs `REDIS_URL`): cold read `X-Cache: MISS` → warm read `X-Cache: HIT` → `?refresh=1` bypasses cache (MISS again, ERP re-called) → 22-request warm loop reports `hit_rate ≥ 0.9` on `/api/health/cache` at `ttl_seconds=60`; profile write invalidates the `me` cache (next read MISS). No direct `erp.*` write from portal (all writes proxied to the internal API).
 
 ### Phase 3 — Harden & Ship (no AI) — ✅ DONE
 
@@ -589,12 +589,12 @@ Bilingual: `ar` default, RTL, header `Globe` toggle persists via `PATCH /api/me`
 
 **Implemented (2026-08-14):**
 
-- **Queue → Redis Streams + DLQ** — `portal/backend/app/services/queue.py` + `backend/app/core/queue.py` both promoted from BRPOPLPUSH to `RedisStreamsQueue` (XADD/XREADGROUP/XACK, 30s visibility, 3-attempt max → `ai:dlq`); `RedisBrpopQueue` kept for rollback; `NoopQueue` fallback preserved. `get_queue()` now returns Streams when `REDIS_URL` is set.
+- **Queue → Redis Streams + DLQ** — `apps/portal/apps/erp/backend/app/services/queue.py` + `apps/erp/backend/app/core/queue.py` both promoted from BRPOPLPUSH to `RedisStreamsQueue` (XADD/XREADGROUP/XACK, 30s visibility, 3-attempt max → `ai:dlq`); `RedisBrpopQueue` kept for rollback; `NoopQueue` fallback preserved. `get_queue()` now returns Streams when `REDIS_URL` is set.
 - **Rate limits (app layer)** — portal default 30/min (ERP 100/min), auth 5–10/min, AI 10/min, force-refresh 1/s. Slowapi is the defense-in-depth layer.
 - **Caddy hardening** — `portal.aldrasat.edu` block caps request bodies at 2MB; `caddy validate` passes. (Edge `rate_limit` directive needs a plugin image, so edge limits stay app-level.)
 - **Audit logs review** — `portal_internal` writes audit rows with `actor_id` in the JSONB payload + null `user_id` (portal actor ids don't exist in the ERP `users` FK) — no change needed.
 - **Backup/DR** — `scripts/backup.sh` now snapshots portal Redis (`redis_data` RDB: queues + cache replay); `scripts/restore-drill.sh` (new) restores the PG dump into a throwaway DB, verifies the `portal` schema/tables, validates the redis archive, drops the temp DB.
-- **Playwright E2E** — `portal/frontend/playwright.config.ts` + `tests/e2e/portal.spec.ts` (6 tests: OTP login → dashboard, grades, attendance, fees, settings, language toggle) with the BFF API mocked at the network layer; runs against `next start` with no live backend needed. All 6 green.
+- **Playwright E2E** — `apps/portal/apps/erp/frontend/playwright.config.ts` + `tests/e2e/portal.spec.ts` (6 tests: OTP login → dashboard, grades, attendance, fees, settings, language toggle) with the BFF API mocked at the network layer; runs against `next start` with no live backend needed. All 6 green.
 
 **Gate:** ✅ Portal ships standalone (ai-service stays a stub). Queue Streams round-trip + consumer-group isolation + DLQ tests pass against real Redis (`tests/test_queue_streams.py`). Portal backend 19 tests green (14 unit + 3 queue + 2 cache smoke). Playwright 6/6 green. `caddy validate` passes. `docs/plans/current.md` updated; this plan archived to `docs/archive/plans/`.
 
@@ -615,7 +615,7 @@ Bilingual: `ar` default, RTL, header `Globe` toggle persists via `PATCH /api/me`
 
 | Layer | What | How |
 |---|---|---|
-| Unit | Cache key hashing, `MD5` determinism, `ON CONFLICT` bulk upsert, `Queue` interface (BRPOPLPUSH vs Streams), portal JWT sign/verify | `pytest` in `portal/backend`, `ai-service` |
+| Unit | Cache key hashing, `MD5` determinism, `ON CONFLICT` bulk upsert, `Queue` interface (BRPOPLPUSH vs Streams), portal JWT sign/verify | `pytest` in `apps/portal/backend`, `ai-service` |
 | Integration | `portal_backend → backend internal API` with service key, cache hit/miss, invalidation, DLQ re-delivery | `pytest` with test PG + `fakeredis` |
 | E2E (browser) | OTP → dashboard → grades/attendance/fees → AI explain stream | Playwright against `docker compose -f docker-compose.portal.yml` + seeded `portal.users` + `parent_links` |
 | Load | 100→2k concurrent parents, `scale portal-backend=3`, `p95 internal <20ms`, `cache_hit_rate` | `k6` or `locust` against portal host only |
@@ -633,13 +633,13 @@ Coverage: portal backend ≥80%, no regression on ERP 221/221 tests.
 | `docker-compose.portal.yml` | **Created** ✅ | 0→1 | 4 services, `external: true` `lims-internal`; `DATABASE_URL` → shared PG host |
 | `infrastructure/caddy/Caddyfile` | **Edited** ✅ | 0 | `erp.` + `portal.` subdomain blocks |
 | `.env.example` | **Edited** ✅ | 0 | `PORTAL_JWT_SECRET`, `ERP_SERVICE_KEY`, `GEMINI_API_KEY`, `OPENAI_API_KEY`, `REDIS_URL` |
-| `backend/app/core/config.py` | **Edited** ✅ | 0 | Settings + validators (portal values doc-only in ERP) |
-| `backend/app/modules/portal_internal/*` | **Created** ✅ | 0 | `router.py`, `schemas.py`, `service.py` (thin queries), `dependencies.py` (service key) |
-| `backend/alembic/versions/202608060008_add_portal_schema.py` | **Created** ✅ | 0 | `portal` schema + tables (§5.1) |
-| `backend/alembic/versions/*_add_ai_pipeline_tables.py` | **Create** | 3 | When `ai-pipeline` §6 lands |
-| `portal/backend/*` | **Created** ✅ | 1→2 | FastAPI BFF — scaffold + modules (§7) + `tests/test_portal_bff.py` (14 tests) + `tests/test_redis_smoke.py` (2 Redis integration tests, Phase 2 gate) |
-| `portal/frontend/*` | **Created** ✅ | 1→2 | Next.js 14 — scaffold + routes (§8, §12), standalone build ✅; Phase 2: `useLinkedStudents`, `StudentSelector`, `RefreshButton`, read pages rebuilt |
-| `ai-service/*` | **Created** ✅ (stub) | 1→4 | FastAPI stateless stub :8002 (health + enqueue 501) — full queues/LLM/RAG in Phase 4 (AI, deferred) |
+| `apps/erp/backend/app/core/config.py` | **Edited** ✅ | 0 | Settings + validators (portal values doc-only in ERP) |
+| `apps/erp/backend/app/modules/portal_internal/*` | **Created** ✅ | 0 | `router.py`, `schemas.py`, `service.py` (thin queries), `dependencies.py` (service key) |
+| `apps/erp/backend/alembic/versions/202608060008_add_portal_schema.py` | **Created** ✅ | 0 | `portal` schema + tables (§5.1) |
+| `apps/erp/backend/alembic/versions/*_add_ai_pipeline_tables.py` | **Create** | 3 | When `ai-pipeline` §6 lands |
+| `apps/portal/apps/erp/backend/*` | **Created** ✅ | 1→2 | FastAPI BFF — scaffold + modules (§7) + `tests/test_portal_bff.py` (14 tests) + `tests/test_redis_smoke.py` (2 Redis integration tests, Phase 2 gate) |
+| `apps/portal/apps/erp/frontend/*` | **Created** ✅ | 1→2 | Next.js 14 — scaffold + routes (§8, §12), standalone build ✅; Phase 2: `useLinkedStudents`, `StudentSelector`, `RefreshButton`, read pages rebuilt |
+| `apps/ai-service/*` | **Created** ✅ (stub) | 1→4 | FastAPI stateless stub :8002 (health + enqueue 501) — full queues/LLM/RAG in Phase 4 (AI, deferred) |
 | `docs/plans/ai-pipeline-implementation-plan.md` | **Edit** | 0 | Cross-ref portal architecture, LOW/HIGH queue split, HOTFIX (§18) |
 | `docs/plans/current.md` | **Edit** | 4 | Advance roadmap after portal v1 |
 | `docs/README.md` | **Edit** | 4 | List this plan |

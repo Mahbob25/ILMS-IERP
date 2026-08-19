@@ -10,7 +10,7 @@ When a section passes its end_date and all students are graded, two bugs prevent
 
 ## Root Cause
 
-`backend/app/modules/academic/service.py:254-359` — `complete_section()` function:
+`apps/erp/backend/app/modules/academic/service.py:254-359` — `complete_section()` function:
 
 - **Line 261**: `if section.status != "active": return None` — rejects `ready_for_completion`
 - **Lines 334-339**: Only calls `ledger_settle_contract` if contract is already `GRADES_SUBMITTED` — no chain to progress ASSIGNED → ACTIVE → GRADES_SUBMITTED first
@@ -32,7 +32,7 @@ When a section passes its end_date and all students are graded, two bugs prevent
 
 ### Phase 1: Accept `ready_for_completion` in `complete_section()`
 
-**File**: `backend/app/modules/academic/service.py`, line 261
+**File**: `apps/erp/backend/app/modules/academic/service.py`, line 261
 
 **Change**: Replace single-status gate with multi-status acceptance:
 ```python
@@ -48,7 +48,7 @@ if section.status not in ("active", "ready_for_completion"):
 
 ### Phase 2: Chain contract lifecycle on completion
 
-**File**: `backend/app/modules/academic/service.py`, lines 333-339
+**File**: `apps/erp/backend/app/modules/academic/service.py`, lines 333-339
 
 **Change**: Replace the single `GRADES_SUBMITTED` check with a chained lifecycle block that progresses the contract step by step:
 
@@ -84,7 +84,7 @@ if section.contract and current_user.id:
 
 ### Phase 3: Hide overdue banner for completed sections
 
-**File**: `frontend/app/[locale]/(dashboard)/dashboard/sections/[sectionId]/page.tsx`, line 552
+**File**: `apps/erp/frontend/app/[locale]/(dashboard)/dashboard/sections/[sectionId]/page.tsx`, line 552
 
 **Change**: Add completed status check alongside the existing cancelled check:
 ```tsx

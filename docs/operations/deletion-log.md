@@ -13,15 +13,15 @@
 - `recharts@^2.12.0` - Used in `ManagerDashboard.tsx` and `revenue/page.tsx` but was missing from dependencies
 
 ### Unused Python Import Removed
-- `backend/app/modules/academic/service.py` - Removed unused import `contains_eager` from sqlalchemy.orm (never referenced in file)
+- `apps/erp/backend/app/modules/academic/service.py` - Removed unused import `contains_eager` from sqlalchemy.orm (never referenced in file)
 
 ### Debug/Artifact Files Deleted
 - `cookie.txt` - Debug cookie file (gitignored)
 - `backend.log` - Server stdout log
-- `backend/backend_err.log` - Server stderr log
-- `backend/backend_out.log` - Server stdout log
-- `frontend/next_error.txt` - Next.js build error output
-- `frontend/next_output.txt` - Next.js build output
+- `apps/erp/backend/backend_err.log` - Server stderr log
+- `apps/erp/backend/backend_out.log` - Server stdout log
+- `apps/erp/frontend/next_error.txt` - Next.js build error output
+- `apps/erp/frontend/next_output.txt` - Next.js build output
 
 ### Tracked Debug Files Removed (git rm)
 - `cookies.txt` - Debug cookie dump (tracked in git)

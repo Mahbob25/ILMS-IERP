@@ -11,8 +11,8 @@ build/
 venv/
 env/
 *.log
-backend/backend_err.log
-backend/backend_out.log
+apps/erp/backend/backend_err.log
+apps/erp/backend/backend_out.log
 SSH-KEY.pem
 # --- Node / Frontend ---
 node_modules/
@@ -24,8 +24,8 @@ out/
 .env
 .env.local
 .env.*.local
-backend/.env
-frontend/.env
+apps/erp/backend/.env
+apps/erp/frontend/.env
 
 # --- IDE / Editor ---
 .vscode/

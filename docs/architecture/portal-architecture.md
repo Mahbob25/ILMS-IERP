@@ -139,7 +139,7 @@ networks:
 
 services:
   portal-backend:
-    build: ./portal/backend
+    build: ./apps/portal/backend
     container_name: portal_backend
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@database:5432/${POSTGRES_DB}
@@ -152,14 +152,14 @@ services:
     deploy: { resources: { limits: { cpus: '1.0', memory: 1G } } }
 
   portal-frontend:
-    build: ./portal/frontend
+    build: ./apps/portal/frontend
     container_name: portal_frontend
     networks: [lims-internal]
     depends_on: [portal-backend]
     deploy: { resources: { limits: { cpus: '1.0', memory: 1G } } }
 
   ai-service:
-    build: ./ai-service
+    build: ./apps/ai-service
     container_name: ai_service
     environment:
       REDIS_URL: redis://redis:6379/0
@@ -425,7 +425,7 @@ flowchart LR
 - Add `PORTAL_JWT_SECRET` / `ERP_SERVICE_KEY` to `.env.example`.
 
 **Phase 1 — Portal BFF + Web (skeleton, 1–2 weeks)**
-- Scaffold `portal/backend` (FastAPI, same patterns as ERP) + `portal/frontend` (Next.js, copy auth/locale middleware).
+- Scaffold `apps/portal/backend` (FastAPI, same patterns as ERP) + `apps/portal/frontend` (Next.js, copy auth/locale middleware).
 - Implement portal auth (OTP) + `GET /api/me` proxied to ERP.
 - Wire `Caddyfile` subdomains + `docker-compose.portal.yml` joining `lims-internal`.
 

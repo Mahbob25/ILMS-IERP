@@ -78,8 +78,8 @@ Also read `docs/plans/section-lifecycle/api-contract.json` for endpoint shapes.
 
 ## Your Phase Details
 - **Estimate:** 1.25 days
-- **Files to create:** `backend/app/modules/academic/section_startup_checks.py`
-- **Files to edit:** `backend/app/main.py` (wire lifespan call)
+- **Files to create:** `apps/erp/backend/app/modules/academic/section_startup_checks.py`
+- **Files to edit:** `apps/erp/backend/app/main.py` (wire lifespan call)
 
 ## Key Rules
 1. **Do NOT touch files owned by other parallel phases.** Your phase owns specific files — only modify those.
@@ -123,7 +123,7 @@ Also read `docs/plans/section-lifecycle/api-contract.json` for endpoint shapes.
 ## Your Phase Details
 - **Estimate:** 1.75 days
 - **Files to create:** None
-- **Files to edit:** `backend/app/modules/academic/service.py` (edit `complete_section()`), `backend/app/modules/academic/router.py` (add force/reason params, restrict DELETE)
+- **Files to edit:** `apps/erp/backend/app/modules/academic/service.py` (edit `complete_section()`), `apps/erp/backend/app/modules/academic/router.py` (add force/reason params, restrict DELETE)
 
 ## Key Rules
 1. **Do NOT touch files owned by other parallel phases.** Your phase owns specific files — only modify those.
@@ -167,8 +167,8 @@ Also read `docs/plans/section-lifecycle/api-contract.json` for endpoint shapes.
 
 ## Your Phase Details
 - **Estimate:** 4.25 days
-- **Files to create:** `backend/app/modules/academic/cancellation_service.py`, `backend/app/modules/lms/cashier_service.py`
-- **Files to edit:** `backend/app/modules/academic/router.py` (append 3 manager endpoints), `backend/app/modules/lms/router.py` (append 4 cashier endpoints)
+- **Files to create:** `apps/erp/backend/app/modules/academic/cancellation_service.py`, `apps/erp/backend/app/modules/lms/cashier_service.py`
+- **Files to edit:** `apps/erp/backend/app/modules/academic/router.py` (append 3 manager endpoints), `apps/erp/backend/app/modules/lms/router.py` (append 4 cashier endpoints)
 
 ## Key Rules
 1. **Do NOT touch files owned by other parallel phases.** Your phase owns specific files — only modify those.
@@ -214,7 +214,7 @@ Also read `docs/plans/section-lifecycle/api-contract.json` for endpoint shapes.
 ## Your Phase Details
 - **Estimate:** 1.25 days
 - **Files to create:** None
-- **Files to edit:** `backend/app/modules/lms/ledger_service.py` (add `deactivate_contract()`), `backend/app/modules/academic/service.py` (append `deactivate_section()`), `backend/app/modules/academic/router.py` (append deactivate endpoint)
+- **Files to edit:** `apps/erp/backend/app/modules/lms/ledger_service.py` (add `deactivate_contract()`), `apps/erp/backend/app/modules/academic/service.py` (append `deactivate_section()`), `apps/erp/backend/app/modules/academic/router.py` (append deactivate endpoint)
 
 ## Key Rules
 1. **Do NOT touch files owned by other parallel phases.** Your phase owns specific files — only modify those.
@@ -304,12 +304,12 @@ Your job is the consolidation layer: reporting, monitoring, admin audit views, a
 Read `docs/plans/section-lifecycle/phase-07-reconciliation-monitoring.md` — it has all the details.
 
 Also read the relevant existing service files to understand data structures:
-- `backend/app/modules/academic/cancellation_service.py`
-- `backend/app/modules/lms/cashier_service.py`
-- `backend/app/modules/academic/section_startup_checks.py`
+- `apps/erp/backend/app/modules/academic/cancellation_service.py`
+- `apps/erp/backend/app/modules/lms/cashier_service.py`
+- `apps/erp/backend/app/modules/academic/section_startup_checks.py`
 
 ## Tasks
-1. Create `backend/app/modules/academic/reconciliation_service.py` with daily reconciliation report generator
+1. Create `apps/erp/backend/app/modules/academic/reconciliation_service.py` with daily reconciliation report generator
 2. Add admin audit endpoints: cancellation history, override audit log, refund history
 3. Add monitoring alert logging for severely overdue sections
 4. Add financial impact dashboard endpoint (`GET /sections/financial-impact`)
@@ -355,15 +355,15 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
 ## Existing Test Files
 These already exist on `main` at:
-- `backend/tests/integration/section_lifecycle/conftest.py` — shared fixtures
-- `backend/tests/integration/section_lifecycle/test_startup_checks.py`
-- `backend/tests/integration/section_lifecycle/test_complete_section.py`
-- `backend/tests/integration/section_lifecycle/test_cancellation.py`
-- `backend/tests/integration/section_lifecycle/test_disbursement.py`
-- `backend/tests/integration/section_lifecycle/test_deactivation.py`
-- `backend/tests/integration/section_lifecycle/test_full_lifecycle.py`
-- `backend/tests/integration/section_lifecycle/test_reconciliation.py`
-- `frontend/tests/e2e/section-lifecycle/cashier-dashboard.spec.ts`
+- `apps/erp/backend/tests/integration/section_lifecycle/conftest.py` — shared fixtures
+- `apps/erp/backend/tests/integration/section_lifecycle/test_startup_checks.py`
+- `apps/erp/backend/tests/integration/section_lifecycle/test_complete_section.py`
+- `apps/erp/backend/tests/integration/section_lifecycle/test_cancellation.py`
+- `apps/erp/backend/tests/integration/section_lifecycle/test_disbursement.py`
+- `apps/erp/backend/tests/integration/section_lifecycle/test_deactivation.py`
+- `apps/erp/backend/tests/integration/section_lifecycle/test_full_lifecycle.py`
+- `apps/erp/backend/tests/integration/section_lifecycle/test_reconciliation.py`
+- `apps/erp/frontend/tests/e2e/section-lifecycle/cashier-dashboard.spec.ts`
 
 ## What to Read
 Read `docs/plans/section-lifecycle/phase-08-system-testing.md` — it lists every test that should exist.

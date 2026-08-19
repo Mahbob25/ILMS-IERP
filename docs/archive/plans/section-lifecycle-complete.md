@@ -116,7 +116,7 @@ pending ──► active ──► ready_for_completion ──► completed
 
 **Architectural Directive:** The server is powered down at night. Traditional time-based schedulers (cron, APScheduler, Celery) must not be used. Instead, trigger daily checks via the FastAPI `@asynccontextmanager` lifespan event.
 
-**New component:** `backend/app/modules/academic/section_startup_checks.py`
+**New component:** `apps/erp/backend/app/modules/academic/section_startup_checks.py`
 
 **Logic (runs on every boot, no timer):**
 
@@ -182,9 +182,9 @@ async def run_daily_section_checks(db: AsyncSession):
 
 | File | Change |
 |------|--------|
-| `backend/app/modules/academic/section_startup_checks.py` | NEW — startup check logic |
-| `backend/app/main.py` | Call `run_daily_section_checks()` inside lifespan event |
-| `backend/app/modules/academic/models.py` | Add `flags: JSONB` column to `CourseSection` |
+| `apps/erp/backend/app/modules/academic/section_startup_checks.py` | NEW — startup check logic |
+| `apps/erp/backend/app/main.py` | Call `run_daily_section_checks()` inside lifespan event |
+| `apps/erp/backend/app/modules/academic/models.py` | Add `flags: JSONB` column to `CourseSection` |
 
 **No new dependencies.** Pure Python + PostgreSQL. No APScheduler, no Celery, no Redis, no message brokers.
 
@@ -656,41 +656,41 @@ ALTER TYPE ledgerentrytype ADD VALUE IF NOT EXISTS 'REFUND_DISBURSEMENT';
 
 | Task | Files | Estimate |
 |------|-------|----------|
-| Create `section_startup_checks.py` with overdue detection + grade completeness check + upcoming deadline warnings + payment deadline awareness | `backend/app/modules/academic/section_startup_checks.py` | 1 day |
-| Wire `run_daily_section_checks()` into FastAPI lifespan event | `backend/app/main.py` | 0.25 day |
+| Create `section_startup_checks.py` with overdue detection + grade completeness check + upcoming deadline warnings + payment deadline awareness | `apps/erp/backend/app/modules/academic/section_startup_checks.py` | 1 day |
+| Wire `run_daily_section_checks()` into FastAPI lifespan event | `apps/erp/backend/app/main.py` | 0.25 day |
 | **Subtotal** | | **1.25 days** |
 
 ### Phase 3: Grade & Payment Enforcement in complete_section()
 
 | Task | Files | Estimate |
 |------|-------|----------|
-| Update grade check: NULL vs 0 distinction with LEFT JOIN query | `backend/app/modules/academic/service.py` | 0.5 day |
-| Add payment balance check for each enrollment | `backend/app/modules/academic/service.py` | 0.5 day |
+| Update grade check: NULL vs 0 distinction with LEFT JOIN query | `apps/erp/backend/app/modules/academic/service.py` | 0.5 day |
+| Add payment balance check for each enrollment | `apps/erp/backend/app/modules/academic/service.py` | 0.5 day |
 | Implement `force=true` override with `SectionCompletionOverride` audit logging | `service.py` | 0.5 day |
-| Update router to accept `force` and `reason` params | `backend/app/modules/academic/router.py` | 0.25 day |
+| Update router to accept `force` and `reason` params | `apps/erp/backend/app/modules/academic/router.py` | 0.25 day |
 | **Subtotal** | | **1.75 days** |
 
 ### Phase 4: Cancelled Status — Backend Services
 
 | Task | Files | Estimate |
 |------|-------|----------|
-| Implement `can_cancel_section()` validation helper | `backend/app/modules/academic/cancellation_service.py` | 0.25 day |
+| Implement `can_cancel_section()` validation helper | `apps/erp/backend/app/modules/academic/cancellation_service.py` | 0.25 day |
 | Implement `preview_cancellation_impact()` | `cancellation_service.py` | 0.5 day |
 | Implement `cancel_section()` orchestrator (validate → reverse wallet → PendingRefund → audit) | `cancellation_service.py` | 1 day |
-| Implement `disburse_pending_refund()` cashier service | `backend/app/modules/lms/cashier_service.py` | 0.75 day |
+| Implement `disburse_pending_refund()` cashier service | `apps/erp/backend/app/modules/lms/cashier_service.py` | 0.75 day |
 | Implement `get_student_pending_refunds()` and `get_pending_refunds_queue()` | `cashier_service.py` | 0.5 day |
-| Manager API endpoints (cancel-preview, cancel, cancellation detail) | `backend/app/modules/academic/router.py` | 0.5 day |
-| Cashier API endpoints (pending-refunds, disburse, refunds history) | `backend/app/modules/lms/router.py` | 0.5 day |
-| Restrict existing DELETE to superadmin only | `backend/app/modules/academic/router.py` | 0.25 day |
+| Manager API endpoints (cancel-preview, cancel, cancellation detail) | `apps/erp/backend/app/modules/academic/router.py` | 0.5 day |
+| Cashier API endpoints (pending-refunds, disburse, refunds history) | `apps/erp/backend/app/modules/lms/router.py` | 0.5 day |
+| Restrict existing DELETE to superadmin only | `apps/erp/backend/app/modules/academic/router.py` | 0.25 day |
 | **Subtotal** | | **4.25 days** |
 
 ### Phase 5: Deactivation
 
 | Task | Files | Estimate |
 |------|-------|----------|
-| Implement `deactivate_contract()` in ledger (activation-only reversal) | `backend/app/modules/lms/ledger_service.py` | 0.5 day |
-| Implement `deactivate_section()` in academic service | `backend/app/modules/academic/service.py` | 0.5 day |
-| Add API endpoint for deactivation | `backend/app/modules/academic/router.py` | 0.25 day |
+| Implement `deactivate_contract()` in ledger (activation-only reversal) | `apps/erp/backend/app/modules/lms/ledger_service.py` | 0.5 day |
+| Implement `deactivate_section()` in academic service | `apps/erp/backend/app/modules/academic/service.py` | 0.5 day |
+| Add API endpoint for deactivation | `apps/erp/backend/app/modules/academic/router.py` | 0.25 day |
 | **Subtotal** | | **1.25 days** |
 
 ### Phase 6: Frontend
