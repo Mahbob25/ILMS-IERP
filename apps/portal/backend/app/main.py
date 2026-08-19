@@ -40,7 +40,8 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.CORS_ORIGINS],
+    allow_origins=settings.cors_origins_list,
+    allow_origin_regex=r"https://(aldirasat|aldirasat-portal|aldirasat-erp|portal\.aldirasat)\.(vercel\.app|com|edu)",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

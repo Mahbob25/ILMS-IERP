@@ -13,6 +13,16 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     ENVIRONMENT: str = "production"
     CORS_ORIGINS: str = "https://aldirasat.com,https://www.aldirasat.com,https://portal.aldirasat.com,https://aldirasat.vercel.app,https://aldirasat-erp.vercel.app,https://aldirasat-portal.vercel.app"
+
+    @property
+    def cors_origins_list(self) -> list[str]:
+        """CORS_ORIGINS is a comma-separated string; split it into a real list.
+
+        Starlette's CORSMiddleware matches each entry exactly, so passing the
+        raw comma-separated string as a single element allows no origin at all
+        (every cross-origin preflight gets a 400 "Disallowed CORS origin").
+        """
+        return [o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip()]
     TEMPLATES_DIR: str = ""
     TIMEZONE: str = "Asia/Riyadh"
     HTTP_PROXY: str = ""
