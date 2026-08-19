@@ -55,7 +55,9 @@
       "Shell(Select-Object:*)",
       "Shell(powershell -Command Get-ChildItem -Recurse -Filter *.tsx | Select-String -Pattern 'amend|AmendmentContract|ContractAmend|IncreaseRequest' -SimpleMatch | ForEach-Object { Write-Host Path ':' Line.Trim() } 2 >& 1)",
       "Shell(python -c c = open(r'app/[locale]/(dashboard)/dashboard/sections/[sectionId]/page.tsx', encoding='utf-8').read(); lines = [l.strip() for l in c.split('\\n') if any(w in l.lower() for w in ['contract', 'wallet', 'button', 'modal', 'action', 'assign', 'activate'])]; [print(l) for l in lines] 2 >& 1)",
-      "Shell(move:*)"
+      "Shell(move:*)",
+      "mcp__aws-mcp__aws___list_regions",
+      "mcp__aws-mcp__aws___call_aws"
     ],
     "deny": [],
     "defaultMode": "default"
