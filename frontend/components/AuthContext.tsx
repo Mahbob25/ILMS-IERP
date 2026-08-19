@@ -111,7 +111,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(null);
       setPermissions([]);
       setLoading(false);
-      window.location.href = "/login";
+      // The shared login now lives on the marketing site.
+      const marketingBase = process.env.NEXT_PUBLIC_MARKETING_URL || "https://aldirasat.com";
+      window.location.href = `${marketingBase}/ar/login`;
     }
   }, []);
 

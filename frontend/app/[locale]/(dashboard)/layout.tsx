@@ -200,10 +200,12 @@ function DashboardLayoutInner({
     );
   }
 
-  // Redirect to login if user not authenticated
+  // Redirect to login if user not authenticated — the shared login now lives
+  // on the marketing site (aldirasat.com), not in this app.
   if (!user) {
     if (typeof window !== "undefined") {
-      router.push(`/${locale}/login`);
+      const marketingBase = process.env.NEXT_PUBLIC_MARKETING_URL || "https://aldirasat.com";
+      window.location.href = `${marketingBase}/${locale}/login`;
     }
     return null;
   }

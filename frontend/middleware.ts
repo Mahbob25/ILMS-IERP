@@ -102,6 +102,13 @@ export function middleware(request: NextRequest) {
     }
   }
 
+  // /login no longer lives in this app — the shared login is on the marketing
+  // site. Keep stale bookmarks working by redirecting there.
+  if (cleanPath === '/login') {
+    const marketingBase = process.env.NEXT_PUBLIC_MARKETING_URL || 'https://aldirasat.com';
+    return NextResponse.redirect(`${marketingBase}/${pathnameLocale}/login`);
+  }
+
   // Protect admin paths strictly for superadmins via JWT claim inspection
   if (isAdminPath && accessToken) {
     const payload = decodeJwtPayload(accessToken);

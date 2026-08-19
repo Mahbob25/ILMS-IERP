@@ -133,7 +133,7 @@ export default function LandingPage() {
     "@context": "https://schema.org",
     "@type": "EducationalOrganization",
     name: isAr ? "معهد الدراسات — تعز" : "Al-Drasat Institute — Taiz",
-    url: `https://aldrasat.example/${locale}`,
+    url: `https://aldirasat.com/${locale}`,
     foundingDate: "1998",
     address: { "@type": "PostalAddress", addressLocality: "Taiz", addressCountry: "YE" },
     description: t.heroDesc,

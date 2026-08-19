@@ -54,7 +54,9 @@ function redirectToLogin() {
 
     if (!pathname.endsWith(`/${locale}/login`)) {
       isRedirectingToLogin = true;
-      window.location.href = `/${locale}/login`;
+      // The shared login now lives on the marketing site.
+      const marketingBase = process.env.NEXT_PUBLIC_MARKETING_URL || "https://aldirasat.com";
+      window.location.href = `${marketingBase}/${locale}/login`;
       if (redirectTimer) clearTimeout(redirectTimer);
       redirectTimer = setTimeout(() => {
         isRedirectingToLogin = false;

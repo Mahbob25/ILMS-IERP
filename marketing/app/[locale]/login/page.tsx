@@ -3,21 +3,22 @@
 import React, { useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { Space_Grotesk, IBM_Plex_Sans_Arabic, Inter, JetBrains_Mono } from "next/font/google";
-import { useAuth } from "@/components/AuthContext";
 import { Globe, ShieldAlert } from "lucide-react";
-import { sanitizeInput } from "@/lib/utils/input";
+import { api } from "@/lib/api";
 
 const spaceGrotesk = Space_Grotesk({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 const ibmArabic = IBM_Plex_Sans_Arabic({ subsets: ["arabic"], weight: ["400", "500", "600", "700"] });
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 const jetbrains = JetBrains_Mono({ subsets: ["latin"], weight: ["400", "500", "700"] });
 
+const ERP_URL = process.env.NEXT_PUBLIC_ERP_URL || "https://erp.aldirasat.com";
+const PORTAL_URL = process.env.NEXT_PUBLIC_PORTAL_URL || "https://portal.aldirasat.com";
+
 export default function LoginPage() {
   const router = useRouter();
   const params = useParams();
   const locale = (params?.locale as string) || "ar";
   const isAr = locale === "ar";
-  const { login } = useAuth();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -74,17 +75,18 @@ export default function LoginPage() {
 
     setSubmitting(true);
     try {
-      const res = await login(sanitizeInput(email), password);
+      const res = await api.post("/auth/login", { email, password });
 
-      // Students/parents are authenticated by the ERP but land on the portal
-      // subdomain — hand off with a one-time SSO ticket.
-      if ((res as any)?.user_type === "portal" && (res as any)?.sso_ticket) {
-        const portalBase = process.env.NEXT_PUBLIC_PORTAL_URL || "https://portal.aldirasat.com";
-        window.location.href = `${portalBase}/${locale}/login?ticket=${encodeURIComponent((res as any).sso_ticket)}`;
+      const data = res.data;
+      // Students/parents get a one-time SSO ticket → portal subdomain.
+      if (data?.user_type === "portal" && data?.sso_ticket) {
+        window.location.href = `${PORTAL_URL}/${locale}/login?ticket=${encodeURIComponent(data.sso_ticket)}`;
         return;
       }
-
-      router.replace(`/${locale}/dashboard`);
+      // Staff get ERP cookies set on the ERP origin by the login response —
+      // a cross-origin redirect lands them on the ERP dashboard where the
+      // middleware sees the cookie.
+      window.location.href = `${ERP_URL}/${locale}/dashboard`;
     } catch (err: any) {
       const detail = err.response?.data?.detail;
       if (err.response?.status === 401) {
@@ -131,7 +133,7 @@ export default function LoginPage() {
             className="text-[10px] tracking-[0.16em] font-bold px-3 py-1.5 rounded-full bg-[#FFFBF0] border border-[#0A0A0A]/10 uppercase"
             style={{ fontFamily: jetbrains.style.fontFamily }}
           >
-            v1.6 Core Auth
+            v1.7 Marketing
           </span>
           <button
             onClick={handleLanguageToggle}
