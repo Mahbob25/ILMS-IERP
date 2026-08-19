@@ -4,7 +4,6 @@ import React, { useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { Space_Grotesk, IBM_Plex_Sans_Arabic, Inter, JetBrains_Mono } from "next/font/google";
 import { Globe, ShieldAlert } from "lucide-react";
-import LoginLoadingOverlay from "@/components/LoginLoadingOverlay";
 
 const spaceGrotesk = Space_Grotesk({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 const ibmArabic = IBM_Plex_Sans_Arabic({ subsets: ["arabic"], weight: ["400", "500", "600", "700"] });
@@ -34,7 +33,7 @@ export default function LoginPage() {
       emailPlaceholder: "name@aldirasat.com",
       passwordPlaceholder: "••••••••",
       submitBtn: "تسجيل الدخول",
-      loading: "جاري تسجيل الدخول...",
+      loading: "جاري التحقق...",
       langToggle: "English",
       backToSite: "العودة إلى الموقع",
       footer: "تأكد من الحفاظ على سرية بيانات اعتمادك.",
@@ -49,7 +48,7 @@ export default function LoginPage() {
       emailPlaceholder: "name@aldirasat.com",
       passwordPlaceholder: "••••••••",
       submitBtn: "Sign In",
-      loading: "Signing you in...",
+      loading: "Authenticating...",
       langToggle: "العربية",
       backToSite: "Back to site",
       footer: "Keep your login credentials secure and confidential.",
@@ -264,11 +263,6 @@ export default function LoginPage() {
           </p>
         </div>
       </div>
-
-      {/* Full-screen loading overlay while the login request is in flight */}
-      {submitting && (
-        <LoginLoadingOverlay text={t.loading} dir={isAr ? "rtl" : "ltr"} />
-      )}
     </div>
   );
 }
