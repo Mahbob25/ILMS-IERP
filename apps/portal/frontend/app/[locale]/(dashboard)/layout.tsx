@@ -87,7 +87,8 @@ export default function PortalDashboardLayout({
 
   if (!user) {
     if (typeof window !== "undefined") {
-      window.location.href = `${process.env.NEXT_PUBLIC_ERP_URL || window.location.origin}/${locale}/login`;
+      const marketingBase = process.env.NEXT_PUBLIC_MARKETING_URL || "https://aldirasat.vercel.app";
+      window.location.href = `${marketingBase}/${locale}/login`;
     }
     return null;
   }

@@ -5,7 +5,7 @@ import { useRouter, useParams } from "next/navigation";
 import { useAuth } from "@/components/AuthContext";
 
 // This page only exists to exchange a one-time SSO ticket issued by the
-// unified ERP login. There is no login form here — students/parents sign in
+// unified login. There is no login form here — students/parents sign in
 // at the main site (aldirasat.com) and get redirected here with ?ticket=.
 export default function PortalSsoPage() {
   const router = useRouter();
@@ -18,10 +18,10 @@ export default function PortalSsoPage() {
     if (handledRef.current) return;
     handledRef.current = true;
     const ticket = new URLSearchParams(window.location.search).get("ticket");
-    const erpBase = process.env.NEXT_PUBLIC_ERP_URL || window.location.origin;
+    const marketingBase = process.env.NEXT_PUBLIC_MARKETING_URL || "https://aldirasat.vercel.app";
     if (!ticket) {
-      // No ticket — redirect to the unified login on the main site.
-      window.location.href = `${erpBase}/${locale}/login`;
+      // No ticket — redirect to the shared login on the main site.
+      window.location.href = `${marketingBase}/${locale}/login`;
       return;
     }
     (async () => {
@@ -29,7 +29,7 @@ export default function PortalSsoPage() {
         await ssoLogin(ticket);
         router.replace(`/${locale}/dashboard`);
       } catch {
-        window.location.href = `${erpBase}/${locale}/login`;
+        window.location.href = `${marketingBase}/${locale}/login`;
       }
     })();
   }, [ssoLogin, locale, router]);

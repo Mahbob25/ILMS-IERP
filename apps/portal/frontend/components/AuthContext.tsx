@@ -117,7 +117,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } finally {
       setUser(null);
       setLoading(false);
-      window.location.href = "/";
+      // After logout, send students/parents back to the public landing page.
+      const marketingBase = process.env.NEXT_PUBLIC_MARKETING_URL || "https://aldirasat.vercel.app";
+      const locale = (typeof window !== "undefined" ? window.location.pathname.match(/^\/(en|ar)/)?.[1] : null) || "ar";
+      window.location.href = `${marketingBase}/${locale}`;
     }
   }, []);
 

@@ -46,10 +46,10 @@ function onRefreshFailed(error: unknown) {
 function redirectToLogin() {
   if (typeof window !== "undefined" && !isRedirectingToLogin) {
     const locale = window.location.pathname.match(/^\/(en|ar)/)?.[1] || "ar";
-    const erpBase = process.env.NEXT_PUBLIC_ERP_URL || window.location.origin;
+    const marketingBase = process.env.NEXT_PUBLIC_MARKETING_URL || "https://aldirasat.vercel.app";
     if (!window.location.pathname.endsWith(`/${locale}/login`)) {
       isRedirectingToLogin = true;
-      window.location.href = `${erpBase}/${locale}/login`;
+      window.location.href = `${marketingBase}/${locale}/login`;
       if (redirectTimer) clearTimeout(redirectTimer);
       redirectTimer = setTimeout(() => {
         isRedirectingToLogin = false;

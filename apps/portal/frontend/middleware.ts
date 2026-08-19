@@ -42,11 +42,11 @@ export function middleware(request: NextRequest) {
   const isDashboardPath = cleanPath.startsWith('/dashboard');
 
   // Protect dashboard without active portal refresh token — send users to the
-  // unified login on the main site (aldirasat.com).
+  // shared login on the marketing site (aldirasat.com).
   if (isDashboardPath) {
     if (!hasRefreshToken) {
-      const erpBase = process.env.NEXT_PUBLIC_ERP_URL || request.nextUrl.origin;
-      return NextResponse.redirect(`${erpBase}/${pathnameLocale}/login`);
+      const marketingBase = process.env.NEXT_PUBLIC_MARKETING_URL || 'https://aldirasat.vercel.app';
+      return NextResponse.redirect(`${marketingBase}/${pathnameLocale}/login`);
     }
   }
 

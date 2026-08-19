@@ -23,8 +23,7 @@ export default function PortalStatusPage() {
   const router = useRouter();
   const locale = (params?.locale as string) === "en" ? "en" : "ar";
   const s = t[locale];
-  const erpBase = process.env.NEXT_PUBLIC_ERP_URL || (typeof window !== "undefined" ? window.location.origin : "");
-
+  const marketingBase = process.env.NEXT_PUBLIC_MARKETING_URL || "https://aldirasat.vercel.app";
   return (
     <div className="relative min-h-screen flex items-center justify-center overflow-hidden bg-slate-50 p-4 md:p-8">
       <div className="absolute top-1/4 left-1/4 -translate-x-1/2 -translate-y-1/2 w-72 md:w-96 h-72 md:h-96 rounded-full bg-brand-500/10 blur-[80px] md:blur-[120px] animate-pulse-slow pointer-events-none" />
@@ -60,7 +59,7 @@ export default function PortalStatusPage() {
         </p>
 
         <a
-          href={`${erpBase}/${locale}/login`}
+          href={`${marketingBase}/${locale}/login`}
           className="mt-6 inline-flex items-center gap-2 w-full justify-center py-2.5 px-4 text-sm font-semibold rounded-lg text-white bg-brand-500 hover:bg-brand-600 shadow-lg shadow-brand-500/25 transition-all duration-150"
         >
           {s.login}
