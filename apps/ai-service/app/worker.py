@@ -1,0 +1,63 @@
+"""ai-worker — consumes the ai:teacher stream and generates LessonForge resources.
+
+Runs as its own container: ``python -m app.worker``. Single-attempt jobs:
+deterministic failures are surfaced to the teacher via ``ai:result:{job_id}``
+rather than retried (DLQ/XAUTOCLAIM machinery is out of scope for now).
+"""
+import asyncio
+import json
+import logging
+
+from app.core.config import settings
+from app.core.logging import setup_logging
+from app.core.queue import RedisStreamsQueue
+from app.services import lessonforge
+
+setup_logging()
+logger = logging.getLogger(__name__)
+
+
+async def main() -> None:
+    queue = RedisStreamsQueue()
+    logger.info(
+        "ai-worker started: consuming %s (group=%s)",
+        settings.AI_TEACHER_QUEUE,
+        settings.GROUP_NAME,
+    )
+    while True:
+        try:
+            job = await queue.dequeue(settings.AI_TEACHER_QUEUE, timeout=5)
+        except Exception:
+            logger.exception("dequeue failed — retrying in 5s")
+            await asyncio.sleep(5)
+            continue
+
+        if not job:
+            continue
+        if job["payload"].get("kind") != "lessonforge":
+            logger.warning("ignoring unknown job kind on ai:teacher: %s", job["payload"].get("kind"))
+            continue
+
+        job_id = job["job_id"]
+        logger.info("lessonforge job %s: processing", job_id)
+        try:
+            result = await lessonforge.generate(job["payload"].get("payload") or {})
+            result["status"] = "completed"
+        except Exception as e:
+            logger.exception("lessonforge job %s failed", job_id)
+            result = {"status": "failed", "error": str(e)}
+
+        try:
+            await queue.set_result(job_id, result, settings.RESULT_TTL)
+            await queue.ack(settings.AI_TEACHER_QUEUE, job_id)
+            logger.info(
+                "lessonforge job %s: %s",
+                job_id,
+                "completed" if result["status"] == "completed" else f"failed: {result.get('error')}",
+            )
+        except Exception:
+            logger.exception("failed to publish/ack result for job %s", job_id)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())

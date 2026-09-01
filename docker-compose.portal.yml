@@ -62,6 +62,27 @@ services:
           cpus: '2.0'
           memory: 4G
 
+  ai-worker:
+    build: ./apps/ai-service
+    container_name: ai_worker
+    restart: always
+    command: ["python", "-m", "app.worker"]
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+    depends_on:
+      - redis
+    networks:
+      - lims-internal
+    healthcheck:
+      disable: true
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+
   redis:
     image: redis:7-alpine
     container_name: portal_redis

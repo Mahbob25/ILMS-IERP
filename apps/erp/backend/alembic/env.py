@@ -17,6 +17,7 @@ from app.modules.academic.models import Course, CourseSection, Student, Enrollme
 from app.modules.lms.models import AttendanceSession, AttendanceRecord, Assignment, Submission, Grade, Payment, Expense, TeacherWallet, DailyClosure, SectionContract, LedgerEntry, CompensationAmendmentRequest, IdempotencyKey
 from app.modules.settings.models import SystemSetting
 from app.modules.bookings.models import Booking  # noqa: F401 — register metadata
+from app.modules.lessonforge.models import LessonForgeResource  # noqa: F401 — register metadata
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

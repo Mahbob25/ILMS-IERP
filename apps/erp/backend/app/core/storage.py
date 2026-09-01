@@ -2,6 +2,7 @@ import os
 import uuid
 import shutil
 from pathlib import Path
+from typing import Optional
 from fastapi import UploadFile
 
 UPLOAD_DIR = Path(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))) / "uploads"
@@ -35,6 +36,18 @@ async def save_upload(file: UploadFile, subdir: str = "") -> str:
         f.write(content)
     rel_path = str(Path(subdir) / filename) if subdir else filename
     return rel_path
+
+
+def save_text(content: str, subdir: str = "", filename: Optional[str] = None) -> str:
+    """Write a text blob (e.g. generated HTML) under UPLOAD_DIR and return its
+    relative path — the same pattern as ``save_upload`` but for strings."""
+    check_disk_space(UPLOAD_DIR)
+    name = filename or f"{uuid.uuid4().hex}.html"
+    target_dir = ensure_upload_dir(subdir)
+    file_path = target_dir / name
+    with open(file_path, "w", encoding="utf-8") as f:
+        f.write(content)
+    return str(Path(subdir) / name) if subdir else name
 
 
 def delete_file(relative_path: str) -> bool:

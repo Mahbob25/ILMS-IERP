@@ -40,6 +40,7 @@ import {
   Megaphone,
   Mail,
   LayoutDashboard,
+  Wand2,
 } from "lucide-react";
 import NotificationBell from "@/components/notifications/NotificationBell";
 import GlobalSearch from "@/components/search/GlobalSearch";
@@ -105,6 +106,7 @@ function DashboardLayoutInner({
         financialRecords: "السجل المالي",
         revenue: "الإيرادات",
         teacherWallet: "محفظة المعلم",
+        lessonforge: "منشئ الموارد التعليمية",
         dailyClosures: "الإغلاق اليومي",
         pos: "نقطة البيع",
         ingestion: "استيراد المناهج",
@@ -150,6 +152,7 @@ function DashboardLayoutInner({
         financialRecords: "Financial Records",
         revenue: "Revenue",
         teacherWallet: "Teacher Wallet",
+        lessonforge: "LessonForge",
         dailyClosures: "Daily Closures",
         pos: "Point of Sale",
         ingestion: "Curriculum Ingestion",
@@ -228,6 +231,7 @@ function DashboardLayoutInner({
     page_financial_records: ["superadmin", "manager", "secretary"],
     page_revenue: ["superadmin", "manager"],
     page_teacher_wallet: ["superadmin", "manager", "teacher"],
+    page_lessonforge: ["superadmin", "teacher"],
     page_daily_closures: ["superadmin", "manager", "secretary"],
     page_pos: ["superadmin", "manager", "secretary"],
     page_cashier_refunds: ["superadmin", "manager", "accountant", "secretary"],
@@ -274,6 +278,7 @@ function DashboardLayoutInner({
     "dashboard/financial-records": "page_financial_records",
     "dashboard/revenue": "page_revenue",
     "dashboard/teacher-wallet": "page_teacher_wallet",
+    "dashboard/lessonforge": "page_lessonforge",
     "dashboard/daily-closures": "page_daily_closures",
     "dashboard/pos": "page_pos",
     "dashboard/cashier/refunds": "page_cashier_refunds",
@@ -427,6 +432,12 @@ function DashboardLayoutInner({
       href: `/${locale}/dashboard/teacher-wallet`,
       icon: CreditCard,
       permission: "page_teacher_wallet",
+    },
+    {
+      name: t.menu.lessonforge,
+      href: `/${locale}/dashboard/lessonforge`,
+      icon: Wand2,
+      permission: "page_lessonforge",
     },
     {
       name: t.menu.staffPayroll,
