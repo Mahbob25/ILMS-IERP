@@ -158,6 +158,13 @@ def build_prompt(payload: dict) -> str:
             f"not silently contradict or replace):\n{p['supporting_notes']}"
         )
 
+    # Pre-compute f-string parts that contain backslashes — Python <3.12 forbids
+    # backslash escapes inside f-string expression parts, and ai-service runs 3.11.
+    components_section = (
+        "\n".join("- " + f for f in flags) if flags else "OPTIONAL COMPONENTS: none requested."
+    )
+    optional_section = "\n".join("- " + o for o in optional) if optional else ""
+
     return f"""You are LessonForge, an expert teacher-focused learning-resource generator.
 
 TEACHER'S TOPIC TEXT (the source — preserve its definitions, rules, examples, formulas, terminology, numbers, warnings, and distinctions; never fabricate content):
@@ -175,9 +182,9 @@ LEARNER CONTEXT: level={learner_level}, difficulty={difficulty}. Adapt explanati
 
 OUTPUT STRUCTURE: {structure}
 
-{f'OPTIONAL COMPONENTS:\n- ' + chr(10).join('- ' + f for f in flags) if flags else 'OPTIONAL COMPONENTS: none requested.'}
+{components_section}
 
-{chr(10).join('- ' + o for o in optional) if optional else ''}
+{optional_section}
 
 PEDAGOGICAL ORGANIZATION (when appropriate): What is it → Core rule → Example → Compare → Exception → Common mistake → Practice → Memory aid. Do not force every section.
 
@@ -234,63 +241,119 @@ async def generate(payload: dict) -> dict:
 
 
 async def _call_llm(prompt: str) -> LessonForgeContent:
-    if not settings.OPENAI_API_KEY:
-        raise RuntimeError("OPENAI_API_KEY is not configured on the ai-service")
+    """Dispatch to the configured provider. Gemini is the default when a
+    GEMINI_API_KEY is present; OpenAI is the alternative."""
+    provider = (settings.LLM_PROVIDER or "gemini").strip().lower()
+    if provider == "gemini" and settings.GEMINI_API_KEY:
+        return await _complete_gemini(prompt)
+    if provider == "openai" and settings.OPENAI_API_KEY:
+        return await _complete_openai(prompt)
+    # Fall back to whichever key is actually configured.
+    if settings.GEMINI_API_KEY:
+        return await _complete_gemini(prompt)
+    if settings.OPENAI_API_KEY:
+        return await _complete_openai(prompt)
+    raise RuntimeError("No LLM API key configured (set GEMINI_API_KEY or OPENAI_API_KEY on the ai-service)")
 
-    client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
-    resp = await client.chat.completions.create(
-        model=settings.OPENAI_MODEL,
-        messages=[
-            {
-                "role": "system",
-                "content": (
-                    "You are LessonForge, an expert teacher-focused learning-resource generator. "
-                    "You always respond with valid JSON only, matching the schema in the user message."
-                ),
-            },
-            {"role": "user", "content": prompt},
-        ],
-        response_format={"type": "json_object"},
-        temperature=0.7,
-        max_tokens=6000,
+
+async def _complete_gemini(prompt: str) -> LessonForgeContent:
+    from google import genai
+    from google.genai import types
+
+    client = genai.Client(api_key=settings.GEMINI_API_KEY)
+    resp = await client.aio.models.generate_content(
+        model=settings.GEMINI_MODEL,
+        contents=(
+            "You are LessonForge, an expert teacher-focused learning-resource generator. "
+            "Respond with valid JSON only, matching the schema in the request.\n\n" + prompt
+        ),
+        config=types.GenerateContentConfig(
+            response_mime_type="application/json",
+            temperature=0.7,
+            max_output_tokens=6000,
+        ),
     )
-    raw = resp.choices[0].message.content or "{}"
+    raw = resp.text or "{}"
+    data, retry = _parse_or_none(raw)
+    if data is not None:
+        return data
+    logger.warning("lessonforge: schema validation failed (gemini) — retrying once")
+    resp = await client.aio.models.generate_content(
+        model=settings.GEMINI_MODEL,
+        contents=(
+            "You are LessonForge. Respond with valid JSON only, exactly matching this schema: "
+            + _SCHEMA
+            + "\n\n"
+            + prompt
+        ),
+        config=types.GenerateContentConfig(
+            response_mime_type="application/json",
+            temperature=0.4,
+            max_output_tokens=6000,
+        ),
+    )
+    raw = resp.text or "{}"
+    try:
+        return LessonForgeContent.model_validate(json.loads(raw))
+    except Exception as e:
+        raise RuntimeError(f"LLM returned invalid JSON on retry: {e}") from e
+
+
+async def _complete_openai(prompt: str) -> LessonForgeContent:
+    client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+
+    async def call(model, sys_content, temp):
+        resp = await client.chat.completions.create(
+            model=model,
+            messages=[{"role": "system", "content": sys_content}, {"role": "user", "content": prompt}],
+            response_format={"type": "json_object"},
+            temperature=temp,
+            max_tokens=6000,
+        )
+        return resp.choices[0].message.content or "{}"
+
+    raw = await call(
+        settings.OPENAI_MODEL,
+        (
+            "You are LessonForge, an expert teacher-focused learning-resource generator. "
+            "You always respond with valid JSON only, matching the schema in the user message."
+        ),
+        0.7,
+    )
+    data, _ = _parse_or_none(raw)
+    if data is not None:
+        return data
+    logger.warning("lessonforge: schema validation failed (openai) — retrying once")
+    raw = await call(
+        settings.OPENAI_MODEL,
+        "You are LessonForge. Respond with valid JSON only, exactly matching this schema: " + _SCHEMA,
+        0.4,
+    )
+    try:
+        return LessonForgeContent.model_validate(json.loads(raw))
+    except Exception as e:
+        raise RuntimeError(f"LLM returned invalid JSON on retry: {e}") from e
+
+
+def _parse_or_none(raw: str):
+    """Return (content, should_retry) — validated content, or (None, True) to retry once."""
     try:
         data = json.loads(raw)
     except json.JSONDecodeError as e:
         raise RuntimeError(f"LLM returned invalid JSON: {e}") from e
-
     try:
-        return LessonForgeContent.model_validate(data)
-    except Exception as e:
-        # One retry with a narrowed instruction before failing the job.
-        logger.warning("lessonforge: schema validation failed (%s) — retrying once", e)
-        resp = await client.chat.completions.create(
-            model=settings.OPENAI_MODEL,
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "You are LessonForge. Respond with valid JSON only, exactly matching this schema: "
-                        '{"title": string, "theme_notes": string|null, "sections": [{"heading": string, '
-                        '"blocks": [{"kind": "definition|rule|example|compare|exception|common_mistake|'
-                        'memory_aid|practice|answer_key|teacher_note|checklist", "text": string, "items": '
-                        'string[]|null, "answer": string|null, "arabic": string|null}]}], '
-                        '"custom_css": string|null}'
-                    ),
-                },
-                {"role": "user", "content": prompt},
-            ],
-            response_format={"type": "json_object"},
-            temperature=0.4,
-            max_tokens=6000,
-        )
-        raw = resp.choices[0].message.content or "{}"
-        try:
-            data = json.loads(raw)
-        except json.JSONDecodeError as e:
-            raise RuntimeError(f"LLM returned invalid JSON on retry: {e}") from e
-        return LessonForgeContent.model_validate(data)
+        return LessonForgeContent.model_validate(data), False
+    except Exception:
+        return None, True
+
+
+_SCHEMA = (
+    '{"title": string, "theme_notes": string|null, "sections": [{"heading": string, '
+    '"blocks": [{"kind": "definition|rule|example|compare|exception|common_mistake|'
+    'memory_aid|practice|answer_key|teacher_note|checklist", "text": string, "items": '
+    'string[]|null, "answer": string|null, "arabic": string|null}]}], '
+    '"custom_css": string|null}'
+)
 
 
 def render_html(content: LessonForgeContent, style: str) -> str:
