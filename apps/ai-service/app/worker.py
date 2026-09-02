@@ -39,6 +39,7 @@ async def main() -> None:
             continue
 
         job_id = job["job_id"]
+        msg_id = job["id"]
         logger.info("lessonforge job %s: processing", job_id)
         try:
             result = await lessonforge.generate(job["payload"].get("payload") or {})
@@ -49,7 +50,7 @@ async def main() -> None:
 
         try:
             await queue.set_result(job_id, result, settings.RESULT_TTL)
-            await queue.ack(settings.AI_TEACHER_QUEUE, job_id)
+            await queue.ack(settings.AI_TEACHER_QUEUE, msg_id)
             logger.info(
                 "lessonforge job %s: %s",
                 job_id,

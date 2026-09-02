@@ -1,6 +1,6 @@
 from typing import List, Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class LessonForgeBlock(BaseModel):
@@ -14,6 +14,12 @@ class LessonForgeBlock(BaseModel):
     items: List[str] = Field(default_factory=list)
     answer: Optional[str] = None
     arabic: Optional[str] = None  # Arabic support/explanation ("Arabic explains; English teaches")
+
+    @field_validator("items", mode="before")
+    @classmethod
+    def items_null_to_empty(cls, v):
+        # LLMs frequently emit null for unused fields — treat as "no bullets".
+        return v if v is not None else []
 
 
 class LessonForgeSection(BaseModel):

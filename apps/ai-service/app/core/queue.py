@@ -76,8 +76,10 @@ class RedisStreamsQueue:
             "queue": queue,
         }
 
-    async def ack(self, queue: str, job_id: str) -> None:
-        await self._redis.xack(queue, GROUP_NAME, job_id)
+    async def ack(self, queue: str, msg_id: str) -> None:
+        # XACK requires the stream entry id returned by dequeue ("id"),
+        # NOT the job_id stored inside the entry fields.
+        await self._redis.xack(queue, GROUP_NAME, msg_id)
 
     async def set_result(self, job_id: str, result: dict, ttl: int) -> None:
         await self._redis.set(
