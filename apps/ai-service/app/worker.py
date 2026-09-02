@@ -32,6 +32,9 @@ async def main() -> None:
             await asyncio.sleep(5)
             continue
 
+        if not job:
+            continue
+
         job_payload = job["payload"]
         if job_payload.get("kind") != "lessonforge":
             logger.warning("ignoring unknown job kind on ai:teacher: %s", job_payload.get("kind"))
