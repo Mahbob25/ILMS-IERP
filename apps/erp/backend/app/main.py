@@ -45,6 +45,7 @@ from app.modules.bookings.router import bookings_router
 from app.modules.content.router import content_router
 from app.modules.contacts.router import contacts_router
 from app.modules.portal_internal.router import internal_router
+from app.modules.ai_management.router import ai_management_router, internal_ai_router
 from app.modules.lessonforge.router import lessonforge_router
 from app.middleware.idempotency import IdempotencyMiddleware
 from app.middleware.real_ip import RealIPMiddleware
@@ -111,6 +112,8 @@ app.include_router(bookings_router, prefix="/api/v1")
 app.include_router(content_router, prefix="/api/v1")
 app.include_router(contacts_router, prefix="/api/v1")
 app.include_router(internal_router, prefix="/api/v1")
+app.include_router(ai_management_router, prefix="/api/v1")
+app.include_router(internal_ai_router, prefix="/api/v1")
 app.include_router(lessonforge_router, prefix="/api/v1")
 
 @app.get("/api/v1/health", tags=["system"])

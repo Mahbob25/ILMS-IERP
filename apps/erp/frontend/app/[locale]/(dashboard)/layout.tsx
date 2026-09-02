@@ -41,6 +41,7 @@ import {
   Mail,
   LayoutDashboard,
   Wand2,
+  Cpu,
 } from "lucide-react";
 import NotificationBell from "@/components/notifications/NotificationBell";
 import GlobalSearch from "@/components/search/GlobalSearch";
@@ -112,6 +113,7 @@ function DashboardLayoutInner({
         ingestion: "استيراد المناهج",
         wizards: "تسجيل سريع",
         systemHealth: "صحة النظام",
+        aiManagement: "إدارة الذكاء الاصطناعي",
         backups: "النسخ الاحتياطي",
         settings: "الإعدادات",
         cashierRefunds: "المبالغ المستردة",
@@ -158,6 +160,7 @@ function DashboardLayoutInner({
         ingestion: "Curriculum Ingestion",
         wizards: "Quick Registration",
         systemHealth: "System Health",
+        aiManagement: "AI Management",
         backups: "Database Backups",
         settings: "Settings",
         cashierRefunds: "Refunds",
@@ -237,6 +240,7 @@ function DashboardLayoutInner({
     page_cashier_refunds: ["superadmin", "manager", "accountant", "secretary"],
     page_ingestion: ["superadmin", "teacher"],
     page_health: ["superadmin"],
+    page_ai_management: ["superadmin"],
     page_backups: ["superadmin"],
     page_settings: ["superadmin", "manager", "secretary", "teacher"],
     page_staff_payroll: ["superadmin", "manager", "secretary"],
@@ -284,6 +288,7 @@ function DashboardLayoutInner({
     "dashboard/cashier/refunds": "page_cashier_refunds",
     "dashboard/ingestion": "page_ingestion",
     "dashboard/health": "page_health",
+    "dashboard/ai-management": "page_ai_management",
     "dashboard/backups": "page_backups",
     "dashboard/settings": "page_settings",
     "dashboard/staff-payroll": "page_staff_payroll",
@@ -507,6 +512,12 @@ function DashboardLayoutInner({
       href: `/${locale}/dashboard/health`,
       icon: Activity,
       permission: "page_health",
+    },
+    {
+      name: t.menu.aiManagement,
+      href: `/${locale}/dashboard/ai-management`,
+      icon: Cpu,
+      permission: "page_ai_management",
     },
     {
       name: t.menu.backups,

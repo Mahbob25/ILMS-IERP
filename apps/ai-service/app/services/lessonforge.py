@@ -6,12 +6,9 @@ Runs inside the ai-worker process (apps/ai-service). No image generation:
 """
 import json
 import logging
-from typing import Optional
 
-from openai import AsyncOpenAI
-
-from app.core.config import settings
-from app.services.lessonforge_content import LessonForgeContent, LessonForgeSection
+from app.services.lessonforge_content import LessonForgeContent
+from app.services.llm_gateway import GatewayError, chat_json, load_config
 
 logger = logging.getLogger(__name__)
 
@@ -241,46 +238,37 @@ async def generate(payload: dict) -> dict:
 
 
 async def _call_llm(prompt: str) -> LessonForgeContent:
-    """Dispatch to the configured provider. Gemini is the default when a
-    GEMINI_API_KEY is present; OpenAI is the alternative."""
-    provider = (settings.LLM_PROVIDER or "gemini").strip().lower()
-    if provider == "gemini" and settings.GEMINI_API_KEY:
-        return await _complete_gemini(prompt)
-    if provider == "openai" and settings.OPENAI_API_KEY:
-        return await _complete_openai(prompt)
-    # Fall back to whichever key is actually configured.
-    if settings.GEMINI_API_KEY:
-        return await _complete_gemini(prompt)
-    if settings.OPENAI_API_KEY:
-        return await _complete_openai(prompt)
-    raise RuntimeError("No LLM API key configured (set GEMINI_API_KEY or OPENAI_API_KEY on the ai-service)")
+    """Route the prompt through the LiteLLM gateway.
 
-
-async def _complete_gemini(prompt: str) -> LessonForgeContent:
-    from google import genai
-    from google.genai import types
-
-    client = genai.Client(api_key=settings.GEMINI_API_KEY)
+    The runtime provider/model/api_key come from the ERP ai_config (Redis or
+    the internal fallback); the model is sent provider-prefixed
+    (``{provider}/{model}``) so one wildcard proxy deployment serves any
+    provider. On an unusable first response, retry once with a concise
+    instruction (same truncation-fix behavior as before).
+    """
+    cfg = await load_config()
+    model_id = f"{cfg['provider']}/{cfg['model']}"
+    api_key = cfg.get("api_key") or ""
 
     async def call(sys_content, temp, max_tokens):
-        resp = await client.aio.models.generate_content(
-            model=settings.GEMINI_MODEL,
-            contents=sys_content + "\n\n" + prompt,
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-                temperature=temp,
-                max_output_tokens=max_tokens,
-            ),
+        raw = await chat_json(
+            prompt,
+            model=model_id,
+            api_key=api_key,
+            max_output_tokens=max_tokens,
+            temperature=temp,
+            schema_hint=_SCHEMA,
+            system=sys_content,
         )
-        return resp.text or "{}"
+        return raw
 
     raw = await call(
         (
             "You are LessonForge, an expert teacher-focused learning-resource generator. "
             "Respond with valid JSON only, matching the schema in the request."
         ),
-        0.7,
-        settings.GEMINI_MAX_OUTPUT_TOKENS,
+        cfg.get("temperature", 0.7),
+        cfg.get("max_output_tokens", 32000),
     )
     data, retry = _parse_or_none(raw)
     if data is not None:
@@ -288,58 +276,19 @@ async def _complete_gemini(prompt: str) -> LessonForgeContent:
 
     # Retry once: tell the model the first attempt was unusable (truncated or
     # off-schema) and to be concise so the whole JSON fits comfortably.
-    logger.warning("lessonforge: first Gemini response unusable — retrying once (concise)")
+    logger.warning("lessonforge: first response unusable — retrying once (concise)")
     raw = await call(
         "You are LessonForge. The previous response was truncated or did not match the schema. "
         "Return COMPLETE, VALID JSON only. Be CONCISE — short definitions, fewer bullets — so the "
         "entire resource fits well under the output limit. Exactly this schema: " + _SCHEMA,
         0.4,
-        settings.GEMINI_MAX_OUTPUT_TOKENS,
+        cfg.get("max_output_tokens", 32000),
     )
     data, retry = _parse_or_none(raw)
     if data is not None:
         return data
     raise RuntimeError(
-        "Gemini returned unusable JSON on retry (truncated or schema mismatch). "
-        "Try a shorter topic or fewer requested sections."
-    )
-
-
-async def _complete_openai(prompt: str) -> LessonForgeContent:
-    client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
-
-    async def call(sys_content, temp):
-        resp = await client.chat.completions.create(
-            model=settings.OPENAI_MODEL,
-            messages=[{"role": "system", "content": sys_content}, {"role": "user", "content": prompt}],
-            response_format={"type": "json_object"},
-            temperature=temp,
-            max_tokens=settings.OPENAI_MAX_OUTPUT_TOKENS,
-        )
-        return resp.choices[0].message.content or "{}"
-
-    raw = await call(
-        (
-            "You are LessonForge, an expert teacher-focused learning-resource generator. "
-            "You always respond with valid JSON only, matching the schema in the user message."
-        ),
-        0.7,
-    )
-    data, _ = _parse_or_none(raw)
-    if data is not None:
-        return data
-    logger.warning("lessonforge: first OpenAI response unusable — retrying once (concise)")
-    raw = await call(
-        "You are LessonForge. The previous response was truncated or did not match the schema. "
-        "Return COMPLETE, VALID JSON only. Be CONCISE — short definitions, fewer bullets — so the "
-        "entire resource fits well under the output limit. Exactly this schema: " + _SCHEMA,
-        0.4,
-    )
-    data, _ = _parse_or_none(raw)
-    if data is not None:
-        return data
-    raise RuntimeError(
-        "OpenAI returned unusable JSON on retry (truncated or schema mismatch). "
+        "LLM returned unusable JSON on retry (truncated or schema mismatch). "
         "Try a shorter topic or fewer requested sections."
     )
 

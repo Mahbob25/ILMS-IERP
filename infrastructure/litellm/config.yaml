@@ -1,0 +1,21 @@
+# LiteLLM proxy config — config-file mode (no LiteLLM Postgres).
+#
+# Wildcard model_list: accepts ANY provider-prefixed model
+# (gemini/..., openai/..., anthropic/..., deepseek/..., groq/...) so the ERP
+# can switch provider/model at runtime without touching this file or
+# restarting the proxy. The provider API key travels per-request as the
+# OpenAI-compatible `api_key` field; the master_key below only authenticates
+# to the proxy itself (internal network).
+model_list:
+  - model_name: "*"
+    litellm_params:
+      model: "*"
+
+general_settings:
+  master_key: sk-litellm-local
+
+litellm_settings:
+  # Drop OpenAI params a provider does not support (never the api_key — that
+  # is a universal LiteLLM credential param). Keeps e.g. response_format from
+  # hard-failing on providers without JSON mode.
+  drop_params: true
