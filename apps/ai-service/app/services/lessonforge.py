@@ -261,59 +261,64 @@ async def _complete_gemini(prompt: str) -> LessonForgeContent:
     from google.genai import types
 
     client = genai.Client(api_key=settings.GEMINI_API_KEY)
-    resp = await client.aio.models.generate_content(
-        model=settings.GEMINI_MODEL,
-        contents=(
+
+    async def call(sys_content, temp, max_tokens):
+        resp = await client.aio.models.generate_content(
+            model=settings.GEMINI_MODEL,
+            contents=sys_content + "\n\n" + prompt,
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+                temperature=temp,
+                max_output_tokens=max_tokens,
+            ),
+        )
+        return resp.text or "{}"
+
+    raw = await call(
+        (
             "You are LessonForge, an expert teacher-focused learning-resource generator. "
-            "Respond with valid JSON only, matching the schema in the request.\n\n" + prompt
+            "Respond with valid JSON only, matching the schema in the request."
         ),
-        config=types.GenerateContentConfig(
-            response_mime_type="application/json",
-            temperature=0.7,
-            max_output_tokens=6000,
-        ),
+        0.7,
+        settings.GEMINI_MAX_OUTPUT_TOKENS,
     )
-    raw = resp.text or "{}"
     data, retry = _parse_or_none(raw)
     if data is not None:
         return data
-    logger.warning("lessonforge: schema validation failed (gemini) — retrying once")
-    resp = await client.aio.models.generate_content(
-        model=settings.GEMINI_MODEL,
-        contents=(
-            "You are LessonForge. Respond with valid JSON only, exactly matching this schema: "
-            + _SCHEMA
-            + "\n\n"
-            + prompt
-        ),
-        config=types.GenerateContentConfig(
-            response_mime_type="application/json",
-            temperature=0.4,
-            max_output_tokens=6000,
-        ),
+
+    # Retry once: tell the model the first attempt was unusable (truncated or
+    # off-schema) and to be concise so the whole JSON fits comfortably.
+    logger.warning("lessonforge: first Gemini response unusable — retrying once (concise)")
+    raw = await call(
+        "You are LessonForge. The previous response was truncated or did not match the schema. "
+        "Return COMPLETE, VALID JSON only. Be CONCISE — short definitions, fewer bullets — so the "
+        "entire resource fits well under the output limit. Exactly this schema: " + _SCHEMA,
+        0.4,
+        settings.GEMINI_MAX_OUTPUT_TOKENS,
     )
-    raw = resp.text or "{}"
-    try:
-        return LessonForgeContent.model_validate(json.loads(raw))
-    except Exception as e:
-        raise RuntimeError(f"LLM returned invalid JSON on retry: {e}") from e
+    data, retry = _parse_or_none(raw)
+    if data is not None:
+        return data
+    raise RuntimeError(
+        "Gemini returned unusable JSON on retry (truncated or schema mismatch). "
+        "Try a shorter topic or fewer requested sections."
+    )
 
 
 async def _complete_openai(prompt: str) -> LessonForgeContent:
     client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
 
-    async def call(model, sys_content, temp):
+    async def call(sys_content, temp):
         resp = await client.chat.completions.create(
-            model=model,
+            model=settings.OPENAI_MODEL,
             messages=[{"role": "system", "content": sys_content}, {"role": "user", "content": prompt}],
             response_format={"type": "json_object"},
             temperature=temp,
-            max_tokens=6000,
+            max_tokens=settings.OPENAI_MAX_OUTPUT_TOKENS,
         )
         return resp.choices[0].message.content or "{}"
 
     raw = await call(
-        settings.OPENAI_MODEL,
         (
             "You are LessonForge, an expert teacher-focused learning-resource generator. "
             "You always respond with valid JSON only, matching the schema in the user message."
@@ -323,24 +328,32 @@ async def _complete_openai(prompt: str) -> LessonForgeContent:
     data, _ = _parse_or_none(raw)
     if data is not None:
         return data
-    logger.warning("lessonforge: schema validation failed (openai) — retrying once")
+    logger.warning("lessonforge: first OpenAI response unusable — retrying once (concise)")
     raw = await call(
-        settings.OPENAI_MODEL,
-        "You are LessonForge. Respond with valid JSON only, exactly matching this schema: " + _SCHEMA,
+        "You are LessonForge. The previous response was truncated or did not match the schema. "
+        "Return COMPLETE, VALID JSON only. Be CONCISE — short definitions, fewer bullets — so the "
+        "entire resource fits well under the output limit. Exactly this schema: " + _SCHEMA,
         0.4,
     )
-    try:
-        return LessonForgeContent.model_validate(json.loads(raw))
-    except Exception as e:
-        raise RuntimeError(f"LLM returned invalid JSON on retry: {e}") from e
+    data, _ = _parse_or_none(raw)
+    if data is not None:
+        return data
+    raise RuntimeError(
+        "OpenAI returned unusable JSON on retry (truncated or schema mismatch). "
+        "Try a shorter topic or fewer requested sections."
+    )
 
 
 def _parse_or_none(raw: str):
-    """Return (content, should_retry) — validated content, or (None, True) to retry once."""
+    """Return (content, should_retry) — validated content, or (None, True) to retry once.
+
+    Both malformed JSON (e.g. a truncated response) and schema mismatches are
+    retryable; only retrying on schema errors left truncation fatal.
+    """
     try:
         data = json.loads(raw)
-    except json.JSONDecodeError as e:
-        raise RuntimeError(f"LLM returned invalid JSON: {e}") from e
+    except json.JSONDecodeError:
+        return None, True
     try:
         return LessonForgeContent.model_validate(data), False
     except Exception:

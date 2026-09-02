@@ -8,8 +8,10 @@ class Settings(BaseSettings):
     LLM_PROVIDER: str = "gemini"
     GEMINI_API_KEY: str = ""
     GEMINI_MODEL: str = "gemini-2.5-flash"
+    GEMINI_MAX_OUTPUT_TOKENS: int = 32000
     OPENAI_API_KEY: str = ""
     OPENAI_MODEL: str = "gpt-4o-mini"
+    OPENAI_MAX_OUTPUT_TOKENS: int = 16000
     AI_TEACHER_QUEUE: str = "ai:teacher"
     GROUP_NAME: str = "ai-workers"
     RESULT_TTL: int = 3600
