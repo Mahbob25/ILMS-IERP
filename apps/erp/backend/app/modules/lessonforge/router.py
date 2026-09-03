@@ -20,6 +20,20 @@ from app.modules.lessonforge import service as lessonforge_service
 lessonforge_router = APIRouter(prefix="/lessonforge", tags=["lessonforge"])
 
 
+def _require_teacher_employee(current_user: User) -> uuid.UUID:
+    """LessonForge rows are owned by an employees row (teacher_id FK NOT NULL).
+
+    Superadmin bypasses RoleChecker but has no employee link, so refuse with a
+    clear 400 rather than a 500 IntegrityError on insert.
+    """
+    if not current_user.employee_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Your account is not linked to an employee. Use a teacher account to generate resources.",
+        )
+    return current_user.employee_id
+
+
 @lessonforge_router.post("/resources", response_model=LessonForgeJobStatus)
 @limiter.limit("10/minute")
 async def create_resource(
@@ -28,8 +42,9 @@ async def create_resource(
     current_user: User = Depends(RoleChecker(["teacher"])),
     db: AsyncSession = Depends(get_db),
 ):
+    teacher_id = _require_teacher_employee(current_user)
     row = await lessonforge_service.create_job(
-        db, teacher_id=current_user.employee_id, payload=body.model_dump()
+        db, teacher_id=teacher_id, payload=body.model_dump()
     )
     return {"job_id": row.job_id, "status": row.status}
 
@@ -40,7 +55,8 @@ async def job_status(
     current_user: User = Depends(RoleChecker(["teacher"])),
     db: AsyncSession = Depends(get_db),
 ):
-    result = await lessonforge_service.poll_job(db, teacher_id=current_user.employee_id, job_id=job_id)
+    teacher_id = _require_teacher_employee(current_user)
+    result = await lessonforge_service.poll_job(db, teacher_id=teacher_id, job_id=job_id)
     if result["status"] == "not_found":
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
     return result
@@ -51,7 +67,8 @@ async def list_resources(
     current_user: User = Depends(RoleChecker(["teacher"])),
     db: AsyncSession = Depends(get_db),
 ):
-    return await lessonforge_service.list_resources(db, teacher_id=current_user.employee_id)
+    teacher_id = _require_teacher_employee(current_user)
+    return await lessonforge_service.list_resources(db, teacher_id=teacher_id)
 
 
 @lessonforge_router.get("/resources/{resource_id}/html")
@@ -60,8 +77,9 @@ async def get_resource_html(
     current_user: User = Depends(RoleChecker(["teacher"])),
     db: AsyncSession = Depends(get_db),
 ):
+    teacher_id = _require_teacher_employee(current_user)
     row = await lessonforge_service.get_owned_resource(
-        db, teacher_id=current_user.employee_id, resource_id=resource_id
+        db, teacher_id=teacher_id, resource_id=resource_id
     )
     if not row:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Resource not found")
@@ -79,8 +97,9 @@ async def delete_resource(
     current_user: User = Depends(RoleChecker(["teacher"])),
     db: AsyncSession = Depends(get_db),
 ):
+    teacher_id = _require_teacher_employee(current_user)
     deleted = await lessonforge_service.delete_resource(
-        db, teacher_id=current_user.employee_id, resource_id=resource_id
+        db, teacher_id=teacher_id, resource_id=resource_id
     )
     if not deleted:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Resource not found")

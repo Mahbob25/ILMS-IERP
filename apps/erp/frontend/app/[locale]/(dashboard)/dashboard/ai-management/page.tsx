@@ -162,7 +162,7 @@ export default function AiManagementPage() {
     setSaving(true);
     setMsg(null);
     try {
-      await apiClient.put("/ai-management/config", buildPayload(false));
+      await apiClient.put("/ai-management/config", buildPayload(true));
       await fetchConfig();
       setMsg({ kind: "ok", text: t.savedOk });
     } catch (e: any) {
