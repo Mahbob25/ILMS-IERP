@@ -21,6 +21,16 @@ class LessonForgeBlock(BaseModel):
         # LLMs frequently emit null for unused fields — treat as "no bullets".
         return v if v is not None else []
 
+    @field_validator("text", mode="before")
+    @classmethod
+    def text_null_to_blank(cls, v):
+        # LLMs occasionally emit null for a block's text — a single null must
+        # not sink the whole resource. A blank block is less harmful than a
+        # failed generation.
+        if not isinstance(v, str) or not v.strip():
+            return " "
+        return v
+
 
 class LessonForgeSection(BaseModel):
     heading: str = Field(..., min_length=1)
