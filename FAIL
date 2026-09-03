@@ -1,0 +1,4 @@
+try 1 = {"status":"ok","service":"lims-api-server","version":"1.7","database":"connected"}
+try 2 = {"status":"ok","service":"lims-api-server","version":"1.7","database":"connected"}
+try 3 = {"status":"ok","service":"lims-api-server","version":"1.7","database":"connected"}
+try 4 = {"status":"ok","service":"lims-api-server","version":"1.7","database":"connected"}
