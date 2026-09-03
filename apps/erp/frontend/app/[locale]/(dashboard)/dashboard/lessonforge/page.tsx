@@ -38,6 +38,7 @@ const OUTPUT_MODES = [
   { value: "practice", ar: "تمارين تدريبية", en: "Practice" },
   { value: "exit_ticket", ar: "بطاقة خروج", en: "Exit Ticket" },
   { value: "learning_pack", ar: "حزمة تعلم", en: "Learning Pack" },
+  { value: "flashcards", ar: "بطاقات تعليمية", en: "Flashcards" },
 ];
 
 const STYLES = [
@@ -74,6 +75,7 @@ const DIFFICULTIES = [
 const LANGUAGES = [
   { value: "english", ar: "الإنجليزية فقط", en: "English" },
   { value: "bilingual", ar: "ثنائي اللغة", en: "Bilingual" },
+  { value: "arabic", ar: "العربية", en: "Arabic" },
   { value: "auto", ar: "تلقائي", en: "Auto" },
 ];
 

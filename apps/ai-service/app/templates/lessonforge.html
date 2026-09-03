@@ -4,7 +4,25 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{{ content.title | e }}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+{% if theme == "theme-academic" %}
+<link href="https://fonts.googleapis.com/css2?family=Merriweather:ital,wght@0,400;0,700;0,900;1,400&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+{% elif theme in ("theme-colorful", "theme-playful") %}
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+{% else %}
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+{% endif %}
+{% if lang_mode == "arabic" %}
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
+{% endif %}
 <style>
+  /* ══════════════════════════════════════════════════════════════════════
+     LessonForge Poster Engine
+     Content stays in semantic cards; the theme + resource-type body classes
+     drive the poster look. Every block becomes a visual container.
+     ══════════════════════════════════════════════════════════════════════ */
+
   :root {
     --page-bg: #f4f6fa;
     --surface: #ffffff;
@@ -12,6 +30,7 @@
     --muted: #64748b;
     --line: #e2e8f0;
     --accent: #2563eb;
+    --accent-ink: #ffffff;
     --accent-soft: #eff6ff;
     --good: #059669;
     --good-soft: #ecfdf5;
@@ -19,205 +38,935 @@
     --bad-soft: #fef2f2;
     --warn: #d97706;
     --warn-soft: #fffbeb;
-    --radius: 14px;
-    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial,
-            "Noto Sans", "Noto Sans Arabic", "Segoe UI", Tahoma, sans-serif;
+    --radius: 16px;
+    --card-border: 1px solid var(--line);
+    --card-shadow: 0 1px 3px rgba(15, 23, 42, .06);
+    --font-display: "Plus Jakarta Sans", "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+    --font-body: "Inter", "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, "Noto Sans", "Noto Sans Arabic", sans-serif;
+    --font-arabic: "Cairo", "Noto Sans Arabic", "Segoe UI", Tahoma, sans-serif;
   }
 
-  /* ── Themes (spec §28) ─────────────────────────────────────────────── */
-  body.theme-colorful { --accent: #7c3aed; --accent-soft: #f5f3ff; --good: #059669; --bad: #dc2626; --page-bg: #f5f3ff; }
-  body.theme-minimalist { --accent: #334155; --accent-soft: #f1f5f9; --page-bg: #fafafa; }
-  body.theme-playful { --accent: #f59e0b; --accent-soft: #fffbeb; --radius: 22px; --page-bg: #fffdf5; }
-  body.theme-academic { --accent: #7f1d1d; --accent-soft: #fef2f2; --font: Georgia, "Times New Roman", "Noto Serif", "Noto Naskh Arabic", serif; --page-bg: #faf9f6; }
-  body.theme-professional { --accent: #0f766e; --accent-soft: #f0fdfa; --page-bg: #f8fafc; }
-  body.theme-dark { --page-bg: #0f172a; --surface: #1e293b; --ink: #e2e8f0; --muted: #94a3b8; --line: #334155; --accent: #38bdf8; --accent-soft: #0c4a6e; --good: #34d399; --good-soft: #064e3b; --bad: #f87171; --bad-soft: #7f1d1d; --warn: #fbbf24; --warn-soft: #78350f; }
-  body.theme-pastel { --accent: #a78bfa; --accent-soft: #f5f3ff; --good: #6ee7b7; --good-soft: #ecfdf5; --bad: #f9a8d4; --bad-soft: #fdf2f8; --page-bg: #fdfbff; }
-  body.theme-modern { --accent: #0891b2; --accent-soft: #ecfeff; --radius: 10px; --page-bg: #f8fafc; }
-  body.theme-classroom { --accent: #2563eb; --accent-soft: #eff6ff; --good: #059669; --bad: #dc2626; --page-bg: #f4f6fa; }
+  /* ── Theme tokens ─────────────────────────────────────────────────── */
+  /* Colorful: pastel canvas, chunky ink borders, playful hard shadow. */
+  body.theme-colorful {
+    --page-bg: #eef2ff;
+    --ink: #1e293b;
+    --muted: #475569;
+    --font-display: "Fredoka", "Comic Sans MS", "Segoe UI", sans-serif;
+    --font-body: "Plus Jakarta Sans", "Segoe UI", sans-serif;
+    --card-border: 3px solid #1e293b;
+    --card-shadow: 0 6px 0 #1e293b;
+    --radius: 20px;
+    --pastel-a: #fee2e2;   /* red   */
+    --pastel-b: #ccfbf1;   /* teal  */
+    --pastel-c: #fef9c3;   /* yellow*/
+    --pastel-d: #f3e8ff;   /* purple*/
+    --pastel-e: #e0f2fe;   /* sky   */
+    --pastel-f: #fce7f3;   /* pink  */
+  }
+  /* Playful: warm cream page, rounded sunny cards. */
+  body.theme-playful {
+    --page-bg: #fff8e7;
+    --ink: #292524;
+    --font-display: "Fredoka", "Comic Sans MS", sans-serif;
+    --font-body: "Plus Jakarta Sans", "Segoe UI", sans-serif;
+    --card-border: 3px solid #292524;
+    --card-shadow: 0 5px 0 rgba(41, 37, 36, .85);
+    --radius: 24px;
+    --pastel-a: #ffe4e6;   /* rose  */
+    --pastel-b: #d1fae5;   /* mint  */
+    --pastel-c: #fef3c7;   /* amber */
+    --pastel-d: #ede9fe;   /* violet*/
+    --pastel-e: #bae6fd;   /* sky   */
+    --pastel-f: #fbcfe8;   /* pink  */
+  }
+  /* Academic: scholarly serif, restrained navy/gold, crisp corners. */
+  body.theme-academic {
+    --page-bg: #faf9f6;
+    --surface: #ffffff;
+    --ink: #1f2a3d;
+    --muted: #5b6577;
+    --accent: #1e3a8a;
+    --accent-ink: #ffffff;
+    --accent-soft: #eef2ff;
+    --good: #1a7f5a;
+    --good-soft: #ecfdf5;
+    --bad: #b91c1c;
+    --bad-soft: #fef2f2;
+    --warn: #a16207;
+    --warn-soft: #fffbeb;
+    --card-border: 1px solid #cbd5e1;
+    --card-shadow: 0 1px 2px rgba(30, 58, 138, .08);
+    --radius: 8px;
+    --font-display: "Merriweather", Georgia, "Times New Roman", serif;
+    --font-body: "Inter", "Segoe UI", sans-serif;
+    --pastel-a: #fee2e2;
+    --pastel-b: #d1fae5;
+    --pastel-c: #fef9c3;
+    --pastel-d: #e0e7ff;
+    --pastel-e: #e0f2fe;
+    --pastel-f: #fae8ff;
+  }
+  body.theme-minimalist {
+    --page-bg: #fafafa;
+    --accent: #334155;
+    --accent-soft: #f1f5f9;
+    --font-display: "Plus Jakarta Sans", "Segoe UI", sans-serif;
+    --font-body: "Inter", "Segoe UI", sans-serif;
+    --card-border: 1px solid #e4e4e7;
+    --card-shadow: 0 1px 2px rgba(24, 24, 27, .05);
+    --radius: 12px;
+  }
+  body.theme-professional {
+    --page-bg: #f8fafc;
+    --accent: #0f766e;
+    --accent-soft: #f0fdfa;
+    --font-display: "Plus Jakarta Sans", "Segoe UI", sans-serif;
+    --font-body: "Inter", "Segoe UI", sans-serif;
+    --radius: 10px;
+  }
+  body.theme-modern {
+    --page-bg: #f8fafc;
+    --accent: #0891b2;
+    --accent-soft: #ecfeff;
+    --font-display: "Plus Jakarta Sans", "Segoe UI", sans-serif;
+    --font-body: "Inter", "Segoe UI", sans-serif;
+    --radius: 12px;
+  }
+  body.theme-pastel {
+    --page-bg: #fdfbff;
+    --accent: #a78bfa;
+    --accent-ink: #4c1d95;
+    --accent-soft: #f5f3ff;
+    --font-display: "Plus Jakarta Sans", "Segoe UI", sans-serif;
+    --font-body: "Inter", "Segoe UI", sans-serif;
+    --pastel-a: #ffe4e6;
+    --pastel-b: #ccfbf1;
+    --pastel-c: #fef9c3;
+    --pastel-d: #ede9fe;
+    --pastel-e: #e0f2fe;
+    --pastel-f: #fce7f3;
+  }
+  body.theme-classroom {
+    --page-bg: #f4f6fa;
+    --accent: #2563eb;
+    --accent-soft: #eff6ff;
+    --font-display: "Plus Jakarta Sans", "Segoe UI", sans-serif;
+    --font-body: "Inter", "Segoe UI", sans-serif;
+    --radius: 14px;
+  }
+  body.theme-dark {
+    --page-bg: #0f172a;
+    --surface: #1e293b;
+    --ink: #e2e8f0;
+    --muted: #94a3b8;
+    --line: #334155;
+    --accent: #38bdf8;
+    --accent-ink: #082f49;
+    --accent-soft: #0c4a6e;
+    --good: #34d399;
+    --good-soft: #064e3b;
+    --bad: #f87171;
+    --bad-soft: #7f1d1d;
+    --warn: #fbbf24;
+    --warn-soft: #78350f;
+    --card-border: 1px solid #334155;
+    --card-shadow: 0 2px 8px rgba(0, 0, 0, .25);
+    --radius: 14px;
+    --pastel-a: #3b1d1d;
+    --pastel-b: #0b3b2e;
+    --pastel-c: #3f3114;
+    --pastel-d: #2e2447;
+    --pastel-e: #0c3446;
+    --pastel-f: #3b1630;
+  }
 
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; }
   body {
-    font-family: var(--font);
+    font-family: var(--font-body);
     background: var(--page-bg);
     color: var(--ink);
-    line-height: 1.6;
+    line-height: 1.55;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
+  /* RTL whole-document flip (Cairo-first when the doc is Arabic). */
+  body.rtl { direction: rtl; font-family: var(--font-arabic), var(--font-body); }
+  body.rtl .font-display { font-family: var(--font-arabic), var(--font-display); }
+
   .page {
-    max-width: 820px;
+    max-width: 1060px;
     margin: 0 auto;
-    padding: 32px 20px 48px;
+    padding: 28px 18px 56px;
   }
-  .resource {
-    background: var(--surface);
-    border: 1px solid var(--line);
+
+  /* ── Hero header ribbon ───────────────────────────────────────────── */
+  .hero {
+    position: relative;
+    background:
+      radial-gradient(circle at 85% 20%, rgba(255, 255, 255, .35), transparent 42%),
+      linear-gradient(135deg, var(--accent) 0%, color-mix(in srgb, var(--accent) 70%, #1e293b) 100%);
+    color: var(--accent-ink);
+    border: var(--card-border);
+    border-bottom-width: 6px;
     border-radius: var(--radius);
+    box-shadow: var(--card-shadow);
+    padding: 26px 28px 22px;
+    margin-bottom: 22px;
     overflow: hidden;
-    box-shadow: 0 1px 3px rgba(15, 23, 42, .06);
   }
-  .resource-head {
-    padding: 28px 28px 20px;
-    border-bottom: 3px solid var(--accent);
-    background: linear-gradient(180deg, var(--accent-soft), transparent);
+  body.theme-dark .hero {
+    background: linear-gradient(135deg, #0c4a6e, #155e75);
+    border-color: #38bdf8;
+    box-shadow: 0 6px 0 #0c4a6e;
+    color: #e0f2fe;
   }
-  .resource-title {
-    margin: 0;
-    font-size: 1.7rem;
+  body.theme-academic .hero {
+    background: linear-gradient(135deg, #1e3a8a 0%, #312e81 100%);
+    border: none;
+    border-radius: 6px;
+    box-shadow: 0 2px 6px rgba(30, 58, 138, .3);
+  }
+  .hero-kicker {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: color-mix(in srgb, var(--accent-ink) 14%, transparent);
+    border: 1.5px solid color-mix(in srgb, var(--accent-ink) 35%, transparent);
+    border-radius: 999px;
+    padding: 4px 14px;
+    font-size: .72rem;
     font-weight: 800;
-    line-height: 1.25;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+  }
+  body.theme-academic .hero-kicker { text-transform: none; letter-spacing: .02em; font-variant: small-caps; }
+  body.rtl .hero-kicker { letter-spacing: 0; }
+  .hero h1 {
+    font-family: var(--font-display);
+    font-size: clamp(1.6rem, 4vw, 2.6rem);
+    line-height: 1.12;
+    font-weight: 800;
+    margin: 12px 0 6px;
     letter-spacing: -.01em;
+    text-wrap: balance;
   }
-  .resource-meta {
-    margin-top: 6px;
-    color: var(--muted);
-    font-size: .85rem;
+  .hero .theme-notes {
+    margin: 0;
+    font-size: .92rem;
+    opacity: .9;
+    max-width: 60ch;
   }
-  section { padding: 8px 28px 4px; }
-  h2.section-heading {
-    font-size: 1.05rem;
+  .hero-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 14px;
+  }
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: color-mix(in srgb, var(--accent-ink) 12%, transparent);
+    border: 1.5px solid color-mix(in srgb, var(--accent-ink) 30%, transparent);
+    border-radius: 999px;
+    padding: 3px 12px;
+    font-size: .78rem;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  /* ── Resource-type body layout classes ────────────────────────────── */
+  body.layout-masonry .sheet { columns: 2 300px; column-gap: 20px; }
+  body.layout-masonry .zone { break-inside: avoid; display: inline-block; width: 100%; margin: 0 0 20px; }
+  body.layout-single .zone { max-width: 860px; margin: 0 auto 22px; }
+
+  .zone { border-radius: var(--radius); }
+  body:not(.layout-masonry) .zone { max-width: 860px; margin: 0 auto 22px; }
+
+  .zone-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0 0 14px;
+    padding-top: 6px;
+  }
+  .zone-head .dot {
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: var(--accent);
+    flex: 0 0 auto;
+  }
+  body.layout-masonry .zone-head { margin-bottom: 10px; }
+  body.layout-masonry .zone-head .dot { width: 10px; height: 10px; }
+  .zone-head h2 {
+    font-family: var(--font-display);
+    font-size: 1.15rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: var(--accent);
+    margin: 0;
+  }
+  body.theme-academic .zone-head h2 { text-transform: none; letter-spacing: .02em; font-variant: small-caps; font-size: 1.2rem; }
+  body.rtl .zone-head h2 { letter-spacing: 0; text-transform: none; }
+  .zone-head .rule {
+    flex: 1 1 auto;
+    height: 3px;
+    border-radius: 3px;
+    background: linear-gradient(90deg, var(--accent), transparent);
+  }
+
+  /* ── Card base ────────────────────────────────────────────────────── */
+  .card {
+    background: var(--surface);
+    border: var(--card-border);
+    border-radius: var(--radius);
+    box-shadow: var(--card-shadow);
+    padding: 16px 18px;
+    margin: 0 0 14px;
+    break-inside: avoid;
+  }
+  .card:last-child { margin-bottom: 0; }
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-size: .7rem;
+    font-weight: 800;
     text-transform: uppercase;
     letter-spacing: .06em;
-    color: var(--accent);
-    border-bottom: 2px solid var(--line);
-    padding-bottom: 6px;
-    margin: 22px 0 12px;
+    color: var(--accent-ink);
+    background: var(--accent);
+    border-radius: 999px;
+    padding: 3px 12px;
+    margin-bottom: 10px;
   }
-  .block {
-    background: var(--surface);
-    border: 1px solid var(--line);
-    border-left: 4px solid var(--accent);
-    border-radius: 10px;
-    padding: 12px 16px;
-    margin: 10px 0;
+  body.theme-academic .pill { text-transform: none; letter-spacing: .02em; font-variant: small-caps; }
+  body.rtl .pill { letter-spacing: 0; }
+  body.theme-dark .pill { color: var(--accent-ink); }
+  .card p { margin: 4px 0; }
+  .card p:first-of-type { margin-top: 0; }
+  .card ul { margin: 6px 0 2px; padding: 0; list-style: none; }
+
+  /* Emoji icon badge (first char of block text) */
+  .icon-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: var(--accent-soft);
+    border: 2px solid var(--accent);
+    font-size: 1.05rem;
+    flex: 0 0 auto;
+    margin-inline-end: 10px;
+    vertical-align: -8px;
   }
-  .block .block-label {
-    display: inline-block;
-    font-size: .7rem;
-    font-weight: 700;
+  .card.kind-definition .icon-badge,
+  .card.kind-memory_aid .icon-badge,
+  .card.kind-practice .icon-badge,
+  .card.kind-example .icon-badge { width: 40px; height: 40px; font-size: 1.25rem; }
+
+  /* Tick / cross bullet grids */
+  .ticks li, .crosses li, .checks li { padding-inline-start: 28px; position: relative; margin: 4px 0; }
+  .ticks li::before {
+    content: "✓";
+    position: absolute;
+    inset-inline-start: 0;
+    top: 0;
+    color: var(--good);
+    font-weight: 900;
+    background: var(--good-soft);
+    border-radius: 50%;
+    width: 19px; height: 19px;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: .72rem;
+  }
+  .crosses li::before {
+    content: "✕";
+    position: absolute;
+    inset-inline-start: 0;
+    top: 0;
+    color: var(--bad);
+    font-weight: 900;
+    background: var(--bad-soft);
+    border-radius: 50%;
+    width: 19px; height: 19px;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: .72rem;
+  }
+
+  /* Alternating pastel palette for the colorful/playful/pastel themes. */
+  body:not(.theme-minimalist):not(.theme-professional):not(.theme-modern):not(.theme-classroom) .card:nth-child(6n+1) { background: var(--pastel-a); }
+  body:not(.theme-minimalist):not(.theme-professional):not(.theme-modern):not(.theme-classroom) .card:nth-child(6n+2) { background: var(--pastel-b); }
+  body:not(.theme-minimalist):not(.theme-professional):not(.theme-modern):not(.theme-classroom) .card:nth-child(6n+3) { background: var(--pastel-c); }
+  body:not(.theme-minimalist):not(.theme-professional):not(.theme-modern):not(.theme-classroom) .card:nth-child(6n+4) { background: var(--pastel-d); }
+  body:not(.theme-minimalist):not(.theme-professional):not(.theme-modern):not(.theme-classroom) .card:nth-child(6n+5) { background: var(--pastel-e); }
+  body:not(.theme-minimalist):not(.theme-professional):not(.theme-modern):not(.theme-classroom) .card:nth-child(6n+6) { background: var(--pastel-f); }
+  /* Keep semantic color accents readable on a pastel card. */
+  body:not(.theme-minimalist):not(.theme-professional):not(.theme-modern):not(.theme-classroom) .card.kind-example { background: var(--pastel-b); }
+  body:not(.theme-minimalist):not(.theme-professional):not(.theme-modern):not(.theme-classroom) .card.kind-exception { background: var(--pastel-c); }
+  body:not(.theme-minimalist):not(.theme-professional):not(.theme-modern):not(.theme-classroom) .card.kind-common_mistake { background: var(--pastel-a); }
+  body:not(.theme-minimalist):not(.theme-professional):not(.theme-modern):not(.theme-classroom) .card.kind-answer_key { background: var(--pastel-b); }
+  body:not(.theme-minimalist):not(.theme-professional):not(.theme-modern):not(.theme-classroom) .card.kind-memory_aid { background: var(--pastel-d); }
+  body:not(.theme-minimalist):not(.theme-professional):not(.theme-modern):not(.theme-classroom) .card.kind-teacher_note { background: var(--pastel-c); }
+
+  /* ── Per-kind treatment ───────────────────────────────────────────── */
+  .card.kind-definition { border-width: 3px; }
+  .card.kind-definition .definition-text { font-size: 1.12rem; font-weight: 600; }
+  body.theme-academic .card.kind-definition .definition-text { font-weight: 500; }
+
+  .card.kind-rule .rule-text { font-family: var(--font-display); font-weight: 700; font-size: 1.12rem; }
+
+  .card.kind-example {
+    background: var(--good-soft);
+    border-color: var(--good);
+  }
+  body.theme-dark .card.kind-example { background: #064e3b; }
+  .card.kind-example .pill { background: var(--good); }
+  .example-row {
+    display: flex;
+    gap: 8px;
+    align-items: baseline;
+    padding: 4px 0;
+    border-bottom: 1px dashed color-mix(in srgb, var(--good) 40%, transparent);
+  }
+  .example-row:last-child { border-bottom: none; }
+  .example-row .mark { color: var(--good); font-weight: 800; flex: 0 0 auto; }
+  .example-row .ex-text { font-weight: 600; }
+  .example-row .ex-en { color: var(--muted); }
+
+  .card.kind-compare { background: var(--surface); }
+  body.theme-dark .card.kind-compare { background: #1e293b; }
+  .compare-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px;
+    margin-top: 10px;
+  }
+  .compare-side {
+    background: color-mix(in srgb, var(--surface) 85%, transparent);
+    border: 2px solid var(--line);
+    border-radius: calc(var(--radius) - 4px);
+    padding: 10px 12px;
+    break-inside: avoid;
+  }
+  body.theme-colorful .compare-side, body.theme-playful .compare-side { border-width: 2px; background: #fff; }
+  .compare-side .cs-label {
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: .85rem;
     text-transform: uppercase;
-    letter-spacing: .05em;
+    letter-spacing: .04em;
     color: var(--accent);
     margin-bottom: 4px;
   }
-  .block p { margin: 4px 0; }
-  .block ul { margin: 6px 0 2px; padding-left: 20px; }
-  .block li { margin: 2px 0; }
+  .compare-side p { margin: 2px 0; }
 
-  .kind-rule { border-left-color: var(--accent); }
-  .kind-example { border-left-color: var(--good); }
-  .kind-compare { border-left-color: var(--warn); }
-  .kind-exception { border-left-color: var(--warn); }
-  .kind-common_mistake { border-left-color: var(--bad); }
-  .kind-memory_aid { border-left-color: var(--accent); background: var(--accent-soft); }
-  .kind-practice { border-left-color: var(--accent); background: var(--accent-soft); }
-  .kind-answer_key { border-left-color: var(--good); background: var(--good-soft); }
-  .kind-checklist { border-left-color: var(--good); }
+  .card.kind-exception { background: var(--warn-soft); border-color: var(--warn); }
+  .card.kind-exception .pill { background: var(--warn); }
+  body.theme-dark .card.kind-exception { background: #78350f; border-color: #fbbf24; }
+  .card.kind-common_mistake { background: var(--bad-soft); border-color: var(--bad); }
+  .card.kind-common_mistake .pill { background: var(--bad); }
+  body.theme-dark .card.kind-common_mistake { background: #7f1d1d; border-color: #f87171; }
+  .card.kind-common_mistake .block-text { color: color-mix(in srgb, var(--bad) 85%, var(--ink)); font-weight: 600; }
 
+  .card.kind-memory_aid {
+    background: linear-gradient(135deg, var(--accent-soft), color-mix(in srgb, var(--accent-soft) 60%, #fff));
+    border-color: var(--accent);
+    border-left-width: 6px;
+  }
+  .card.kind-memory_aid .pill { background: var(--accent); }
+
+  .card.kind-answer_key { background: var(--good-soft); border-color: var(--good); }
+  .card.kind-answer_key .pill { background: var(--good); }
+  body.theme-dark .card.kind-answer_key { background: #064e3b; border-color: #34d399; }
+  details.answer-toggle summary {
+    cursor: pointer;
+    font-weight: 800;
+    font-size: .8rem;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: var(--good);
+    user-select: none;
+  }
+  details.answer-toggle summary::before { content: "🔑 "; }
+  details.answer-toggle[open] summary::before { content: "🔽 "; }
+
+  /* Checkbox checklist */
+  .checks li::before {
+    content: "";
+    position: absolute;
+    inset-inline-start: 0;
+    top: 2px;
+    width: 17px; height: 17px;
+    border: 2px solid var(--accent);
+    border-radius: 5px;
+    background: #fff;
+  }
+  body.theme-colorful .checks li::before, body.theme-playful .checks li::before { border-radius: 7px; }
+
+  /* ── Practice / quiz numbers & options ────────────────────────────── */
+  .q-stem { font-weight: 700; margin-bottom: 6px; }
+  .practice-answer-line {
+    border-bottom: 2px dashed #94a3b8;
+    min-height: 1.4em;
+    display: inline-block;
+    min-width: 160px;
+    color: var(--good);
+    font-weight: 800;
+  }
+  .answer { font-weight: 800; color: var(--good); }
+
+  /* Quiz option bubbles (A) (B) (C) (D) */
+  .option {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    padding: 6px 10px;
+    margin: 4px 0;
+    border: 1.5px solid var(--line);
+    border-radius: 10px;
+    background: #fff;
+    break-inside: avoid;
+  }
+  body.theme-colorful .option, body.theme-playful .option { background: #fff; border-radius: 14px; }
+  .option .letter {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px; height: 26px;
+    border-radius: 50%;
+    border: 2px solid var(--accent);
+    color: var(--accent);
+    font-weight: 900;
+    font-size: .8rem;
+  }
+
+  /* Fill-in dashed answer space under practice cards */
+  .fill-row {
+    border-bottom: 2px dashed #94a3b8;
+    min-height: 2em;
+    margin-top: 8px;
+    width: 100%;
+  }
+
+  /* ── Arabic callout card (bilingual mode) ─────────────────────────── */
   .arabic {
     display: block;
     direction: rtl;
-    font-family: "Noto Sans Arabic", "Segoe UI", Tahoma, sans-serif;
-    color: var(--muted);
-    margin-top: 6px;
-    padding-top: 6px;
-    border-top: 1px dashed var(--line);
-    font-size: .95em;
-  }
-  .answer {
-    display: block;
-    margin-top: 6px;
-    font-weight: 600;
-    color: var(--good);
+    font-family: var(--font-arabic), "Segoe UI", Tahoma, sans-serif;
+    font-size: .95rem;
+    line-height: 1.7;
+    background: color-mix(in srgb, var(--accent-soft) 55%, transparent);
+    border: 1px dashed color-mix(in srgb, var(--accent) 55%, transparent);
+    border-radius: calc(var(--radius) - 4px);
+    padding: 8px 14px;
+    margin-top: 10px;
+    color: var(--ink);
   }
 
-  /* Teacher-only material (spec §23/§25) — hidden on print, collapsible on screen. */
+  /* ── Teacher-only material — print-hidden, collapsible on screen ──── */
   details.teacher-only {
     background: var(--warn-soft);
-    border: 1px solid var(--line);
-    border-radius: 10px;
+    border: var(--card-border);
+    border-radius: calc(var(--radius) - 4px);
     padding: 8px 14px;
     margin: 10px 0;
   }
   details.teacher-only summary {
     cursor: pointer;
-    font-weight: 700;
-    font-size: .85rem;
+    font-weight: 800;
+    font-size: .82rem;
     color: var(--warn);
+    user-select: none;
   }
-  details.teacher-only .block { border-left-color: var(--warn); background: transparent; }
+  details.teacher-only summary::before { content: "👩‍🏫 "; }
+  details.teacher-only p { margin: 8px 0 4px; }
+
+  /* Worksheet metadata strip (Name / Date / Score) */
+  .meta-strip {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 22px;
+  }
+  .meta-box {
+    background: var(--surface);
+    border: var(--card-border);
+    border-bottom-width: 3px;
+    border-radius: var(--radius);
+    box-shadow: var(--card-shadow);
+    padding: 8px 12px;
+    font-size: .72rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--muted);
+  }
+  .meta-box .fill {
+    display: block;
+    border-bottom: 2px dashed #94a3b8;
+    min-height: 1.6em;
+    margin-top: 4px;
+  }
+
+  /* Flashcards */
+  body.layout-flashcards .sheet.flash-grid { display: block; }
+  body.layout-flashcards .zone { display: block; margin-bottom: 18px; }
+  body.layout-flashcards .zone .flashcards-inner {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 16px;
+  }
+  .flash-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 16px;
+  }
+  .flashcard {
+    background: var(--surface);
+    border: var(--card-border);
+    border-radius: var(--radius);
+    box-shadow: var(--card-shadow);
+    padding: 18px 16px;
+    break-inside: avoid;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .flashcard .fc-front {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 1rem;
+  }
+  .flashcard .fc-back {
+    border-top: 2px dashed var(--line);
+    padding-top: 8px;
+    color: var(--muted);
+    font-size: .9rem;
+  }
+  .flashcard .fc-back .fc-answer { color: var(--good); font-weight: 700; }
+  .flashcard .fc-label {
+    font-size: .66rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: var(--accent);
+  }
 
   .resource-foot {
-    padding: 14px 28px 24px;
+    margin-top: 30px;
     color: var(--muted);
     font-size: .78rem;
     text-align: center;
   }
 
-  /* ── Print (spec §31) ──────────────────────────────────────────────── */
+  /* ── Print (clean A4/Letter; keep cards intact) ───────────────────── */
   @media print {
     body { background: #fff; }
     .page { max-width: 100%; padding: 0; }
-    .resource { border: none; box-shadow: none; }
+    body:not(.layout-single):not(.layout-masonry) .zone { max-width: 100%; }
+    .card, .compare-side, .option, .flashcard, .zone { break-inside: avoid; page-break-inside: avoid; }
     details.teacher-only { display: none; }
+    details.answer-toggle:not([open]) { display: none; }
     .resource-foot { display: none; }
-    section { page-break-inside: auto; }
-    .block { page-break-inside: avoid; }
+    body.layout-masonry .sheet { columns: 1; }
+    body.layout-masonry .zone { display: block; }
+    .hero { box-shadow: none; }
+    .flash-grid { grid-template-columns: repeat(2, 1fr); }
+    .meta-strip { margin-bottom: 14px; }
   }
+  @page { margin: 12mm; }
 
-  /* ── Mobile (spec §31) ─────────────────────────────────────────────── */
+  /* ── Mobile ───────────────────────────────────────────────────────── */
   @media (max-width: 560px) {
-    .page { padding: 16px 10px 32px; }
-    .resource-head { padding: 20px 18px 14px; }
-    section { padding: 6px 18px 2px; }
-    .resource-title { font-size: 1.35rem; }
+    .page { padding: 14px 10px 40px; }
+    .hero { padding: 20px 16px 18px; }
+    .zone-head h2 { font-size: 1rem; }
+    .meta-strip { grid-template-columns: 1fr; gap: 10px; }
+    .compare-grid { grid-template-columns: 1fr; }
+    body.layout-masonry .sheet { columns: 1; }
+    .card { padding: 14px 14px; }
   }
 
   {{ custom_css if custom_css else "" }}
 </style>
 </head>
-<body class="{{ theme }}">
+<body class="{{ theme }} {{ 'rtl' if lang_mode == 'arabic' }} layout-{{ layout }}" dir="{{ 'rtl' if lang_mode == 'arabic' else 'ltr' }}" lang="{{ 'ar' if lang_mode == 'arabic' else 'en' }}">
   <div class="page">
-    <article class="resource">
-      <header class="resource-head">
-        <h1 class="resource-title">{{ content.title | e }}</h1>
-        {% if content.theme_notes %}<div class="resource-meta">{{ content.theme_notes | e }}</div>{% endif %}
-      </header>
+    <header class="hero">
+      {% if hero_kicker %}<span class="hero-kicker">{{ hero_kicker | e }}</span>{% endif %}
+      <h1>{{ content.title | e }}</h1>
+      {% if content.theme_notes %}<p class="theme-notes">{{ content.theme_notes | e }}</p>{% endif %}
+      {% if hero_chips %}
+      <div class="hero-chips">
+        {% for chip in hero_chips %}<span class="chip">{{ chip | e }}</span>{% endfor %}
+      </div>
+      {% endif %}
+    </header>
 
+    {% if layout == "worksheet" %}
+    <div class="meta-strip">
+      <div class="meta-box">Name <span class="fill"></span></div>
+      <div class="meta-box">Date <span class="fill"></span></div>
+      <div class="meta-box">Score <span class="fill"></span></div>
+    </div>
+    {% endif %}
+
+    <div class="sheet {{ 'flash-grid' if layout == 'flashcards' }}">
       {% for section in content.sections %}
-      <section>
-        <h2 class="section-heading">{{ section.heading | e }}</h2>
+      <section class="zone">
+        <div class="zone-head"><span class="dot"></span><h2>{{ section.heading | e }}</h2><span class="rule"></span></div>
+        {% if layout == "flashcards" %}<div class="flashcards-inner">{% endif %}
         {% for block in section.blocks %}
-          {% if block.kind == "teacher_note" %}
+          {% if layout == "flashcards" and block.kind in ("definition", "rule", "memory_aid", "compare", "exception", "checklist", "practice") and block.text %}
+          <div class="flashcard">
+            <span class="fc-label">{{ "الوجه" if lang_mode == "arabic" else "Front" }}</span>
+            {% if block.text[:1] in "💡📖📘🧠⭐✨📏📌✅📝✏️🔢⚠️❗️🚧❌🚫🙅⚖️🔁↔️➡️🎯🔑" %}
+            <div class="fc-front">{{ block.text[1:].lstrip() | e }}</div>
+            {% else %}
+            <div class="fc-front">{{ block.text | e }}</div>
+            {% endif %}
+            {% if block.items or block.answer %}
+            <div class="fc-back">
+              {% if block.answer %}<div><span class="fc-label">{{ "الإجابة" if lang_mode == "arabic" else "Answer" }}</span> <span class="fc-answer">{{ block.answer | e }}</span></div>{% endif %}
+              {% if block.items %}
+              <ul class="ticks">
+                {% for item in block.items %}<li>{{ item | e }}</li>{% endfor %}
+              </ul>
+              {% endif %}
+            </div>
+            {% endif %}
+            {% if block.arabic %}<span class="arabic">{{ block.arabic | e }}</span>{% endif %}
+          </div>
+
+          {% elif block.kind == "teacher_note" %}
           <details class="teacher-only">
-            <summary>{{ "Teacher note" if block.text else "" }} 👩‍🏫</summary>
+            <summary>{{ "Teacher note" if block.text else "" }}</summary>
             <p>{{ block.text | e }}</p>
             {% if block.arabic %}<span class="arabic">{{ block.arabic | e }}</span>{% endif %}
           </details>
-          {% else %}
-          <div class="block kind-{{ block.kind }}">
-            {% if block.kind != "definition" %}
-            <span class="block-label">{{ block.kind | replace("_", " ") | capitalize | e }}</span>
-            {% endif %}
-            <p>{{ block.text | e }}</p>
+
+          {% elif block.kind == "definition" %}
+          <div class="card kind-definition">
+            {% set badge = block.text[:1] if block.text and block.text[:1] in "💡📖📘🧠⭐✨" else "💡" %}
+            <span class="icon-badge">{{ badge }}</span>
+            <span class="pill">{{ "ما هو؟" if lang_mode == "arabic" else "What is it?" }}</span>
+            {% if block.text and block.text[:1] in "💡📖📘🧠⭐✨" %}<p class="definition-text">{{ block.text[1:].lstrip() | e }}</p>{% else %}<p class="definition-text">{{ block.text | e }}</p>{% endif %}
             {% if block.items %}
-            <ul>
-              {% for item in block.items %}
-              <li>{{ item | e }}</li>
-              {% endfor %}
+            <ul class="ticks">
+              {% for item in block.items %}<li>{{ item | e }}</li>{% endfor %}
             </ul>
             {% endif %}
-            {% if block.answer %}<span class="answer">{{ "Answer: " }}{{ block.answer | e }}</span>{% endif %}
+            {% if block.arabic %}<span class="arabic">{{ block.arabic | e }}</span>{% endif %}
+          </div>
+
+          {% elif block.kind == "rule" %}
+          <div class="card kind-rule">
+            {% set badge = block.text[:1] if block.text and block.text[:1] in "📏📌✅📝" else "📏" %}
+            <span class="icon-badge">{{ badge }}</span>
+            <span class="pill">{{ "القاعدة" if lang_mode == "arabic" else "Rule" }}</span>
+            {% if block.text and block.text[:1] in "📏📌✅📝" %}<p class="rule-text">{{ block.text[1:].lstrip() | e }}</p>{% else %}<p class="rule-text">{{ block.text | e }}</p>{% endif %}
+            {% if block.items %}
+            <ul class="ticks">
+              {% for item in block.items %}<li>{{ item | e }}</li>{% endfor %}
+            </ul>
+            {% endif %}
+            {% if block.arabic %}<span class="arabic">{{ block.arabic | e }}</span>{% endif %}
+          </div>
+
+          {% elif block.kind == "example" %}
+          <div class="card kind-example">
+            {% set badge = block.text[:1] if block.text and block.text[:1] in "✏️💬✅⭐" else "✏️" %}
+            <span class="icon-badge">{{ badge }}</span>
+            <span class="pill">{{ "مثال" if lang_mode == "arabic" else "Example" }}</span>
+            {% if block.text %}
+              {% if block.text[:1] in "✏️💬✅⭐" %}
+              <p>{{ block.text[1:].lstrip() | e }}</p>
+              {% else %}
+              <p>{{ block.text | e }}</p>
+              {% endif %}
+            {% endif %}
+            {% if block.items %}
+            <ul class="ticks">
+              {% for item in block.items %}<li>{{ item | e }}</li>{% endfor %}
+            </ul>
+            {% endif %}
+            {% if block.arabic %}<span class="arabic">{{ block.arabic | e }}</span>{% endif %}
+          </div>
+
+          {% elif block.kind == "compare" %}
+          <div class="card kind-compare">
+            {% set badge = block.text[:1] if block.text and block.text[:1] in "⚖️🔁↔️➡️" else "⚖️" %}
+            <span class="icon-badge">{{ badge }}</span>
+            <span class="pill">{{ "قارن" if lang_mode == "arabic" else "Compare" }}</span>
+            {% if block.text %}
+              {% if block.text[:1] in "⚖️🔁↔️➡️" %}
+              <p>{{ block.text[1:].lstrip() | e }}</p>
+              {% else %}
+              <p>{{ block.text | e }}</p>
+              {% endif %}
+            {% endif %}
+            {% if block.items %}
+            <div class="compare-grid">
+              {% for item in block.items %}
+                {% set pair = item.split(" | ") %}
+                {% if pair | length >= 2 %}
+                <div class="compare-side"><div class="cs-label">{{ pair[0].strip() | e }}</div><p>{{ pair[1: ] | join(" | ") | e }}</p></div>
+                {% else %}
+                <div class="compare-side"><p>{{ item | e }}</p></div>
+                {% endif %}
+              {% endfor %}
+            </div>
+            {% endif %}
+            {% if block.arabic %}<span class="arabic">{{ block.arabic | e }}</span>{% endif %}
+          </div>
+
+          {% elif block.kind == "exception" %}
+          <div class="card kind-exception">
+            {% set badge = block.text[:1] if block.text and block.text[:1] in "⚠️❗️🚧" else "⚠️" %}
+            <span class="icon-badge">{{ badge }}</span>
+            <span class="pill">{{ "انتبه" if lang_mode == "arabic" else "Watch Out" }}</span>
+            {% if block.text %}
+              {% if block.text[:1] in "⚠️❗️🚧" %}
+              <p>{{ block.text[1:].lstrip() | e }}</p>
+              {% else %}
+              <p>{{ block.text | e }}</p>
+              {% endif %}
+            {% endif %}
+            {% if block.items %}
+            <ul class="crosses">
+              {% for item in block.items %}<li>{{ item | e }}</li>{% endfor %}
+            </ul>
+            {% endif %}
+            {% if block.arabic %}<span class="arabic">{{ block.arabic | e }}</span>{% endif %}
+          </div>
+
+          {% elif block.kind == "common_mistake" %}
+          <div class="card kind-common_mistake">
+            {% set badge = block.text[:1] if block.text and block.text[:1] in "❌🚫🙅" else "❌" %}
+            <span class="icon-badge">{{ badge }}</span>
+            <span class="pill">{{ "خطأ شائع" if lang_mode == "arabic" else "Common Mistake" }}</span>
+            {% if block.text %}
+              {% if block.text[:1] in "❌🚫🙅" %}
+              <p class="block-text">{{ block.text[1:].lstrip() | e }}</p>
+              {% else %}
+              <p class="block-text">{{ block.text | e }}</p>
+              {% endif %}
+            {% endif %}
+            {% if block.items %}
+            <ul class="crosses">
+              {% for item in block.items %}<li>{{ item | e }}</li>{% endfor %}
+            </ul>
+            {% endif %}
+            {% if block.arabic %}<span class="arabic">{{ block.arabic | e }}</span>{% endif %}
+          </div>
+
+          {% elif block.kind == "memory_aid" %}
+          <div class="card kind-memory_aid">
+            {% set badge = block.text[:1] if block.text and block.text[:1] in "🧠⭐🎯✨🔑" else "🧠" %}
+            <span class="icon-badge">{{ badge }}</span>
+            <span class="pill">{{ "حيلة حفظ" if lang_mode == "arabic" else "Memory Trick" }}</span>
+            {% if block.text %}
+              {% if block.text[:1] in "🧠⭐🎯✨🔑" %}
+              <p class="rule-text">{{ block.text[1:].lstrip() | e }}</p>
+              {% else %}
+              <p class="rule-text">{{ block.text | e }}</p>
+              {% endif %}
+            {% endif %}
+            {% if block.items %}
+            <ul class="ticks">
+              {% for item in block.items %}<li>{{ item | e }}</li>{% endfor %}
+            </ul>
+            {% endif %}
+            {% if block.arabic %}<span class="arabic">{{ block.arabic | e }}</span>{% endif %}
+          </div>
+
+          {% elif block.kind == "checklist" %}
+          <div class="card kind-checklist">
+            <span class="icon-badge">✅</span>
+            <span class="pill">{{ "تحقق سريع" if lang_mode == "arabic" else "Quick Check" }}</span>
+            {% if block.text %}<p>{{ block.text | e }}</p>{% endif %}
+            {% if block.items %}
+            <ul class="checks">
+              {% for item in block.items %}<li>{{ item | e }}</li>{% endfor %}
+            </ul>
+            {% endif %}
+            {% if block.arabic %}<span class="arabic">{{ block.arabic | e }}</span>{% endif %}
+          </div>
+
+          {% elif block.kind == "practice" %}
+          <div class="card kind-practice">
+            <span class="icon-badge">✏️</span>
+            <span class="pill">{{ "تمرين" if lang_mode == "arabic" else "Practice" }}</span>
+            {% set stem = block.text[:1] if block.text and block.text[:1] in "✏️🔢📝" else "" %}
+            {% if block.text %}
+              {% if stem %}<p class="q-stem">{{ block.text[1:].lstrip() | e }}</p>
+              {% else %}<p class="q-stem">{{ block.text | e }}</p>{% endif %}
+            {% endif %}
+            {% if block.items and block.items | length >= 2 and block.answer %}
+            {# Quiz-style multiple choice: (A) (B) (C) (D) bubbles #}
+            <div class="options">
+              {% for item in block.items %}
+              {% set letters = ["A", "B", "C", "D", "E", "F"] %}
+              <div class="option"><span class="letter">{{ letters[loop.index0] }}</span><span>{{ item | e }}</span></div>
+              {% endfor %}
+            </div>
+            {% elif block.items %}
+            <ul class="ticks">
+              {% for item in block.items %}<li>{{ item | e }}</li>{% endfor %}
+            </ul>
+            {% endif %}
+            {% if block.answer and not (block.items and block.items | length >= 2) %}
+            <span class="answer">{{ "الإجابة: " if lang_mode == "arabic" else "Answer: " }}{{ block.answer | e }}</span>
+            {% endif %}
+            {% if block.arabic %}<span class="arabic">{{ block.arabic | e }}</span>{% endif %}
+          </div>
+
+          {% elif block.kind == "answer_key" %}
+          <div class="card kind-answer_key">
+            <span class="icon-badge">🔑</span>
+            <span class="pill">{{ "نموذج الإجابة" if lang_mode == "arabic" else "Answer Key" }}</span>
+            <details class="answer-toggle">
+              <summary>{{ "إظهار الإجابات" if lang_mode == "arabic" else "Reveal answers" }}</summary>
+              {% if block.text %}<p>{{ block.text | e }}</p>{% endif %}
+              {% if block.items %}
+              <ul class="ticks">
+                {% for item in block.items %}<li>{{ item | e }}</li>{% endfor %}
+              </ul>
+              {% endif %}
+              {% if block.answer %}<span class="answer">{{ "الإجابة: " if lang_mode == "arabic" else "Answer: " }}{{ block.answer | e }}</span>{% endif %}
+              {% if block.arabic %}<span class="arabic">{{ block.arabic | e }}</span>{% endif %}
+            </details>
+          </div>
+
+          {% else %}
+          <div class="card kind-{{ block.kind }}">
+            {% if block.kind != "definition" %}
+            <span class="pill">{{ block.kind | replace("_", " ") | capitalize | e }}</span>
+            {% endif %}
+            {% if block.text %}<p>{{ block.text | e }}</p>{% endif %}
+            {% if block.items %}
+            <ul class="ticks">
+              {% for item in block.items %}<li>{{ item | e }}</li>{% endfor %}
+            </ul>
+            {% endif %}
+            {% if block.answer %}<span class="answer">{{ "الإجابة: " if lang_mode == "arabic" else "Answer: " }}{{ block.answer | e }}</span>{% endif %}
             {% if block.arabic %}<span class="arabic">{{ block.arabic | e }}</span>{% endif %}
           </div>
           {% endif %}
         {% endfor %}
+        {% if layout == "flashcards" %}</div>{% endif %}
       </section>
       {% endfor %}
+    </div>
 
-      <footer class="resource-foot">Generated with LessonForge · {{ content.title | e }}</footer>
-    </article>
+    <footer class="resource-foot">Generated with LessonForge · {{ content.title | e }}</footer>
   </div>
 </body>
 </html>

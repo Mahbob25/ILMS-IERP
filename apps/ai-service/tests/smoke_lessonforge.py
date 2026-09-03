@@ -78,13 +78,26 @@ async def main() -> None:
     assert "kind-rule" in html
     assert "kind-practice" in html
     assert "teacher-only" in html
-    assert "class=\"arabic\"" in html
+    assert 'class="arabic"' in html
     assert "Answer: works" in html
     assert "@media print" in html
     assert "@media (max-width: 560px)" in html
-    # No external dependency leaks
-    assert "http://" not in html and "https://" not in html
     assert "<style>" in html and "</style>" in html
+
+    # Poster-engine markers (cards, grids, icon badges, hero ribbon, fonts)
+    assert 'class="card kind-rule"' in html
+    assert "icon-badge" in html
+    assert 'class="compare-grid"' in html or "compare-grid" in html
+    assert 'class="hero"' in html
+    assert "layout-worksheet" in html
+    assert "fonts.googleapis.com" in html or "fonts.gstatic.com" in html
+    assert "break-inside: avoid" in html
+
+    # Only Google Fonts external dependencies are allowed (fonts.googleapis / gstatic)
+    import re
+    external = re.findall(r"https?://[^\s\"'>]+", html)
+    for url in external:
+        assert "fonts.googleapis.com" in url or "fonts.gstatic.com" in url, f"unexpected external URL: {url}"
 
     print("generator smoke test PASSED")
     print(f"html length: {len(html)} bytes")

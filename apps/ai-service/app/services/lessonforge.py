@@ -65,6 +65,14 @@ def build_prompt(payload: dict) -> str:
             "field) for explanations, definitions, difficult concepts, comparisons, and misconceptions. "
             "Guiding principle: 'Arabic explains; English teaches.' Do not translate every example."
         ),
+        "arabic": (
+            "LANGUAGE MODE: Arabic-first lesson. Write the entire resource content — title, section "
+            "headings, definitions, rules, examples, practice questions, and answers — in clear Modern "
+            "Standard Arabic, right-to-left. Keep only target-language vocabulary (e.g. English terms "
+            "being taught) inside the Arabic text where a teacher would, but all explanations and "
+            "instructions are Arabic. The resource will be laid out RTL. Do not include English "
+            "instructional prose."
+        ),
     }.get(
         lang,
         (
@@ -96,7 +104,7 @@ def build_prompt(payload: dict) -> str:
     content_rule = content_rules.get(content_mode) or content_rules["strict_source"]
 
     structure_by_mode = {
-        "cheat_sheet": "Concise, scannable cheat sheet: topic title, concise definition, major rules, examples, comparisons, exceptions, common mistakes, memory aids, quick-review checklist.",
+        "cheat_sheet": "Cheat sheet: large topic title, concise definition, major rules, examples, comparisons, exceptions, common mistakes, memory aids, quick-review checklist. Prioritize scannability and visual hierarchy.",
         "revision_guide": "Revision guide prioritizing key concepts, rules, examples, common mistakes, exam traps, quick review, optional practice.",
         "worksheet": "Worksheet: concise explanation, worked examples, guided practice, independent exercises of increasing difficulty, optional answer key.",
         "quiz": "Quiz: clear instructions, questions aligned with the objective, appropriate difficulty, varied question types, unambiguous answers, optional answer key. Do not test unrelated knowledge.",
@@ -104,10 +112,11 @@ def build_prompt(payload: dict) -> str:
         "practice": "Practice resource prioritizing exercises: recognition, guided application, independent application, tricky cases, challenge.",
         "exit_ticket": "Exit ticket: short assessment focused on the learning objective, 3–5 questions, quick completion, clear answer format.",
         "learning_pack": "Learning pack combining: cheat sheet, examples, common mistakes, practice, challenge, answer key, teacher notes. Clearly separate Student Material from Teacher Material.",
+        "flashcards": "Flashcards: concise, one-concept-per-card drill deck. Each card is a 'practice' block: the question or term goes in 'text', the answer/definition goes in 'answer', and any short example or hint goes as a single bullet in 'items'. Cover the whole topic with a focused set of cards (aim for 8–16 cards).",
     }
     structure = structure_by_mode.get(output_mode) or (
         "Select the most appropriate resource structure for the teacher's content and requested purpose "
-        "among: cheat sheet, revision guide, worksheet, quiz, poster, practice, exit ticket, learning pack."
+        "among: cheat sheet, revision guide, worksheet, quiz, poster, practice, exit ticket, learning pack, flashcards."
     )
 
     flags = []
@@ -185,6 +194,12 @@ OUTPUT STRUCTURE: {structure}
 
 PEDAGOGICAL ORGANIZATION (when appropriate): What is it → Core rule → Example → Compare → Exception → Common mistake → Practice → Memory aid. Do not force every section.
 
+VISUAL-STRUCTURE CONVENTIONS (the generator renders these as poster cards):
+- Prefer short, punchy block text over long paragraphs. Put extra detail in "items" bullets.
+- For "compare" blocks, express each row as two sides separated by " | " (e.g. "Singular | Plural", "Active | Passive") — one item per row. The template renders these as side-by-side grid cells.
+- "definition", "rule", "memory_aid", and "practice" text may begin with ONE matching emoji (💡 📖 🧠 ⭐ 🎯 ✏️ 📏 📌 ⚖️ ⚠️ ❌ 🚫 🔑) as a visual icon marker; never put more than one leading emoji, and keep the rest of the text clean.
+- Section headings should be short labels the teacher recognizes: "What is it?", "The Rule", "Examples", "Compare", "Watch Out", "Common Mistakes", "Memory Tricks", "Practice", "Answer Key".
+
 FIDELITY RULES:
 - Preserve the teacher's content and meaning exactly.
 - Keep numbers, formulas, symbols, and terminology correct.
@@ -228,7 +243,7 @@ async def generate(payload: dict) -> dict:
     style = str(payload.get("style", "")).strip()
 
     content = await _call_llm(prompt)
-    html = render_html(content, style)
+    html = render_html(content, style, payload)
     return {
         "status": "completed",
         "title": content.title,
@@ -318,10 +333,89 @@ _SCHEMA = (
 )
 
 
-def render_html(content: LessonForgeContent, style: str) -> str:
+def render_html(
+    content: LessonForgeContent,
+    style: str,
+    payload: dict | None = None,
+) -> str:
     """Render the validated content into a self-contained HTML document."""
     theme = THEME_NAMES.get(style.lower(), THEME_NAMES["classroom-friendly"])
     theme_style = STYLE_HINTS.get(style.lower())
+    payload = payload or {}
+
+    lang_mode = str(payload.get("explanation_language") or "auto").strip().lower()
+    if lang_mode not in ("english", "bilingual", "arabic", "auto"):
+        lang_mode = "auto"
+    output_mode = str(payload.get("output_mode") or "auto").strip().lower()
+
+    # Resource-type body layout: auto maps to a tidy single-column article,
+    # cheat-sheet-family modes get the masonry grid, others get focused rows.
+    layout = {
+        "cheat_sheet": "masonry",
+        "revision_guide": "masonry",
+        "learning_pack": "masonry",
+        "worksheet": "worksheet",
+        "quiz": "quiz",
+        "flashcards": "flashcards",
+        "poster": "masonry",
+        "exit_ticket": "single",
+        "practice": "single",
+    }.get(output_mode, "single")
+
+    # Mode label chip shown in the hero ribbon.
+    mode_label = {
+        "cheat_sheet": "Cheat Sheet",
+        "revision_guide": "Revision Guide",
+        "worksheet": "Worksheet",
+        "quiz": "Quiz",
+        "poster": "Poster",
+        "practice": "Practice",
+        "exit_ticket": "Exit Ticket",
+        "learning_pack": "Learning Pack",
+        "flashcards": "Flashcards",
+        "auto": "Lesson Resource",
+    }.get(output_mode, "Lesson Resource")
+
+    # Learner-level chip shown under the title.
+    level_label = {
+        "beginner": "Beginner",
+        "elementary": "Elementary",
+        "middle_school": "Middle School",
+        "high_school": "High School",
+        "university": "University",
+        "adult": "Adult",
+        "auto": "",
+    }.get(str(payload.get("learner_level") or "").strip().lower(), "")
+
+    # Localized mode + level chips for Arabic-first resources.
+    ar_mode = {
+        "cheat_sheet": "ملخص سريع",
+        "revision_guide": "دليل مراجعة",
+        "worksheet": "ورقة عمل",
+        "quiz": "اختبار",
+        "poster": "ملصق",
+        "practice": "تمارين",
+        "exit_ticket": "بطاقة خروج",
+        "learning_pack": "حزمة تعلم",
+        "flashcards": "بطاقات تعليمية",
+        "auto": "مورد تعليمي",
+    }.get(output_mode, "مورد تعليمي")
+    ar_level = {
+        "beginner": "مبتدئ",
+        "elementary": "ابتدائي",
+        "middle_school": "متوسط",
+        "high_school": "ثانوي",
+        "university": "جامعي",
+        "adult": "بالغ",
+    }.get(str(payload.get("learner_level") or "").strip().lower(), "")
+
+    if lang_mode == "arabic":
+        hero_kicker = "مورد تعليمي"
+        hero_chips = [c for c in (ar_mode, ar_level) if c]
+    else:
+        hero_kicker = "LessonForge"
+        hero_chips = [c for c in (mode_label, level_label) if c]
+
     from jinja2 import Environment, PackageLoader, select_autoescape
 
     env = Environment(
@@ -334,4 +428,8 @@ def render_html(content: LessonForgeContent, style: str) -> str:
         theme=theme,
         style_hint=theme_style,
         custom_css=content.custom_css if style.lower() not in THEME_NAMES else None,
+        lang_mode=lang_mode,
+        layout=layout,
+        hero_kicker=hero_kicker,
+        hero_chips=hero_chips,
     )

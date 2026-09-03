@@ -4,10 +4,10 @@ from typing import Optional, Union
 from pydantic import BaseModel, Field, field_validator
 
 # ── Spec §8 / §34 — output modes ──────────────────────────────────────────────
-OUTPUT_MODES = ("cheat_sheet", "revision_guide", "worksheet", "quiz", "poster", "practice", "exit_ticket", "learning_pack", "auto")
+OUTPUT_MODES = ("cheat_sheet", "revision_guide", "worksheet", "quiz", "poster", "practice", "exit_ticket", "learning_pack", "flashcards", "auto")
 LEARNER_LEVELS = ("beginner", "elementary", "middle_school", "high_school", "university", "adult", "auto")
 DIFFICULTIES = ("easy", "medium", "hard", "advanced", "auto")
-LANGUAGES = ("english", "bilingual", "auto")
+LANGUAGES = ("english", "bilingual", "arabic", "auto")
 CONTENT_MODES = ("strict_source", "source_plus_examples", "teacher_creative")
 DENSITIES = ("light", "balanced", "dense", "auto")
 PRACTICE_TYPES = ("multiple_choice", "fill_in_the_blank", "correct_the_sentence", "matching", "true_false", "short_answer", "mixed", "auto")
@@ -25,7 +25,7 @@ class LessonForgeCreate(BaseModel):
     style: str = Field(..., min_length=1, max_length=200)
 
     # ── Language (spec §2) ────────────────────────────────────────────────
-    explanation_language: str = Field(default="auto", pattern="^(english|bilingual|auto)$")
+    explanation_language: str = Field(default="auto", pattern="^(english|bilingual|arabic|auto)$")
 
     # ── Learner context (spec §4) ─────────────────────────────────────────
     learner_level: str = Field(default="auto", pattern="^(beginner|elementary|middle_school|high_school|university|adult|auto)$")
@@ -38,7 +38,7 @@ class LessonForgeCreate(BaseModel):
     lesson_duration: Optional[str] = Field(default=None, max_length=50)
 
     # ── Output (spec §8) ──────────────────────────────────────────────────
-    output_mode: str = Field(default="auto", pattern="^(cheat_sheet|revision_guide|worksheet|quiz|poster|practice|exit_ticket|learning_pack|auto)$")
+    output_mode: str = Field(default="auto", pattern="^(cheat_sheet|revision_guide|worksheet|quiz|poster|practice|exit_ticket|learning_pack|flashcards|auto)$")
 
     # ── Customization (spec §10) ──────────────────────────────────────────
     number_of_pages: Union[int, str] = Field(default="auto")
