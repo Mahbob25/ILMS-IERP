@@ -16,7 +16,15 @@ FAKE_LLM_JSON = {
         {
             "heading": "Core Rule",
             "blocks": [
-                {"kind": "definition", "text": "A fraction represents a part of a whole.", "items": [], "arabic": None}
+                {
+                    "kind": "definition",
+                    "text": "A fraction represents a part of a whole.",
+                    "items": [],
+                    "arabic": None,
+                    # Phase-2 seam: an internal base64 data URI is attached
+                    # post-generation; the template renders it as a die-cut img.
+                    "image_data": "data:image/png;base64,AAAA",
+                }
             ],
         }
     ],
@@ -62,6 +70,13 @@ async def main() -> None:
 
     lessonforge._call_llm = fake_call
 
+    # Image generation is disabled here; the FAKE already carries image_data, so
+    # enrichment must no-op and leave it untouched.
+    async def no_image_cfg():
+        return {"image_provider": "", "image_model": "", "api_key": ""}
+
+    lessonforge.load_config = no_image_cfg
+
     import app.worker as worker
 
     q = FakeQueue()
@@ -88,6 +103,11 @@ async def main() -> None:
     assert "job-123" in q.results, "result not published"
     assert q.results["job-123"]["status"] == "completed"
     assert "Fractions" in q.results["job-123"]["html"]
+    # Phase-1/2 asset slot: an attached image_data data URI renders as a
+    # die-cut img inside the white medallion.
+    assert 'class="sticker-medallion"' in q.results["job-123"]["html"]
+    assert '<img class="sticker-gen"' in q.results["job-123"]["html"]
+    assert "data:image/png;base64,AAAA" in q.results["job-123"]["html"]
     assert q.acked == ["job-123"], f"ack not called: {q.acked}"
     print("worker smoke test PASSED")
 

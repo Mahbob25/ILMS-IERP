@@ -21,6 +21,11 @@ DEFAULT_AI_CONFIG = {
     "api_key": "",
     "max_output_tokens": 32000,
     "temperature": 0.7,
+    # Image generation (Phase 2). Empty provider/model = feature disabled.
+    # These share the same api_key as the text model — the image provider is
+    # usually the same vendor key forwarded to a separate image model.
+    "image_provider": "",
+    "image_model": "",
 }
 
 
@@ -32,6 +37,8 @@ class AiConfig(BaseModel):
     api_key: Optional[str] = None
     max_output_tokens: int = Field(default=32000, ge=256, le=128000)
     temperature: float = Field(default=0.7, ge=0.0, le=2.0)
+    image_provider: str = Field(default="", pattern=r"^[a-z0-9_]*$")
+    image_model: str = Field(default="")
 
 
 class AiConfigResponse(BaseModel):
@@ -42,6 +49,8 @@ class AiConfigResponse(BaseModel):
     api_key: str = ""
     max_output_tokens: int = 32000
     temperature: float = 0.7
+    image_provider: str = ""
+    image_model: str = ""
 
 
 class AiTestRequest(AiConfig):

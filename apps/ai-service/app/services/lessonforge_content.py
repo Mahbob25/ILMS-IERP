@@ -14,6 +14,9 @@ class LessonForgeBlock(BaseModel):
     items: List[str] = Field(default_factory=list)
     answer: Optional[str] = None
     arabic: Optional[str] = None  # Arabic support/explanation ("Arabic explains; English teaches")
+    sticker: Optional[str] = None  # key into the curated SVG sticker bank (e.g. "lightbulb", "kids_group")
+    image_hint: Optional[str] = None  # textless, bespoke-sticker description (consumed in Phase 2)
+    image_data: Optional[str] = None  # internal only: base64 data URI attached post-generation; never sent to the LLM
 
     @field_validator("items", mode="before")
     @classmethod
@@ -42,3 +45,5 @@ class LessonForgeContent(BaseModel):
     theme_notes: Optional[str] = None
     sections: List[LessonForgeSection] = Field(..., min_length=1)
     custom_css: Optional[str] = None  # only used when style is a custom teacher description
+    hero_image_hint: Optional[str] = None  # textless hero-banner sticker description (consumed in Phase 2)
+    hero_image_data: Optional[str] = None  # internal only: base64 data URI attached post-generation

@@ -264,6 +264,8 @@
     gap: 8px;
     margin-top: 14px;
   }
+  .hero-visual { margin: 14px 0 2px; }
+  .hero-medallion { margin-inline-end: 0; box-shadow: 0 4px 0 rgba(15, 23, 42, .28), 0 6px 12px rgba(15, 23, 42, .2); }
   .chip {
     display: inline-flex;
     align-items: center;
@@ -369,6 +371,68 @@
   .card.kind-memory_aid .icon-badge,
   .card.kind-practice .icon-badge,
   .card.kind-example .icon-badge { width: 40px; height: 40px; font-size: 1.25rem; }
+
+  /* ── Die-cut sticker medallion (Layer 1 SVG bank / Layer 2 AI data URIs) ──
+     Every sticker/image renders inside a white circular disc with a hard drop
+     shadow, so even a square white-background PNG reads as an intentional
+     die-cut sticker rather than a white box. The emoji icon-badge remains the
+     fallback when a card has no sticker or image asset. ──────────────────── */
+  .sticker-medallion {
+    width: 72px;
+    height: 72px;
+    flex: 0 0 auto;
+    border-radius: 50%;
+    background: #fff;
+    display: grid;
+    place-items: center;
+    box-shadow: 0 4px 0 rgba(15, 23, 42, .22), 0 6px 12px rgba(15, 23, 42, .18);
+    margin-inline-end: 14px;
+    vertical-align: middle;
+    overflow: hidden;
+    border: 2px solid rgba(15, 23, 42, .08);
+  }
+  body.theme-colorful .sticker-medallion,
+  body.theme-playful .sticker-medallion { box-shadow: 0 5px 0 rgba(15, 23, 42, .28); }
+  body.theme-academic .sticker-medallion { box-shadow: 0 2px 4px rgba(30, 58, 138, .25); }
+  body.theme-dark .sticker-medallion { background: #fff; border-color: rgba(255, 255, 255, .15); }
+  .sticker-medallion svg {
+    width: 88%;
+    height: 88%;
+    display: block;
+  }
+  .sticker-gen {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    border-radius: 50%;
+    background: #fff;
+    display: block;
+  }
+  /* Adaptive sticker palette: soft pastels on light themes, darker variants
+     on the dark theme so the inked outlines keep contrast on the white disc. */
+  :root {
+    --sticker-ink: #1e293b;
+    --sticker-a: #fee2e2;   /* red/flesh */
+    --sticker-b: #e0f2fe;   /* sky       */
+    --sticker-c: #fef9c3;   /* yellow    */
+    --sticker-d: #f3e8ff;   /* purple    */
+    --sticker-e: #d1fae5;   /* mint      */
+    --sticker-f: #fce7f3;   /* pink      */
+    --sticker-g: #ffedd5;   /* orange    */
+  }
+  body.theme-dark {
+    --sticker-ink: #0f172a;
+    --sticker-a: #fecaca;
+    --sticker-b: #bae6fd;
+    --sticker-c: #fde68a;
+    --sticker-d: #ddd6fe;
+    --sticker-e: #a7f3d0;
+    --sticker-f: #fbcfe8;
+    --sticker-g: #fdba74;
+  }
+  @media print {
+    .sticker-medallion { box-shadow: 0 2px 0 rgba(15, 23, 42, .25); }
+  }
 
   /* Tick / cross bullet grids */
   .ticks li, .crosses li, .checks li { padding-inline-start: 28px; position: relative; margin: 4px 0; }
@@ -699,8 +763,161 @@
 </head>
 <body class="{{ theme }} {{ 'rtl' if lang_mode == 'arabic' }} layout-{{ layout }}" dir="{{ 'rtl' if lang_mode == 'arabic' else 'ltr' }}" lang="{{ 'ar' if lang_mode == 'arabic' else 'en' }}">
   <div class="page">
+    {# ── Die-cut sticker bank (Layer 1). Each is a self-contained 100×100 SVG in
+       a bold-outline, pastel-fill, flat "sticker" style. Colours come from CSS
+       variables so the dark theme gets adaptive variants automatically. ──── #}
+    {% macro sticker(key) -%}
+      {% if key == "lightbulb" %}
+      <svg viewBox="0 0 100 100" role="img" aria-hidden="true">
+        <g stroke="var(--sticker-ink)" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M62 12l6 6M38 12l-6 6M74 24l6 5M26 24l-6 5" stroke-width="4"/>
+          <circle cx="50" cy="40" r="22" fill="var(--sticker-c)"/>
+          <path d="M40 66l-4 8h28l-4-8" fill="var(--sticker-g)"/>
+          <path d="M42 74v6h16v-6" fill="var(--sticker-g)"/>
+        </g>
+      </svg>
+      {% elif key == "star" %}
+      <svg viewBox="0 0 100 100" role="img" aria-hidden="true">
+        <g stroke="var(--sticker-ink)" stroke-width="6" stroke-linejoin="round">
+          <path d="M50 8l12 26 28 3-21 18 6 28-25-14-25 14 6-28L10 37l28-3z" fill="var(--sticker-c)"/>
+        </g>
+      </svg>
+      {% elif key == "pencil" %}
+      <svg viewBox="0 0 100 100" role="img" aria-hidden="true">
+        <g stroke="var(--sticker-ink)" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M18 82l14-14 40-40a6 6 0 019 0l0 0a6 6 0 010 9l-40 40-22 6z" fill="var(--sticker-a)"/>
+          <path d="M88 22a6 6 0 00-9 0l-9 9 9 9 9-9a6 6 0 000-9z" fill="var(--sticker-g)"/>
+          <path d="M62 28l9 9" fill="none"/>
+        </g>
+      </svg>
+      {% elif key == "clipboard" %}
+      <svg viewBox="0 0 100 100" role="img" aria-hidden="true">
+        <g stroke="var(--sticker-ink)" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="24" y="22" width="52" height="64" rx="8" fill="var(--sticker-b)"/>
+          <rect x="36" y="14" width="28" height="16" rx="5" fill="var(--sticker-c)"/>
+          <path d="M34 46h32M34 58h32M34 70h24" fill="none"/>
+        </g>
+      </svg>
+      {% elif key == "warning" %}
+      <svg viewBox="0 0 100 100" role="img" aria-hidden="true">
+        <g stroke="var(--sticker-ink)" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M50 12L86 82H14z" fill="var(--sticker-c)"/>
+          <path d="M50 40v18M50 70v2" stroke-width="7"/>
+        </g>
+      </svg>
+      {% elif key == "cross" %}
+      <svg viewBox="0 0 100 100" role="img" aria-hidden="true">
+        <g stroke="var(--sticker-ink)" stroke-width="7" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="50" cy="50" r="34" fill="var(--sticker-a)"/>
+          <path d="M38 38l24 24M62 38L38 62"/>
+        </g>
+      </svg>
+      {% elif key == "check" %}
+      <svg viewBox="0 0 100 100" role="img" aria-hidden="true">
+        <g stroke="var(--sticker-ink)" stroke-width="7" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="50" cy="50" r="34" fill="var(--sticker-e)"/>
+          <path d="M34 52l12 12 20-24" fill="none"/>
+        </g>
+      </svg>
+      {% elif key == "brain" %}
+      <svg viewBox="0 0 100 100" role="img" aria-hidden="true">
+        <g stroke="var(--sticker-ink)" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M24 44a14 14 0 01-2-28 18 18 0 0132-6h-4a14 14 0 0123 0h1a14 14 0 016 9 14 14 0 012 8 14 14 0 01-3 23 14 14 0 01-24 3 14 14 0 01-23 14 14 14 0 01-7-20 14 14 0 01-1-3z" fill="var(--sticker-f)" transform="rotate(-4 50 50)"/>
+        </g>
+      </svg>
+      {% elif key == "rocket" %}
+      <svg viewBox="0 0 100 100" role="img" aria-hidden="true">
+        <g stroke="var(--sticker-ink)" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M50 12c12 0 20 10 22 18l6 26-28 22-28-22 6-26c2-8 10-18 22-18z" fill="var(--sticker-b)"/>
+          <path d="M50 28v16M50 40l-12 8M50 40l12 8" fill="none"/>
+          <circle cx="50" cy="40" r="8" fill="var(--sticker-c)"/>
+          <path d="M34 66c-6 6-8 16-8 16s10-2 16-8" fill="var(--sticker-g)"/>
+        </g>
+      </svg>
+      {% elif key == "magnifying_glass" %}
+      <svg viewBox="0 0 100 100" role="img" aria-hidden="true">
+        <g stroke="var(--sticker-ink)" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="44" cy="44" r="26" fill="var(--sticker-e)"/>
+          <path d="M64 64l22 22M32 38a24 24 0 00-2 8" fill="none"/>
+        </g>
+      </svg>
+      {% elif key == "clock" %}
+      <svg viewBox="0 0 100 100" role="img" aria-hidden="true">
+        <g stroke="var(--sticker-ink)" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="50" cy="50" r="34" fill="var(--sticker-c)"/>
+          <path d="M50 28v22l15 9" fill="none"/>
+          <circle cx="50" cy="50" r="4" fill="var(--sticker-ink)"/>
+        </g>
+      </svg>
+      {% elif key == "book" %}
+      <svg viewBox="0 0 100 100" role="img" aria-hidden="true">
+        <g stroke="var(--sticker-ink)" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M50 26c-8-6-20-7-30-3v54c10-3 21-2 30 3 9-5 20-6 30-3V23c-10-4-22-3-30 3z" fill="var(--sticker-b)"/>
+          <path d="M50 26v54" fill="none"/>
+        </g>
+      </svg>
+      {% elif key == "speech_bubble" %}
+      <svg viewBox="0 0 100 100" role="img" aria-hidden="true">
+        <g stroke="var(--sticker-ink)" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M20 20h60a10 10 0 0110 10v28a10 10 0 01-10 10H44l-14 14v-14h-10a10 10 0 01-10-10V30a10 10 0 0110-10z" fill="var(--sticker-e)"/>
+          <path d="M36 38h28M36 50h20" fill="none"/>
+        </g>
+      </svg>
+      {% elif key == "trophy" %}
+      <svg viewBox="0 0 100 100" role="img" aria-hidden="true">
+        <g stroke="var(--sticker-ink)" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M32 16h36v18a18 18 0 01-36 0z" fill="var(--sticker-c)"/>
+          <path d="M32 22h-8a6 6 0 00-6 8 14 14 0 0014 12M68 22h8a6 6 0 016 8 14 14 0 01-14 12" fill="var(--sticker-g)"/>
+          <path d="M50 52v10M38 76a12 12 0 0112 12M38 66h24l6 22H32z" fill="var(--sticker-g)"/>
+        </g>
+      </svg>
+      {% elif key == "kids_group" %}
+      <svg viewBox="0 0 100 100" role="img" aria-hidden="true">
+        <g stroke="var(--sticker-ink)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="24" cy="30" r="11" fill="var(--sticker-e)"/>
+          <circle cx="50" cy="26" r="12" fill="var(--sticker-c)"/>
+          <circle cx="76" cy="30" r="11" fill="var(--sticker-b)"/>
+          <path d="M10 80c2-14 8-20 14-20s12 6 14 22z" fill="var(--sticker-e)"/>
+          <path d="M38 80c2-16 7-22 12-22s10 6 12 24z" fill="var(--sticker-c)"/>
+          <path d="M62 80c2-14 8-20 14-20s12 6 14 22z" fill="var(--sticker-b)"/>
+        </g>
+      </svg>
+      {% elif key == "kids_pair" %}
+      <svg viewBox="0 0 100 100" role="img" aria-hidden="true">
+        <g stroke="var(--sticker-ink)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="36" cy="30" r="12" fill="var(--sticker-c)"/>
+          <circle cx="68" cy="34" r="11" fill="var(--sticker-e)"/>
+          <path d="M22 84c2-14 8-20 14-20s12 6 14 22z" fill="var(--sticker-c)"/>
+          <path d="M54 84c2-14 8-20 14-20s12 6 14 22z" fill="var(--sticker-e)"/>
+        </g>
+      </svg>
+      {% elif key == "question_blob" %}
+      <svg viewBox="0 0 100 100" role="img" aria-hidden="true">
+        <g stroke="var(--sticker-ink)" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M50 12a38 22 0 010 44c-8 0-14-4-17-10l-3 10c-12 0-16-20-16-42h36z" fill="var(--sticker-d)"/>
+          <path d="M42 40a8 8 0 0115-3c0 5-6 6-6 11M51 56v3" fill="none" stroke-width="7"/>
+        </g>
+      </svg>
+      {% endif %}
+    {%- endmacro %}
+
+    {# Asset slot: image (Layer 2) > sticker (Layer 1) > emoji badge fallback. #}
+    {% macro asset(blk, defaults) -%}
+      {% if blk.image_data %}
+      <div class="sticker-medallion"><img class="sticker-gen" src="{{ blk.image_data }}" alt=""></div>
+      {% elif blk.sticker and sticker(blk.sticker) %}
+      <div class="sticker-medallion">{{ sticker(blk.sticker) }}</div>
+      {% else %}
+      {% set badge = blk.text[:1] if blk.text and blk.text[:1] in defaults else defaults[0] %}
+      <span class="icon-badge">{{ badge }}</span>
+      {% endif %}
+    {%- endmacro %}
+
     <header class="hero">
       {% if hero_kicker %}<span class="hero-kicker">{{ hero_kicker | e }}</span>{% endif %}
+      {% if content.hero_image_data %}
+      <div class="hero-visual"><div class="sticker-medallion hero-medallion"><img class="sticker-gen" src="{{ content.hero_image_data }}" alt=""></div></div>
+      {% endif %}
       <h1>{{ content.title | e }}</h1>
       {% if content.theme_notes %}<p class="theme-notes">{{ content.theme_notes | e }}</p>{% endif %}
       {% if hero_chips %}
@@ -754,8 +971,7 @@
 
           {% elif block.kind == "definition" %}
           <div class="card kind-definition">
-            {% set badge = block.text[:1] if block.text and block.text[:1] in "💡📖📘🧠⭐✨" else "💡" %}
-            <span class="icon-badge">{{ badge }}</span>
+            {{ asset(block, "💡📖📘🧠⭐✨") }}
             <span class="pill">{{ "ما هو؟" if lang_mode == "arabic" else "What is it?" }}</span>
             {% if block.text and block.text[:1] in "💡📖📘🧠⭐✨" %}<p class="definition-text">{{ block.text[1:].lstrip() | e }}</p>{% else %}<p class="definition-text">{{ block.text | e }}</p>{% endif %}
             {% if block.items %}
@@ -768,8 +984,7 @@
 
           {% elif block.kind == "rule" %}
           <div class="card kind-rule">
-            {% set badge = block.text[:1] if block.text and block.text[:1] in "📏📌✅📝" else "📏" %}
-            <span class="icon-badge">{{ badge }}</span>
+            {{ asset(block, "📏📌✅📝") }}
             <span class="pill">{{ "القاعدة" if lang_mode == "arabic" else "Rule" }}</span>
             {% if block.text and block.text[:1] in "📏📌✅📝" %}<p class="rule-text">{{ block.text[1:].lstrip() | e }}</p>{% else %}<p class="rule-text">{{ block.text | e }}</p>{% endif %}
             {% if block.items %}
@@ -782,8 +997,7 @@
 
           {% elif block.kind == "example" %}
           <div class="card kind-example">
-            {% set badge = block.text[:1] if block.text and block.text[:1] in "✏️💬✅⭐" else "✏️" %}
-            <span class="icon-badge">{{ badge }}</span>
+            {{ asset(block, "✏️💬✅⭐") }}
             <span class="pill">{{ "مثال" if lang_mode == "arabic" else "Example" }}</span>
             {% if block.text %}
               {% if block.text[:1] in "✏️💬✅⭐" %}
@@ -802,8 +1016,7 @@
 
           {% elif block.kind == "compare" %}
           <div class="card kind-compare">
-            {% set badge = block.text[:1] if block.text and block.text[:1] in "⚖️🔁↔️➡️" else "⚖️" %}
-            <span class="icon-badge">{{ badge }}</span>
+            {{ asset(block, "⚖️🔁↔️➡️") }}
             <span class="pill">{{ "قارن" if lang_mode == "arabic" else "Compare" }}</span>
             {% if block.text %}
               {% if block.text[:1] in "⚖️🔁↔️➡️" %}
@@ -829,8 +1042,7 @@
 
           {% elif block.kind == "exception" %}
           <div class="card kind-exception">
-            {% set badge = block.text[:1] if block.text and block.text[:1] in "⚠️❗️🚧" else "⚠️" %}
-            <span class="icon-badge">{{ badge }}</span>
+            {{ asset(block, "⚠️❗️🚧") }}
             <span class="pill">{{ "انتبه" if lang_mode == "arabic" else "Watch Out" }}</span>
             {% if block.text %}
               {% if block.text[:1] in "⚠️❗️🚧" %}
@@ -849,8 +1061,7 @@
 
           {% elif block.kind == "common_mistake" %}
           <div class="card kind-common_mistake">
-            {% set badge = block.text[:1] if block.text and block.text[:1] in "❌🚫🙅" else "❌" %}
-            <span class="icon-badge">{{ badge }}</span>
+            {{ asset(block, "❌🚫🙅") }}
             <span class="pill">{{ "خطأ شائع" if lang_mode == "arabic" else "Common Mistake" }}</span>
             {% if block.text %}
               {% if block.text[:1] in "❌🚫🙅" %}
@@ -869,8 +1080,7 @@
 
           {% elif block.kind == "memory_aid" %}
           <div class="card kind-memory_aid">
-            {% set badge = block.text[:1] if block.text and block.text[:1] in "🧠⭐🎯✨🔑" else "🧠" %}
-            <span class="icon-badge">{{ badge }}</span>
+            {{ asset(block, "🧠⭐🎯✨🔑") }}
             <span class="pill">{{ "حيلة حفظ" if lang_mode == "arabic" else "Memory Trick" }}</span>
             {% if block.text %}
               {% if block.text[:1] in "🧠⭐🎯✨🔑" %}
@@ -902,7 +1112,7 @@
 
           {% elif block.kind == "practice" %}
           <div class="card kind-practice">
-            <span class="icon-badge">✏️</span>
+            {{ asset(block, "✏️") }}
             <span class="pill">{{ "تمرين" if lang_mode == "arabic" else "Practice" }}</span>
             {% set stem = block.text[:1] if block.text and block.text[:1] in "✏️🔢📝" else "" %}
             {% if block.text %}

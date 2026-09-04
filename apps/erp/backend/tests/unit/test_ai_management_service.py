@@ -97,6 +97,8 @@ def _valid_payload(**overrides):
         "api_key": "REAL-KEY",
         "max_output_tokens": 32000,
         "temperature": 0.7,
+        "image_provider": "openai",
+        "image_model": "gpt-image-1",
     }
     payload.update(overrides)
     return payload
@@ -166,3 +168,59 @@ def test_test_config_rejects_missing_or_masked_key():
         result = _run(ai_service.test_config(_valid_payload(api_key=bad)))
         assert result["ok"] is False
         assert "API key is required" in result["error"]
+
+
+# ── Phase 2: image generation config fields ─────────────────────────
+
+
+def test_default_image_fields_are_disabled_when_no_row():
+    db = FakeDB()
+    cfg = _run(ai_service.get_config(db))
+    assert cfg["image_provider"] == ""
+    assert cfg["image_model"] == ""
+
+
+def test_save_persists_image_fields_and_keeps_text_api_key():
+    db = FakeDB(existing=_valid_payload(api_key="stored-key"))
+    actor = uuid.uuid4()
+    result = _run(
+        ai_service.save_config(
+            db,
+            _valid_payload(
+                api_key=API_KEY_MASK,
+                image_provider="google",
+                image_model="gemini-2.5-flash-image-preview",
+            ),
+            actor,
+        )
+    )
+    stored = db.rows["ai_config"].value
+    # Shared text key is retained; image fields update independently.
+    assert stored["api_key"] == "stored-key"
+    assert stored["image_provider"] == "google"
+    assert stored["image_model"] == "gemini-2.5-flash-image-preview"
+    # Response masks the key but still surfaces the image fields.
+    assert result["api_key"] == API_KEY_MASK
+    assert result["image_provider"] == "google"
+    assert result["image_model"] == "gemini-2.5-flash-image-preview"
+
+
+def test_save_without_image_fields_defaults_to_disabled():
+    db = FakeDB()
+    actor = uuid.uuid4()
+    payload = {k: v for k, v in _valid_payload().items() if not k.startswith("image_")}
+    _run(ai_service.save_config(db, payload, actor))
+    stored = db.rows["ai_config"].value
+    assert stored["image_provider"] == ""
+    assert stored["image_model"] == ""
+
+
+def test_get_config_and_internal_config_carry_image_fields():
+    db = FakeDB(existing=_valid_payload(api_key="secret"))
+    masked = _run(ai_service.get_config(db))
+    assert masked["image_provider"] == "openai"
+    assert masked["image_model"] == "gpt-image-1"
+    raw = _run(ai_service.get_internal_config(db))
+    assert raw["image_provider"] == "openai"
+    assert raw["image_model"] == "gpt-image-1"
+    assert raw["api_key"] == "secret"

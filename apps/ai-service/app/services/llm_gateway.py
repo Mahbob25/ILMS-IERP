@@ -134,6 +134,92 @@ async def chat_json(
     return content or "{}"
 
 
+# Image generation timeout — locked down: a stall must not hang a worker job.
+_IMAGE_TIMEOUT_SECONDS = 8.0
+
+
+async def generate_image(
+    prompt: str,
+    *,
+    model: str,
+    api_key: str,
+    size: str = "512x512",
+) -> bytes:
+    """Generate one image through the LiteLLM proxy and return raw PNG bytes.
+
+    Providers are called via the OpenAI-compatible ``/images/generations``
+    endpoint (LiteLLM translates to any vendor). ``size`` is restricted to the
+    two supported resolutions so the base64 payload stays small enough to embed
+    in the single-file HTML (a 256×256 PNG ≈ ~30–70 KB once base64-encoded).
+
+    The response may carry the image as base64 (``b64_json``) or as a URL; both
+    are handled. Raises ``GatewayError`` on an HTTP error or an unusable body.
+    The caller wraps this and treats any failure as "no image" — a resource
+    never fails because of an image.
+    """
+    size = size.strip().lower()
+    if size not in ("256x256", "512x512"):
+        size = "512x512"
+
+    url = f"{settings.LITELLM_URL.rstrip('/')}/images/generations"
+    headers = {"Authorization": f"Bearer {settings.LITELLM_MASTER_KEY}"}
+    body = {
+        "model": model,
+        "api_key": api_key,
+        "prompt": prompt,
+        "n": 1,
+        "size": size,
+        "response_format": "b64_json",
+    }
+
+    started = time.monotonic()
+    try:
+        async with httpx.AsyncClient(timeout=_IMAGE_TIMEOUT_SECONDS) as client:
+            resp = await client.post(url, headers=headers, json=body)
+    except httpx.HTTPError as e:
+        raise GatewayError(f"Image gateway request failed: {e}") from e
+    elapsed_ms = int((time.monotonic() - started) * 1000)
+
+    if resp.status_code >= 400:
+        raise GatewayError(
+            f"LiteLLM image call returned HTTP {resp.status_code} "
+            f"after {elapsed_ms}ms: {_error_detail(resp)}"
+        )
+
+    try:
+        data = resp.json()
+        item = data["data"][0]
+    except (KeyError, IndexError, TypeError, ValueError) as e:
+        raise GatewayError(
+            f"Malformed image response after {elapsed_ms}ms: {e}"
+        ) from e
+
+    b64 = item.get("b64_json")
+    if isinstance(b64, str) and b64:
+        try:
+            import base64
+
+            return base64.b64decode(b64)
+        except Exception as e:
+            raise GatewayError(
+                f"Invalid base64 in image response after {elapsed_ms}ms: {e}"
+            ) from e
+
+    # Some providers return only a URL to the generated asset instead of b64.
+    image_url = item.get("url")
+    if isinstance(image_url, str) and image_url:
+        try:
+            async with httpx.AsyncClient(timeout=_IMAGE_TIMEOUT_SECONDS) as client:
+                r = await client.get(image_url)
+        except httpx.HTTPError as e:
+            raise GatewayError(f"Failed to fetch image URL: {e}") from e
+        if r.status_code >= 400:
+            raise GatewayError(f"Image URL returned HTTP {r.status_code}")
+        return r.content
+
+    raise GatewayError(f"Image response contained no usable b64_json or url after {elapsed_ms}ms")
+
+
 # ── config sources ──────────────────────────────────────────────────
 
 
@@ -213,22 +299,32 @@ async def _from_erp_internal() -> Optional[dict]:
 def _from_env() -> Optional[dict]:
     """Local-dev fallback when neither Redis nor the ERP is available."""
     provider = (settings.LLM_PROVIDER or "gemini").strip().lower()
+    cfg = {
+        "max_output_tokens": 16000,
+        "temperature": 0.7,
+        "image_provider": (settings.IMAGE_PROVIDER or "").strip().lower(),
+        "image_model": (settings.IMAGE_MODEL or "").strip(),
+    }
     if provider == "openai" and settings.OPENAI_API_KEY:
-        return {
-            "provider": "openai",
-            "model": settings.OPENAI_MODEL,
-            "api_key": settings.OPENAI_API_KEY,
-            "max_output_tokens": 16000,
-            "temperature": 0.7,
-        }
+        cfg.update(
+            {
+                "provider": "openai",
+                "model": settings.OPENAI_MODEL,
+                "api_key": settings.OPENAI_API_KEY,
+                "max_output_tokens": 16000,
+            }
+        )
+        return cfg
     if settings.GEMINI_API_KEY:
-        return {
-            "provider": "gemini",
-            "model": settings.GEMINI_MODEL,
-            "api_key": settings.GEMINI_API_KEY,
-            "max_output_tokens": 32000,
-            "temperature": 0.7,
-        }
+        cfg.update(
+            {
+                "provider": "gemini",
+                "model": settings.GEMINI_MODEL,
+                "api_key": settings.GEMINI_API_KEY,
+                "max_output_tokens": 32000,
+            }
+        )
+        return cfg
     return None
 
 

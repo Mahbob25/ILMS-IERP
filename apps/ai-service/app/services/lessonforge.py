@@ -1,14 +1,18 @@
 """LessonForge generator — turns the teacher's spec contract into self-contained,
 classroom-ready HTML via an LLM + a Jinja2 template.
 
-Runs inside the ai-worker process (apps/ai-service). No image generation:
-``output_format`` is fixed to ``html``, produced by a text LLM.
+Runs inside the ai-worker process (apps/ai-service). The main output is a text
+LLM rendered to ``html``; when image generation is configured (Phase 2), a
+small number of parallel image calls enrich matching blocks with base64 data-URI
+stickers that render inside die-cut medallions. Every image failure degrades
+gracefully to the emoji/sticker fallback — a resource never fails on images.
 """
+import asyncio
 import json
 import logging
 
 from app.services.lessonforge_content import LessonForgeContent
-from app.services.llm_gateway import GatewayError, chat_json, load_config
+from app.services.llm_gateway import GatewayError, chat_json, generate_image, load_config
 
 logger = logging.getLogger(__name__)
 
@@ -199,6 +203,8 @@ VISUAL-STRUCTURE CONVENTIONS (the generator renders these as poster cards):
 - For "compare" blocks, express each row as two sides separated by " | " (e.g. "Singular | Plural", "Active | Passive") — one item per row. The template renders these as side-by-side grid cells.
 - "definition", "rule", "memory_aid", and "practice" text may begin with ONE matching emoji (💡 📖 🧠 ⭐ 🎯 ✏️ 📏 📌 ⚖️ ⚠️ ❌ 🚫 🔑) as a visual icon marker; never put more than one leading emoji, and keep the rest of the text clean.
 - Section headings should be short labels the teacher recognizes: "What is it?", "The Rule", "Examples", "Compare", "Watch Out", "Common Mistakes", "Memory Tricks", "Practice", "Answer Key".
+- Optional "sticker" key on any card that would benefit from a recognizable character or object. Choose ONLY from this fixed enum of keys: "lightbulb", "star", "pencil", "clipboard", "warning", "cross", "check", "brain", "rocket", "magnifying_glass", "clock", "book", "speech_bubble", "trophy", "kids_group", "kids_pair", "question_blob". When the card already leads with a descriptive emoji, prefer that over a sticker; add a sticker only when a die-cut character/object clearly aids comprehension. Most cards should have no sticker. Use "warning" only for exception/common_mistake cards, "cross" only for common_mistake, "check" only for example/answer_key.
+- Optional "image_hint" on the content root or a card ONLY when a bespoke illustration meaningfully aids the concept and none of the sticker-bank keys fits (e.g. a "cute dinosaur time machine" for a creative writing prompt). Use at most 1–2 image_hints in the entire resource — prefer sticker keys everywhere else. An image_hint must be TEXTLESS (no letters or numbers), flat vector, bold outline, vibrant, isolated on a plain background, sticker style. Keep it a short phrase (3–8 words).
 
 FIDELITY RULES:
 - Preserve the teacher's content and meaning exactly.
@@ -212,6 +218,7 @@ RESPONSE FORMAT: Respond with VALID JSON ONLY (no markdown fences, no commentary
 {{
   "title": "Resource title",
   "theme_notes": "optional short note on the visual treatment, or null",
+  "hero_image_hint": "optional textless hero illustration, or null",
   "sections": [
     {{
       "heading": "Section heading (e.g. 'What is it?', 'Core Rule', 'Examples', 'Practice')",
@@ -221,7 +228,9 @@ RESPONSE FORMAT: Respond with VALID JSON ONLY (no markdown fences, no commentary
           "text": "the block content",
           "items": ["optional bullet items"],
           "answer": "only for practice/answer_key blocks",
-          "arabic": "Arabic support text only in bilingual/auto modes when useful, else null"
+          "arabic": "Arabic support text only in bilingual/auto modes when useful, else null",
+          "sticker": "optional sticker-bank key from the fixed enum, else null",
+          "image_hint": "optional textless bespoke-sticker description, else null"
         }}
       ]
     }}
@@ -234,6 +243,8 @@ Notes:
 - "practice" blocks: give the exercise to the student; put the solution in "answer" ONLY when include_answer_key is true (guided exercises excepted).
 - "teacher_note" blocks are for the teacher only.
 - If the style is a custom teacher description (not one of the presets), you may set "custom_css" to a small block of CSS that realizes it; otherwise null.
+- "sticker" must be one of: lightbulb, star, pencil, clipboard, warning, cross, check, brain, rocket, magnifying_glass, clock, book, speech_bubble, trophy, kids_group, kids_pair, question_blob — or null. Leave it null unless a die-cut sticker clearly aids the card.
+- "image_hint" must be a SHORT textless description (3–8 words). Use at most 1–2 per resource; otherwise null.
 """
 
 
@@ -243,6 +254,7 @@ async def generate(payload: dict) -> dict:
     style = str(payload.get("style", "")).strip()
 
     content = await _call_llm(prompt)
+    await _enrich_with_images(content)
     html = render_html(content, style, payload)
     return {
         "status": "completed",
@@ -250,6 +262,116 @@ async def generate(payload: dict) -> dict:
         "output_mode": payload.get("output_mode", "auto"),
         "html": html,
     }
+
+
+# ── Image enrichment (Phase 2, layer 2) ─────────────────────────────
+# Cost/latency bound: at most ONE hero + TWO card images per resource.
+# A single generated PNG (base64) adds tens of KB; 3 is a safe ceiling for
+# the single-file HTML budget while still making the key cards pop.
+MAX_HERO_IMAGES = 1
+MAX_CARD_IMAGES = 2
+IMAGE_TIMEOUT_SECONDS = 8.0  # locked down: a stalled provider must not hang a job
+
+
+async def _enrich_with_images(content: LessonForgeContent) -> None:
+    """Generate AI stickers for image hints and attach base64 data URIs.
+
+    Pure best-effort: any failure (no config, provider error, timeout,
+    content-safety block, oversized payload) leaves that slot null and logs —
+    the template then falls back to the SVG sticker bank or the emoji badge.
+    This function NEVER raises and never fails the job.
+    """
+    try:
+        cfg = await load_config()
+        image_provider = (cfg.get("image_provider") or "").strip().lower()
+        image_model = (cfg.get("image_model") or "").strip()
+    except (GatewayError, Exception) as e:
+        logger.warning("lessonforge: image enrichment skipped (no config or error): %s", e)
+        return
+
+    if not image_provider or not image_model:
+        logger.info("lessonforge: image generation disabled (no image_provider/model)")
+        return
+
+    api_key = cfg.get("api_key") or ""
+    model_id = f"{image_provider}/{image_model}"
+
+    # 1) Pick hero hint (highest priority) first.
+    tasks: list = []
+    if content.hero_image_hint:
+        tasks.append(("hero", None, content.hero_image_hint))
+
+    # 2) Pick card hints by priority, capped at MAX_CARD_IMAGES.
+    collected: list = []
+    for section in content.sections:
+        for block in section.blocks:
+            hint = (block.image_hint or "").strip()
+            if hint:
+                collected.append((id(block), block, hint))
+    for block_id, block, hint in collected[:MAX_CARD_IMAGES]:
+        tasks.append(("card", block_id, hint))
+
+    if not tasks:
+        return
+
+    # 3) Fire every hint in parallel; each gets its own strict timeout.
+    results = await asyncio.gather(
+        *[asyncio.wait_for(_safe_generate(p, model_id, api_key), IMAGE_TIMEOUT_SECONDS) for _, _, p in tasks],
+        return_exceptions=True,
+    )
+
+    # 4) Attach successful data URIs to their matching slot.
+    for (kind, block_id, _), outcome in zip(tasks, results):
+        if isinstance(outcome, Exception):
+            logger.warning(
+                "lessonforge: image for %s hint failed (%s) — falling back",
+                kind,
+                type(outcome).__name__,
+            )
+            continue
+        data_uri = _png_data_uri(outcome)
+        if data_uri is None:
+            continue  # size guard rejected it; slot stays null
+        if kind == "hero":
+            content.hero_image_data = data_uri
+            logger.info("lessonforge: attached hero image (%d bytes)", len(outcome))
+        else:
+            for section in content.sections:
+                for block in section.blocks:
+                    if id(block) == block_id:
+                        block.image_data = data_uri
+                        logger.info("lessonforge: attached card image (%d bytes)", len(outcome))
+                        break
+
+
+async def _safe_generate(prompt: str, model_id: str, api_key: str) -> bytes:
+    """Wrap generate_image with its own per-call timeout (in addition to the
+    gather-level timeout) so a hung provider task is always reaped quickly."""
+    try:
+        return await asyncio.wait_for(
+            generate_image(prompt, model=model_id, api_key=api_key),
+            timeout=IMAGE_TIMEOUT_SECONDS,
+        )
+    except asyncio.TimeoutError as e:
+        raise GatewayError("image generation timed out") from e
+
+
+def _png_data_uri(raw: bytes) -> str | None:
+    """Wrap PNG bytes as an embeddable data URI, guarding total payload size.
+
+    Rejects anything larger than ~1 MB decoded — a real PNG at 256–512px is
+    far smaller, so this only trips on misconfigured/oversized output that
+    would balloon the single-file HTML well past budget.
+    """
+    if not isinstance(raw, bytes) or not raw:
+        return None
+    if len(raw) > 1_048_576:
+        logger.warning("lessonforge: generated image too large (%d bytes) — skipping", len(raw))
+        return None
+    import base64
+
+    encoded = base64.b64encode(raw).decode("ascii")
+    return f"data:image/png;base64,{encoded}"
 
 
 async def _call_llm(prompt: str) -> LessonForgeContent:
@@ -325,10 +447,12 @@ def _parse_or_none(raw: str):
 
 
 _SCHEMA = (
-    '{"title": string, "theme_notes": string|null, "sections": [{"heading": string, '
+    '{"title": string, "theme_notes": string|null, "hero_image_hint": string|null, '
+    '"sections": [{"heading": string, '
     '"blocks": [{"kind": "definition|rule|example|compare|exception|common_mistake|'
     'memory_aid|practice|answer_key|teacher_note|checklist", "text": string, "items": '
-    'string[]|null, "answer": string|null, "arabic": string|null}]}], '
+    'string[]|null, "answer": string|null, "arabic": string|null, "sticker": string|null, '
+    '"image_hint": string|null}]}], '
     '"custom_css": string|null}'
 )
 

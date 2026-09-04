@@ -24,6 +24,10 @@ class Settings(BaseSettings):
     GEMINI_MODEL: str = "gemini-2.5-flash"
     OPENAI_API_KEY: str = ""
     OPENAI_MODEL: str = "gpt-4o-mini"
+    # Optional image generation (Phase 2). Images share the text model's key;
+    # empty IMAGE_PROVIDER/IMAGE_MODEL disables dynamic sticker generation.
+    IMAGE_PROVIDER: str = ""
+    IMAGE_MODEL: str = ""
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 

@@ -84,6 +84,8 @@ async def save_config(
             payload.get("max_output_tokens") or DEFAULT_AI_CONFIG["max_output_tokens"]
         ),
         "temperature": float(payload.get("temperature") if payload.get("temperature") is not None else DEFAULT_AI_CONFIG["temperature"]),
+        "image_provider": str(payload.get("image_provider") or DEFAULT_AI_CONFIG["image_provider"]),
+        "image_model": str(payload.get("image_model") or DEFAULT_AI_CONFIG["image_model"]),
     }
 
     row = await db.get(SystemSetting, AI_CONFIG_KEY)

@@ -20,6 +20,7 @@ FAKE_LLM_JSON = {
                     "text": "The subject and verb must agree in number.",
                     "items": ["Singular subject → singular verb", "Plural subject → plural verb"],
                     "arabic": "يجب أن يتوافق الفاعل والفعل من حيث المفرد والجمع.",
+                    "sticker": "lightbulb",
                 }
             ],
         },
@@ -50,6 +51,19 @@ async def main() -> None:
         return LessonForgeContent.model_validate(FAKE_LLM_JSON)
 
     lessonforge._call_llm = fake_call
+
+    # Image generation is disabled in this smoke (no provider/model), so the
+    # enrichment step must no-op and keep the emoji/sticker fallback.
+    async def no_image_cfg():
+        return {
+            "provider": "gemini",
+            "model": "gemini-2.5-flash",
+            "api_key": "",
+            "image_provider": "",
+            "image_model": "",
+        }
+
+    lessonforge.load_config = no_image_cfg
 
     payload = {
         "topic_text": "Subject and verb must agree in number.",
@@ -99,9 +113,96 @@ async def main() -> None:
     for url in external:
         assert "fonts.googleapis.com" in url or "fonts.gstatic.com" in url, f"unexpected external URL: {url}"
 
+    # ── Phase 1: sticker bank + medallion asset slot ─────────────────────
+    # A block with a "sticker" key renders inside a white die-cut medallion.
+    assert 'class="sticker-medallion"' in html
+    assert "viewBox=\"0 0 100 100\"" in html, "sticker SVG bank should be emitted"
+    assert 'class="icon-badge"' in html, "cards without an asset keep the emoji-badge fallback"
+    # No AI-generated image without config: no rendered <img> sticker and no
+    # embedded base64 data URI (the .sticker-gen CSS rule may still be present).
+    assert '<img class="sticker-gen"' not in html, "no generated image should render without image config"
+    assert "data:image" not in html, "no base64 image should be embedded without image config"
+
     print("generator smoke test PASSED")
     print(f"html length: {len(html)} bytes")
 
 
+async def run_enrichment() -> None:
+    """Exercise the Phase-2 image enrichment pipeline with mocked gateway calls.
+
+    Verifies the graceful-degradation contract: with image config present, a
+    block's image_hint gets a base64 data URI attached; a failing image call
+    leaves that slot null; and with no image config nothing is generated.
+    """
+    from app.services.lessonforge_content import LessonForgeContent
+
+    def _content(hints: list, hero: str | None = None):
+        blocks = [
+            {"kind": "definition", "text": "a", "items": [], "arabic": None, "image_hint": h}
+            for h in hints
+        ]
+        return LessonForgeContent.model_validate(
+            {
+                "title": "T",
+                "theme_notes": None,
+                "sections": [{"heading": "H", "blocks": blocks}],
+                "hero_image_hint": hero,
+            }
+        )
+
+    png = b"\x89PNG\r\n\x1a\n" + b"\x00" * 16
+
+    # Case A: image config present -> hints get data URIs; failures stay null.
+    async def fake_gen(prompt, *, model, api_key, size="512x512"):
+        if "FAIL" in prompt:
+            raise RuntimeError("provider refused")
+        return png
+
+    async def fake_load():
+        return {
+            "image_provider": "google",
+            "image_model": "gemini-2.5-flash-image-preview",
+            "api_key": "k",
+        }
+
+    from app.services import lessonforge as lf
+
+    orig_gen, orig_load = lf.generate_image, lf.load_config
+    lf.generate_image, lf.load_config = fake_gen, fake_load
+    try:
+        # 3 hints but the cap is MAX_CARD_IMAGES=2: only the first two are
+        # scheduled; the third must be left null (cost bound).
+        c = _content(["ok one", "FAIL two", "ok three"])
+        await lf._enrich_with_images(c)
+        b1, b2, b3 = c.sections[0].blocks
+        assert b1.image_data.startswith("data:image/png;base64,")
+        assert b2.image_data is None, "failed image call must leave the slot null"
+        assert b3.image_data is None, "hints beyond the cap must not be generated"
+    finally:
+        lf.generate_image, lf.load_config = orig_gen, orig_load
+
+    # Case B: no image config -> nothing generated, calls never fire.
+    async def fake_load_disabled():
+        return {"image_provider": "", "image_model": "", "api_key": "k"}
+
+    fired = []
+
+    async def fake_gen_bad(prompt, **kw):
+        fired.append(prompt)
+
+    lf.generate_image, lf.load_config = fake_gen_bad, fake_load_disabled
+    try:
+        c2 = _content(["ignored"], hero="hero hint")
+        await lf._enrich_with_images(c2)
+        assert c2.hero_image_data is None
+        assert c2.sections[0].blocks[0].image_data is None
+        assert fired == [], "image calls must not fire without config"
+    finally:
+        lf.generate_image, lf.load_config = orig_gen, orig_load
+
+    print("image enrichment smoke test PASSED")
+
+
 if __name__ == "__main__":
     asyncio.run(main())
+    asyncio.run(run_enrichment())

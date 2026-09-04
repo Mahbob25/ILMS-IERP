@@ -23,6 +23,8 @@ interface AiConfigData {
   api_key: string; // "" or the mask "•••"
   max_output_tokens: number;
   temperature: number;
+  image_provider: string; // "" = disabled
+  image_model: string; // "" = disabled
 }
 
 interface TestResponse {
@@ -53,6 +55,8 @@ export default function AiManagementPage() {
   const [showKey, setShowKey] = useState(false);
   const [maxTokens, setMaxTokens] = useState("32000");
   const [temperature, setTemperature] = useState("0.7");
+  const [imageProvider, setImageProvider] = useState("");
+  const [imageModel, setImageModel] = useState("");
 
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
@@ -62,6 +66,11 @@ export default function AiManagementPage() {
 
   const t = {
     ar: {
+      imageProvider: "مُزوِّد الصور",
+      imageProviderHint: "gemini, openai, azure…",
+      imageModel: "نموذج الصور (اختياري)",
+      imageModelHint: "مثال: gemini-2.5-flash-image-preview أو gpt-image-1",
+      imageDisabledHint: "يُمكّن توليد ملصقات مخصّصة عند تعيين كليهما ، وتتم مشاركة مفتاح النص",
       title: "إدارة الذكاء الاصطناعي",
       subtitle: "ضبط مزوّد ونموذج LessonForge دون إعادة تشغيل",
       superadminOnly: "هذه الصفحة متاحة لمدير النظام فقط",
@@ -87,6 +96,11 @@ export default function AiManagementPage() {
       keyHint: "سيتم عرض ••• عند وجود مفتاح مخزّن",
     },
     en: {
+      imageProvider: "Image provider",
+      imageProviderHint: "gemini, openai, azure…",
+      imageModel: "Image model (optional)",
+      imageModelHint: "e.g. gemini-2.5-flash-image-preview or gpt-image-1",
+      imageDisabledHint: "Generates custom stickers when both are set; shares the text API key",
       title: "AI Management",
       subtitle: "Switch the LessonForge LLM provider/model at runtime",
       superadminOnly: "Superadmin access only",
@@ -128,6 +142,8 @@ export default function AiManagementPage() {
       setHasStoredKey(!!data.api_key);
       setMaxTokens(String(data.max_output_tokens ?? 32000));
       setTemperature(String(data.temperature ?? 0.7));
+      setImageProvider(data.image_provider || "");
+      setImageModel(data.image_model || "");
     } catch {
       setLoadErr(true);
     } finally {
@@ -149,13 +165,19 @@ export default function AiManagementPage() {
         max_output_tokens: Math.max(1, Math.floor(Number(maxTokens) || 32000)),
         temperature: Math.min(2, Math.max(0, Number(temperature) || 0.7)),
       };
+      const cleanImgProvider = sanitizeInput(imageProvider.trim()).toLowerCase();
+      const cleanImgModel = sanitizeInput(imageModel.trim());
+      if (cleanImgProvider && cleanImgModel) {
+        payload.image_provider = cleanImgProvider;
+        payload.image_model = cleanImgModel;
+      }
       if (includeKey) {
         const cleanKey = sanitizeInput(apiKey.trim());
         if (cleanKey) payload.api_key = cleanKey;
       }
       return payload;
     },
-    [provider, model, apiKey, maxTokens, temperature]
+    [provider, model, apiKey, maxTokens, temperature, imageProvider, imageModel]
   );
 
   const handleSave = useCallback(async () => {
@@ -298,6 +320,29 @@ export default function AiManagementPage() {
               className="input-field mt-1"
               dir="ltr"
             />
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold text-slate-700">{t.imageProvider}</label>
+            <input
+              value={imageProvider}
+              onChange={(e) => setImageProvider(sanitizeInput(e.target.value))}
+              placeholder={t.imageProviderHint}
+              className="input-field mt-1"
+              dir="ltr"
+            />
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold text-slate-700">{t.imageModel}</label>
+            <input
+              value={imageModel}
+              onChange={(e) => setImageModel(sanitizeInput(e.target.value))}
+              placeholder={t.imageModelHint}
+              className="input-field mt-1"
+              dir="ltr"
+            />
+            <p className="text-[11px] text-slate-400 mt-1">{t.imageDisabledHint}</p>
           </div>
 
           <div className="md:col-span-2">
