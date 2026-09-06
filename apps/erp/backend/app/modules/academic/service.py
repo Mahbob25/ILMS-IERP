@@ -134,6 +134,23 @@ async def get_course_section(
     return result.unique().scalar_one_or_none()
 
 
+async def get_course_section_detail(
+    db: AsyncSession, section_id: uuid.UUID
+) -> Optional[CourseSection]:
+    result = await db.execute(
+        select(CourseSection)
+        .where(
+            CourseSection.id == section_id, CourseSection.deleted_at.is_(None)
+        )
+        .options(
+            joinedload(CourseSection.contract),
+            joinedload(CourseSection.course),
+            joinedload(CourseSection.teacher_employee),
+        )
+    )
+    return result.unique().scalar_one_or_none()
+
+
 async def list_course_sections(
     db: AsyncSession,
     teacher_id: Optional[uuid.UUID] = None,

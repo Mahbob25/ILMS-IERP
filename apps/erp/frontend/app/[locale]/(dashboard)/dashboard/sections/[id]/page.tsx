@@ -52,6 +52,9 @@ interface SectionInfo {
   id: string;
   course_id: string;
   teacher_id: string;
+  course_name?: string | null;
+  course_code?: string | null;
+  teacher_name?: string | null;
   capacity: number;
   enrolled_count: number;
   status: string;
@@ -78,16 +81,6 @@ interface ContractInfo {
   total_earned: number;
   total_paid: number;
   created_at: string;
-}
-
-interface Course {
-  id: string;
-  name: string;
-  code: string;
-}
-interface Employee {
-  id: string;
-  full_name: string;
 }
 
 export default function SectionStudentsPage() {
@@ -277,8 +270,6 @@ export default function SectionStudentsPage() {
 
   const [section, setSection] = useState<SectionInfo | null>(null);
   const [students, setStudents] = useState<SectionEnrollmentDetail[]>([]);
-  const [courses, setCourses] = useState<Course[]>([]);
-  const [teachers, setTeachers] = useState<any[]>([]);
   const [contract, setContract] = useState<ContractInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -318,41 +309,25 @@ export default function SectionStudentsPage() {
     setLoading(true);
     setNotFound(false);
     try {
-      const [sectRes, enrollRes, courseRes, teachersRes, contractRes] =
-        await Promise.all([
-          apiClient
-            .get<{ items: SectionInfo[]; total: number }>(
-              `/academic/course-sections?limit=1000`,
-            )
-            .catch(() => null),
-          apiClient
-            .get<SectionEnrollmentDetail[]>(
-              `/academic/sections/${sectionId}/enrollments/detailed`,
-            )
-            .catch(() => null),
-          apiClient
-            .get<{ items: Course[]; total: number }>(
-              "/academic/courses?limit=1000",
-            )
-            .catch(() => null),
-          apiClient.get<any[]>("/users/teachers").catch(() => null),
-          apiClient
-            .get<ContractInfo>(`/lms/sections/${sectionId}/contract`)
-            .catch(() => null),
-        ]);
+      const [sectRes, enrollRes, contractRes] = await Promise.all([
+        apiClient
+          .get<SectionInfo>(`/academic/course-sections/${sectionId}`)
+          .catch(() => null),
+        apiClient
+          .get<SectionEnrollmentDetail[]>(
+            `/academic/sections/${sectionId}/enrollments/detailed`,
+          )
+          .catch(() => null),
+        apiClient
+          .get<ContractInfo>(`/lms/sections/${sectionId}/contract`)
+          .catch(() => null),
+      ]);
 
-      if (courseRes) setCourses(courseRes.data.items);
-      if (teachersRes) setTeachers(teachersRes.data);
       if (enrollRes) setStudents(enrollRes.data);
       if (contractRes) setContract(contractRes.data);
 
       if (sectRes) {
-        const found = sectRes.data.items.find((s) => s.id === sectionId);
-        if (found) {
-          setSection(found);
-        } else {
-          setNotFound(true);
-        }
+        setSection(sectRes.data);
       } else {
         setNotFound(true);
       }
@@ -427,10 +402,8 @@ export default function SectionStudentsPage() {
     return students.length > 0 && students.every((s) => s.final_score != null);
   }, [students]);
 
-  const getCourseName = (courseId: string) =>
-    courses.find((c) => c.id === courseId)?.name || courseId;
-  const getTeacherName = (teacherId: string) =>
-    teachers.find((u) => u.id === teacherId)?.full_name || teacherId;
+  const getCourseName = () => section?.course_name || section?.course_id || "";
+  const getTeacherName = () => section?.teacher_name || section?.teacher_id || "";
 
   if (loading) {
     return (
@@ -469,8 +442,8 @@ export default function SectionStudentsPage() {
             <h2 className="text-xl font-bold text-slate-900">{t.title}</h2>
             {section && (
               <p className="text-sm text-slate-500 mt-1">
-                {getCourseName(section.course_id)} &middot; {t.teacher}:{" "}
-                {getTeacherName(section.teacher_id)}
+                {getCourseName()} &middot; {t.teacher}:{" "}
+                {getTeacherName()}
               </p>
             )}
           </div>
@@ -483,13 +456,13 @@ export default function SectionStudentsPage() {
           <div className="flex items-center gap-2">
             <span className="text-slate-500">{t.course}:</span>
             <span className="font-semibold text-slate-900">
-              {getCourseName(section.course_id)}
+              {getCourseName()}
             </span>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-slate-500">{t.teacher}:</span>
             <span className="font-semibold text-slate-900">
-              {getTeacherName(section.teacher_id)}
+              {getTeacherName()}
             </span>
           </div>
           <div className="flex items-center gap-2">
@@ -804,7 +777,7 @@ export default function SectionStudentsPage() {
         open={showCancelModal}
         onClose={() => setShowCancelModal(false)}
         sectionId={sectionId}
-        sectionName={section ? getCourseName(section.course_id) : ""}
+        sectionName={section ? getCourseName() : ""}
         isRtl={isRtl}
         locale={locale}
         onSuccess={() => { setError(null); fetchData(); }}
@@ -814,7 +787,7 @@ export default function SectionStudentsPage() {
         open={showDeactivateModal}
         onClose={() => setShowDeactivateModal(false)}
         sectionId={sectionId}
-        sectionName={section ? getCourseName(section.course_id) : ""}
+        sectionName={section ? getCourseName() : ""}
         hasPayments={students.some((s) => (s.total_paid || 0) > 0)}
         isRtl={isRtl}
         locale={locale}
@@ -885,7 +858,7 @@ export default function SectionStudentsPage() {
         open={unenrollTarget !== null}
         enrollmentId={unenrollTarget?.id || ""}
         studentName={unenrollTarget?.student_name || ""}
-        sectionName={unenrollTarget ? getCourseName(section?.course_id || "") : ""}
+        sectionName={unenrollTarget ? getCourseName() : ""}
         isRtl={isRtl}
         locale={locale}
         onSuccess={() => { setUnenrollTarget(null); setSuccessMsg(t.unenrollSuccess); fetchData(); }}

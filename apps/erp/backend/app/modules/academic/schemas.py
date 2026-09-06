@@ -87,6 +87,12 @@ class CourseSectionResponse(BaseModel):
         from_attributes = True
 
 
+class CourseSectionDetailResponse(CourseSectionResponse):
+    course_name: Optional[str] = None
+    course_code: Optional[str] = None
+    teacher_name: Optional[str] = None
+
+
 class SectionActivate(BaseModel):
     teacher_percentage: Optional[float] = None
 

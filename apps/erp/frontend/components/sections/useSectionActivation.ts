@@ -7,6 +7,9 @@ interface SectionInfo {
   id: string;
   course_id: string;
   teacher_id: string;
+  course_name?: string | null;
+  course_code?: string | null;
+  teacher_name?: string | null;
   capacity: number;
   enrolled_count: number;
   status: string;
@@ -81,10 +84,10 @@ export function useSectionActivation({ sectionId, locale, t, onSuccess }: Activa
       setError(null);
       const [contractRes, sectionRes] = await Promise.all([
         apiClient.get<ContractInfo>(`/lms/sections/${sectionId}/contract`).catch(() => null),
-        apiClient.get<{ items: SectionInfo[]; total: number }>("/academic/course-sections?limit=1000").catch(() => null),
+        apiClient.get<SectionInfo>(`/academic/course-sections/${sectionId}`).catch(() => null),
       ]);
       if (onSuccess) {
-        const updatedSection = sectionRes?.data?.items.find((s) => s.id === sectionId) || section;
+        const updatedSection = sectionRes?.data || section;
         onSuccess(updatedSection, contractRes?.data);
       }
     } catch (activateErr) {

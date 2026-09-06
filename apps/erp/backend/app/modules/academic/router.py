@@ -9,7 +9,7 @@ from app.modules.identity.models import User
 from app.modules.identity.dependencies import get_current_user, RoleChecker
 from app.modules.academic.schemas import (
     CourseCreate, CourseUpdate, CourseResponse,
-    CourseSectionCreate, CourseSectionUpdate, CourseSectionResponse, SectionActivate,
+    CourseSectionCreate, CourseSectionUpdate, CourseSectionResponse, CourseSectionDetailResponse, SectionActivate,
     StudentCreate, StudentUpdate, StudentResponse,
     EnrollmentCreate, EnrollmentCreateWithStudent, EnrollmentResponse, EnrollmentDetailResponse,
     FinalGradeCreate, FinalGradeBulkCreate, FinalGradeResponse, StudentGradeSummary,
@@ -105,6 +105,28 @@ async def create_course_section(
     db: AsyncSession = Depends(get_db)
 ):
     return await academic_service.create_course_section(db, data.model_dump())
+
+@academic_router.get("/course-sections/{section_id}", response_model=CourseSectionDetailResponse)
+async def get_course_section_detail(
+    section_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    section = await academic_service.get_course_section_detail(db, section_id)
+    if not section:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course section not found")
+    if current_user.role.name == "teacher" and section.teacher_id != current_user.employee_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course section not found")
+    section.contract_status = section.contract.status.value if section.contract else None
+    section.contract_compensation_model = (
+        section.contract.compensation_model.value
+        if section.contract and section.contract.compensation_model
+        else None
+    )
+    section.course_name = section.course.name if section.course else None
+    section.course_code = section.course.code if section.course else None
+    section.teacher_name = section.teacher_employee.full_name if section.teacher_employee else None
+    return section
 
 @academic_router.put("/course-sections/{section_id}", response_model=CourseSectionResponse)
 async def update_course_section(
