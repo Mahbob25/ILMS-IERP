@@ -49,8 +49,9 @@ class Settings(BaseSettings):
     # cutoff limit sits in front of the app (Vercel's proxy, Caddy), with
     # margin, so the close is OURS — a server-initiated clean close reconnects
     # predictably, whereas being cut off mid-stream surfaces as a console error.
-    # 600s assumes the Phase 0 ingress spike confirmed the Vercel rewrite passes
-    # long-lived responses through; lower it if the spike measured a lower ceiling.
+    # Verified in production: a stream held through the Vercel rewrite for the
+    # full 600s and then closed cleanly, so neither the proxy timeout nor the
+    # buffering risk materialised. Raise only with a fresh measurement.
     EVENT_STREAM_MAX_SECONDS: int = 600
     # Idle interval after which we emit a comment frame, so intermediaries do not
     # treat a quiet stream as a dead connection.
