@@ -128,6 +128,8 @@ export default function StudentsPage() {
   });
   const [deleteTarget, setDeleteTarget] = useState<Student | null>(null);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [nameError, setNameError] = useState("");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
@@ -195,6 +197,8 @@ export default function StudentsPage() {
       parent_relationship: "",
     });
     setEditingId(null);
+    setFormError(null);
+    setNameError("");
     setShowForm(true);
   };
 
@@ -210,15 +214,18 @@ export default function StudentsPage() {
       parent_relationship: "",
     });
     setEditingId(student.id);
+    setFormError(null);
+    setNameError("");
     setShowForm(true);
   };
 
   const handleSave = async () => {
     if (!validateName(form.full_name, locale as "ar" | "en")) {
-      setMessage({ type: "error", text: t.nameInvalid });
+      setNameError(t.nameInvalid);
       return;
     }
     setSubmitting(true);
+    setFormError(null);
     try {
       const payload: Record<string, unknown> = {
         student_code: sanitizeInput(form.student_code),
@@ -248,7 +255,7 @@ export default function StudentsPage() {
     } catch (e: any) {
       const detail = e?.response?.data?.detail;
       const text = Array.isArray(detail) ? detail.map((d: any) => d.msg).join("; ") : (detail || e.message || "Failed to save student");
-      setMessage({ type: "error", text });
+      setFormError(text);
     } finally {
       setSubmitting(false);
     }
@@ -339,6 +346,11 @@ export default function StudentsPage() {
 
       <Modal open={showForm} onClose={() => setShowForm(false)} title={editingId ? t.edit : t.add} size="xl">
         <div className="space-y-6">
+          {formError && (
+            <div className="px-4 py-3 rounded-lg text-sm font-medium bg-red-50 text-red-700 border border-red-200">
+              {formError}
+            </div>
+          )}
           <StudentFormFields
             values={form}
             onChange={setForm}
@@ -353,6 +365,8 @@ export default function StudentsPage() {
               parentEmail: t.parentEmail,
               parentRelationship: t.parentRelationship,
             }}
+            nameError={nameError}
+            onClearNameError={() => setNameError("")}
           />
           <div className="flex gap-3 pt-2">
             <button onClick={handleSave} disabled={submitting} className="btn-primary">{submitting ? "..." : t.save}</button>

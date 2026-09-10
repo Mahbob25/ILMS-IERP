@@ -94,6 +94,7 @@ export default function CoursesPage() {
   const [form, setForm] = useState({ name: "", code: "", description: "", credits: 3 });
   const [deleteTarget, setDeleteTarget] = useState<Course | null>(null);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -148,6 +149,7 @@ export default function CoursesPage() {
     setEditingId(null);
     setShowForm(true);
     setMessage(null);
+    setFormError(null);
   };
 
   const openEdit = (course: Course) => {
@@ -159,10 +161,12 @@ export default function CoursesPage() {
     });
     setEditingId(course.id);
     setShowForm(true);
+    setFormError(null);
   };
 
   const handleSave = async () => {
     setSubmitting(true);
+    setFormError(null);
     try {
       const payload: Record<string, unknown> = {
         name: sanitizeInput(form.name),
@@ -183,7 +187,8 @@ export default function CoursesPage() {
       handleRefresh();
     } catch (e) {
       setSubmitting(false);
-      setMessage({ type: "error", text: "Failed to save course" });
+      const err = e as { response?: { data?: { detail?: string } } };
+      setFormError(err?.response?.data?.detail || "Failed to save course");
     }
   };
 
@@ -283,6 +288,11 @@ export default function CoursesPage() {
 
       <Modal open={showForm} onClose={() => setShowForm(false)} title={editingId ? t.edit : t.add} size="xl">
         <div className="space-y-6">
+          {formError && (
+            <div className="px-4 py-3 rounded-lg text-sm font-medium bg-red-50 text-red-700 border border-red-200">
+              {formError}
+            </div>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label className="block text-xs font-medium text-slate-700 mb-1">{t.name}</label>

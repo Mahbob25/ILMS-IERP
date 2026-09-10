@@ -135,6 +135,7 @@ export default function EmployeesPage() {
   const [grantSubmitting, setGrantSubmitting] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
   const [grantForm, setGrantForm] = useState({ email: "", password: "", role_id: "" });
   const [grantError, setGrantError] = useState<string | null>(null);
 
@@ -177,6 +178,7 @@ export default function EmployeesPage() {
     setForm({ full_name: "", employee_type: "", phone_number: "", salary: "", hire_date: "", contract_end_date: "", address: "", compensation_type: "salary", default_percentage: "" });
     setEditingId(null);
     setShowForm(true);
+    setFormError(null);
   };
 
   const openEdit = (emp: Employee) => {
@@ -211,14 +213,16 @@ export default function EmployeesPage() {
     }
     setEditingId(emp.id);
     setShowForm(true);
+    setFormError(null);
   };
 
   const handleSave = async () => {
     if (!validateName(form.full_name, locale as "ar" | "en")) {
-      setMessage({ type: "error", text: t.invalidName });
+      setFormError(t.invalidName);
       return;
     }
     setSubmitting(true);
+    setFormError(null);
     try {
       const payload: Record<string, any> = {
         full_name: sanitizeInput(form.full_name),
@@ -248,7 +252,7 @@ export default function EmployeesPage() {
       setSubmitting(false);
       const detail = e?.response?.data?.detail;
       const text = Array.isArray(detail) ? detail.map((d: any) => d.msg).join("; ") : (detail || "Error");
-      setMessage({ type: "error", text });
+      setFormError(text);
     }
   };
 
@@ -378,6 +382,11 @@ export default function EmployeesPage() {
 
       <Modal open={showForm} onClose={() => setShowForm(false)} title={editingId ? t.editTitle : t.createTitle} size="xl">
         <div className="space-y-6">
+          {formError && (
+            <div className="px-4 py-3 rounded-lg text-sm font-medium bg-red-50 text-red-700 border border-red-200">
+              {formError}
+            </div>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div>
               <label className="block text-xs font-medium text-slate-700 mb-1">{t.fullName}</label>
