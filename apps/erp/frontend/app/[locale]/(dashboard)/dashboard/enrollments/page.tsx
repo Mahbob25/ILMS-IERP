@@ -163,6 +163,8 @@ export default function EnrollmentsPage() {
   const [unenrollTarget, setUnenrollTarget] = useState<Enrollment | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Enrollment | null>(null);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [enrollError, setEnrollError] = useState<string | null>(null);
+  const [createStudentError, setCreateStudentError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const submittingRef = useRef(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
@@ -254,6 +256,7 @@ export default function EnrollmentsPage() {
 
   const openEnrollModal = () => {
     setMessage(null);
+    setEnrollError(null);
     setForm({ student_id: "", section_id: "", admin_discount: "", price_override: "" });
     setShowEnrollModal(true);
   };
@@ -262,6 +265,7 @@ export default function EnrollmentsPage() {
     if (!form.section_id || !form.student_id || submittingRef.current) return;
     submittingRef.current = true;
     setSubmitting(true);
+    setEnrollError(null);
     try {
       const payload: Record<string, unknown> = {
         student_id: sanitizeInput(form.student_id),
@@ -275,7 +279,7 @@ export default function EnrollmentsPage() {
       fetchEnrollments(search, page);
     } catch (e: any) {
       const detail = e?.response?.data?.detail || e?.message || "Failed to save enrollment";
-      setMessage({ type: "error", text: detail });
+      setEnrollError(detail);
     } finally {
       submittingRef.current = false;
       setSubmitting(false);
@@ -291,6 +295,7 @@ export default function EnrollmentsPage() {
     }
     submittingRef.current = true;
     setSubmitting(true);
+    setCreateStudentError(null);
     try {
       const payload: Record<string, unknown> = {
         student_code: sanitizeInput(createStudentForm.student_code),
@@ -317,7 +322,7 @@ export default function EnrollmentsPage() {
       });
     } catch (e: any) {
       const detail = e?.response?.data?.detail || e?.message || "Failed to create student";
-      setMessage({ type: "error", text: detail });
+      setCreateStudentError(detail);
     } finally {
       submittingRef.current = false;
       setSubmitting(false);
@@ -403,6 +408,11 @@ export default function EnrollmentsPage() {
       {/* Enrollment Modal */}
       <Modal open={showEnrollModal} onClose={() => setShowEnrollModal(false)} title={t.add} size="xl">
         <div className="space-y-6">
+          {enrollError && (
+            <div className="px-4 py-3 rounded-lg text-sm font-medium bg-red-50 text-red-700 border border-red-200">
+              {enrollError}
+            </div>
+          )}
           <EnrollmentFormFields
             ref={enrollmentFormRef}
             studentId={form.student_id}
@@ -423,6 +433,7 @@ export default function EnrollmentsPage() {
                 parent_full_name: "", parent_phone: "", parent_email: "", parent_relationship: "",
               });
               setNameError("");
+              setCreateStudentError(null);
               setShowCreateStudentModal(true);
             }}
             labels={{
@@ -448,6 +459,11 @@ export default function EnrollmentsPage() {
       {/* Create Student Modal */}
       <Modal open={showCreateStudentModal} onClose={() => setShowCreateStudentModal(false)} title={t.createStudentTitle} size="xl">
         <div className="space-y-6">
+          {createStudentError && (
+            <div className="px-4 py-3 rounded-lg text-sm font-medium bg-red-50 text-red-700 border border-red-200">
+              {createStudentError}
+            </div>
+          )}
           <StudentFormFields
             values={createStudentForm}
             onChange={(next) => setCreateStudentForm(next)}

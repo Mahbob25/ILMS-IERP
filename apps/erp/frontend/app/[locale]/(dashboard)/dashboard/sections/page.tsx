@@ -75,6 +75,7 @@ export default function SectionsPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [registering, setRegistering] = useState(false);
+  const [registerError, setRegisterError] = useState<string | null>(null);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -450,6 +451,7 @@ export default function SectionsPage() {
     if (!registerForm.student_id) return;
     if (!showRegister) return;
     setRegistering(true);
+    setRegisterError(null);
     try {
       await apiClient.post("/academic/enrollments", {
         student_id: registerForm.student_id,
@@ -464,10 +466,9 @@ export default function SectionsPage() {
       fetchSections(search, statusFilter, page);
     } catch (e: unknown) {
       const err = e as { response?: { data?: { detail?: string } } };
-      setActionMessage({
-        type: "error",
-        text: err?.response?.data?.detail || t.registrationFailed,
-      });
+      setRegisterError(
+        err?.response?.data?.detail || t.registrationFailed,
+      );
     } finally {
       setRegistering(false);
     }
@@ -628,6 +629,7 @@ export default function SectionsPage() {
         onActivate={handleActivate}
         onRegister={(sectionId) => {
           setShowRegister(sectionId);
+          setRegisterError(null);
           setRegisterForm({ student_id: "", admin_discount: "" });
         }}
         onPageChange={(p) => {
@@ -645,6 +647,11 @@ export default function SectionsPage() {
         size="xl"
       >
         <div className="space-y-6">
+          {registerError && (
+            <div className="px-4 py-3 rounded-lg text-sm font-medium bg-red-50 text-red-700 border border-red-200">
+              {registerError}
+            </div>
+          )}
           <div>
             <label className="block text-xs font-medium text-slate-700 mb-1">
               {t.selectStudent}
