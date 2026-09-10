@@ -59,6 +59,17 @@ services:
     environment:
       TZ: ${TIMEZONE:-Asia/Riyadh}
       REDIS_PASSWORD: ${REDIS_PASSWORD:-lims_secure_redis_pass}
+      # Must stay comfortably BELOW the container memory limit above so Redis
+      # hits its own cap instead of being OOM-killed; the headroom covers
+      # client output buffers, the AOF rewrite buffer and fork COW pages.
+      # Raise this if the container limit is raised.
+      REDIS_MAXMEMORY: ${REDIS_MAXMEMORY:-192mb}
+      # volatile-lru evicts only keys WITH a TTL — the portal read-through
+      # cache (set with ex=60) — while the ai:* stream entries (no TTL) are
+      # never evicted. Do NOT use allkeys-lru here: it could silently drop
+      # queued jobs. With no volatile keys the write fails loudly, which is
+      # the intended degradation instead of an OOM kill.
+      REDIS_MAXMEMORY_POLICY: ${REDIS_MAXMEMORY_POLICY:-volatile-lru}
     # --requirepass is expanded by the container shell from REDIS_PASSWORD
     # (the `sh -c` layer is required: Compose's string form does NOT expand
     # variables, so the name would be passed to redis-server literally).
@@ -69,6 +80,8 @@ services:
       - >
         exec redis-server
         --requirepass "$$REDIS_PASSWORD"
+        --maxmemory "$$REDIS_MAXMEMORY"
+        --maxmemory-policy "$$REDIS_MAXMEMORY_POLICY"
         --appendonly yes
         --appendfsync everysec
     volumes:

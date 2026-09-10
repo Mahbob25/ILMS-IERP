@@ -267,6 +267,32 @@ check_disk() {
   fi
 }
 
+# Redis forks for BGSAVE / AOF rewrite; with vm.overcommit_memory=0 the
+# kernel's heuristic can refuse those allocations and the background save
+# fails. Persist the documented value so it survives a reboot. Idempotent,
+# and never fatal — the stack still runs (just with an unhardened Redis).
+prepare_host() {
+  local cur dropin=/etc/sysctl.d/99-redis-overcommit.conf
+  cur=$(cat /proc/sys/vm/overcommit_memory 2>/dev/null || echo "")
+  if [ "$cur" = "1" ]; then
+    ok "vm.overcommit_memory already 1"
+    return 0
+  fi
+  if ! sudo -n true 2>/dev/null; then
+    warn "vm.overcommit_memory is ${cur:-unknown} (Redis wants 1) and sudo is not passwordless."
+    warn "Redis still runs, but a background AOF/RDB save may fail under memory pressure."
+    warn "Fix as root:  echo 'vm.overcommit_memory = 1' > $dropin && sysctl -p $dropin"
+    return 0
+  fi
+  info "Setting vm.overcommit_memory=1 (required by Redis background saves)"
+  if echo 'vm.overcommit_memory = 1' | sudo tee "$dropin" >/dev/null \
+     && sudo sysctl -p "$dropin" >/dev/null 2>&1; then
+    ok "vm.overcommit_memory=1 (persisted in $dropin)"
+  else
+    warn "Could not set vm.overcommit_memory — continuing; Redis logs a warning."
+  fi
+}
+
 get_env() {
   grep -E "^$1=" "$ENV_FILE" 2>/dev/null | head -1 | cut -d= -f2-
 }
@@ -548,6 +574,7 @@ main() {
   if [ "$FIRST_RUN" = "1" ]; then
     check_port_80
   fi
+  prepare_host
   if [ "$FRESH" = "1" ]; then
     warn "Wiping ALL containers and volumes (--fresh). Data will be lost."
     "${COMPOSE[@]}" -f "$COMPOSE_FILE" down -v || true
