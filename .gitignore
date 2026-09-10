@@ -11,6 +11,7 @@ build/
 venv/
 env/
 *.log
+lms-key.pem
 apps/erp/backend/backend_err.log
 apps/erp/backend/backend_out.log
 SSH-KEY.pem
@@ -52,6 +53,9 @@ desktop.ini
 next_error.txt
 next_output.txt
 .npm-cache/
+
+# --- Production health check raw evidence (local, regenerated each run) ---
+production-health-latest.txt
 
 # --- TypeScript ---
 tsconfig.tsbuildinfo
