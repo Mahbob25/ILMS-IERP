@@ -31,6 +31,18 @@ class Settings(BaseSettings):
     NOTIFICATION_RETENTION_DAYS: int = 90
     BACKUP_DIR: str = "/app/backups"
 
+    # ── System Health page probes (read-only, in-container) ───────────────
+    # Per-probe timeout for the Redis/HTTP checks on the health endpoint.
+    HEALTH_PROBE_TIMEOUT_SECONDS: float = 2.0
+    # Backup freshness thresholds surfaced as health status.
+    HEALTH_BACKUP_WARN_HOURS: int = 26
+    HEALTH_BACKUP_FAIL_HOURS: int = 48
+    # Empty → resolved next to the app package (see sysmetrics.service).
+    ALEMBIC_INI_PATH: str = ""
+    # Sibling containers on the lims-internal network. Empty disables a probe.
+    HEALTH_PORTAL_HEALTH_URL: str = "http://portal-backend:8001/api/health"
+    HEALTH_GATEWAY_HEALTH_URL: str = "http://caddy/api/v1/health"
+
     # ── Portal (Phase 0) ──────────────────────────────────────────
     # Doc-only in ERP: ERP never signs portal JWTs (portal BFF owns them).
     PORTAL_JWT_SECRET: str = ""

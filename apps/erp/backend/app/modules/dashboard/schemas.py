@@ -3,6 +3,16 @@ from datetime import date, datetime
 from typing import Optional
 from pydantic import BaseModel
 
+from app.modules.sysmetrics.schemas import (
+    HealthResources,
+    HealthDatabase,
+    HealthMigrations,
+    HealthRedis,
+    HealthService,
+    HealthJob,
+    HealthBackups,
+)
+
 
 class SectionInfo(BaseModel):
     id: uuid.UUID
@@ -94,6 +104,15 @@ class ExtendedSystemHealth(BaseModel):
     service: str
     version: str
     last_backup: Optional[str] = None
+
+    # Detailed, independently-degrading metric sections (see sysmetrics).
+    resources: Optional[HealthResources] = None
+    database: Optional[HealthDatabase] = None
+    migrations: Optional[HealthMigrations] = None
+    redis: Optional[HealthRedis] = None
+    services: list[HealthService] = []
+    jobs: list[HealthJob] = []
+    backups: Optional[HealthBackups] = None
 
     class Config:
         from_attributes = True

@@ -17,6 +17,7 @@ from app.modules.lms.models import (
     AttendanceSession, Assignment, Submission, Grade
 )
 from app.modules.identity.models import User, Employee, AuditLog
+from app.modules.sysmetrics import service as sysmetrics_service
 from app.modules.dashboard.schemas import (
     SectionInfo, TodaySession,
     DailyTransaction, UnlockRequest, AuditLogEntry,
@@ -348,9 +349,8 @@ async def get_extended_health(db: AsyncSession) -> dict:
     except Exception:
         logger.warning("Health check — database unreachable")
 
-    disk = psutil.disk_usage("/")
-    mem = psutil.virtual_memory()
-    cpu = psutil.cpu_percent(interval=0)
+    metrics = await sysmetrics_service.gather_metrics(db)
+    resources = metrics.get("resources") or {}
 
     total_users_result = await db.execute(select(func.count()).select_from(User))
     total_users = total_users_result.scalar() or 0
@@ -379,16 +379,36 @@ async def get_extended_health(db: AsyncSession) -> dict:
     else:
         api_uptime = f"{hours}h {(uptime_delta.seconds % 3600) // 60}m"
 
+    # Container-accurate where cgroups expose it, psutil otherwise. The flat
+    # fields below are kept for compatibility, but now report the container's
+    # own memory/CPU rather than host-wide /proc numbers.
+    disk = psutil.disk_usage("/")
+    mem_used_mb = resources.get("memory_used_mb")
+    mem_limit_mb = resources.get("memory_limit_mb")
+    mem_percent = resources.get("memory_percent")
+    cpu_percent = resources.get("cpu_percent")
+
+    if mem_used_mb is None or mem_limit_mb is None:
+        mem = psutil.virtual_memory()
+        if mem_used_mb is None:
+            mem_used_mb = mem.used / (1024 ** 2)
+        if mem_limit_mb is None:
+            mem_limit_mb = mem.total / (1024 ** 2)
+    if mem_percent is None:
+        mem_percent = round(mem_used_mb / mem_limit_mb * 100, 1) if mem_limit_mb else 0.0
+    if cpu_percent is None:
+        cpu_percent = psutil.cpu_percent(interval=0.1)
+
     return {
         "db_status": db_status,
         "api_uptime": api_uptime,
-        "disk_usage_percent": disk.percent,
-        "disk_total_gb": round(disk.total / (1024 ** 3), 1),
-        "disk_used_gb": round(disk.used / (1024 ** 3), 1),
-        "memory_percent": mem.percent,
-        "memory_total_gb": round(mem.total / (1024 ** 3), 1),
-        "memory_used_gb": round(mem.used / (1024 ** 3), 1),
-        "cpu_percent": cpu,
+        "disk_usage_percent": resources.get("host_disk_percent", disk.percent),
+        "disk_total_gb": resources.get("host_disk_total_gb", round(disk.total / (1024 ** 3), 1)),
+        "disk_used_gb": resources.get("host_disk_used_gb", round(disk.used / (1024 ** 3), 1)),
+        "memory_percent": mem_percent,
+        "memory_total_gb": round(mem_limit_mb / 1024, 1),
+        "memory_used_gb": round(mem_used_mb / 1024, 1),
+        "cpu_percent": cpu_percent,
         "total_users": total_users,
         "total_students": total_students,
         "total_courses": total_courses,
@@ -396,4 +416,11 @@ async def get_extended_health(db: AsyncSession) -> dict:
         "service": "lims-api-server",
         "version": "1.7",
         "last_backup": last_backup,
+        "resources": metrics.get("resources"),
+        "database": metrics.get("database"),
+        "migrations": metrics.get("migrations"),
+        "redis": metrics.get("redis"),
+        "services": metrics.get("services") or [],
+        "jobs": metrics.get("jobs") or [],
+        "backups": metrics.get("backups"),
     }
