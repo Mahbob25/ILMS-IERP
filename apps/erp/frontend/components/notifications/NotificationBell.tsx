@@ -15,8 +15,9 @@ import {
 } from "@/lib/events";
 
 // The realtime stream is the primary signal. This interval is only a safety net
-// for when the stream is not open (see the fallback effect below): with a
-// healthy stream the badge updates on push and this never fires.
+// for a stream that has genuinely given up ("down") — not for the ~1s reconnect
+// that follows each clean 600s close, whose `ready` event already carries the
+// count. With a healthy stream this never fires.
 const FALLBACK_POLL_MS = 5 * 60_000;
 const MAX_DROPDOWN_ITEMS = 10;
 const UNDO_CLEAR_SECONDS = 30;
@@ -156,10 +157,15 @@ export default function NotificationBell() {
     };
   }, [user, fetchUnreadCount, fetchItems]);
 
-  // Safety net: poll only while the stream is NOT open and the tab is visible.
-  // With a healthy stream this never fires, so unread-count traffic drops to
-  // near zero; if the stream dies silently the badge still self-corrects rather
-  // than freezing.
+  // Safety net for a stream that has genuinely given up. Keyed on "down"
+  // specifically: "connecting" is the ~1s window of a normal reconnect (the
+  // server closes us at EVENT_STREAM_MAX_SECONDS and EventSource retries on the
+  // retry hint), and that reconnect's `ready` event already delivers a fresh
+  // count — polling for it would just add a request per recycle.
+  //
+  // The poll is the last resort, not the recovery path: the stream client
+  // retries with backoff, so a recovered backend restores the count via `ready`
+  // long before this interval matters.
   useEffect(() => {
     if (!user) return;
 
@@ -167,12 +173,12 @@ export default function NotificationBell() {
 
     const sync = () => {
       const shouldPoll =
-        eventStream.getState() !== "open" &&
+        eventStream.getState() === "down" &&
         document.visibilityState === "visible";
 
       if (shouldPoll && !interval) {
-        // Fetch immediately so there is no blind spot at mount or when
-        // returning to the tab.
+        // Reconcile immediately on entering "down", then keep a slow net under
+        // it, so the badge never freezes while the stream is gone.
         fetchUnreadCount();
         interval = setInterval(() => {
           if (document.visibilityState === "visible") fetchUnreadCount();
@@ -183,6 +189,9 @@ export default function NotificationBell() {
       }
     };
 
+    // Focus stays broader than the interval on purpose: it is user-initiated and
+    // infrequent, and it is the one thing that covers a background tab whose
+    // EventSource was suspended and has not silently recovered.
     const onFocus = () => {
       if (eventStream.getState() !== "open") fetchUnreadCount();
     };
