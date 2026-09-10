@@ -170,10 +170,19 @@ class StudentResponse(BaseModel):
 
 
 # --- Enrollment ---
+def _validate_price_override(v: Optional[float]) -> Optional[float]:
+    if v is None:
+        return v
+    if v < 0:
+        raise ValueError("Price override cannot be negative")
+    return round(v, 2)
+
+
 class EnrollmentCreate(BaseModel):
     student_id: uuid.UUID
     section_id: uuid.UUID
     admin_discount: Optional[float] = None
+    price_override: Optional[float] = None
 
     @field_validator("admin_discount")
     @classmethod
@@ -186,11 +195,17 @@ class EnrollmentCreate(BaseModel):
             raise ValueError("Discount cannot exceed 100%")
         return round(v, 2)
 
+    @field_validator("price_override")
+    @classmethod
+    def validate_price_override(cls, v: Optional[float]) -> Optional[float]:
+        return _validate_price_override(v)
+
 
 class EnrollmentCreateWithStudent(BaseModel):
     student_id: Optional[uuid.UUID] = None
     section_id: uuid.UUID
     admin_discount: Optional[float] = None
+    price_override: Optional[float] = None
     student_code: Optional[str] = None
     full_name: Optional[str] = None
     email: Optional[str] = None
@@ -211,6 +226,11 @@ class EnrollmentCreateWithStudent(BaseModel):
             raise ValueError("Discount cannot exceed 100%")
         return round(v, 2)
 
+    @field_validator("price_override")
+    @classmethod
+    def validate_price_override(cls, v: Optional[float]) -> Optional[float]:
+        return _validate_price_override(v)
+
 
 class EnrollmentResponse(BaseModel):
     id: uuid.UUID
@@ -218,7 +238,10 @@ class EnrollmentResponse(BaseModel):
     section_id: uuid.UUID
     enrolled_at: datetime
     agreed_price: Optional[float] = None
+    price_override: Optional[float] = None
     admin_discount: Optional[float] = None
+    discount_amount: Optional[float] = None
+    net_price: Optional[float] = None
     total_paid: float = 0
     balance_remaining: Optional[float] = None
 
@@ -232,7 +255,11 @@ class EnrollmentDetailResponse(BaseModel):
     section_id: uuid.UUID
     enrolled_at: datetime
     agreed_price: Optional[float] = None
+    base_price: Optional[float] = None
+    price_override: Optional[float] = None
     admin_discount: Optional[float] = None
+    discount_amount: Optional[float] = None
+    net_price: Optional[float] = None
     student_name: str
     student_code: str
     student_email: Optional[str] = None

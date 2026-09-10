@@ -27,6 +27,7 @@ async def test_certificate_creation_failure_logged():
     enrollment.section = section
     enrollment.deleted_at = None
     enrollment.agreed_price = Decimal("500")
+    enrollment.price_override = None
     enrollment.admin_discount = Decimal("0")
 
     db = AsyncMock()

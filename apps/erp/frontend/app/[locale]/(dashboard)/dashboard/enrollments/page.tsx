@@ -52,6 +52,7 @@ export default function EnrollmentsPage() {
       enrolledAt: "تاريخ التسجيل",
       price: "السعر",
       discount: "الخصم (%)",
+      priceOverride: "سعر خاص (ريال)",
       actions: "الإجراءات",
       add: "تسجيل طالب",
       delete: "حذف",
@@ -101,6 +102,7 @@ export default function EnrollmentsPage() {
       enrolledAt: "Enrolled At",
       price: "Price",
       discount: "Discount (%)",
+      priceOverride: "Custom price (SAR)",
       actions: "Actions",
       add: "Enroll Student",
       delete: "Delete",
@@ -151,7 +153,7 @@ export default function EnrollmentsPage() {
   const [loading, setLoading] = useState(true);
   const [showEnrollModal, setShowEnrollModal] = useState(false);
   const [showCreateStudentModal, setShowCreateStudentModal] = useState(false);
-  const [form, setForm] = useState({ student_id: "", section_id: "", admin_discount: "" });
+  const [form, setForm] = useState({ student_id: "", section_id: "", admin_discount: "", price_override: "" });
   const [createStudentForm, setCreateStudentForm] = useState({
     student_code: "", full_name: "", email: "", phone: "",
     parent_full_name: "", parent_phone: "", parent_email: "", parent_relationship: "",
@@ -252,7 +254,7 @@ export default function EnrollmentsPage() {
 
   const openEnrollModal = () => {
     setMessage(null);
-    setForm({ student_id: "", section_id: "", admin_discount: "" });
+    setForm({ student_id: "", section_id: "", admin_discount: "", price_override: "" });
     setShowEnrollModal(true);
   };
 
@@ -266,6 +268,7 @@ export default function EnrollmentsPage() {
         section_id: sanitizeInput(form.section_id),
       };
       if (form.admin_discount) payload.admin_discount = parseFloat(form.admin_discount);
+      if (form.price_override) payload.price_override = parseFloat(form.price_override);
       await apiClient.post("/academic/enrollments", payload);
       setShowEnrollModal(false);
       fetchLookups();
@@ -411,6 +414,8 @@ export default function EnrollmentsPage() {
             showDiscount={user?.role?.name !== "secretary"}
             discount={form.admin_discount}
             onDiscountChange={(value) => setForm({ ...form, admin_discount: value })}
+            priceOverride={form.price_override}
+            onPriceOverrideChange={(value) => setForm({ ...form, price_override: value })}
             students={students}
             onCreateNewStudent={() => {
               setCreateStudentForm({
@@ -427,6 +432,7 @@ export default function EnrollmentsPage() {
               noResults: t.noResults,
               selectSection: t.selectSection,
               discount: t.discount,
+              priceOverride: t.priceOverride,
             }}
           />
           <div className="flex gap-3 pt-2">

@@ -23,6 +23,7 @@ from app.modules.academic.models import (
     Course, CourseSection, Enrollment, Student, Refund, PendingRefund,
 )
 from app.modules.identity.models import Employee, EmployeeType, User
+from app.modules.academic.pricing import get_enrollment_price_components
 from app.core.error_messages import get_error_detail
 from app.core.timezone import utcnow
 
@@ -108,12 +109,13 @@ async def create_payment(
         .where(Payment.enrollment_id == enrollment_id)
     )
     total_paid_before = Decimal(str(total_paid_result.scalar() or 0))
-    agreed_price = enrollment.agreed_price or (enrollment.section.price if enrollment.section else 0) or 0
-    discount_pct = enrollment.admin_discount or 0
-    discount_amount = agreed_price * discount_pct / 100
-    net_price = agreed_price - discount_amount
-    if net_price <= 0:
-        net_price = max(agreed_price, 1)
+    components = await get_enrollment_price_components(
+        db, enrollment, section=enrollment.section
+    )
+    base_price = components["base_price"] or Decimal("0")
+    net_price = components["net_price"]
+    if net_price is None or net_price <= 0:
+        net_price = max(base_price, Decimal("1"))
     remaining = net_price - total_paid_before
     if amount > remaining + Decimal('0.001'):
         raise HTTPException(
@@ -804,18 +806,21 @@ async def get_student_payment_summary(
     )
     enrollment = enrollment_result.scalar_one_or_none()
 
-    agreed_price = enrollment.agreed_price if enrollment else None
-    if agreed_price is None and enrollment and enrollment.section:
-        agreed_price = enrollment.section.price
-    admin_discount = enrollment.admin_discount if enrollment else None
-    discount_amount = (agreed_price * admin_discount / 100) if (agreed_price is not None and admin_discount is not None) else None
-    net_price = (agreed_price - discount_amount) if (agreed_price is not None and discount_amount is not None) else agreed_price
+    components = (
+        await get_enrollment_price_components(db, enrollment, section=enrollment.section)
+        if enrollment
+        else {"base_price": None, "admin_discount": None, "discount_amount": None, "net_price": None}
+    )
+    agreed_price = components["base_price"]
+    net_price = components["net_price"]
     balance_remaining = (net_price - total_paid) if net_price is not None else None
 
     return {
         "total_paid": total_paid,
         "agreed_price": agreed_price,
-        "admin_discount": admin_discount,
+        "base_price": agreed_price,
+        "admin_discount": components["admin_discount"],
+        "discount_amount": components["discount_amount"],
         "net_price": net_price,
         "balance_remaining": balance_remaining,
     }

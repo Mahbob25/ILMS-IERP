@@ -7,6 +7,7 @@ export interface SectionEnrollmentStepLabels {
   selectStudent: string;
   selectSection: string;
   discount: string;
+  priceOverride: string;
   sectionNotSelected: string;
 }
 
@@ -19,6 +20,8 @@ interface SectionEnrollmentStepProps {
   showDiscount: boolean;
   discount: string;
   onDiscountChange: (value: string) => void;
+  priceOverride: string;
+  onPriceOverrideChange: (value: string) => void;
   error: string;
   labels: SectionEnrollmentStepLabels;
 }
@@ -32,6 +35,8 @@ export default function SectionEnrollmentStep({
   showDiscount,
   discount,
   onDiscountChange,
+  priceOverride,
+  onPriceOverrideChange,
   error,
   labels,
 }: SectionEnrollmentStepProps) {
@@ -47,6 +52,8 @@ export default function SectionEnrollmentStep({
         showDiscount={showDiscount}
         discount={discount}
         onDiscountChange={onDiscountChange}
+        priceOverride={priceOverride}
+        onPriceOverrideChange={onPriceOverrideChange}
         students={[]}
         onCreateNewStudent={() => {}}
         labels={{
@@ -56,6 +63,7 @@ export default function SectionEnrollmentStep({
           noResults: "",
           selectSection: labels.selectSection,
           discount: labels.discount,
+          priceOverride: labels.priceOverride,
         }}
         lockedStudent
         lockedStudentName={studentName}

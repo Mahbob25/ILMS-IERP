@@ -22,6 +22,7 @@ from app.modules.lms.ledger_service import get_or_create_wallet, get_wallet_summ
 class TestPureFunctions:
     async def test_calculate_net_price_with_discount(self):
         enrollment = MagicMock()
+        enrollment.price_override = None
         enrollment.agreed_price = Decimal("5000")
         enrollment.admin_discount = Decimal("10")
         result = _calculate_net_price(enrollment)
@@ -29,6 +30,7 @@ class TestPureFunctions:
 
     async def test_calculate_net_price_no_discount(self):
         enrollment = MagicMock()
+        enrollment.price_override = None
         enrollment.agreed_price = Decimal("5000")
         enrollment.admin_discount = None
         result = _calculate_net_price(enrollment)
@@ -36,10 +38,19 @@ class TestPureFunctions:
 
     async def test_calculate_net_price_zero_price(self):
         enrollment = MagicMock()
+        enrollment.price_override = None
         enrollment.agreed_price = None
         enrollment.admin_discount = None
         result = _calculate_net_price(enrollment)
         assert result == Decimal("0")
+
+    async def test_calculate_net_price_prefers_price_override(self):
+        enrollment = MagicMock()
+        enrollment.price_override = Decimal("800")
+        enrollment.agreed_price = Decimal("5000")
+        enrollment.admin_discount = Decimal("10")
+        result = _calculate_net_price(enrollment)
+        assert result == Decimal("720")
 
 
 @pytest.mark.asyncio

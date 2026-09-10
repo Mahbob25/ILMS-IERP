@@ -37,6 +37,7 @@ def make_enrollment(**kwargs):
     e.section_id = kwargs.get("section_id", uuid.uuid4())
     e.deleted_at = kwargs.get("deleted_at", None)
     e.agreed_price = kwargs.get("agreed_price", Decimal("5000"))
+    e.price_override = kwargs.get("price_override")
     e.admin_discount = kwargs.get("admin_discount", Decimal("10"))
     e.section = kwargs.get("section")
     e.student = kwargs.get("student")

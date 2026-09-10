@@ -53,6 +53,7 @@ export interface Wizard1State {
   nameError: string;
   sectionId: string;
   discount: string;
+  priceOverride: string;
   enrollment: EnrollmentInfo | null;
   summary: PaymentSummary | null;
   payment: PaymentInfo | null;
@@ -95,6 +96,7 @@ export type Wizard1Action =
   | { type: "CREATE_STUDENT_SUCCESS"; student: StudentInfo }
   | { type: "SET_SECTION"; sectionId: string }
   | { type: "SET_DISCOUNT"; discount: string }
+  | { type: "SET_PRICE_OVERRIDE"; priceOverride: string }
   | { type: "ENROLL_START" }
   | {
       type: "ENROLL_SUCCESS";
@@ -136,6 +138,7 @@ export const createInitialWizard1State = (): Wizard1State => ({
   nameError: "",
   sectionId: "",
   discount: "",
+  priceOverride: "",
   enrollment: null,
   summary: null,
   payment: null,
@@ -199,6 +202,8 @@ export function wizard1Reducer(
       return { ...state, sectionId: action.sectionId, error: "" };
     case "SET_DISCOUNT":
       return { ...state, discount: action.discount, error: "" };
+    case "SET_PRICE_OVERRIDE":
+      return { ...state, priceOverride: action.priceOverride, error: "" };
     case "ENROLL_START":
       return { ...state, submitting: true, error: "" };
     case "ENROLL_SUCCESS":

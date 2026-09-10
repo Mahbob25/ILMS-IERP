@@ -20,6 +20,7 @@ from fastapi import HTTPException
 from app.core.timezone import utcnow
 from app.modules.academic.models import Course, CourseSection, Enrollment, Student, FinalGrade
 from app.modules.academic.certificate_service import get_grade_label
+from app.modules.academic.pricing import get_enrollment_price_components
 from app.modules.lms.models import (
     AttendanceRecord,
     AttendanceSession,
@@ -636,14 +637,10 @@ async def get_student_section_report(
     course = section.course
     teacher_employee = section.teacher_employee
 
-    agreed_price = enrollment.agreed_price if enrollment.agreed_price is not None else section.price
-    admin_discount = enrollment.admin_discount
-    net_price = None
-    if agreed_price is not None:
-        if admin_discount is not None:
-            net_price = Decimal(str(agreed_price)) - (Decimal(str(agreed_price)) * Decimal(str(admin_discount)) / Decimal("100"))
-        else:
-            net_price = Decimal(str(agreed_price))
+    components = await get_enrollment_price_components(db, enrollment, section=section)
+    agreed_price = components["base_price"]
+    admin_discount = components["admin_discount"]
+    net_price = components["net_price"]
 
     total_paid_result = await db.execute(
         select(func.coalesce(func.sum(Payment.amount), 0)).where(Payment.enrollment_id == enrollment.id)

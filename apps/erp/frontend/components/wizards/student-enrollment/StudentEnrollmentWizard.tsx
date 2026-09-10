@@ -115,6 +115,7 @@ export default function StudentEnrollmentWizard({
       backToSearch: "رجوع للبحث",
       selectSection: "اختر الشعبة",
       discount: "الخصم (%)",
+      priceOverride: "سعر خاص (ريال)",
       selectEnrollment: "التسجيل",
       enterAmount: "أدخل المبلغ",
       paymentDate: "تاريخ الدفع",
@@ -181,6 +182,7 @@ export default function StudentEnrollmentWizard({
       backToSearch: "Back to Search",
       selectSection: "Select Section",
       discount: "Discount (%)",
+      priceOverride: "Custom price (SAR)",
       selectEnrollment: "Select Enrollment",
       enterAmount: "Enter Amount",
       paymentDate: "Payment Date",
@@ -417,6 +419,9 @@ useEffect(() => {
       if (state.discount) {
         payload.admin_discount = parseFloat(state.discount);
       }
+      if (state.priceOverride) {
+        payload.price_override = parseFloat(state.priceOverride);
+      }
       const res = await apiClient.post<{
         id: string;
         agreed_price: number | null;
@@ -600,6 +605,7 @@ useEffect(() => {
     selectStudent: t.studentLocked,
     selectSection: t.selectSection,
     discount: t.discount,
+    priceOverride: t.priceOverride,
     sectionNotSelected: t.errors.no_section,
   };
 
@@ -703,6 +709,11 @@ useEffect(() => {
             onDiscountChange={(discount) => {
               markDirty();
               dispatch({ type: "SET_DISCOUNT", discount });
+            }}
+            priceOverride={state.priceOverride}
+            onPriceOverrideChange={(priceOverride) => {
+              markDirty();
+              dispatch({ type: "SET_PRICE_OVERRIDE", priceOverride });
             }}
             error={state.step === 2 ? stepError : ""}
             labels={sectionLabels}

@@ -27,6 +27,7 @@ export interface EnrollmentFormLabels {
   noResults: string;
   selectSection: string;
   discount: string;
+  priceOverride: string;
 }
 
 interface EnrollmentFormFieldsProps {
@@ -39,6 +40,8 @@ interface EnrollmentFormFieldsProps {
   showDiscount: boolean;
   discount: string;
   onDiscountChange: (value: string) => void;
+  priceOverride?: string;
+  onPriceOverrideChange?: (value: string) => void;
   students: Student[];
   onCreateNewStudent: () => void;
   labels: EnrollmentFormLabels;
@@ -61,6 +64,8 @@ const EnrollmentFormFields = forwardRef<
     showDiscount,
     discount,
     onDiscountChange,
+    priceOverride = "",
+    onPriceOverrideChange,
     students,
     onCreateNewStudent,
     labels,
@@ -132,6 +137,21 @@ const EnrollmentFormFields = forwardRef<
             className="input-field"
             min={0}
             max={100}
+          />
+        </div>
+      )}
+      {showDiscount && (
+        <div>
+          <label className="block text-xs font-medium text-slate-700 mb-1">
+            {labels.priceOverride}
+          </label>
+          <input
+            type="number"
+            value={priceOverride}
+            onChange={(e) => onPriceOverrideChange?.(e.target.value)}
+            className="input-field"
+            min={0}
+            placeholder="—"
           />
         </div>
       )}

@@ -10,6 +10,7 @@ from sqlalchemy.orm import joinedload
 
 from app.modules.lms.models import Payment, Expense
 from app.modules.academic.models import Enrollment, CourseSection, Refund, PendingRefund
+from app.modules.academic.pricing import get_enrollment_price_components
 from app.modules.identity.models import User
 from app.core.templates import template_engine
 
@@ -178,12 +179,12 @@ async def get_receipt_html_content(db: AsyncSession, payment_id: uuid.UUID, loca
         .where(Payment.enrollment_id == enrollment.id)
     )
     total_paid = Decimal(str(total_paid_result.scalar() or 0))
-    agreed_price = enrollment.agreed_price or 0
-    discount_pct = enrollment.admin_discount or 0
-    discount_amount = agreed_price * discount_pct / 100
-    net_price = agreed_price - discount_amount
-    if net_price <= 0:
-        net_price = max(agreed_price, 1)
+    components = await get_enrollment_price_components(db, enrollment, section=section)
+    agreed_price = components["base_price"] or Decimal("0")
+    discount_amount = components["discount_amount"] or Decimal("0")
+    net_price = components["net_price"]
+    if net_price is None or net_price <= 0:
+        net_price = max(agreed_price, Decimal("1"))
     balance_remaining = net_price - total_paid
 
     cashier_name = (payment.created_by_user.full_name or "") if payment.created_by_user else ""

@@ -1,7 +1,7 @@
 import uuid
 from datetime import date, datetime, time
 from typing import Optional, TYPE_CHECKING
-from sqlalchemy import String, Integer, Float, Date, DateTime, Time, ForeignKey, Text, Boolean, Enum as SAEnum, UniqueConstraint, CheckConstraint, Numeric, text
+from sqlalchemy import String, Integer, Float, Date, DateTime, Time, ForeignKey, Text, Boolean, Enum as SAEnum, UniqueConstraint, CheckConstraint, Numeric, Index, text
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID, JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
@@ -145,6 +145,9 @@ class CourseSection(Base):
     teacher_employee: Mapped[Optional["Employee"]] = relationship(back_populates="sections")
     contract: Mapped[Optional["SectionContract"]] = relationship(back_populates="section", uselist=False)
     enrollments: Mapped[list["Enrollment"]] = relationship(back_populates="section", cascade="all, delete-orphan")
+    price_records: Mapped[list["SectionPriceRecord"]] = relationship(
+        back_populates="section", cascade="all, delete-orphan", order_by="SectionPriceRecord.effective_at"
+    )
     attendance_sessions: Mapped[list["AttendanceSession"]] = relationship(back_populates="section", cascade="all, delete-orphan")
     assignments: Mapped[list["Assignment"]] = relationship(back_populates="section", cascade="all, delete-orphan")
     certificates: Mapped[list["Certificate"]] = relationship(back_populates="section", cascade="all, delete-orphan")
@@ -191,6 +194,7 @@ class Enrollment(Base):
         server_default="timezone('utc'::text, now())"
     )
     agreed_price: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
+    price_override: Mapped[Optional[float]] = mapped_column(Numeric(12, 2), nullable=True)
     admin_discount: Mapped[Optional[float]] = mapped_column(Numeric(5, 2), nullable=True)
     deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
@@ -200,6 +204,37 @@ class Enrollment(Base):
     certificates: Mapped[list["Certificate"]] = relationship(back_populates="enrollment", cascade="all, delete-orphan")
     pending_refunds: Mapped[list["PendingRefund"]] = relationship(back_populates="enrollment", cascade="all, delete-orphan")
     unenrollment_records: Mapped[list["UnenrollmentRecord"]] = relationship(back_populates="enrollment", cascade="all, delete-orphan")
+
+
+class SectionPriceRecord(Base):
+    __tablename__ = "section_price_history"
+    __table_args__ = (
+        Index("ix_section_price_history_section_effective", "section_id", "effective_at"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4,
+        server_default="gen_random_uuid()"
+    )
+    section_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("course_sections.id", ondelete="CASCADE"), nullable=False
+    )
+    price: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
+    effective_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False,
+        server_default="timezone('utc'::text, now())"
+    )
+    created_by: Mapped[Optional[uuid.UUID]] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False,
+        default=utcnow,
+        server_default=text("timezone('utc'::text, now())"),
+    )
+
+    section: Mapped["CourseSection"] = relationship(back_populates="price_records")
+    created_by_user: Mapped[Optional["User"]] = relationship()
 
 
 class SectionCancellation(Base):

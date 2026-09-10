@@ -7,6 +7,7 @@ from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import joinedload
+from sqlalchemy.orm.attributes import set_committed_value
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import exists, func, or_, and_
 
@@ -19,9 +20,15 @@ from app.modules.academic.models import (
     FinalGrade,
     SectionCompletionOverride,
     SectionLifecycleConfig,
+    SectionPriceRecord,
     DailyJobsLog,
 )
 from app.modules.academic.certificate_service import create_certificate, get_grade_label
+from app.modules.academic.pricing import (
+    apply_discount,
+    get_enrollment_price_components_batch,
+    to_decimal,
+)
 from app.modules.identity.models import User
 from app.modules.lms.models import Payment, ContractStatus, SectionContract
 from app.modules.lms.financial_service import create_payment as lms_create_payment
@@ -31,7 +38,7 @@ from app.modules.lms.ledger_service import (
     finalize_grades_for_section as ledger_finalize_grades,
     deactivate_contract as ledger_deactivate_contract,
 )
-from app.core.timezone import get_today
+from app.core.timezone import get_today, utcnow
 from app.modules.portal_accounts import service as portal_accounts_service
 
 
@@ -118,6 +125,13 @@ async def create_course_section(db: AsyncSession, data: dict) -> CourseSection:
     section = CourseSection(**data)
     db.add(section)
     await db.flush()
+    if section.price is not None:
+        db.add(SectionPriceRecord(
+            section_id=section.id,
+            price=section.price,
+            effective_at=utcnow(),
+        ))
+        await db.flush()
     return section
 
 
@@ -200,30 +214,34 @@ async def list_course_sections(
 
 
 async def update_course_section(
-    db: AsyncSession, section_id: uuid.UUID, data: dict
+    db: AsyncSession,
+    section_id: uuid.UUID,
+    data: dict,
+    updated_by: Optional[uuid.UUID] = None,
 ) -> Optional[CourseSection]:
     section = await get_course_section(db, section_id)
     if not section:
         return None
 
+    new_price = data.get("price")
+    price_changed = (
+        new_price is not None
+        and to_decimal(new_price) != to_decimal(section.price)
+    )
+
     for key, value in data.items():
         if value is not None:
             setattr(section, key, value)
 
-    # Propagate price to enrollments without an agreed_price.
-    # Direct ORM mutation is intentional - SQLAlchemy tracks these changes
-    # and will persist them on the next flush/commit.
-    if "price" in data and data["price"] is not None:
-        result = await db.execute(
-            select(Enrollment).where(
-                Enrollment.section_id == section_id,
-                Enrollment.deleted_at.is_(None),
-                Enrollment.agreed_price.is_(None),
-            )
-        )
-        enrollments_to_update = result.scalars().all()
-        for enrollment in enrollments_to_update:
-            enrollment.agreed_price = data["price"]
+    # Record every price change so enrollments can derive the price that was in
+    # effect when they were created. Existing enrollments are never rewritten.
+    if price_changed:
+        db.add(SectionPriceRecord(
+            section_id=section_id,
+            price=section.price,
+            effective_at=utcnow(),
+            created_by=updated_by,
+        ))
 
     await db.flush()
     return section
@@ -322,8 +340,15 @@ async def complete_section(
             Enrollment.deleted_at.is_(None),
         )
     )
-    for enrollment in enrollments_result.scalars().all():
-        net_price = _calculate_net_price(enrollment)
+    completion_enrollments = enrollments_result.scalars().all()
+    price_components = await get_enrollment_price_components_batch(
+        db,
+        completion_enrollments,
+        sections_by_id={section.id: section},
+    )
+    for enrollment in completion_enrollments:
+        components = price_components.get(enrollment.id) or {}
+        net_price = components.get("net_price") or Decimal("0")
         total_paid = await _sum_payments_for_enrollment(db, enrollment.id)
         balance = net_price - total_paid
 
@@ -589,6 +614,7 @@ async def create_enrollment(
     section_id: uuid.UUID,
     student_id: Optional[uuid.UUID] = None,
     admin_discount: Optional[float] = None,
+    price_override: Optional[float] = None,
     student_data: Optional[dict] = None,
 ) -> Optional[Enrollment]:
     if not student_id and student_data:
@@ -622,7 +648,7 @@ async def create_enrollment(
     enrollment = Enrollment(
         student_id=student_id,
         section_id=section_id,
-        agreed_price=section.price,
+        price_override=price_override,
         admin_discount=admin_discount,
     )
     db.add(enrollment)
@@ -694,19 +720,29 @@ async def list_enrollments(
         )
         total_paid_map = {row[0]: Decimal(str(row[1])) for row in total_paid_rows.all()}
 
+        price_components = await get_enrollment_price_components_batch(
+            db, items, sections_by_id={e.section.id: e.section for e in items if e.section}
+        )
+
         for e in items:
             total_paid = float(total_paid_map.get(e.id, Decimal("0")))
-            effective_price = e.agreed_price or (e.section.price if e.section else None)
-            agreed_price = float(effective_price) if effective_price is not None else None
-            admin_discount = (
-                float(e.admin_discount) if e.admin_discount is not None else None
+            components = price_components.get(e.id) or {}
+            base_price = components.get("base_price")
+            net_price = components.get("net_price")
+            balance = (net_price - Decimal(str(total_paid))) if net_price is not None else None
+            # Derived values are exposed without marking the ORM row dirty.
+            set_committed_value(
+                e, "agreed_price",
+                float(base_price) if base_price is not None else None,
             )
-            net_price = agreed_price
-            if agreed_price is not None and admin_discount is not None:
-                net_price = agreed_price - (agreed_price * admin_discount / 100)
-            balance = (net_price - total_paid) if net_price is not None else None
+            e.discount_amount = (
+                float(components["discount_amount"])
+                if components.get("discount_amount") is not None
+                else None
+            )
+            e.net_price = float(net_price) if net_price is not None else None
             e.total_paid = total_paid
-            e.balance_remaining = balance
+            e.balance_remaining = float(balance) if balance is not None else None
 
     return {"items": items, "total": total}
 
@@ -759,12 +795,16 @@ async def get_section_enrollments_detailed(
     grade_map = {g.student_id: g for g in grades}
 
     results = []
+    price_components = await get_enrollment_price_components_batch(
+        db,
+        enrollments,
+        sections_by_id={section.id: section} if section else None,
+    )
     for e in enrollments:
         total_paid = total_paid_map.get(e.id, Decimal("0"))
-        effective_price = e.agreed_price or section_price
-        net_price = effective_price
-        if effective_price is not None and e.admin_discount is not None:
-            net_price = effective_price - (effective_price * e.admin_discount / 100)
+        components = price_components.get(e.id) or {}
+        base_price = components.get("base_price")
+        net_price = components.get("net_price")
         balance = (net_price - total_paid) if net_price is not None else None
 
         final_grade = grade_map.get(e.student_id)
@@ -777,8 +817,12 @@ async def get_section_enrollments_detailed(
                 "student_id": e.student_id,
                 "section_id": e.section_id,
                 "enrolled_at": e.enrolled_at,
-                "agreed_price": e.agreed_price or section_price,
+                "agreed_price": base_price if base_price is not None else section_price,
+                "base_price": base_price if base_price is not None else section_price,
+                "price_override": components["price_override"],
                 "admin_discount": e.admin_discount,
+                "discount_amount": components["discount_amount"],
+                "net_price": net_price,
                 "student_name": e.student.full_name,
                 "student_code": e.student.student_code,
                 "student_email": e.student.email,
@@ -987,12 +1031,11 @@ async def _get_ungraded_students(
 
 
 def _calculate_net_price(enrollment: Enrollment) -> Decimal:
-    net_price = enrollment.agreed_price or Decimal("0")
-    if enrollment.agreed_price is not None and enrollment.admin_discount is not None:
-        net_price = enrollment.agreed_price - (
-            enrollment.agreed_price * enrollment.admin_discount / Decimal("100")
-        )
-    return Decimal(str(net_price)) if not isinstance(net_price, Decimal) else net_price
+    base = enrollment.price_override if enrollment.price_override is not None else enrollment.agreed_price
+    if base is None:
+        return Decimal("0")
+    _, net_price = apply_discount(to_decimal(base), to_decimal(enrollment.admin_discount))
+    return net_price
 
 
 async def _sum_payments_for_enrollment(
@@ -1036,6 +1079,7 @@ async def create_enrollment_with_payment(
     created_by: uuid.UUID,
     student_id: Optional[uuid.UUID] = None,
     admin_discount: Optional[float] = None,
+    price_override: Optional[float] = None,
     student_data: Optional[dict] = None,
     payment_date: Optional[date] = None,
     payment_method: str = "cash",
@@ -1047,6 +1091,7 @@ async def create_enrollment_with_payment(
         section_id=section_id,
         student_id=student_id,
         admin_discount=admin_discount,
+        price_override=price_override,
         student_data=student_data,
     )
     if not enrollment:

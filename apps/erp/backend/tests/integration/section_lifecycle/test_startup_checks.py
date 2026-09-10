@@ -188,6 +188,8 @@ class TestPaymentDeadlines:
         enrollment = Mock()
         enrollment.id = 199
         enrollment.agreed_price = 500
+        enrollment.price_override = None
+        enrollment.admin_discount = None
         enrollment.deleted_at = None
 
         config_mock = Mock()

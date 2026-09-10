@@ -6,6 +6,8 @@ interface StudentSummary {
   id: string;
   student_name: string;
   agreed_price: number | null;
+  base_price?: number | null;
+  price_override?: number | null;
   admin_discount: number | null;
   total_paid: number;
   balance_remaining: number | null;
@@ -26,7 +28,7 @@ export default function FinancialSummary({
 }: FinancialSummaryProps) {
   const summary = useMemo(() => {
     const fullAmount = students.reduce((sum, s) => {
-      const price = s.agreed_price ?? sectionPrice ?? 0;
+      const price = s.base_price ?? s.agreed_price ?? sectionPrice ?? 0;
       const discount = s.admin_discount ?? 0;
       return sum + price - (price * discount) / 100;
     }, 0);
@@ -99,6 +101,25 @@ export default function FinancialSummary({
               <span className="truncate">{enr.student_name}</span>
               <span className="font-medium whitespace-nowrap ms-2">
                 {enr.agreed_price != null ? `${enr.agreed_price.toFixed(2)} ${t.sar}` : "—"}
+                {(enr.price_override != null ||
+                  (sectionPrice != null &&
+                    enr.base_price != null &&
+                    enr.base_price !== sectionPrice)) && (
+                  <span
+                    className="ms-1 text-amber-600 cursor-help"
+                    title={
+                      enr.price_override != null
+                        ? isRtl
+                          ? "سعر تفاوضي ثابت"
+                          : "Negotiated price"
+                        : isRtl
+                        ? "سعر تاريخ التسجيل"
+                        : "Price on enroll date"
+                    }
+                  >
+                    ⓘ
+                  </span>
+                )}
               </span>
             </div>
           ))}

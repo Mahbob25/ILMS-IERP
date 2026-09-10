@@ -67,6 +67,7 @@ class TestFullLifecycle:
         enrollment.student_id = mock_student.id
         enrollment.student = mock_student
         enrollment.agreed_price = Decimal("500")
+        enrollment.price_override = None
         enrollment.admin_discount = None
 
         section = _make_section(
@@ -105,6 +106,7 @@ class TestFullLifecycle:
         enrollment.student_id = mock_student.id
         enrollment.student = mock_student
         enrollment.agreed_price = Decimal("500")
+        enrollment.price_override = None
         enrollment.admin_discount = None
 
         section = _make_section(course=mock_course)
@@ -151,6 +153,7 @@ class TestFullLifecycle:
         enrollment.id = uuid.uuid4()
         enrollment.student_id = uuid.uuid4()
         enrollment.agreed_price = Decimal("500")
+        enrollment.price_override = None
         enrollment.admin_discount = None
 
         section = _make_section(

@@ -13,6 +13,7 @@ from app.modules.academic.models import (
     PendingRefund, Student,
 )
 from app.modules.academic.models import Certificate, FinalGrade
+from app.modules.academic.pricing import get_enrollment_price_components
 from app.modules.lms.models import Payment, LedgerEntry, TeacherWallet
 from app.modules.lms.ledger_service import reverse_teacher_shares as ledger_reverse_shares, get_or_create_wallet
 from app.modules.lms.models import LedgerEntryType
@@ -203,18 +204,11 @@ async def preview_unenrollment_impact(
         frozen = Decimal(str(wallet.frozen_balance or 0))
         teacher_wallet_available_balance = teacher_wallet_balance - frozen
 
-    effective_price = enrollment.agreed_price or (section.price if section else None)
-    agreed_price = Decimal(str(effective_price)) if effective_price is not None else None
-    admin_discount = Decimal(str(enrollment.admin_discount)) if enrollment.admin_discount is not None else None
-
-    net_price = None
-    remaining_balance = None
-    if agreed_price is not None:
-        if admin_discount is not None:
-            net_price = agreed_price - (agreed_price * admin_discount / Decimal("100"))
-        else:
-            net_price = agreed_price
-        remaining_balance = net_price - total_paid
+    components = await get_enrollment_price_components(db, enrollment, section=section)
+    agreed_price = components["base_price"]
+    admin_discount = components["admin_discount"]
+    net_price = components["net_price"]
+    remaining_balance = (net_price - total_paid) if net_price is not None else None
 
     precondition = await can_unenroll_student(db, enrollment_id)
 

@@ -47,6 +47,7 @@ class TestCompleteSection:
         e.id = uuid.uuid4()
         e.student_id = kwargs.get("student_id", uuid.uuid4())
         e.agreed_price = kwargs.get("agreed_price", Decimal("500"))
+        e.price_override = kwargs.get("price_override")
         e.admin_discount = kwargs.get("admin_discount")
         e.section = kwargs.get("section")
         e.student = kwargs.get("student") or Mock(full_name=kwargs.get("student_name", "Student One"))

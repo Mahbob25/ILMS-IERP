@@ -1,5 +1,6 @@
 import logging
 from datetime import date, timedelta
+from decimal import Decimal
 
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,6 +16,7 @@ from app.modules.academic.models import (
     FinalGrade,
     SectionLifecycleConfig,
 )
+from app.modules.academic.pricing import get_enrollment_price_components_batch
 from app.modules.lms.models import Payment
 
 
@@ -175,14 +177,18 @@ async def _check_payment_deadlines(db: AsyncSession, today: date) -> None:
         enrollments = list(enrollments_result.scalars().all())
 
         unpaid_count = 0
+        price_components = await get_enrollment_price_components_batch(
+            db, enrollments, sections_by_id={section.id: section}
+        )
         for enrollment in enrollments:
             payments_result = await db.execute(
                 select(func.coalesce(func.sum(Payment.amount), 0)).where(
                     Payment.enrollment_id == enrollment.id,
                 )
             )
-            total_paid = payments_result.scalar() or 0
-            owed = enrollment.agreed_price or section.price or 0
+            total_paid = Decimal(str(payments_result.scalar() or 0))
+            components = price_components.get(enrollment.id) or {}
+            owed = components.get("net_price") or Decimal("0")
 
             if total_paid < owed:
                 unpaid_count += 1

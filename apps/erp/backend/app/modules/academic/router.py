@@ -7,6 +7,7 @@ from sqlalchemy import select, func
 from app.db.session import get_db
 from app.modules.identity.models import User
 from app.modules.identity.dependencies import get_current_user, RoleChecker
+from app.modules.identity.service import create_audit_log
 from app.modules.academic.schemas import (
     CourseCreate, CourseUpdate, CourseResponse,
     CourseSectionCreate, CourseSectionUpdate, CourseSectionResponse, CourseSectionDetailResponse, SectionActivate,
@@ -144,9 +145,24 @@ async def update_course_section(
             detail="Section can only be edited while in pending status. Deactivate it first if changes are needed.",
         )
     cleaned = {k: v for k, v in data.model_dump().items() if v is not None}
-    section = await academic_service.update_course_section(db, section_id, cleaned)
+    old_price = existing.price
+    section = await academic_service.update_course_section(
+        db, section_id, cleaned, updated_by=current_user.id
+    )
     if not section:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course section not found")
+    new_price = cleaned.get("price")
+    if new_price is not None and old_price != new_price:
+        await create_audit_log(
+            db,
+            action="course_section.price_changed",
+            user_id=current_user.id,
+            payload={
+                "section_id": str(section_id),
+                "old_price": float(old_price) if old_price is not None else None,
+                "new_price": float(new_price),
+            },
+        )
     return section
 
 @academic_router.delete("/course-sections/{section_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -539,8 +555,8 @@ async def create_enrollment(
     current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])),
     db: AsyncSession = Depends(get_db)
 ):
-    if data.admin_discount is not None and current_user.role.name not in ("superadmin", "manager"):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only managers can set discounts")
+    if (data.admin_discount is not None or data.price_override is not None) and current_user.role.name not in ("superadmin", "manager"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only managers can set discounts or price overrides")
     section = await academic_service.get_course_section(db, data.section_id)
     if not section:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Section not found")
@@ -551,10 +567,23 @@ async def create_enrollment(
         )
     enrollment = await academic_service.create_enrollment(
         db, section_id=data.section_id, student_id=data.student_id,
-        admin_discount=data.admin_discount
+        admin_discount=data.admin_discount, price_override=data.price_override
     )
     if enrollment is None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Section is full or enrollment already exists")
+    if data.admin_discount is not None or data.price_override is not None:
+        await create_audit_log(
+            db,
+            action="enrollment.adjusted",
+            user_id=current_user.id,
+            payload={
+                "enrollment_id": str(enrollment.id),
+                "section_id": str(data.section_id),
+                "student_id": str(enrollment.student_id),
+                "admin_discount": data.admin_discount,
+                "price_override": data.price_override,
+            },
+        )
     return enrollment
 
 @academic_router.post("/enrollments/with-student", response_model=EnrollmentResponse, status_code=status.HTTP_201_CREATED)
@@ -565,8 +594,8 @@ async def create_enrollment_with_student(
     current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])),
     db: AsyncSession = Depends(get_db)
 ):
-    if data.admin_discount is not None and current_user.role.name not in ("superadmin", "manager"):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only managers can set discounts")
+    if (data.admin_discount is not None or data.price_override is not None) and current_user.role.name not in ("superadmin", "manager"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only managers can set discounts or price overrides")
     section = await academic_service.get_course_section(db, data.section_id)
     if not section:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Section not found")
@@ -589,10 +618,24 @@ async def create_enrollment_with_student(
         }
     enrollment = await academic_service.create_enrollment(
         db, section_id=data.section_id, student_id=data.student_id,
-        admin_discount=data.admin_discount, student_data=student_data
+        admin_discount=data.admin_discount, price_override=data.price_override,
+        student_data=student_data
     )
     if enrollment is None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Section is full or enrollment already exists")
+    if data.admin_discount is not None or data.price_override is not None:
+        await create_audit_log(
+            db,
+            action="enrollment.adjusted",
+            user_id=current_user.id,
+            payload={
+                "enrollment_id": str(enrollment.id),
+                "section_id": str(data.section_id),
+                "student_id": str(enrollment.student_id),
+                "admin_discount": data.admin_discount,
+                "price_override": data.price_override,
+            },
+        )
     return enrollment
 
 @academic_router.delete("/enrollments/{enrollment_id}", status_code=status.HTTP_204_NO_CONTENT)

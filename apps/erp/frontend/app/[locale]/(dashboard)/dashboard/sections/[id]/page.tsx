@@ -41,6 +41,9 @@ interface SectionEnrollmentDetail {
   section_id: string;
   enrolled_at: string;
   agreed_price: number | null;
+  base_price: number | null;
+  price_override: number | null;
+  discount_amount: number | null;
   admin_discount: number | null;
   total_paid: number;
   balance_remaining: number | null;
@@ -101,6 +104,8 @@ export default function SectionStudentsPage() {
       capacity: "السعة",
       enrolled: "المسجلون",
       price: "السعر",
+      negotiatedPrice: "سعر تفاوضي ثابت",
+      priceOnEnrollDate: "سعر تاريخ التسجيل",
       schedule: "الجدول",
       studentName: "اسم الطالب",
       studentCode: "الرمز",
@@ -187,6 +192,8 @@ export default function SectionStudentsPage() {
       capacity: "Capacity",
       enrolled: "Enrolled",
       price: "Price",
+      negotiatedPrice: "Negotiated price",
+      priceOnEnrollDate: "Price on enroll date",
       schedule: "Schedule",
       studentName: "Student Name",
       studentCode: "Code",
@@ -721,9 +728,28 @@ export default function SectionStudentsPage() {
                       {formatDate(enr.enrolled_at)}
                     </td>
                     <td className="text-slate-600">
-                      {enr.agreed_price != null
-                        ? `${enr.agreed_price.toFixed(2)} ${t.sar}`
-                        : "—"}
+                      {enr.agreed_price != null ? (
+                        <span className="inline-flex items-center gap-1">
+                          {`${enr.agreed_price.toFixed(2)} ${t.sar}`}
+                          {(enr.price_override != null ||
+                            (section?.price != null &&
+                              enr.base_price != null &&
+                              enr.base_price !== section.price)) && (
+                            <span
+                              className="text-amber-600 cursor-help"
+                              title={
+                                enr.price_override != null
+                                  ? `${t.negotiatedPrice}: ${enr.price_override.toFixed(2)} ${t.sar}`
+                                  : `${t.priceOnEnrollDate} ${formatDate(enr.enrolled_at)}: ${enr.base_price?.toFixed(2)} ${t.sar}`
+                              }
+                            >
+                              ⓘ
+                            </span>
+                          )}
+                        </span>
+                      ) : (
+                        "—"
+                      )}
                     </td>
                     <td className="hidden md:table-cell text-slate-600">
                       {enr.admin_discount != null

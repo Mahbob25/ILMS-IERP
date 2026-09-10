@@ -48,6 +48,7 @@ class TestIdempotencyE2E:
         enrollment = Mock()
         enrollment.id = enrollment_id
         enrollment.section = section
+        enrollment.price_override = None
         enrollment.agreed_price = Decimal("1000.00")
         enrollment.admin_discount = None
         enrollment.student = Mock()
@@ -127,6 +128,7 @@ class TestIdempotencyE2E:
         enrollment = Mock()
         enrollment.id = enrollment_id
         enrollment.section = section
+        enrollment.price_override = None
         enrollment.agreed_price = Decimal("1000.00")
         enrollment.admin_discount = None
         enrollment.student = Mock()

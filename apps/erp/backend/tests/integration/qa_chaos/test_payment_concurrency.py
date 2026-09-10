@@ -43,6 +43,7 @@ class TestPaymentConcurrency:
         enrollment = Mock()
         enrollment.id = enrollment_id
         enrollment.section = section
+        enrollment.price_override = None
         enrollment.agreed_price = AGREED_PRICE
         enrollment.admin_discount = None
         enrollment.student = Mock()
@@ -119,6 +120,7 @@ class TestPaymentConcurrency:
         enrollment = Mock()
         enrollment.id = enrollment_id
         enrollment.section = section
+        enrollment.price_override = None
         enrollment.agreed_price = Decimal("1000.00")
         enrollment.admin_discount = None
         enrollment.student = Mock()
@@ -188,6 +190,7 @@ class TestPaymentConcurrency:
         enrollment = Mock()
         enrollment.id = enrollment_id
         enrollment.section = section
+        enrollment.price_override = None
         enrollment.agreed_price = Decimal("500.00")
         enrollment.admin_discount = None
         enrollment.student = Mock()
@@ -251,6 +254,7 @@ class TestPaymentConcurrency:
         enrollment = Mock()
         enrollment.id = enrollment_id
         enrollment.section = section
+        enrollment.price_override = None
         enrollment.agreed_price = Decimal("1000.00")
         enrollment.admin_discount = None
         enrollment.student = Mock()
