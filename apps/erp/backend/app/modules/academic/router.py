@@ -16,6 +16,7 @@ from app.modules.academic.schemas import (
     EnrollmentWithPaymentCreate, EnrollmentWithPaymentResponse, PaymentReceiptInfo,
     FinalGradeCreate, FinalGradeBulkCreate, FinalGradeResponse, StudentGradeSummary,
     CertificateResponse, CertificateBatchDeleteRequest, BatchDeleteResult, DeactivateRequest,
+    CertificateSectionOption,
     UnenrollmentPreviewResponse, UnenrollRequest, UnenrollmentRecordResponse,
     PaginatedResponse,
 )
@@ -246,6 +247,8 @@ async def list_certificates(
     student_id: Optional[uuid.UUID] = Query(None),
     section_id: Optional[uuid.UUID] = Query(None),
     search: Optional[str] = Query(None),
+    date_from: Optional[date] = Query(None),
+    date_to: Optional[date] = Query(None),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=10000),
     sort_by: str = Query("issued_at"),
@@ -258,6 +261,7 @@ async def list_certificates(
         teacher_id = current_user.employee_id
     result = await certificate_service.list_certificates(
         db, student_id=student_id, section_id=section_id, search=search,
+        date_from=date_from, date_to=date_to,
         skip=skip, limit=limit, sort_by=sort_by, sort_order=sort_order,
         teacher_id=teacher_id
     )
@@ -284,6 +288,14 @@ async def list_certificates(
         }
         items.append(cert_dict)
     return {"items": items, "total": result["total"]}
+
+
+@academic_router.get("/certificates/sections", response_model=list[CertificateSectionOption])
+async def list_certificate_sections(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    return await certificate_service.list_certificate_sections(db)
 
 
 def _section_duration_text(section) -> str:

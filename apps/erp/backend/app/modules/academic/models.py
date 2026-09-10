@@ -48,6 +48,17 @@ class Certificate(Base):
     __tablename__ = "certificates"
     __table_args__ = (
         UniqueConstraint("student_id", "section_id", name="uq_certificates_student_section"),
+        Index(
+            "ix_certificates_issued_at_active",
+            "issued_at",
+            postgresql_where=text("deleted_at IS NULL"),
+        ),
+        Index(
+            "ix_certificates_section_issued_at_active",
+            "section_id",
+            "issued_at",
+            postgresql_where=text("deleted_at IS NULL"),
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(

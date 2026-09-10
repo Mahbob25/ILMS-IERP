@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from typing import Optional
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -164,6 +164,8 @@ async def list_certificates(
     student_id: Optional[uuid.UUID] = None,
     section_id: Optional[uuid.UUID] = None,
     search: Optional[str] = None,
+    date_from: Optional[date] = None,
+    date_to: Optional[date] = None,
     skip: int = 0,
     limit: int = 50,
     sort_by: str = "issued_at",
@@ -203,6 +205,15 @@ async def list_certificates(
             )
         )
 
+    if date_from:
+        lower_bound = datetime.combine(date_from, time.min, tzinfo=timezone.utc)
+        query = query.where(Certificate.issued_at >= lower_bound)
+        count_query = count_query.where(Certificate.issued_at >= lower_bound)
+    if date_to:
+        upper_bound = datetime.combine(date_to, time.min, tzinfo=timezone.utc) + timedelta(days=1)
+        query = query.where(Certificate.issued_at < upper_bound)
+        count_query = count_query.where(Certificate.issued_at < upper_bound)
+
     total = (await db.execute(count_query)).scalar() or 0
     sort_col = getattr(Certificate, sort_by, Certificate.issued_at)
     order = sort_col.asc() if sort_order == "asc" else sort_col.desc()
@@ -211,6 +222,33 @@ async def list_certificates(
     )
     items = result.scalars().all()
     return {"items": items, "total": total}
+
+
+async def list_certificate_sections(db: AsyncSession) -> list[dict]:
+    result = await db.execute(
+        select(
+            CourseSection.id,
+            Course.name,
+            Course.code,
+            CourseSection.start_date,
+            func.count(Certificate.id),
+        )
+        .join(Certificate, Certificate.section_id == CourseSection.id)
+        .join(Course, Course.id == CourseSection.course_id)
+        .where(Certificate.deleted_at.is_(None))
+        .group_by(CourseSection.id, Course.name, Course.code, CourseSection.start_date)
+        .order_by(Course.name.asc())
+    )
+    return [
+        {
+            "section_id": row[0],
+            "course_name": row[1],
+            "course_code": row[2],
+            "start_date": row[3],
+            "certificate_count": row[4],
+        }
+        for row in result.all()
+    ]
 
 
 async def delete_certificate(db: AsyncSession, cert_id: uuid.UUID) -> bool:

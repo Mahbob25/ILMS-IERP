@@ -419,3 +419,11 @@ class CertificateResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class CertificateSectionOption(BaseModel):
+    section_id: uuid.UUID
+    course_name: str
+    course_code: Optional[str] = None
+    start_date: Optional[date] = None
+    certificate_count: int

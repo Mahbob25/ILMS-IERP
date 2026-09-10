@@ -20,8 +20,10 @@ import {
   ChevronDown,
   ChevronUp,
   AlertCircle,
+  Award,
 } from "lucide-react";
 import TableContainer from "@/components/ui/TableContainer";
+import CertificatesTable from "@/components/certificates/CertificatesTable";
 import SectionWarningBanner from "@/components/sections/SectionWarningBanner";
 import SectionStatusBadge from "@/components/sections/SectionStatusBadge";
 import FinancialSummary from "@/components/sections/FinancialSummary";
@@ -170,6 +172,7 @@ export default function SectionStudentsPage() {
       outstandingPayments: (n: number, a: number) =>
         `${n} طالب عليهم ${a.toFixed(2)}`,
       unenroll: "إلغاء تسجيل",
+      certificates: "الشهادات",
       unenrollHistory: "سجل إلغاء التسجيل",
       unenrollSuccess: "تم إلغاء التسجيل بنجاح",
       showHistory: "عرض السجل",
@@ -260,6 +263,7 @@ export default function SectionStudentsPage() {
       outstandingPayments: (n: number, a: number) =>
         `${n} students owe ${a.toFixed(2)}`,
       unenroll: "Unenroll",
+      certificates: "Certificates",
       unenrollHistory: "Unenrollment History",
       unenrollSuccess: "Unenrolled successfully",
       showHistory: "Show History",
@@ -295,6 +299,8 @@ export default function SectionStudentsPage() {
   const [unenrollHistory, setUnenrollHistory] = useState<any[]>([]);
   const [showUnenrollHistory, setShowUnenrollHistory] = useState(false);
   const [loadingUnenrollHistory, setLoadingUnenrollHistory] = useState(false);
+  const [certRefreshKey, setCertRefreshKey] = useState(0);
+  const [showCertificates, setShowCertificates] = useState(false);
 
   const { activate, activating, error: activationError, setError: setActivationError } = useSectionActivation({
     sectionId,
@@ -455,7 +461,7 @@ export default function SectionStudentsPage() {
             )}
           </div>
         </div>
-        <RefreshButton onRefresh={fetchData} />
+        <RefreshButton onRefresh={async () => { await fetchData(); setCertRefreshKey((k) => k + 1); }} />
       </div>
 
       {section && (
@@ -799,6 +805,35 @@ export default function SectionStudentsPage() {
         )}
       </div>
 
+      <div className="card overflow-hidden">
+        <button
+          onClick={() => setShowCertificates(!showCertificates)}
+          className="w-full px-4 py-3 border-b border-slate-200 flex items-center gap-2 text-sm font-bold text-slate-900 hover:bg-slate-50 transition-colors"
+        >
+          <Award size={16} className="text-slate-400" />
+          <span>{t.certificates}</span>
+          <div className="flex-1" />
+          {showCertificates ? (
+            <ChevronUp size={16} className="text-slate-400" />
+          ) : (
+            <ChevronDown size={16} className="text-slate-400" />
+          )}
+        </button>
+        {showCertificates && (
+          <div className="p-4">
+            <CertificatesTable
+              sectionId={sectionId}
+              isRtl={isRtl}
+              locale={locale}
+              canDelete={Boolean(user?.is_superadmin || user?.role?.name === "manager")}
+              showFilters={false}
+              showCourseColumn={false}
+              refreshKey={certRefreshKey}
+            />
+          </div>
+        )}
+      </div>
+
       <CancelSectionModal
         open={showCancelModal}
         onClose={() => setShowCancelModal(false)}
@@ -830,7 +865,7 @@ export default function SectionStudentsPage() {
         unpaidStudents={overrideData.unpaid}
         isRtl={isRtl}
         locale={locale}
-        onSuccess={() => { setError(null); setShowCompleteOverride(false); setOverrideData({ ungraded: [], unpaid: [] }); setSuccessMsg(t.completeSuccess); fetchData(); }}
+        onSuccess={() => { setError(null); setShowCompleteOverride(false); setOverrideData({ ungraded: [], unpaid: [] }); setSuccessMsg(t.completeSuccess); setCertRefreshKey((k) => k + 1); fetchData(); }}
       />
 
       {/* Unenrollment History Section */}
