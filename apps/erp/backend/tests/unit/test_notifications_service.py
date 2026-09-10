@@ -1,6 +1,7 @@
 """Unit tests for the Notifications Center service (Phase 1).
 
-Covers notification CRUD, deduplication, pagination, and cleanup.
+Covers notification CRUD, deduplication, pagination, cleanup, and the realtime
+hints published to the per-user event stream.
 All tests use AsyncMock — no real database.
 """
 
@@ -21,10 +22,41 @@ def mock_db():
     return AsyncMock()
 
 
+@pytest.fixture
+def published(monkeypatch):
+    """Capture the realtime hints the service publishes, instead of hitting Redis."""
+    events = []
+
+    class SpyBus:
+        async def publish(self, channel, event):
+            events.append((channel, event))
+
+    monkeypatch.setattr(notif_service, "get_event_bus", lambda: SpyBus())
+    return events
+
+
+@pytest.fixture
+def mock_db_inserted(mock_db):
+    """A db whose INSERT actually produced a row (RETURNING gave one id back)."""
+    result = Mock()
+    result.first.return_value = (uuid.uuid4(),)
+    mock_db.execute = AsyncMock(return_value=result)
+    return mock_db
+
+
+@pytest.fixture
+def mock_db_deduped(mock_db):
+    """A db whose INSERT was skipped by ON CONFLICT DO NOTHING (no row back)."""
+    result = Mock()
+    result.first.return_value = None
+    mock_db.execute = AsyncMock(return_value=result)
+    return mock_db
+
+
 class TestCreateNotification:
-    async def test_inserts_row_with_all_fields(self, mock_db):
+    async def test_inserts_row_with_all_fields(self, mock_db_inserted):
         await notif_service.create_notification(
-            mock_db,
+            mock_db_inserted,
             user_id=USER_ID,
             type_="refund_requested",
             title_key="notif.refund_requested",
@@ -35,19 +67,46 @@ class TestCreateNotification:
             dedupe_key="refund_requested:abc-123",
         )
 
-        mock_db.execute.assert_called_once()
+        mock_db_inserted.execute.assert_called_once()
 
-    async def test_dedupe_same_key_twice_does_not_raise(self, mock_db):
+    async def test_publishes_hint_when_row_inserted(self, mock_db_inserted, published):
+        await notif_service.create_notification(
+            mock_db_inserted,
+            user_id=USER_ID,
+            type_="refund_requested",
+            title_key="notif.refund",
+            priority="high",
+        )
+
+        assert len(published) == 1
+        channel, event = published[0]
+        assert channel == f"events:user:{USER_ID}"
+        assert event["type"] == "notification.created"
+        assert event["data"]["notification_type"] == "refund_requested"
+
+    async def test_stays_silent_when_insert_is_deduped(self, mock_db_deduped, published):
+        """ON CONFLICT DO NOTHING must not wake every client for nothing."""
+        await notif_service.create_notification(
+            mock_db_deduped,
+            user_id=USER_ID,
+            type_="unlock_requested",
+            title_key="notif.unlock",
+            dedupe_key="unlock_requested:2026-07-01",
+        )
+
+        assert published == []
+
+    async def test_dedupe_same_key_twice_does_not_raise(self, mock_db_deduped):
         for _ in range(2):
             await notif_service.create_notification(
-                mock_db,
+                mock_db_deduped,
                 user_id=USER_ID,
                 type_="unlock_requested",
                 title_key="notif.unlock",
                 dedupe_key="unlock_requested:2026-07-01",
             )
 
-        assert mock_db.execute.call_count == 2
+        assert mock_db_deduped.execute.call_count == 2
 
     async def test_failure_is_suppressed_and_returns_none(self, mock_db):
         mock_db.execute.side_effect = RuntimeError("db down")
@@ -60,6 +119,25 @@ class TestCreateNotification:
         )
 
         assert result is None
+
+    async def test_publish_failure_never_breaks_the_insert(self, mock_db_inserted, monkeypatch):
+        """A dead event bus must not fail the business flow that triggered it."""
+
+        class ExplodingBus:
+            async def publish(self, channel, event):
+                raise RuntimeError("redis down")
+
+        monkeypatch.setattr(notif_service, "get_event_bus", lambda: ExplodingBus())
+
+        result = await notif_service.create_notification(
+            mock_db_inserted,
+            user_id=USER_ID,
+            type_="refund_requested",
+            title_key="notif.refund",
+        )
+
+        assert result is None
+        mock_db_inserted.execute.assert_called_once()
 
 
 class TestListNotifications:
@@ -132,7 +210,7 @@ class TestUnreadCount:
 
 
 class TestMarkRead:
-    async def test_mark_specific_ids_only_own_notifications(self, mock_db):
+    async def test_mark_specific_ids_only_own_notifications(self, mock_db, published):
         target_ids = [uuid.uuid4(), uuid.uuid4()]
         mock_result = Mock()
         mock_result.rowcount = 2
@@ -167,6 +245,30 @@ class TestMarkRead:
         updated = await notif_service.mark_read(mock_db, user_id=USER_ID, ids=None)
 
         assert updated == 5
+
+    async def test_publishes_update_so_other_tabs_reconcile(self, mock_db, published):
+        mock_result = Mock()
+        mock_result.rowcount = 3
+
+        mock_db.execute = AsyncMock(return_value=mock_result)
+
+        await notif_service.mark_read(mock_db, user_id=USER_ID, ids=[uuid.uuid4()])
+
+        assert len(published) == 1
+        channel, event = published[0]
+        assert channel == f"events:user:{USER_ID}"
+        assert event["type"] == "notification.updated"
+        assert event["data"]["reason"] == "mark_read"
+
+    async def test_no_publish_when_nothing_changed(self, mock_db, published):
+        mock_result = Mock()
+        mock_result.rowcount = 0
+
+        mock_db.execute = AsyncMock(return_value=mock_result)
+
+        await notif_service.mark_read(mock_db, user_id=USER_ID, ids=[uuid.uuid4()])
+
+        assert published == []
 
 
 class TestDeleteExpired:

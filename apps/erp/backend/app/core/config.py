@@ -43,6 +43,19 @@ class Settings(BaseSettings):
     HEALTH_PORTAL_HEALTH_URL: str = "http://portal-backend:8001/api/health"
     HEALTH_GATEWAY_HEALTH_URL: str = "http://caddy/api/v1/health"
 
+    # ── Realtime event stream (SSE) ───────────────────────────────
+    # How long one stream stays open before we close it cleanly and let the
+    # browser's EventSource reconnect. This MUST stay below whatever idle or
+    # cutoff limit sits in front of the app (Vercel's proxy, Caddy), with
+    # margin, so the close is OURS — a server-initiated clean close reconnects
+    # predictably, whereas being cut off mid-stream surfaces as a console error.
+    # 600s assumes the Phase 0 ingress spike confirmed the Vercel rewrite passes
+    # long-lived responses through; lower it if the spike measured a lower ceiling.
+    EVENT_STREAM_MAX_SECONDS: int = 600
+    # Idle interval after which we emit a comment frame, so intermediaries do not
+    # treat a quiet stream as a dead connection.
+    EVENT_STREAM_HEARTBEAT_SECONDS: int = 20
+
     # ── Portal (Phase 0) ──────────────────────────────────────────
     # Doc-only in ERP: ERP never signs portal JWTs (portal BFF owns them).
     PORTAL_JWT_SECRET: str = ""

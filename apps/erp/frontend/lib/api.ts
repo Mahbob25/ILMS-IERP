@@ -41,6 +41,42 @@ function onRefreshFailed(error: unknown) {
   refreshSubscribers = []
 }
 
+/**
+ * Refresh the session cookie, coalescing concurrent callers into one request.
+ *
+ * Exported because the realtime stream client has to re-authenticate too:
+ * EventSource retries dropped connections on its own but cannot refresh a
+ * cookie, so without this an expired session would become a silent 401 loop.
+ */
+export async function refreshSession(): Promise<void> {
+  if (isRefreshing) {
+    // Piggyback on the in-flight refresh instead of starting a second one.
+    return new Promise<void>((resolve, reject) => {
+      refreshSubscribers.push({ resolve: () => resolve(), reject })
+    })
+  }
+
+  isRefreshing = true
+
+  try {
+    const csrfToken = getCookie('csrf_token');
+    await axios.post(
+      `${API_BASE_URL}/auth/refresh`,
+      {},
+      {
+        withCredentials: true,
+        headers: csrfToken ? { 'X-CSRF-Token': csrfToken } : undefined,
+      }
+    );
+    onRefreshed();
+  } catch (refreshError) {
+    onRefreshFailed(refreshError);
+    throw refreshError;
+  } finally {
+    isRefreshing = false;
+  }
+}
+
 function redirectToLogin() {
   if (typeof window !== "undefined" && !isRedirectingToLogin) {
     const pathname = window.location.pathname;
@@ -171,35 +207,12 @@ apiClient.interceptors.response.use(
 
       originalRequest._retry = true;
 
-      if (isRefreshing) {
-        return new Promise((resolve, reject) => {
-          refreshSubscribers.push({ resolve, reject });
-        }).then(() => apiClient(originalRequest)).catch(() => {
-          redirectToLogin();
-          return Promise.reject(error);
-        });
-      }
-
-      isRefreshing = true;
-
       try {
-        const csrfToken = getCookie('csrf_token');
-        await axios.post(
-          `${API_BASE_URL}/auth/refresh`,
-          {},
-          {
-            withCredentials: true,
-            headers: csrfToken ? { 'X-CSRF-Token': csrfToken } : undefined,
-          }
-        );
-        onRefreshed();
+        await refreshSession();
         return apiClient(originalRequest);
       } catch (refreshError) {
-        onRefreshFailed(refreshError as Error);
         redirectToLogin();
         return Promise.reject(refreshError);
-      } finally {
-        isRefreshing = false;
       }
     }
 

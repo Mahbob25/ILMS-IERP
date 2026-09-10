@@ -39,6 +39,8 @@ from app.modules.dashboard.router import dashboard_router
 from app.modules.backups.router import router as backups_router
 from app.modules.reports.router import reports_router
 from app.modules.notifications.router import notifications_router
+from app.modules.events.router import events_router
+from app.modules.events.spike import spike_router  # TEMPORARY — Phase 0 ingress probe
 from app.modules.settings.router import settings_router
 from app.modules.search.router import search_router
 from app.modules.bookings.router import bookings_router
@@ -104,6 +106,8 @@ app.include_router(backups_router, prefix="/api/v1")
 app.include_router(staff_payroll_router, prefix="/api/v1")
 app.include_router(reports_router, prefix="/api/v1")
 app.include_router(notifications_router, prefix="/api/v1")
+app.include_router(events_router, prefix="/api/v1")
+app.include_router(spike_router, prefix="/api/v1")  # TEMPORARY — Phase 0 ingress probe
 app.include_router(settings_router, prefix="/api/v1")
 app.include_router(search_router, prefix="/api/v1")
 app.include_router(bookings_router, prefix="/api/v1")

@@ -7,8 +7,17 @@ import { useAuth } from "@/components/AuthContext";
 import { Bell, Check, CheckCircle, AlertCircle, Loader2, Unlock, Trash2, Undo2, X, ExternalLink, RotateCcw } from "lucide-react";
 import { renderNotification } from "@/components/notifications/notificationMessages";
 import ConfirmModal from "@/components/ConfirmModal";
+import {
+  eventStream,
+  EVENT_READY,
+  NOTIFICATION_CREATED,
+  NOTIFICATION_UPDATED,
+} from "@/lib/events";
 
-const POLL_INTERVAL_MS = 30_000;
+// The realtime stream is the primary signal. This interval is only a safety net
+// for when the stream is not open (see the fallback effect below): with a
+// healthy stream the badge updates on push and this never fires.
+const FALLBACK_POLL_MS = 5 * 60_000;
 const MAX_DROPDOWN_ITEMS = 10;
 const UNDO_CLEAR_SECONDS = 30;
 
@@ -78,7 +87,7 @@ export default function NotificationBell() {
   const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const bellRef = useRef<HTMLDivElement>(null);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const openRef = useRef(false);
 
   const fetchUnreadCount = useCallback(async () => {
     try {
@@ -108,20 +117,85 @@ export default function NotificationBell() {
     }
   }, []);
 
-  // Polling + focus listener
+  // Lets the stream handler read the latest dropdown state without having to
+  // resubscribe every time it is toggled.
+  useEffect(() => {
+    openRef.current = open;
+  }, [open]);
+
+  // Primary signal: the realtime stream. Events are hints, so each one triggers
+  // a debounced HTTP reconcile rather than carrying authoritative state — a
+  // dropped or duplicated event therefore costs nothing but a little freshness.
   useEffect(() => {
     if (!user) return;
 
-    fetchUnreadCount();
+    let debounce: ReturnType<typeof setTimeout> | null = null;
+    const reconcile = () => {
+      if (debounce) clearTimeout(debounce);
+      // Collapses a burst (e.g. clear-all followed by a delete) into one fetch.
+      debounce = setTimeout(() => {
+        fetchUnreadCount();
+        if (openRef.current) fetchItems();
+      }, 250);
+    };
 
-    pollRef.current = setInterval(fetchUnreadCount, POLL_INTERVAL_MS);
+    const offCreated = eventStream.on(NOTIFICATION_CREATED, reconcile);
+    const offUpdated = eventStream.on(NOTIFICATION_UPDATED, reconcile);
+    // Sent on every (re)connection carrying the current count: replaces the old
+    // mount-time fetch and covers anything missed while the stream was down.
+    const offReady = eventStream.on(EVENT_READY, ({ data }) => {
+      const count = data?.unread_count;
+      if (typeof count === "number") setUnreadCount(count);
+    });
 
-    const onFocus = () => fetchUnreadCount();
+    return () => {
+      if (debounce) clearTimeout(debounce);
+      offCreated();
+      offUpdated();
+      offReady();
+    };
+  }, [user, fetchUnreadCount, fetchItems]);
+
+  // Safety net: poll only while the stream is NOT open and the tab is visible.
+  // With a healthy stream this never fires, so unread-count traffic drops to
+  // near zero; if the stream dies silently the badge still self-corrects rather
+  // than freezing.
+  useEffect(() => {
+    if (!user) return;
+
+    let interval: ReturnType<typeof setInterval> | null = null;
+
+    const sync = () => {
+      const shouldPoll =
+        eventStream.getState() !== "open" &&
+        document.visibilityState === "visible";
+
+      if (shouldPoll && !interval) {
+        // Fetch immediately so there is no blind spot at mount or when
+        // returning to the tab.
+        fetchUnreadCount();
+        interval = setInterval(() => {
+          if (document.visibilityState === "visible") fetchUnreadCount();
+        }, FALLBACK_POLL_MS);
+      } else if (!shouldPoll && interval) {
+        clearInterval(interval);
+        interval = null;
+      }
+    };
+
+    const onFocus = () => {
+      if (eventStream.getState() !== "open") fetchUnreadCount();
+    };
+
+    const offState = eventStream.onStateChange(sync);
+    document.addEventListener("visibilitychange", sync);
     window.addEventListener("focus", onFocus);
 
     return () => {
-      if (pollRef.current) clearInterval(pollRef.current);
+      offState();
+      document.removeEventListener("visibilitychange", sync);
       window.removeEventListener("focus", onFocus);
+      if (interval) clearInterval(interval);
     };
   }, [user, fetchUnreadCount]);
 

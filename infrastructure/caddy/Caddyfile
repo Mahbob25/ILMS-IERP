@@ -13,15 +13,38 @@
 
 # API-only gateway — the frontends are hosted on Vercel and rewrite their
 # /api/* calls to this host (path-based routing on :80, no DNS required).
+#   - /api/v1/events/stream → ERP backend, realtime SSE (unbuffered, see below)
 #   - /api/v1/*  → ERP backend
 #   - /uploads/* → ERP backend (cert/receipt/attachment files)
 #   - /api/*     → portal BFF (portal routes are /api/auth, /api/me, ...)
 :80 {
-    encode gzip
+    # Realtime SSE. Must come before the catch-all /api/v1/* handler — `handle`
+    # blocks are mutually exclusive, so the more specific path wins.
+    #
+    # flush_interval -1 disables response buffering. Without it Caddy batches
+    # the stream and realtime events appear to do nothing until the connection
+    # closes. gzip is deliberately NOT applied here: compressing a stream adds a
+    # buffer and re-introduces exactly the latency this route exists to avoid.
+    handle /api/v1/events/stream {
+        reverse_proxy {env.BACKEND_URL} {
+            flush_interval -1
+        }
+    }
 
-    reverse_proxy /api/v1/* {env.BACKEND_URL}
-    reverse_proxy /uploads/* {env.BACKEND_URL}
-    reverse_proxy /api/* {env.PORTAL_BACKEND_URL}
+    handle /uploads/* {
+        encode gzip
+        reverse_proxy {env.BACKEND_URL}
+    }
+
+    handle /api/v1/* {
+        encode gzip
+        reverse_proxy {env.BACKEND_URL}
+    }
+
+    handle /api/* {
+        encode gzip
+        reverse_proxy {env.PORTAL_BACKEND_URL}
+    }
 
     import security_headers
 }
@@ -29,20 +52,35 @@
 # Production hostnames — enable when DNS is pointed at this server (or the
 # tunnel routes to Caddy). Frontends are on Vercel; these serve APIs only.
 erp.aldirasat.edu {
-    encode gzip
-    reverse_proxy /api/v1/* {env.BACKEND_URL}
-    reverse_proxy /uploads/* {env.BACKEND_URL}
+    handle /api/v1/events/stream {
+        reverse_proxy {env.BACKEND_URL} {
+            flush_interval -1
+        }
+    }
+
+    handle /uploads/* {
+        encode gzip
+        reverse_proxy {env.BACKEND_URL}
+    }
+
+    handle /api/v1/* {
+        encode gzip
+        reverse_proxy {env.BACKEND_URL}
+    }
+
     import security_headers
 }
 
 portal.aldirasat.edu {
-    encode gzip
-
     # Cap request sizes (portal accepts JSON, never big uploads).
     request_body {
         max_size 2MB
     }
 
-    reverse_proxy /api/* {env.PORTAL_BACKEND_URL}
+    handle /api/* {
+        encode gzip
+        reverse_proxy {env.PORTAL_BACKEND_URL}
+    }
+
     import security_headers
 }
