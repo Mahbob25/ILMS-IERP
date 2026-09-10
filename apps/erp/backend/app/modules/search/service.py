@@ -55,7 +55,8 @@ async def search_grouped(
             total += len(hits)
 
     if _page_search_allowed(user, "page_courses"):
-        res = await academic_service.list_courses(db, search=q, skip=0, limit=limit_per_type)
+        teacher_id = user.employee_id if (user.role and user.role.name == "teacher") else None
+        res = await academic_service.list_courses(db, teacher_id=teacher_id, search=q, skip=0, limit=limit_per_type)
         hits = []
         for c in res["items"]:
             hits.append(SearchHit(

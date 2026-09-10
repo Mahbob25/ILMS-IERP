@@ -47,7 +47,12 @@ async def list_courses(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    return await academic_service.list_courses(db, search=search, skip=skip, limit=limit, sort_by=sort_by, sort_order=sort_order)
+    teacher_id = None
+    if current_user.role.name == "teacher":
+        teacher_id = current_user.employee_id
+        if teacher_id is None:
+            return {"items": [], "total": 0}
+    return await academic_service.list_courses(db, teacher_id=teacher_id, search=search, skip=skip, limit=limit, sort_by=sort_by, sort_order=sort_order)
 
 @academic_router.post("/courses", response_model=CourseResponse, status_code=status.HTTP_201_CREATED)
 async def create_course(
@@ -96,6 +101,8 @@ async def list_course_sections(
     teacher_id = None
     if current_user.role.name == "teacher":
         teacher_id = current_user.employee_id
+        if teacher_id is None:
+            return {"items": [], "total": 0}
     return await academic_service.list_course_sections(
         db, teacher_id=teacher_id, search=search, status=status,
         skip=skip, limit=limit, sort_by=sort_by, sort_order=sort_order

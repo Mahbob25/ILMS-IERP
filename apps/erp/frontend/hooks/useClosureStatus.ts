@@ -2,14 +2,21 @@
 
 import { useState, useEffect } from "react";
 import { apiClient } from "@/lib/api";
+import { useAuth } from "@/components/AuthContext";
 
 type ClosureStatus = "closed" | "pending" | "unlock_requested" | null;
 
+// Must match the roles accepted by GET /lms/daily-closures on the backend.
+const CLOSURE_ROLES = ["superadmin", "manager", "secretary"];
+
 export function useClosureStatus(date: string | null): ClosureStatus {
+  const { user } = useAuth();
   const [status, setStatus] = useState<ClosureStatus>(null);
+  const allowed =
+    !!user?.is_superadmin || CLOSURE_ROLES.includes(user?.role?.name ?? "");
 
   useEffect(() => {
-    if (!date) {
+    if (!date || !allowed) {
       setStatus(null);
       return;
     }
@@ -34,7 +41,7 @@ export function useClosureStatus(date: string | null): ClosureStatus {
     return () => {
       cancelled = true;
     };
-  }, [date]);
+  }, [date, allowed]);
 
   return status;
 }

@@ -70,6 +70,7 @@ async def get_course(db: AsyncSession, course_id: uuid.UUID) -> Optional[Course]
 
 async def list_courses(
     db: AsyncSession,
+    teacher_id: Optional[uuid.UUID] = None,
     search: Optional[str] = None,
     skip: int = 0,
     limit: int = 100,
@@ -78,6 +79,14 @@ async def list_courses(
 ) -> dict:
     query = select(Course).where(Course.deleted_at.is_(None))
     count_query = select(func.count(Course.id)).where(Course.deleted_at.is_(None))
+    if teacher_id is not None:
+        teacher_course = exists().where(
+            CourseSection.course_id == Course.id,
+            CourseSection.deleted_at.is_(None),
+            CourseSection.teacher_id == teacher_id,
+        )
+        query = query.where(teacher_course)
+        count_query = count_query.where(teacher_course)
     if search:
         pattern = f"%{search}%"
         filter_clause = or_(Course.name.ilike(pattern), Course.code.ilike(pattern))
@@ -180,12 +189,8 @@ async def list_course_sections(
         CourseSection.deleted_at.is_(None)
     )
     if teacher_id:
-        query = query.where(
-            or_(CourseSection.teacher_id == teacher_id, CourseSection.teacher_id.is_(None))
-        )
-        count_query = count_query.where(
-            or_(CourseSection.teacher_id == teacher_id, CourseSection.teacher_id.is_(None))
-        )
+        query = query.where(CourseSection.teacher_id == teacher_id)
+        count_query = count_query.where(CourseSection.teacher_id == teacher_id)
     if status:
         query = query.where(CourseSection.status == status)
         count_query = count_query.where(CourseSection.status == status)

@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { authHeader } from '../fixtures/tokens'
+import { authHeader, ensureAuthHeader } from '../fixtures/tokens'
 
 const BASE_URL = process.env.BASE_URL || 'http://localhost:8000/api/v1'
 
@@ -110,6 +110,29 @@ test.describe('Academic: Courses', () => {
       data: { code: 'BAD', credits: 3 },
     })
     expect([400, 422]).toContain(response.status())
+  })
+
+  test('should return only courses taught by the teacher', async ({ request }) => {
+    const teacherHeaders = await ensureAuthHeader('teacher')
+    expect(teacherHeaders.Cookie).toBeTruthy()
+
+    const coursesRes = await request.get(`${BASE_URL}/academic/courses?limit=1000`, {
+      headers: teacherHeaders,
+    })
+    expect(coursesRes.status()).toBe(200)
+    const courses = await coursesRes.json()
+
+    const sectionsRes = await request.get(`${BASE_URL}/academic/course-sections?limit=1000`, {
+      headers: teacherHeaders,
+    })
+    expect(sectionsRes.status()).toBe(200)
+    const sections = await sectionsRes.json()
+
+    // Course scoping is defined as "has at least one of my own sections".
+    const taughtCourseIds = new Set<string>(sections.items.map((s: { course_id: string }) => s.course_id))
+    for (const course of courses.items) {
+      expect(taughtCourseIds.has(course.id)).toBe(true)
+    }
   })
 
   test('should return 404 for non-existent course', async ({ request }) => {
