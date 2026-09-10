@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useReducer, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useReducer, useState } from "react";
 import { apiClient } from "@/lib/api";
 import { useAuth } from "@/components/AuthContext";
 import {
@@ -25,8 +25,10 @@ import CompletionScreen, {
 import {
   createInitialWizard1State,
   wizard1Reducer,
+  PaymentInfo,
   PaymentSummary,
 } from "./wizard1Reducer";
+import { computePreviewSummary } from "./previewSummary";
 import { Loader2 } from "lucide-react";
 
 interface Student {
@@ -41,6 +43,7 @@ interface CourseSection {
   status: string;
   capacity: number;
   enrolled_count: number;
+  price?: number | null;
   class_time?: string | null;
   class_duration_minutes?: number | null;
   classroom?: string | null;
@@ -400,7 +403,16 @@ useEffect(() => {
     }
   };
 
-  const handleEnroll = async () => {
+  const previewSummary = useMemo(() => {
+    const section = sections.find((s) => s.id === state.sectionId);
+    return computePreviewSummary({
+      sectionPrice: section?.price ?? null,
+      discount: state.discount,
+      priceOverride: state.priceOverride,
+    });
+  }, [sections, state.sectionId, state.discount, state.priceOverride]);
+
+  const handleCommit = async (withPayment: boolean) => {
     setServerDetail("");
     if (!state.student) {
       dispatch({ type: "SET_ERROR", error: "no_student" });
@@ -410,99 +422,103 @@ useEffect(() => {
       dispatch({ type: "SET_ERROR", error: "no_section" });
       return;
     }
-    dispatch({ type: "ENROLL_START" });
-    try {
-      const payload: Record<string, unknown> = {
-        student_id: state.student.id,
-        section_id: state.sectionId,
-      };
-      if (state.discount) {
-        payload.admin_discount = parseFloat(state.discount);
-      }
-      if (state.priceOverride) {
-        payload.price_override = parseFloat(state.priceOverride);
-      }
-      const res = await apiClient.post<{
-        id: string;
-        agreed_price: number | null;
-        total_paid: number;
-        balance_remaining: number | null;
-      }>("/academic/enrollments", payload);
-      const summaryRes = await apiClient.get<PaymentSummary>(
-        `/lms/payments/summary/${res.data.id}`
-      );
-      markClean();
-      dispatch({
-        type: "ENROLL_SUCCESS",
-        enrollment: {
-          id: res.data.id,
-          agreed_price: res.data.agreed_price,
-          total_paid: res.data.total_paid,
-          balance_remaining: res.data.balance_remaining,
-        },
-        summary: summaryRes.data,
-      });
-    } catch (err) {
-      setServerDetail(detailOf(err));
-      dispatch({ type: "SET_ERROR", error: "enroll_failed" });
-    }
-  };
-
-  const handlePay = async () => {
-    setServerDetail("");
-    if (!state.enrollment) return;
     const amount = parseFloat(state.paymentForm.amount);
-    if (!amount || amount <= 0) {
-      dispatch({ type: "SET_ERROR", error: "bad_amount" });
-      return;
+    if (withPayment) {
+      if (!amount || amount <= 0) {
+        dispatch({ type: "SET_ERROR", error: "bad_amount" });
+        return;
+      }
+      if (
+        state.paymentForm.payment_method === "online" &&
+        !state.paymentForm.transaction_number.trim()
+      ) {
+        dispatch({ type: "SET_ERROR", error: "bad_transaction" });
+        return;
+      }
     }
-    if (
-      state.paymentForm.payment_method === "online" &&
-      !state.paymentForm.transaction_number.trim()
-    ) {
-      dispatch({ type: "SET_ERROR", error: "bad_transaction" });
-      return;
-    }
-    dispatch({ type: "PAY_START" });
+    dispatch({ type: "SUBMIT_START" });
     try {
-      const payload: Record<string, unknown> = {
-        enrollment_id: state.enrollment.id,
-        amount,
-        payment_method: state.paymentForm.payment_method,
-      };
-      if (state.paymentForm.date) {
-        payload.date = state.paymentForm.date;
+      let enrollmentId: string;
+      let paymentInfo: PaymentInfo | null = null;
+
+      if (withPayment) {
+        const payload: Record<string, unknown> = {
+          student_id: state.student.id,
+          section_id: state.sectionId,
+          amount,
+          payment_method: state.paymentForm.payment_method,
+        };
+        if (state.discount) {
+          payload.admin_discount = parseFloat(state.discount);
+        }
+        if (state.priceOverride) {
+          payload.price_override = parseFloat(state.priceOverride);
+        }
+        if (state.paymentForm.date) {
+          payload.payment_date = state.paymentForm.date;
+        }
+        if (state.paymentForm.payment_method === "online") {
+          payload.transaction_number = state.paymentForm.transaction_number;
+        }
+        const res = await apiClient.post<{
+          enrollment: { id: string };
+          payment: {
+            id: string;
+            receipt_number: string;
+            date: string;
+            amount: number;
+            payment_method: string;
+            transaction_number: string | null;
+          };
+        }>("/academic/enrollments/with-payment", payload);
+        enrollmentId = res.data.enrollment.id;
+        paymentInfo = {
+          id: res.data.payment.id,
+          receipt_number: res.data.payment.receipt_number,
+          date: res.data.payment.date,
+          amount: res.data.payment.amount,
+          payment_method: res.data.payment.payment_method,
+          transaction_number: res.data.payment.transaction_number,
+        };
+      } else {
+        const payload: Record<string, unknown> = {
+          student_id: state.student.id,
+          section_id: state.sectionId,
+        };
+        if (state.discount) {
+          payload.admin_discount = parseFloat(state.discount);
+        }
+        if (state.priceOverride) {
+          payload.price_override = parseFloat(state.priceOverride);
+        }
+        const res = await apiClient.post<{ id: string }>(
+          "/academic/enrollments",
+          payload
+        );
+        enrollmentId = res.data.id;
       }
-      if (state.paymentForm.payment_method === "online") {
-        payload.transaction_number = state.paymentForm.transaction_number;
-      }
-      const res = await apiClient.post<{
-        id: string;
-        receipt_number: string;
-        date: string;
-        amount: number;
-        payment_method: string;
-        transaction_number: string | null;
-      }>("/lms/payments", payload);
+
       const summaryRes = await apiClient.get<PaymentSummary>(
-        `/lms/payments/summary/${state.enrollment.id}`
+        `/lms/payments/summary/${enrollmentId}`
       );
       markClean();
       dispatch({
-        type: "PAY_SUCCESS",
-        payment: {
-          id: res.data.id,
-          receipt_number: res.data.receipt_number,
-          date: res.data.date,
-          amount: res.data.amount,
-          payment_method: res.data.payment_method,
-          transaction_number: res.data.transaction_number,
+        type: "COMMIT_SUCCESS",
+        enrollment: {
+          id: enrollmentId,
+          agreed_price: summaryRes.data.agreed_price,
+          total_paid: summaryRes.data.total_paid,
+          balance_remaining: summaryRes.data.balance_remaining,
         },
         summary: summaryRes.data,
+        payment: paymentInfo,
       });
     } catch (err) {
       setServerDetail(detailOf(err));
-      dispatch({ type: "SET_ERROR", error: "pay_failed" });
+      dispatch({
+        type: "SET_ERROR",
+        error: withPayment ? "pay_failed" : "enroll_failed",
+      });
     }
   };
 
@@ -514,9 +530,27 @@ useEffect(() => {
       }
       dispatch({ type: "SET_STEP", step: 2 });
     } else if (state.step === 2) {
-      handleEnroll();
+      if (!state.sectionId) {
+        dispatch({ type: "SET_ERROR", error: "no_section" });
+        return;
+      }
+      dispatch({ type: "SET_STEP", step: 3 });
+      const balance = previewSummary?.balance_remaining;
+      if (balance != null) {
+        const current = parseFloat(state.paymentForm.amount);
+        if (
+          state.paymentForm.amount === "" ||
+          Number.isNaN(current) ||
+          current > balance
+        ) {
+          dispatch({
+            type: "SET_PAYMENT_FORM",
+            patch: { amount: balance.toString() },
+          });
+        }
+      }
     } else if (state.step === 3) {
-      handlePay();
+      handleCommit(true);
     }
   };
 
@@ -531,14 +565,6 @@ useEffect(() => {
     { label: t.step3, optional: true },
     { label: t.step4 },
   ];
-
-  const enrollmentOption =
-    state.enrollment && state.student
-      ? {
-          value: state.enrollment.id,
-          label: `${state.student.full_name} - ${getSectionLabel(state.sectionId)}`,
-        }
-      : null;
 
   const availableSections = sections.filter(
     (s) =>
@@ -720,16 +746,17 @@ useEffect(() => {
           />
         )}
 
-        {state.step === 3 && enrollmentOption && (
+        {state.step === 3 && (
           <PaymentStep
             form={state.paymentForm}
             onFormChange={(patch) => {
               markDirty();
               dispatch({ type: "SET_PAYMENT_FORM", patch });
             }}
-            summary={state.summary}
-            enrollmentOptions={[enrollmentOption]}
+            summary={previewSummary}
+            enrollmentOptions={[]}
             onEnrollmentSelect={() => {}}
+            showEnrollmentSelect={false}
             error={state.step === 3 ? stepError : ""}
             labels={paymentLabels}
           />
@@ -772,7 +799,7 @@ useEffect(() => {
               })
             }
             onNext={handleNext}
-            onSkip={() => dispatch({ type: "SKIP_PAYMENT" })}
+            onSkip={() => handleCommit(false)}
             canNext={!state.submitting}
             showSkip={state.step === 3}
             submitting={state.submitting}

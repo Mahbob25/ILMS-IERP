@@ -63,10 +63,18 @@ test.describe('Student Enrollment Wizard (Authenticated)', () => {
     await wizard.expectEnrollmentStep()
 
     await wizard.selectSection(openCourse.name)
-    await wizard.goNext() // submits enrollment -> payment step
+    await wizard.goNext() // step 2 -> 3: no write yet
 
     await wizard.expectPaymentStep()
-    await wizard.skipPayment()
+
+    // Going back to step 2 and forward again must not persist anything nor error out.
+    await wizard.goBack()
+    await wizard.expectEnrollmentStep()
+    await wizard.goNext()
+    await wizard.expectPaymentStep()
+    await expect(page.locator('text=Section is full or enrollment already exists')).toHaveCount(0)
+
+    await wizard.skipPayment() // step 3 -> 4: commits the enrollment only
     await wizard.expectCompletion()
     await page.screenshot({ path: 'test-results/artifacts/wizard-complete-skip.png' })
   })
@@ -103,10 +111,10 @@ test.describe('Student Enrollment Wizard (Authenticated)', () => {
     await wizard.expectEnrollmentStep()
 
     await wizard.selectSection(openCourse.name)
-    await wizard.goNext() // submits enrollment -> payment step
+    await wizard.goNext() // step 2 -> 3: no write yet
 
     await wizard.expectPaymentStep()
-    await wizard.goNext() // submits payment -> receipt + completion
+    await wizard.goNext() // step 3 -> 4: commits enrollment + payment -> receipt + completion
     await wizard.expectReceiptModal()
     await page.screenshot({ path: 'test-results/artifacts/wizard-receipt.png' })
     await wizard.closeReceipt()

@@ -41,6 +41,8 @@ interface PaymentFormFieldsProps {
   onFormChange: (patch: Partial<PaymentFormState>) => void;
   enrollmentOptions: { value: string; label: string }[];
   onEnrollmentSelect: (enrollmentId: string) => void;
+  /** Hide the enrollment picker when the context already implies a single enrollment. */
+  showEnrollmentSelect?: boolean;
   summary: PaymentSummary | null;
   formError: string;
   labels: PaymentFormLabels;
@@ -51,6 +53,7 @@ export default function PaymentFormFields({
   onFormChange,
   enrollmentOptions,
   onEnrollmentSelect,
+  showEnrollmentSelect = true,
   summary,
   formError,
   labels,
@@ -58,17 +61,19 @@ export default function PaymentFormFields({
   return (
     <>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div>
-          <label className="block text-xs font-medium text-slate-700 mb-1">
-            {labels.selectEnrollment}
-          </label>
-          <Select
-            value={form.enrollment_id}
-            onChange={(value) => onEnrollmentSelect(value)}
-            options={enrollmentOptions}
-            placeholder="--"
-          />
-        </div>
+        {showEnrollmentSelect && (
+          <div>
+            <label className="block text-xs font-medium text-slate-700 mb-1">
+              {labels.selectEnrollment}
+            </label>
+            <Select
+              value={form.enrollment_id}
+              onChange={(value) => onEnrollmentSelect(value)}
+              options={enrollmentOptions}
+              placeholder="--"
+            />
+          </div>
+        )}
         <div>
           <label className="block text-xs font-medium text-slate-700 mb-1">
             {labels.enterAmount}
@@ -95,7 +100,7 @@ export default function PaymentFormFields({
             className="input-field"
             placeholder="0.00"
           />
-          {!form.enrollment_id && (
+          {showEnrollmentSelect && !form.enrollment_id && (
             <p className="text-xs text-slate-400 mt-2">
               {labels.selectEnrollment}
             </p>

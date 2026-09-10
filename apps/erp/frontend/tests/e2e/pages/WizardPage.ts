@@ -6,6 +6,7 @@ export class WizardPage {
   readonly stepper: Locator
   readonly nextButton: Locator
   readonly skipButton: Locator
+  readonly backButton: Locator
   readonly receiptModal: Locator
 
   constructor(page: Page) {
@@ -15,6 +16,7 @@ export class WizardPage {
     // The wizard nav bar has Back/Next/Skip buttons
     this.nextButton = page.locator('main button').filter({ hasText: 'Next' }).first()
     this.skipButton = page.locator('main button').filter({ hasText: 'Skip' }).first()
+    this.backButton = page.locator('main button').filter({ hasText: 'Back' }).first()
     this.receiptModal = page.locator('text=Payment Receipt').first()
   }
 
@@ -67,6 +69,10 @@ export class WizardPage {
 
   async goNext(): Promise<void> {
     await this.nextButton.click()
+  }
+
+  async goBack(): Promise<void> {
+    await this.backButton.click()
   }
 
   async expectEnrollmentStep(): Promise<void> {

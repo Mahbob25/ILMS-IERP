@@ -97,11 +97,12 @@ export type Wizard1Action =
   | { type: "SET_SECTION"; sectionId: string }
   | { type: "SET_DISCOUNT"; discount: string }
   | { type: "SET_PRICE_OVERRIDE"; priceOverride: string }
-  | { type: "ENROLL_START" }
+  | { type: "SUBMIT_START" }
   | {
-      type: "ENROLL_SUCCESS";
+      type: "COMMIT_SUCCESS";
       enrollment: EnrollmentInfo;
       summary: PaymentSummary;
+      payment: PaymentInfo | null;
     }
   | {
       type: "SET_PAYMENT_FORM";
@@ -113,10 +114,7 @@ export type Wizard1Action =
         transaction_number: string;
       }>;
     }
-  | { type: "PAY_START" }
-  | { type: "PAY_SUCCESS"; payment: PaymentInfo; summary: PaymentSummary }
   | { type: "SET_RECEIPT_OPEN"; open: boolean }
-  | { type: "SKIP_PAYMENT" }
   | { type: "SET_ERROR"; error: string }
   | { type: "RESET" };
 
@@ -204,22 +202,20 @@ export function wizard1Reducer(
       return { ...state, discount: action.discount, error: "" };
     case "SET_PRICE_OVERRIDE":
       return { ...state, priceOverride: action.priceOverride, error: "" };
-    case "ENROLL_START":
+    case "SUBMIT_START":
       return { ...state, submitting: true, error: "" };
-    case "ENROLL_SUCCESS":
+    case "COMMIT_SUCCESS":
       return {
         ...state,
-        step: 3,
+        step: 4,
         submitting: false,
         enrollment: action.enrollment,
         summary: action.summary,
+        payment: action.payment,
+        receiptOpen: action.payment != null,
         paymentForm: {
           ...state.paymentForm,
           enrollment_id: action.enrollment.id,
-          amount:
-            action.summary.balance_remaining != null
-              ? action.summary.balance_remaining.toString()
-              : "",
         },
       };
     case "SET_PAYMENT_FORM":
@@ -228,21 +224,8 @@ export function wizard1Reducer(
         paymentForm: { ...state.paymentForm, ...action.patch },
         error: "",
       };
-    case "PAY_START":
-      return { ...state, submitting: true, error: "" };
-    case "PAY_SUCCESS":
-      return {
-        ...state,
-        submitting: false,
-        payment: action.payment,
-        summary: action.summary,
-        receiptOpen: true,
-        step: 4,
-      };
     case "SET_RECEIPT_OPEN":
       return { ...state, receiptOpen: action.open };
-    case "SKIP_PAYMENT":
-      return { ...state, step: 4, error: "" };
     case "SET_ERROR":
       return { ...state, error: action.error, submitting: false };
     case "RESET":

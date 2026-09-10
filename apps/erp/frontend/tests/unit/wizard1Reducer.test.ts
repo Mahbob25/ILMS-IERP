@@ -1,3 +1,4 @@
+import { describe, test, expect } from 'vitest'
 import {
   wizard1Reducer,
   createInitialWizard1State,
@@ -24,6 +25,11 @@ describe('wizard1Reducer', () => {
         student_code: '',
         full_name: '',
         email: '',
+        phone: '',
+        parent_full_name: '',
+        parent_phone: '',
+        parent_email: '',
+        parent_relationship: '',
       })
       expect(s.paymentForm).toEqual({
         enrollment_id: '',
@@ -199,50 +205,22 @@ describe('wizard1Reducer', () => {
       expect(next.error).toBe('')
     })
 
-    test('ENROLL_START sets submitting and clears error', () => {
+    test('SUBMIT_START sets submitting and clears error', () => {
       const fromError = wizard1Reducer(initialState(), {
         type: 'SET_ERROR',
         error: 'enroll_failed',
       })
-      const next = wizard1Reducer(fromError, { type: 'ENROLL_START' })
+      const next = wizard1Reducer(fromError, { type: 'SUBMIT_START' })
       expect(next.submitting).toBe(true)
       expect(next.error).toBe('')
     })
 
-    test('ENROLL_SUCCESS moves to step 3, stores enrollment + summary and seeds payment amount from balance', () => {
-      const next = wizard1Reducer(initialState(), {
-        type: 'ENROLL_SUCCESS',
-        enrollment: { id: 'e1', agreed_price: 1000, total_paid: 0, balance_remaining: 500 },
-        summary: {
-          total_paid: 0,
-          agreed_price: 1000,
-          admin_discount: 10,
-          net_price: 900,
-          balance_remaining: 500,
-        },
-      })
+    test('SET_STEP to 3 persists nothing (enrollment stays null)', () => {
+      const next = wizard1Reducer(initialState(), { type: 'SET_STEP', step: 3 })
       expect(next.step).toBe(3)
-      expect(next.submitting).toBe(false)
-      expect(next.enrollment?.id).toBe('e1')
-      expect(next.summary?.net_price).toBe(900)
-      expect(next.paymentForm.enrollment_id).toBe('e1')
-      expect(next.paymentForm.amount).toBe('500')
-    })
-
-    test('ENROLL_SUCCESS with null balance leaves payment amount empty', () => {
-      const next = wizard1Reducer(initialState(), {
-        type: 'ENROLL_SUCCESS',
-        enrollment: { id: 'e2', agreed_price: 0, total_paid: 0, balance_remaining: null },
-        summary: {
-          total_paid: 0,
-          agreed_price: 0,
-          admin_discount: null,
-          net_price: null,
-          balance_remaining: null,
-        },
-      })
-      expect(next.step).toBe(3)
-      expect(next.paymentForm.amount).toBe('')
+      expect(next.enrollment).toBeNull()
+      expect(next.summary).toBeNull()
+      expect(next.payment).toBeNull()
     })
   })
 
@@ -262,20 +240,11 @@ describe('wizard1Reducer', () => {
       expect(next.error).toBe('')
     })
 
-    test('PAY_START sets submitting and clears error', () => {
-      const fromError = wizard1Reducer(initialState(), {
-        type: 'SET_ERROR',
-        error: 'pay_failed',
-      })
-      const next = wizard1Reducer(fromError, { type: 'PAY_START' })
-      expect(next.submitting).toBe(true)
-      expect(next.error).toBe('')
-    })
-
-    test('PAY_SUCCESS moves to step 4, stores payment, opens receipt and clears submitting', () => {
-      const started = wizard1Reducer(initialState(), { type: 'PAY_START' })
+    test('COMMIT_SUCCESS with a payment moves to step 4, stores everything and opens the receipt', () => {
+      const started = wizard1Reducer(initialState(), { type: 'SUBMIT_START' })
       const next = wizard1Reducer(started, {
-        type: 'PAY_SUCCESS',
+        type: 'COMMIT_SUCCESS',
+        enrollment: { id: 'e1', agreed_price: 1000, total_paid: 250, balance_remaining: 650 },
         payment: {
           id: 'p1',
           receipt_number: 'R-1',
@@ -294,20 +263,32 @@ describe('wizard1Reducer', () => {
       })
       expect(next.submitting).toBe(false)
       expect(next.step).toBe(4)
+      expect(next.enrollment?.id).toBe('e1')
       expect(next.payment?.receipt_number).toBe('R-1')
       expect(next.payment?.amount).toBe(250)
       expect(next.receiptOpen).toBe(true)
       expect(next.summary?.total_paid).toBe(250)
+      expect(next.paymentForm.enrollment_id).toBe('e1')
     })
 
-    test('SKIP_PAYMENT advances to step 4 and clears error', () => {
-      const fromError = wizard1Reducer(initialState(), {
-        type: 'SET_ERROR',
-        error: 'pay_failed',
+    test('COMMIT_SUCCESS on the skip path stores the enrollment without opening a receipt', () => {
+      const started = wizard1Reducer(initialState(), { type: 'SUBMIT_START' })
+      const next = wizard1Reducer(started, {
+        type: 'COMMIT_SUCCESS',
+        enrollment: { id: 'e2', agreed_price: 1000, total_paid: 0, balance_remaining: 1000 },
+        payment: null,
+        summary: {
+          total_paid: 0,
+          agreed_price: 1000,
+          admin_discount: null,
+          net_price: 1000,
+          balance_remaining: 1000,
+        },
       })
-      const next = wizard1Reducer(fromError, { type: 'SKIP_PAYMENT' })
       expect(next.step).toBe(4)
-      expect(next.error).toBe('')
+      expect(next.payment).toBeNull()
+      expect(next.receiptOpen).toBe(false)
+      expect(next.enrollment?.id).toBe('e2')
     })
   })
 
@@ -326,7 +307,7 @@ describe('wizard1Reducer', () => {
     })
 
     test('SET_ERROR records the code and stops submitting', () => {
-      const submitting = wizard1Reducer(initialState(), { type: 'ENROLL_START' })
+      const submitting = wizard1Reducer(initialState(), { type: 'SUBMIT_START' })
       const next = wizard1Reducer(submitting, { type: 'SET_ERROR', error: 'enroll_failed' })
       expect(next.error).toBe('enroll_failed')
       expect(next.submitting).toBe(false)

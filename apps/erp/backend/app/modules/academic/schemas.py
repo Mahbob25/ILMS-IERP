@@ -232,6 +232,32 @@ class EnrollmentCreateWithStudent(BaseModel):
         return _validate_price_override(v)
 
 
+class EnrollmentWithPaymentCreate(EnrollmentCreate):
+    amount: float
+    payment_date: Optional[date] = None
+    payment_method: str = "cash"
+    transaction_number: Optional[str] = None
+
+    @field_validator("amount")
+    @classmethod
+    def validate_amount(cls, v: float) -> float:
+        if v <= 0:
+            raise ValueError("Payment amount must be positive")
+        return round(v, 2)
+
+
+class PaymentReceiptInfo(BaseModel):
+    id: uuid.UUID
+    receipt_number: str
+    date: date
+    amount: float
+    payment_method: str
+    transaction_number: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
 class EnrollmentResponse(BaseModel):
     id: uuid.UUID
     student_id: uuid.UUID
@@ -247,6 +273,11 @@ class EnrollmentResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class EnrollmentWithPaymentResponse(BaseModel):
+    enrollment: EnrollmentResponse
+    payment: PaymentReceiptInfo
 
 
 class EnrollmentDetailResponse(BaseModel):

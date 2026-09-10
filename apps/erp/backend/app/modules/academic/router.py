@@ -13,6 +13,7 @@ from app.modules.academic.schemas import (
     CourseSectionCreate, CourseSectionUpdate, CourseSectionResponse, CourseSectionDetailResponse, SectionActivate,
     StudentCreate, StudentUpdate, StudentResponse,
     EnrollmentCreate, EnrollmentCreateWithStudent, EnrollmentResponse, EnrollmentDetailResponse,
+    EnrollmentWithPaymentCreate, EnrollmentWithPaymentResponse, PaymentReceiptInfo,
     FinalGradeCreate, FinalGradeBulkCreate, FinalGradeResponse, StudentGradeSummary,
     CertificateResponse, CertificateBatchDeleteRequest, BatchDeleteResult, DeactivateRequest,
     UnenrollmentPreviewResponse, UnenrollRequest, UnenrollmentRecordResponse,
@@ -637,6 +638,59 @@ async def create_enrollment_with_student(
             },
         )
     return enrollment
+
+@academic_router.post("/enrollments/with-payment", response_model=EnrollmentWithPaymentResponse, status_code=status.HTTP_201_CREATED)
+@limiter.limit("20/minute")
+async def create_enrollment_with_payment_endpoint(
+    request: Request,
+    data: EnrollmentWithPaymentCreate,
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary"])),
+    db: AsyncSession = Depends(get_db)
+):
+    """Create the enrollment and its first payment atomically.
+
+    Both rows are written in a single transaction (``get_db`` commits once, on success),
+    so a rejected payment rolls the enrollment back instead of leaving an orphan behind.
+    """
+    if (data.admin_discount is not None or data.price_override is not None) and current_user.role.name not in ("superadmin", "manager"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only managers can set discounts or price overrides")
+    section = await academic_service.get_course_section(db, data.section_id)
+    if not section:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Section not found")
+    if section.price is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=get_error_detail("section_no_price", "ar"),
+        )
+    enrollment, payment = await academic_service.create_enrollment_with_payment(
+        db,
+        section_id=data.section_id,
+        amount=data.amount,
+        created_by=current_user.id,
+        student_id=data.student_id,
+        admin_discount=data.admin_discount,
+        price_override=data.price_override,
+        payment_date=data.payment_date,
+        payment_method=data.payment_method,
+        transaction_number=data.transaction_number,
+    )
+    if data.admin_discount is not None or data.price_override is not None:
+        await create_audit_log(
+            db,
+            action="enrollment.adjusted",
+            user_id=current_user.id,
+            payload={
+                "enrollment_id": str(enrollment.id),
+                "section_id": str(data.section_id),
+                "student_id": str(enrollment.student_id),
+                "admin_discount": data.admin_discount,
+                "price_override": data.price_override,
+            },
+        )
+    return EnrollmentWithPaymentResponse(
+        enrollment=EnrollmentResponse.model_validate(enrollment),
+        payment=PaymentReceiptInfo.model_validate(payment),
+    )
 
 @academic_router.delete("/enrollments/{enrollment_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_enrollment(

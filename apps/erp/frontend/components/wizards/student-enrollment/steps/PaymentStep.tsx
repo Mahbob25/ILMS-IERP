@@ -15,6 +15,7 @@ interface PaymentStepProps {
   summary: PaymentSummary | null;
   enrollmentOptions: { value: string; label: string }[];
   onEnrollmentSelect: (enrollmentId: string) => void;
+  showEnrollmentSelect?: boolean;
   error: string;
   labels: PaymentStepLabels;
 }
@@ -25,6 +26,7 @@ export default function PaymentStep({
   summary,
   enrollmentOptions,
   onEnrollmentSelect,
+  showEnrollmentSelect,
   error,
   labels,
 }: PaymentStepProps) {
@@ -35,6 +37,7 @@ export default function PaymentStep({
         onFormChange={onFormChange}
         enrollmentOptions={enrollmentOptions}
         onEnrollmentSelect={onEnrollmentSelect}
+        showEnrollmentSelect={showEnrollmentSelect}
         summary={summary}
         formError={error}
         labels={labels}
