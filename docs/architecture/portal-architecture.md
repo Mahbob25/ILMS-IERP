@@ -126,6 +126,7 @@ flowchart TB
 - Portal **never** writes ERP tables directly. All writes go through `lims_backend` internal API.
 - Portal owns `portal.*` schema (portal_users, sessions, preferences) OR its own logical DB — your call. Start with same Postgres host, separate schema, zero code change to split later.
 - `ai-service` is **stateless** but runs **two logical queues** so student-facing streaming never starves behind a batch ingestion job (see §4.4). Scale/kill/move to GPU node without touching ERP or Portal.
+- **Redis is one shared instance owned by `docker-compose.yml`** (service `redis`, container `lims_redis`), with a password (`REDIS_PASSWORD`) and AOF persistence. Portal BFF and `ai-service` point at it via `REDIS_URL`. The portal compose must **not** declare its own `redis` service — a duplicate service name would collide on the `redis` network alias.
 
 ### 3.2 Network & Compose
 
@@ -146,9 +147,10 @@ services:
       PORTAL_JWT_SECRET: ${PORTAL_JWT_SECRET}
       ERP_INTERNAL_URL: http://backend:8000
       ERP_SERVICE_KEY: ${ERP_SERVICE_KEY}
-      REDIS_URL: redis://redis:6379/0
+      REDIS_URL: ${REDIS_URL:-redis://:lims_secure_redis_pass@redis:6379/0}
     networks: [lims-internal]
-    depends_on: [redis]
+    # No depends_on: redis — it lives in docker-compose.yml (different project),
+    # and depends_on cannot reach across compose files. Start the ERP stack first.
     deploy: { resources: { limits: { cpus: '1.0', memory: 1G } } }
 
   portal-frontend:
@@ -162,20 +164,14 @@ services:
     build: ./apps/ai-service
     container_name: ai_service
     environment:
-      REDIS_URL: redis://redis:6379/0
+      REDIS_URL: ${REDIS_URL:-redis://:lims_secure_redis_pass@redis:6379/0}
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       GEMINI_API_KEY: ${GEMINI_API_KEY}
     networks: [lims-internal]
     deploy: { resources: { limits: { cpus: '2.0', memory: 4G } } }
 
-  redis:
-    image: redis:7-alpine
-    container_name: portal_redis
-    networks: [lims-internal]
-    volumes: [redis_data:/data]
-
-volumes:
-  redis_data:
+# NOTE: no `redis` service here. The single shared Redis is declared in
+# docker-compose.yml (container `lims_redis`, password + AOF).
 ```
 
 ```caddy

@@ -2,8 +2,12 @@
 #   Local:  docker compose -f docker-compose.portal.yml up -d
 #   Prod:   same command on the VM (after `docker compose up -d` for the ERP)
 #
-# Principle: ERP docker-compose.yml NEVER gains a redis service; Redis lives
-# only here. No host `ports:` on portal/ai/redis — Caddy is the sole ingress.
+# Principle: Redis is ONE shared instance owned by docker-compose.yml
+# (service `redis`, container `lims_redis`). This file must NOT declare its
+# own `redis` service — a duplicate service name would collide on the `redis`
+# network alias and the two instances would fight over the same volume.
+# Start the ERP stack first so Redis exists before these services connect.
+# No host `ports:` on portal/ai — Caddy is the sole ingress.
 
 networks:
   lims-internal:
@@ -27,11 +31,16 @@ services:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-lims}:${POSTGRES_PASSWORD:-lims_secure_pass}@database:5432/${POSTGRES_DB:-lims}
       ERP_INTERNAL_URL: http://backend:8000
       ERP_SERVICE_KEY: ${ERP_SERVICE_KEY:-}
-      REDIS_URL: redis://redis:6379/0
+      # Shared Redis (owned by docker-compose.yml). The URL carries the
+      # password; scripts/setup.sh writes it to .env. The default matches the
+      # redis service's fallback password so a no-.env `up` still works.
+      REDIS_URL: ${REDIS_URL:-redis://:lims_secure_redis_pass@redis:6379/0}
       CACHE_TTL_SECONDS: 60
       SENTRY_DSN: ${SENTRY_DSN:-}
-    depends_on:
-      - redis
+    # NOTE: no `depends_on: redis` — `redis` lives in the ERP compose file,
+    # and depends_on only reaches services in the same project. Ordering is
+    # handled by starting the ERP stack first (scripts/setup.sh); the BFF
+    # degrades gracefully if Redis is briefly unavailable.
     networks:
       - lims-internal
     healthcheck:
@@ -51,7 +60,7 @@ services:
     container_name: ai_service
     restart: always
     environment:
-      REDIS_URL: redis://redis:6379/0
+      REDIS_URL: ${REDIS_URL:-redis://:lims_secure_redis_pass@redis:6379/0}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
     networks:
@@ -61,25 +70,3 @@ services:
         limits:
           cpus: '2.0'
           memory: 4G
-
-  redis:
-    image: redis:7-alpine
-    container_name: portal_redis
-    restart: always
-    volumes:
-      - redis_data:/data
-    networks:
-      - lims-internal
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 256M
-
-volumes:
-  redis_data:

@@ -26,16 +26,19 @@ echo "==> Dumping portal database (portal.* schema shares the same PG host)"
 # is in the same database as erp.*. If the portal is ever moved to a 2nd PG host,
 # add a dedicated pg_dump for it here.
 
-echo "==> Snapshotting portal Redis (queue + cache)"
-# Redis is portal-owned (docker-compose.portal.yml). RDB snapshot preserves the
-# ai:student/ai:ingestion queues + read-through cache for replay after a restore.
-PORTAL_REDIS="$(docker ps -q -f name=portal_redis 2>/dev/null || true)"
-if [ -n "$PORTAL_REDIS" ]; then
-  docker exec "$PORTAL_REDIS" redis-cli SAVE
-  docker run --rm -v "redis_data:/data:ro" -v "$BACKUP_DIR:/backup" alpine \
-    sh -c 'mkdir -p /tmp/rdb && cp /data/dump.rdb /tmp/rdb/ && tar czf /backup/redis-$STAMP.tar.gz -C /tmp/rdb .'
+echo "==> Snapshotting shared Redis (queues + cache)"
+# Redis is shared and owned by docker-compose.yml (`lims_redis`); the portal
+# and ai-service use the same instance. SAVE forces an RDB point-in-time dump,
+# and the whole /data dir is archived so the AOF (appendonlydir) is captured
+# too. Resolve the real volume name — compose prefixes it with the project.
+REDIS_CONTAINER="$(docker ps -q -f name=lims_redis 2>/dev/null || true)"
+REDIS_VOLUME="$(docker volume ls -q -f name=redis_data 2>/dev/null | head -1)"
+if [ -n "$REDIS_CONTAINER" ] && [ -n "$REDIS_VOLUME" ]; then
+  docker exec "$REDIS_CONTAINER" sh -c 'redis-cli --no-auth-warning -a "$REDIS_PASSWORD" SAVE'
+  docker run --rm -v "${REDIS_VOLUME}:/data:ro" -v "$BACKUP_DIR:/backup" alpine \
+    sh -c "tar czf /backup/redis-$STAMP.tar.gz -C /data ."
 else
-  echo "WARN: portal_redis not running — skipping redis snapshot (cache will cold-start)"
+  echo "WARN: lims_redis container or redis_data volume not found — skipping redis snapshot (cache/queues will cold-start)"
 fi
 
 echo "==> Archiving uploads"

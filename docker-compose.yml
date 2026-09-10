@@ -1,12 +1,18 @@
 # Unified Docker Compose — works for local development AND production deploy.
 #
-#   Local:  docker compose up -d         (database + backend + frontend + caddy)
+#   Local:  docker compose up -d         (database + redis + backend + caddy)
 #   Prod:   docker compose --profile tunnel up -d
 #           (adds cloudflared; run from the server with a real .env)
 #
 # Environment variables are interpolated from the repo-root .env file.
 # Every variable has a local-development default, so `docker compose up`
 # works out of the box; production values come from .env on the server.
+#
+# Redis is the ONE shared instance for every backend (ERP realtime/queue,
+# portal BFF cache/queue, ai-service). It is owned by this file so it shares
+# the ERP's network + lifecycle; docker-compose.portal.yml must NOT declare
+# its own `redis` service (a duplicate service name would collide on the
+# `redis` network alias).
 
 networks:
   lims-internal:
@@ -41,6 +47,46 @@ services:
           cpus: '2.0'
           memory: 2G
 
+  # Shared Redis — the single instance for the whole stack. The ERP uses it
+  # for the realtime bus + queue (REDIS_URL), the portal BFF for its
+  # read-through cache and ai:* queues, and ai-service as the job transport.
+  # AOF persistence keeps queued jobs across restarts. Databases are
+  # namespaced by key prefix, not by Redis DB index (all clients use /0).
+  redis:
+    image: redis:7-alpine
+    container_name: lims_redis
+    restart: always
+    environment:
+      TZ: ${TIMEZONE:-Asia/Riyadh}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-lims_secure_redis_pass}
+    # --requirepass is expanded by the container shell from REDIS_PASSWORD
+    # (the `sh -c` layer is required: Compose's string form does NOT expand
+    # variables, so the name would be passed to redis-server literally).
+    # appendonly keeps the ai:* queues durable across restarts.
+    command:
+      - sh
+      - -c
+      - >
+        exec redis-server
+        --requirepass "$$REDIS_PASSWORD"
+        --appendonly yes
+        --appendfsync everysec
+    volumes:
+      - redis_data:/data
+    networks:
+      - lims-internal
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli --no-auth-warning -a \"$$REDIS_PASSWORD\" ping | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      start_period: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+
   backend:
     build:
       context: ./apps/erp/backend
@@ -56,7 +102,7 @@ services:
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:80,http://localhost:3000,https://aldirasat.com,https://portal.aldirasat.com}
       SENTRY_DSN: ${SENTRY_DSN:-}
       ERP_SERVICE_KEY: ${ERP_SERVICE_KEY:-}
-      REDIS_URL: ${REDIS_URL:-}
+      REDIS_URL: ${REDIS_URL:-redis://:lims_secure_redis_pass@redis:6379/0}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       PORTAL_JWT_SECRET: ${PORTAL_JWT_SECRET:-}
@@ -128,6 +174,7 @@ services:
 
 volumes:
   pgdata:
+  redis_data:
   uploads_data:
   backups:
   caddy_data:

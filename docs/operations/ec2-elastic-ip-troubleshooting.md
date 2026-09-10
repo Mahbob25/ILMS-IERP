@@ -168,6 +168,6 @@ aws ec2 describe-addresses --region eu-north-1 --public-ips 13.50.176.4
 ## 8. Related Context (if this becomes a deployment doc)
 
 - Frontends now deploy to **Vercel** (ERP: `apps/erp/frontend/` → root dir, Portal: `apps/portal/frontend/` → root dir). Both rewrite `/api/*` to `http://13.50.176.4` in `next.config.js`.
-- EC2 runs only the backend stack (no frontend containers): `lims_backend` :8000, `portal_backend` :8001, `lims_database`, `lims_caddy` (API gateway on :80), `lims_cloudflared` (tunnel), `portal_redis`, `ai_service`.
+- EC2 runs only the backend stack (no frontend containers): `lims_backend` :8000, `portal_backend` :8001, `lims_database`, `lims_redis` (shared Redis, password auth), `lims_caddy` (API gateway on :80), `lims_cloudflared` (tunnel), `ai_service`.
 - The app is fully functional when reached locally or over the IPv6 path; only inbound IPv4 to the EIP is broken.
 - Once IPv4 is restored, final verification: `curl http://13.50.176.4/api/v1/health` → `200` from anywhere, then test the live Vercel frontends end-to-end.

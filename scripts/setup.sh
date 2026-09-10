@@ -351,7 +351,29 @@ ensure_env() {
       set_env ERP_SERVICE_KEY "$new"
       ;;
   esac
-  ok ".env is ready (JWT_SECRET_KEY / POSTGRES_PASSWORD / PORTAL_JWT_SECRET / ERP_SERVICE_KEY set)"
+
+  # ── Shared Redis (docker-compose.yml owns the `redis` service) ──────
+  # One Redis serves the ERP (realtime bus + queue), the portal BFF
+  # (cache + ai:* queues) and ai-service. A password is required, and the
+  # client URL must embed it — keep the two in sync here so no caller has
+  # to remember. A custom (e.g. cloud-managed) REDIS_URL is left untouched.
+  local rp ru
+  rp=$(get_env REDIS_PASSWORD)
+  case "$rp" in
+    ""|"change_me_redis_password")
+      rp=$(generate_secret)
+      info "Generating a strong REDIS_PASSWORD (shared Redis: ERP + portal + ai)"
+      set_env REDIS_PASSWORD "$rp"
+      ;;
+  esac
+  ru=$(get_env REDIS_URL)
+  case "$ru" in
+    ""|"redis://redis:6379/0"|"redis://:change_me_redis_password@redis:6379/0")
+      set_env REDIS_URL "redis://:${rp}@redis:6379/0"
+      ;;
+  esac
+
+  ok ".env is ready (JWT_SECRET_KEY / POSTGRES_PASSWORD / PORTAL_JWT_SECRET / ERP_SERVICE_KEY / REDIS_PASSWORD set)"
 }
 
 detect_mode() {
@@ -427,9 +449,9 @@ compose_up() {
 
   # Portal + AI stack (docker-compose.portal.yml) — separate compose file on
   # the same lims-internal network. The ERP must be up first (it owns the
-  # database + Caddy); the portal joins after.
+  # database, Caddy and the shared Redis); the portal joins after.
   if [ -f "$PORTAL_COMPOSE_FILE" ]; then
-    info "Starting portal stack ($PORTAL_COMPOSE_FILE: portal-backend, portal-frontend, ai-service, redis)"
+    info "Starting portal stack ($PORTAL_COMPOSE_FILE: portal-backend, ai-service — shared redis comes from the ERP stack)"
     "${COMPOSE[@]}" -f "$PORTAL_COMPOSE_FILE" build || fail "Portal image build failed — see error above."
     "${COMPOSE[@]}" -f "$PORTAL_COMPOSE_FILE" up -d || fail "Failed to start portal services — see error above."
   else
@@ -454,6 +476,17 @@ verify() {
     warn "backend logs (last 25):"
     "${COMPOSE[@]}" -f "$COMPOSE_FILE" logs --tail=25 backend 2>/dev/null || true
     warn "Most likely causes: .env values, port 80 in use, or a failing migration above."
+    return 1
+  fi
+
+  # Shared Redis — the ERP/portal/ai bus. Prove it is actually usable
+  # (accepting the password from .env), not merely running.
+  if "${COMPOSE[@]}" -f "$COMPOSE_FILE" exec -T redis \
+       sh -c 'redis-cli --no-auth-warning -a "$REDIS_PASSWORD" ping' 2>/dev/null | grep -q PONG; then
+    ok "Shared Redis is reachable (lims_redis, password auth)"
+  else
+    warn "Shared Redis did not answer PING — check 'docker compose -f $COMPOSE_FILE logs redis'."
+    warn "Backends fall back to no-Redis mode, but realtime/queue features will be disabled."
     return 1
   fi
 
@@ -482,9 +515,10 @@ print_summary() {
   printf '\n%s%sBackend stack is up%s\n' "$BOLD" "$GREEN" "$RESET"
   printf '  API health: http://localhost/api/v1/health\n'
   printf '  Database  : localhost:5431 (postgres)\n'
+  printf '  Redis     : lims_redis :6379 (shared by ERP + portal + ai, password auth)\n'
   printf '  Logs      : docker compose logs -f backend\n'
   if [ -f "$PORTAL_COMPOSE_FILE" ]; then
-    printf '  Portal    : portal-backend :8001, ai-service :8002, redis :6379 (on lims-internal)\n'
+    printf '  Portal    : portal-backend :8001, ai-service :8002 (on lims-internal)\n'
     printf '  Portal log: docker compose -f %s logs -f portal-backend\n' "$PORTAL_COMPOSE_FILE"
   fi
   printf '\n  Frontends are hosted on Vercel — this server serves APIs only.\n'
