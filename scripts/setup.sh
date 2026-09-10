@@ -460,6 +460,66 @@ pull_code() {
   fi
 }
 
+# ── Recreate policy ──────────────────────────────────────────────────────────
+# `up -d` WITHOUT --force-recreate recreates only the services whose image or
+# configuration actually changed, which is why a code-only deploy no longer
+# bounces Postgres and Redis. That mattered: force-recreating everything took
+# the whole API down for ~15-20s on every push (Caddy stops listening), and
+# users saw it as Vercel's ROUTER_EXTERNAL_TARGET_CONNECTION_ERROR for every
+# request until the stack came back.
+#
+# Two things `up -d` cannot detect, so they are handled explicitly below:
+#   * the Caddyfile is a BIND MOUNT — its content is not part of Compose's
+#     config hash, and Caddy reads the file only at startup;
+#   * a rebuilt image must actually be picked up by the running container.
+
+# True when the Caddyfile on disk is newer than the running Caddy process, i.e.
+# the process is serving a config that has since changed. Self-contained: no
+# state is kept between runs, and a manual Caddyfile edit is caught too.
+caddy_config_stale() {
+  local started started_epoch file_epoch
+  started=$(docker inspect -f '{{.State.StartedAt}}' lims_caddy 2>/dev/null) || return 1
+  [ -n "$started" ] || return 1
+  # Docker reports RFC3339 with nanoseconds ("...T22:22:11.618678509Z");
+  # strip the fraction so GNU date parses it.
+  started_epoch=$(date -u -d "${started%%.*}Z" +%s 2>/dev/null) || return 1
+  file_epoch=$(stat -c %Y infrastructure/caddy/Caddyfile 2>/dev/null) || return 1
+  [ "$file_epoch" -gt "$started_epoch" ]
+}
+
+# True when the running backend container is not on the image we just built.
+# A cheap guard against silently shipping stale code if Compose ever misses the
+# image swap.
+backend_image_stale() {
+  local running built
+  running=$(docker inspect -f '{{.Image}}' lims_backend 2>/dev/null) || return 1
+  [ -n "$running" ] || return 1
+  built=$("${COMPOSE[@]}" -f "$COMPOSE_FILE" images -q backend 2>/dev/null | head -1)
+  [ -n "$built" ] || return 1
+  # `docker inspect` reports "sha256:<hex>" whereas `compose images -q` reports
+  # the bare "<hex>", so the prefix must be stripped — otherwise the values
+  # never match and the backend is recreated on every deploy.
+  [ "${running#sha256:}" != "${built#sha256:}" ]
+}
+
+# Containers running but NOT attached to the shared network, given as container
+# names. A renamed network once left the stack in exactly this state: containers
+# kept running but could not be reached by service name, and a plain `up -d` did
+# not reconcile it (it needed a manual `docker compose down`). Detecting it keeps
+# that recovery automatic without force-recreating everything on every deploy.
+containers_off_network() {
+  local c nets out=""
+  for c in "$@"; do
+    docker inspect "$c" >/dev/null 2>&1 || continue
+    nets=$(docker inspect -f '{{range $k, $v := .NetworkSettings.Networks}}{{$k}} {{end}}' "$c" 2>/dev/null)
+    case " $nets " in
+      *" lims-internal "*) ;;
+      *) out="${out}${c} " ;;
+    esac
+  done
+  printf '%s' "$out"
+}
+
 compose_up() {
   info "Building images (cached — fast on updates)"
   "${COMPOSE[@]}" -f "$COMPOSE_FILE" build || fail "Image build failed — see error above."
@@ -469,9 +529,39 @@ compose_up() {
     profile_args=(--profile tunnel)
     info "Starting services with the tunnel profile (cloudflared)"
   else
-    info "Starting services (database, backend, frontend, caddy)"
+    info "Starting services (database, redis, backend, caddy)"
   fi
-  "${COMPOSE[@]}" -f "$COMPOSE_FILE" "${profile_args[@]}" up -d --force-recreate || fail "Failed to start services — see error above."
+
+  # No --force-recreate: services whose image and config are unchanged (notably
+  # database and redis) are left running. Recreating them on every deploy is
+  # what caused a full-stack outage per push.
+  "${COMPOSE[@]}" -f "$COMPOSE_FILE" "${profile_args[@]}" up -d || fail "Failed to start services — see error above."
+
+  # Recovery path for the network-rename case, which `up -d` does not fix: if
+  # anything is off the shared network, rebuild the stack so it rejoins. Rare,
+  # and only when genuinely broken — the normal deploy never takes this branch.
+  local off
+  off=$(containers_off_network lims_database lims_redis lims_backend lims_caddy)
+  if [ -n "$off" ]; then
+    warn "not attached to lims-internal: ${off% } — recreating the stack to rejoin it"
+    "${COMPOSE[@]}" -f "$COMPOSE_FILE" "${profile_args[@]}" up -d --force-recreate \
+      || fail "Failed to recreate services — see error above."
+  fi
+
+  # Safety net — make sure the freshly built backend is really the one running.
+  if backend_image_stale; then
+    warn "backend is still running an older image — recreating it"
+    "${COMPOSE[@]}" -f "$COMPOSE_FILE" up -d --force-recreate --no-deps backend \
+      || fail "Failed to recreate backend — see error above."
+  fi
+
+  # Bind-mounted Caddyfile: invisible to Compose's config hash and read only at
+  # startup, so a config change needs an explicit recreate.
+  if caddy_config_stale; then
+    info "Caddyfile changed — recreating caddy to load it"
+    "${COMPOSE[@]}" -f "$COMPOSE_FILE" up -d --force-recreate --no-deps caddy \
+      || fail "Failed to recreate caddy — see error above."
+  fi
 
   # Portal + AI stack (docker-compose.portal.yml) — separate compose file on
   # the same lims-internal network. The ERP must be up first (it owns the
@@ -480,6 +570,15 @@ compose_up() {
     info "Starting portal stack ($PORTAL_COMPOSE_FILE: portal-backend, ai-service — shared redis comes from the ERP stack)"
     "${COMPOSE[@]}" -f "$PORTAL_COMPOSE_FILE" build || fail "Portal image build failed — see error above."
     "${COMPOSE[@]}" -f "$PORTAL_COMPOSE_FILE" up -d || fail "Failed to start portal services — see error above."
+
+    # Same network-rename recovery for the portal services.
+    local port_off
+    port_off=$(containers_off_network portal_backend ai_service)
+    if [ -n "$port_off" ]; then
+      warn "not attached to lims-internal: ${port_off% } — recreating the portal stack"
+      "${COMPOSE[@]}" -f "$PORTAL_COMPOSE_FILE" up -d --force-recreate \
+        || fail "Failed to recreate portal services — see error above."
+    fi
   else
     warn "$PORTAL_COMPOSE_FILE not found — skipping portal stack."
   fi
