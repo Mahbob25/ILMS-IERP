@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { Wallet, CalendarRange, LogOut, Bell, User as UserIcon, X } from "lucide-react";
+import { Wallet, CalendarRange, LogOut, Bell, User as UserIcon, X, BookOpen } from "lucide-react";
 import type { PortalUser } from "@/components/AuthContext";
 
 interface Props {
@@ -26,6 +26,7 @@ export default function OverflowSheet({ open, onClose, user, onLogout }: Props) 
   const s =
     locale === "ar"
       ? {
+          courses: "مقرراتي",
           fees: "الرسوم الدراسية",
           revision: "خطة المذاكرة (قريبًا)",
           logout: "تسجيل الخروج",
@@ -33,6 +34,7 @@ export default function OverflowSheet({ open, onClose, user, onLogout }: Props) 
           more: "القائمة",
         }
       : {
+          courses: "My Courses",
           fees: "Tuition Fees",
           revision: "Revision Plan (soon)",
           logout: "Log Out",
@@ -57,6 +59,7 @@ export default function OverflowSheet({ open, onClose, user, onLogout }: Props) 
   };
 
   const items = [
+    { name: s.courses, href: `/${locale}/dashboard/courses`, icon: BookOpen },
     { name: s.fees, href: `/${locale}/dashboard/fees`, icon: Wallet },
     { name: s.revision, href: `/${locale}/dashboard/ai/revision`, icon: CalendarRange },
   ];

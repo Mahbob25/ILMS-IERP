@@ -20,10 +20,14 @@ class GradeDTO(BaseModel):
     section_id: uuid.UUID
     course_name: str
     final_score: Optional[float] = None
+    grade_label: Optional[str] = None
     graded_at: Optional[datetime] = None
 
 
 class AttendanceDTO(BaseModel):
+    # Which section the session belonged to — lets the portal attribute
+    # attendance per course without one query per section.
+    section_id: uuid.UUID
     date: date
     status: str
     course_name: str
@@ -44,6 +48,16 @@ class SectionDTO(BaseModel):
     status: str
     start_date: Optional[date] = None
     end_date: Optional[date] = None
+    # "HH:MM", formatted server-side (the column is a time, not a string).
+    class_time: Optional[str] = None
+    class_duration_minutes: Optional[int] = None
+    classroom: Optional[str] = None
+    teacher_name: Optional[str] = None
+    # Set when the student withdrew: the enrollment is soft-deleted but stays in
+    # the course history so the academic record is complete.
+    withdrawn: bool = False
+    withdrawn_at: Optional[datetime] = None
+    withdrawal_reason: Optional[str] = None
 
 
 class ProfileUpdateRequest(BaseModel):

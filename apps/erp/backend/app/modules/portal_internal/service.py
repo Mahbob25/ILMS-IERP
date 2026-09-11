@@ -1,6 +1,6 @@
 import logging
 import uuid
-from datetime import date, datetime
+from datetime import date, datetime, time
 from decimal import Decimal
 from typing import Any, Optional
 
@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import joinedload
 
+from app.modules.academic.certificate_service import get_grade_label
 from app.modules.academic.models import CourseSection, Enrollment
 from app.modules.academic.pricing import (
     get_enrollment_price_components_batch,
@@ -116,7 +117,13 @@ async def get_grades(db: AsyncSession, student_id: str) -> list[dict[str, Any]]:
         ),
         {"sid": student_id},
     )
-    return [dict(r) for r in rows.mappings().all()]
+    grades = [dict(r) for r in rows.mappings().all()]
+    # Label server-side with the same bands the ERP certificate uses, rather than
+    # duplicating the thresholds in TypeScript.
+    for grade in grades:
+        score = grade.get("final_score")
+        grade["grade_label"] = get_grade_label(float(score)) if score is not None else None
+    return grades
 
 
 async def get_attendance(
@@ -126,7 +133,7 @@ async def get_attendance(
 ) -> list[dict[str, Any]]:
     query = text(
         f"""
-        SELECT ar.status, asn.date, c.name AS course_name
+        SELECT ar.status, asn.date, asn.section_id, c.name AS course_name
         FROM attendance_records ar
         JOIN attendance_sessions asn ON asn.id = ar.session_id
         JOIN course_sections cs ON cs.id = asn.section_id AND {_ACTIVE_SECTION}
@@ -160,21 +167,52 @@ async def get_payments(db: AsyncSession, student_id: str) -> list[dict[str, Any]
 
 
 async def get_sections(db: AsyncSession, student_id: str) -> list[dict[str, Any]]:
+    """Every section the student enrolled in — their course history.
+
+    Unlike the ERP views, a SOFT-DELETED enrollment (withdrawn) is returned too,
+    flagged via ``withdrawn``, so the student's record stays complete. A pair of
+    withdraw-then-re-enroll rows collapses to one via DISTINCT ON, preferring the
+    live enrollment (``uq_active_enrollment`` permits one active per student +
+    section, so duplicates are otherwise possible).
+    """
     rows = await db.execute(
         text(
             f"""
-            SELECT cs.id, c.name AS course_name, cs.status,
-                   cs.start_date, cs.end_date
-            FROM enrollments e
-            JOIN course_sections cs ON cs.id = e.section_id AND {_ACTIVE_SECTION}
-            JOIN courses c ON c.id = cs.course_id AND c.deleted_at IS NULL
-            WHERE e.student_id = :sid AND {_ACTIVE_ENROLLMENT}
-            ORDER BY cs.start_date DESC NULLS LAST
+            SELECT * FROM (
+                SELECT DISTINCT ON (cs.id)
+                       cs.id, c.name AS course_name, cs.status,
+                       cs.start_date, cs.end_date,
+                       cs.class_time, cs.class_duration_minutes, cs.classroom,
+                       emp.full_name AS teacher_name,
+                       (e.deleted_at IS NOT NULL) AS withdrawn,
+                       ur.unenrolled_at AS withdrawn_at,
+                       ur.reason AS withdrawal_reason
+                FROM enrollments e
+                JOIN course_sections cs ON cs.id = e.section_id AND {_ACTIVE_SECTION}
+                JOIN courses c ON c.id = cs.course_id AND c.deleted_at IS NULL
+                LEFT JOIN employees emp ON emp.id = cs.teacher_id
+                LEFT JOIN unenrollment_records ur ON ur.enrollment_id = e.id
+                WHERE e.student_id = :sid
+                ORDER BY cs.id, (e.deleted_at IS NOT NULL) ASC, e.enrolled_at DESC NULLS LAST
+            ) t
+            ORDER BY t.start_date DESC NULLS LAST, t.course_name
             """
         ),
         {"sid": student_id},
     )
-    return [dict(r) for r in rows.mappings().all()]
+    sections = [dict(r) for r in rows.mappings().all()]
+    for section in sections:
+        section["class_time"] = _format_class_time(section.get("class_time"))
+    return sections
+
+
+def _format_class_time(value: Any) -> Optional[str]:
+    """``time`` columns come back as ``datetime.time``; the DTO wants "HH:MM"."""
+    if value is None:
+        return None
+    if isinstance(value, time):
+        return value.strftime("%H:%M")
+    return str(value)[:5]
 
 
 async def update_profile(

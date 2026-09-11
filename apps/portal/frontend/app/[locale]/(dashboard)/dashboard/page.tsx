@@ -12,6 +12,7 @@ import Skeleton from "@/components/Skeleton";
 import EmptyState from "@/components/EmptyState";
 import StatCard from "@/components/StatCard";
 import type { AttendanceSlice } from "@/components/AttendanceDonut";
+import { attendanceStats } from "@/lib/utils/attendance";
 import {
   Award,
   CalendarCheck,
@@ -19,6 +20,9 @@ import {
   Sparkles,
   Users,
   ChevronRight,
+  BookOpen,
+  Clock,
+  User as UserIcon,
 } from "lucide-react";
 
 // recharts is heavy (~100 kB) — keep it out of the dashboard's initial JS and
@@ -29,9 +33,21 @@ const AttendanceDonut = dynamic(() => import("@/components/AttendanceDonut"), {
 });
 
 interface AttendanceRecord {
+  section_id?: string;
   date: string;
   status: string;
   course_name: string;
+}
+
+interface SectionRow {
+  id: string;
+  course_name: string;
+  status: string;
+  class_time: string | null;
+  class_duration_minutes: number | null;
+  classroom: string | null;
+  teacher_name: string | null;
+  withdrawn: boolean;
 }
 
 interface GradeRow {
@@ -60,6 +76,7 @@ interface DashboardData {
   attendance: AttendanceRecord[];
   grades: GradeRow[];
   fees: FeesSummary | null;
+  sections: SectionRow[];
   asOf: string | null;
 }
 
@@ -101,6 +118,9 @@ const t = {
     feesUnavailable: "تعذر تحميل بيانات الرسوم",
     // misc
     quickLinks: "روابط سريعة",
+    myCourses: "مقرراتي الحالية",
+    noCurrentCourses: "لا توجد مقررات حالية.",
+    viewAllCourses: "عرض كل المقررات",
     aiTeaser: "مساعد الذكاء الاصطناعي",
     aiTeaserDesc: "اطرح سؤالًا عن أي مقرر واحصل على إجابة مدعومة بالمصادر.",
   },
@@ -129,6 +149,9 @@ const t = {
     noOutstanding: "No outstanding balance",
     feesUnavailable: "Fees unavailable",
     quickLinks: "Quick links",
+    myCourses: "Current courses",
+    noCurrentCourses: "No current courses.",
+    viewAllCourses: "View all courses",
     aiTeaser: "AI Tutor",
     aiTeaserDesc: "Ask a question about any course and get a sourced answer.",
   },
@@ -147,6 +170,7 @@ export default function DashboardHome() {
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
   const [grades, setGrades] = useState<GradeRow[]>([]);
   const [fees, setFees] = useState<FeesSummary | null>(null);
+  const [sections, setSections] = useState<SectionRow[]>([]);
   const [asOf, setAsOf] = useState<string | null>(null);
   const [dataLoading, setDataLoading] = useState(false);
 
@@ -158,13 +182,14 @@ export default function DashboardHome() {
         ? { student_id: studentId, refresh: "1" }
         : { student_id: studentId };
 
-      const [att, grd, fee] = await Promise.allSettled([
+      const [att, grd, fee, sec] = await Promise.allSettled([
         apiClient.get<AttendanceRecord[]>("/me/attendance", { params: reqParams }),
         apiClient.get<GradeRow[]>("/me/grades", { params: reqParams }),
         apiClient.get<FeesSummary>("/me/fees", { params: reqParams }),
+        apiClient.get<SectionRow[]>("/me/sections", { params: reqParams }),
       ]);
 
-      const settled = [att, grd, fee].find((r) => r.status === "fulfilled");
+      const settled = [att, grd, fee, sec].find((r) => r.status === "fulfilled");
       const asOfHeader =
         settled && settled.status === "fulfilled"
           ? settled.value.headers?.["x-data-as-of"]
@@ -174,6 +199,7 @@ export default function DashboardHome() {
         attendance: att.status === "fulfilled" ? att.value.data || [] : [],
         grades: grd.status === "fulfilled" ? grd.value.data || [] : [],
         fees: fee.status === "fulfilled" ? fee.value.data : null,
+        sections: sec.status === "fulfilled" ? sec.value.data || [] : [],
         asOf: typeof asOfHeader === "string" ? asOfHeader : null,
       };
     },
@@ -184,6 +210,7 @@ export default function DashboardHome() {
     setAttendance(data.attendance);
     setGrades(data.grades);
     setFees(data.fees);
+    setSections(data.sections);
     setAsOf(data.asOf);
   }, []);
 
@@ -214,18 +241,14 @@ export default function DashboardHome() {
     }
   };
 
-  const stats = useMemo(() => {
-    const counts = { present: 0, absent: 0, late: 0, partial: 0, excused: 0 };
-    for (const record of attendance) {
-      const key = (record.status || "").toLowerCase() as keyof typeof counts;
-      if (key in counts) counts[key] += 1;
-    }
-    const total = counts.present + counts.absent + counts.late + counts.partial + counts.excused;
-    // Mirrors the ERP report: a partial attendance counts as attended.
-    const attended = counts.present + counts.partial;
-    const rate = total ? Math.round((attended / total) * 1000) / 10 : 0;
-    return { counts, total, rate };
-  }, [attendance]);
+  // Rate rule shared with the courses page (partial counts as attended).
+  const stats = useMemo(() => attendanceStats(attendance), [attendance]);
+
+  // Active, non-withdrawn sections — what the student is studying right now.
+  const currentCourses = useMemo(
+    () => sections.filter((section) => section.status === "active" && !section.withdrawn),
+    [sections]
+  );
 
   const slices: AttendanceSlice[] = [
     { key: "present", label: s.present, value: stats.counts.present, color: ATTENDANCE_COLORS.present },
@@ -380,6 +403,55 @@ export default function DashboardHome() {
                 <ChevronRight size={14} />
               </div>
             </StatCard>
+          </div>
+
+          {/* Current courses */}
+          <div className="card p-5">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                <BookOpen size={16} className="text-brand-600" />
+                {s.myCourses}
+              </h2>
+              <button
+                onClick={() => router.push(`/${locale}/dashboard/courses`)}
+                className="btn-touch gap-1 text-xs font-medium text-brand-700 hover:text-brand-800"
+              >
+                {s.viewAllCourses}
+                <ChevronRight size={14} className={locale === "ar" ? "rotate-180" : ""} />
+              </button>
+            </div>
+
+            {currentCourses.length === 0 ? (
+              <p className="text-xs text-slate-400 mt-3">{s.noCurrentCourses}</p>
+            ) : (
+              <div className="grid gap-3 sm:grid-cols-2 mt-3">
+                {currentCourses.map((section) => (
+                  <div
+                    key={section.id}
+                    className="rounded-lg border border-slate-200 px-3 py-2.5 space-y-1"
+                  >
+                    <p className="text-sm font-medium text-slate-900 truncate">
+                      {section.course_name}
+                    </p>
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+                      <span className="flex items-center gap-1">
+                        <UserIcon size={12} className="text-slate-400" />
+                        {section.teacher_name || "—"}
+                      </span>
+                      {section.class_time && (
+                        <span className="flex items-center gap-1" dir="ltr">
+                          <Clock size={12} className="text-slate-400" />
+                          {section.class_time}
+                        </span>
+                      )}
+                      {section.classroom && (
+                        <span className="text-slate-400">{section.classroom}</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Quick links */}

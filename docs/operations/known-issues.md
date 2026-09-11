@@ -70,6 +70,17 @@ The portal dashboard computes the attendance percentage in the frontend from the
 portal path. This is fine at current volumes; if a student accumulates thousands of records,
 add a server-side aggregate instead of shipping them all.
 
+### Portal course history includes withdrawn sections (by design)
+
+`/me/sections` returns sections whose enrollment was **soft-deleted** (withdrawn), flagged via
+`withdrawn`, so the student's academic record is complete. For an actor with a withdraw-then-
+re-enroll pair, `DISTINCT ON (cs.id)` collapses them to one row preferring the live enrollment.
+
+This is **deliberately different from the ERP enrolment views**, which filter deleted
+enrollments out — so the portal course list and an ERP enrolment list will not show the same
+number of rows for the same student. Don't "fix" the portal query to match the ERP without
+confirming the product intent.
+
 ### Grades: only section-level final grades are exposed
 
 The portal exposes `final_grades` (`final_score`, `graded_at`) only. There are no
@@ -110,15 +121,17 @@ guidance for when each applies.
 
 A `partial` mark counts as attended: `rate = (present + partial) / total`.
 
-This rule now exists in two places that cannot import each other:
+This rule exists in two places that cannot import each other:
 
 - **Python** — `attendance_totals()` in `apps/erp/backend/app/modules/reports/service.py`
-- **TypeScript** — the `stats` memo in
-  `apps/portal/frontend/app/[locale]/(dashboard)/dashboard/page.tsx`
+- **TypeScript** — `attendanceStats()` in
+  `apps/portal/frontend/lib/utils/attendance.ts`
 
-The Python function docstring points at the portal file, but **nothing enforces the two stay in
-sync**. If the policy changes (e.g. half-credit for partial), both must be updated or the ERP
-report and the portal dashboard will disagree on the same student's rate.
+Within the portal it is defined **once** (the helper) and shared by the dashboard and the
+courses page — do not re-implement it inline in a new page; import the helper. But **nothing
+enforces the Python/TypeScript pair staying in sync**. If the policy changes (e.g. half-credit
+for partial), both must be updated or the ERP report and the portal will disagree on the same
+student's rate.
 
 ### `get_fees_summary` is ORM-based in an otherwise raw-SQL module
 
@@ -146,3 +159,16 @@ Untested paths — these need a running stack, so they were not exercised during
   landing on the portal, and the permission gate for `manager` / `secretary` / `teacher`.
 - **`partial` status in a real session**: teacher marks partial, then confirm it appears in the
   student-detail counts, section report, print sheet, CSV export, and the portal dashboard.
+- **My Courses page**: that a live section renders under Current with teacher/schedule/grade/
+  attendance, a withdrawn course shows its badge and date, and a withdraw-then-re-enroll pair
+  appears as a single row.
+
+---
+
+## Deferred by explicit decision
+
+- **Course code and credit hours** are not shown on the portal course cards. The data is
+  available (`courses.code`, `courses.credits`) — it was excluded by request, not for lack of
+  data. Add the fields to `SectionDTO` if that changes.
+- **Per-course drill-down** (assignments, materials per course) — the portal has no data path
+  for it; would need new internal endpoints.
