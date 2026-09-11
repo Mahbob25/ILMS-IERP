@@ -41,6 +41,7 @@ import {
   Megaphone,
   Mail,
   LayoutDashboard,
+  KeyRound,
 } from "lucide-react";
 import NotificationBell from "@/components/notifications/NotificationBell";
 import GlobalSearch from "@/components/search/GlobalSearch";
@@ -94,6 +95,7 @@ function DashboardLayoutInner({
         employees: "الموظفين",
         roles: "الأدوار",
         users: "المستخدمين",
+        portalAccounts: "حسابات البوابة",
         courses: "المقررات",
         sections: "الشعب الدراسية",
         certificates: "الشهادات",
@@ -139,6 +141,7 @@ function DashboardLayoutInner({
         employees: "Employees",
         roles: "Roles",
         users: "User Management",
+        portalAccounts: "Portal Accounts",
         courses: "Courses",
         sections: "Course Sections",
         certificates: "Certificates",
@@ -218,6 +221,7 @@ function DashboardLayoutInner({
   const ROUTE_PERMISSION_MAP: Record<string, string> = {
     dashboard: "page_dashboard",
     "dashboard/users": "page_users",
+    "dashboard/portal-accounts": "page_portal_accounts",
     "dashboard/employees": "page_employees",
     "dashboard/roles": "page_roles",
     "dashboard/courses": "page_courses",
@@ -404,6 +408,12 @@ function DashboardLayoutInner({
       href: `/${locale}/dashboard/users`,
       icon: Users,
       permission: "page_users",
+    },
+    {
+      name: t.menu.portalAccounts,
+      href: `/${locale}/dashboard/portal-accounts`,
+      icon: KeyRound,
+      permission: "page_portal_accounts",
     },
     {
       name: t.menu.roles,

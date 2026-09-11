@@ -636,6 +636,9 @@ async def delete_student(db: AsyncSession, student_id: uuid.UUID) -> bool:
         return False
     student.deleted_at = datetime.now(timezone.utc)
     await db.flush()
+
+    # A deleted student must not keep a working portal login.
+    await portal_accounts_service.deactivate_portal_account_for_student(db, student_id)
     return True
 
 

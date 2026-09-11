@@ -352,3 +352,269 @@ async def sync_student_portal_account(
         params,
     )
     await db.flush()
+
+
+# --- Admin management (ERP dashboard) ---
+#
+# Student vs parent is inferred structurally: a portal.guardians row means a
+# parent account, otherwise it is a student account (portal.users has no role).
+
+_LIST_SELECT = """
+    SELECT
+        u.id, u.email, u.phone, u.full_name, u.locale_pref, u.is_active,
+        u.failed_login_attempts, u.locked_until, u.created_at,
+        CASE WHEN g.id IS NOT NULL THEN 'parent' ELSE 'student' END AS account_type,
+        s.id AS student_id, s.student_code, s.full_name AS student_name,
+        (SELECT count(*) FROM portal.parent_links pl WHERE pl.guardian_id = u.id)
+            AS linked_students_count
+    FROM portal.users u
+    LEFT JOIN portal.guardians g ON g.id = u.id
+    LEFT JOIN portal.student_links sl ON sl.user_id = u.id
+    LEFT JOIN students s ON s.id = sl.student_id
+"""
+
+_SORTABLE_COLUMNS = {
+    "full_name": "u.full_name",
+    "email": "u.email",
+    "created_at": "u.created_at",
+    "is_active": "u.is_active",
+}
+
+
+def _account_where(
+    search: Optional[str], account_type: str, account_status: str
+) -> tuple[str, dict[str, Any]]:
+    clauses: list[str] = []
+    params: dict[str, Any] = {}
+    if search:
+        clauses.append("(u.full_name ILIKE :q OR u.email ILIKE :q OR u.phone ILIKE :q)")
+        params["q"] = f"%{search}%"
+    if account_type == "parent":
+        clauses.append("g.id IS NOT NULL")
+    elif account_type == "student":
+        clauses.append("g.id IS NULL")
+    if account_status == "active":
+        clauses.append("u.is_active = true AND (u.locked_until IS NULL OR u.locked_until < now())")
+    elif account_status == "inactive":
+        clauses.append("u.is_active = false")
+    elif account_status == "locked":
+        clauses.append("u.locked_until IS NOT NULL AND u.locked_until > now()")
+    where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+    return where, params
+
+
+async def list_portal_accounts(
+    db: AsyncSession,
+    *,
+    search: Optional[str] = None,
+    account_type: str = "all",
+    status: str = "all",
+    skip: int = 0,
+    limit: int = 50,
+    sort_by: str = "created_at",
+    sort_order: str = "desc",
+) -> tuple[list[dict[str, Any]], int]:
+    where, params = _account_where(search, account_type, status)
+
+    total = (
+        await db.execute(
+            text(
+                "SELECT count(*) FROM portal.users u "
+                "LEFT JOIN portal.guardians g ON g.id = u.id "
+                f"{where}"
+            ),
+            params,
+        )
+    ).scalar_one()
+
+    column = _SORTABLE_COLUMNS.get(sort_by, "u.created_at")
+    direction = "ASC" if str(sort_order).lower() == "asc" else "DESC"
+    rows = (
+        await db.execute(
+            text(
+                _LIST_SELECT
+                + f" {where} ORDER BY {column} {direction} NULLS LAST LIMIT :limit OFFSET :skip"
+            ),
+            {**params, "limit": limit, "skip": skip},
+        )
+    ).mappings().all()
+    return [dict(row) for row in rows], int(total)
+
+
+async def get_portal_account(db: AsyncSession, user_id: Any) -> Optional[dict[str, Any]]:
+    """Account header + inferred type (used for 404s and type checks)."""
+    row = (
+        await db.execute(
+            text(
+                """
+                SELECT u.id, u.email, u.phone, u.full_name, u.is_active,
+                       u.failed_login_attempts, u.locked_until,
+                       CASE WHEN g.id IS NOT NULL THEN 'parent' ELSE 'student' END AS account_type
+                FROM portal.users u
+                LEFT JOIN portal.guardians g ON g.id = u.id
+                WHERE u.id = :user_id
+                """
+            ),
+            {"user_id": user_id},
+        )
+    ).mappings().first()
+    return dict(row) if row else None
+
+
+async def list_linked_students(db: AsyncSession, guardian_id: Any) -> list[dict[str, Any]]:
+    rows = (
+        await db.execute(
+            text(
+                """
+                SELECT s.id AS student_id, s.student_code, s.full_name,
+                       pl.relationship, pl.verified_at
+                FROM portal.parent_links pl
+                JOIN students s ON s.id = pl.student_id
+                WHERE pl.guardian_id = :guardian_id
+                ORDER BY s.full_name
+                """
+            ),
+            {"guardian_id": guardian_id},
+        )
+    ).mappings().all()
+    return [dict(row) for row in rows]
+
+
+async def get_portal_account_detail(db: AsyncSession, user_id: Any) -> Optional[dict[str, Any]]:
+    row = (
+        await db.execute(text(_LIST_SELECT + " WHERE u.id = :user_id"), {"user_id": user_id})
+    ).mappings().first()
+    if not row:
+        return None
+    account = dict(row)
+    account["linked_students"] = (
+        await list_linked_students(db, user_id) if account["account_type"] == "parent" else []
+    )
+    return account
+
+
+async def student_exists(db: AsyncSession, student_id: Any) -> bool:
+    row = (
+        await db.execute(
+            text("SELECT 1 FROM students WHERE id = :student_id AND deleted_at IS NULL"),
+            {"student_id": student_id},
+        )
+    ).first()
+    return row is not None
+
+
+async def revoke_portal_refresh_tokens(db: AsyncSession, user_id: Any) -> None:
+    """Kill every active session for a portal account (password change / deactivation)."""
+    await db.execute(
+        text(
+            """
+            UPDATE portal.refresh_tokens SET revoked = true
+            WHERE user_id = :user_id AND revoked = false
+            """
+        ),
+        {"user_id": user_id},
+    )
+
+
+async def set_portal_password(
+    db: AsyncSession, user_id: Any, plaintext: str
+) -> Optional[dict[str, Any]]:
+    row = (
+        await db.execute(
+            text(
+                """
+                UPDATE portal.users
+                SET password_hash = :password_hash, failed_login_attempts = 0,
+                    locked_until = NULL, updated_at = now()
+                WHERE id = :user_id
+                RETURNING id, is_active, failed_login_attempts, locked_until
+                """
+            ),
+            {"user_id": user_id, "password_hash": get_password_hash(plaintext)},
+        )
+    ).mappings().first()
+    await revoke_portal_refresh_tokens(db, user_id)
+    await db.flush()
+    return dict(row) if row else None
+
+
+async def set_portal_active(
+    db: AsyncSession, user_id: Any, is_active: bool
+) -> Optional[dict[str, Any]]:
+    row = (
+        await db.execute(
+            text(
+                """
+                UPDATE portal.users SET is_active = :is_active, updated_at = now()
+                WHERE id = :user_id
+                RETURNING id, is_active, failed_login_attempts, locked_until
+                """
+            ),
+            {"user_id": user_id, "is_active": is_active},
+        )
+    ).mappings().first()
+    if not is_active:
+        await revoke_portal_refresh_tokens(db, user_id)
+    await db.flush()
+    return dict(row) if row else None
+
+
+async def unlock_portal_account(db: AsyncSession, user_id: Any) -> Optional[dict[str, Any]]:
+    row = (
+        await db.execute(
+            text(
+                """
+                UPDATE portal.users
+                SET failed_login_attempts = 0, locked_until = NULL, updated_at = now()
+                WHERE id = :user_id
+                RETURNING id, is_active, failed_login_attempts, locked_until
+                """
+            ),
+            {"user_id": user_id},
+        )
+    ).mappings().first()
+    await db.flush()
+    return dict(row) if row else None
+
+
+async def link_parent_to_student(
+    db: AsyncSession, guardian_id: Any, student_id: Any, relationship: Optional[str] = None
+) -> None:
+    await db.execute(
+        text(
+            """
+            INSERT INTO portal.guardians (id, national_id) VALUES (:guardian_id, NULL)
+            ON CONFLICT (id) DO NOTHING
+            """
+        ),
+        {"guardian_id": guardian_id},
+    )
+    await _upsert_parent_link(
+        db, guardian_id=str(guardian_id), student_id=str(student_id), relationship=relationship
+    )
+    await db.flush()
+
+
+async def unlink_parent_from_student(db: AsyncSession, guardian_id: Any, student_id: Any) -> int:
+    result = await db.execute(
+        text(
+            """
+            DELETE FROM portal.parent_links
+            WHERE guardian_id = :guardian_id AND student_id = :student_id
+            """
+        ),
+        {"guardian_id": guardian_id, "student_id": student_id},
+    )
+    await db.flush()
+    return result.rowcount or 0
+
+
+async def deactivate_portal_account_for_student(
+    db: AsyncSession, student_id: Any
+) -> Optional[dict[str, Any]]:
+    """Called when a student is deleted so their portal login stops working."""
+    account = await find_portal_user_by_student_id(db, str(student_id))
+    if not account or not account.get("id"):
+        return None
+    await set_portal_active(db, str(account["id"]), False)
+    return account

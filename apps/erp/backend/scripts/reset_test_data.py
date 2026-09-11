@@ -30,6 +30,14 @@ from app.core.config import settings  # noqa: E402
 
 
 DELETE_ORDER = [
+    # Portal schema (FK → portal.users and students; must precede students)
+    "portal.refresh_tokens",           # FK → portal.users (CASCADE)
+    "portal.parent_links",             # FK → portal.users, students (CASCADE)
+    "portal.student_links",            # FK → portal.users, students (CASCADE)
+    "portal.preferences",              # FK → portal.users (CASCADE)
+    "portal.sso_tickets",              # No FKs
+    "portal.guardians",                # FK → portal.users (CASCADE)
+    "portal.users",                    # Root of the portal schema
     # Academic & LMS leaf tables (deepest FK dependencies first)
     "grades",                          # FK → submissions (CASCADE)
     "submissions",                     # FK → assignments, students (CASCADE)
