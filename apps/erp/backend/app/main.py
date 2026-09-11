@@ -9,9 +9,11 @@ from sentry_sdk.integrations.fastapi import FastApiIntegration
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError
 from app.core.rate_limit import limiter
 
 from app.core.config import settings
+from app.core.error_handlers import integrity_error_handler
 from app.core.logging import setup_logging
 
 logger = logging.getLogger(__name__)
@@ -72,6 +74,9 @@ app = FastAPI(
 # Attach rate limiter to app state and exception handler
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# Database constraint violations become 409s instead of bare 500s
+app.add_exception_handler(IntegrityError, integrity_error_handler)
 
 # Setup CORS middleware
 # Note: we must allow credentials so that HttpOnly cookies can be forwarded from/to the frontend.

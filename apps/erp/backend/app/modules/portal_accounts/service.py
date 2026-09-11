@@ -9,9 +9,11 @@ the caller's transaction (rollback together on failure). They only touch the
 import logging
 from typing import Any, Optional
 
+from fastapi import HTTPException, status
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.error_messages import get_error_detail
 from app.modules.identity.security import get_password_hash
 
 logger = logging.getLogger(__name__)
@@ -28,6 +30,23 @@ async def find_portal_user_by_email(db: AsyncSession, email: str) -> Optional[di
                 """
             ),
             {"email": email},
+        )
+    ).mappings().first()
+    return dict(row) if row else None
+
+
+async def find_portal_user_by_phone(db: AsyncSession, phone: str) -> Optional[dict[str, Any]]:
+    """Portal account owning a phone number (portal.users.phone is UNIQUE)."""
+    row = (
+        await db.execute(
+            text(
+                """
+                SELECT id, phone, email, full_name, locale_pref, is_active
+                FROM portal.users
+                WHERE phone = :phone
+                """
+            ),
+            {"phone": phone},
         )
     ).mappings().first()
     return dict(row) if row else None
@@ -66,7 +85,16 @@ async def create_student_portal_account(
     """
     existing = await find_portal_user_by_email(db, email)
     if existing:
-        raise ValueError(f"Email already registered in the portal: {email}")
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=get_error_detail("student_email_taken", "ar"),
+        )
+    existing_phone = await find_portal_user_by_phone(db, phone)
+    if existing_phone:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=get_error_detail("student_phone_taken", "ar"),
+        )
 
     result = await db.execute(
         text(
@@ -118,6 +146,13 @@ async def create_parent_portal_account(
             db, guardian_id=str(existing["id"]), student_id=student_id, relationship=relationship
         )
         return existing
+
+    existing_phone = await find_portal_user_by_phone(db, phone)
+    if existing_phone:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=get_error_detail("parent_phone_taken", "ar"),
+        )
 
     result = await db.execute(
         text(

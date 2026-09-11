@@ -31,6 +31,22 @@ ERROR_MESSAGES = {
         "ar": "لا يمكن التسجيل - الشعبة ليس لها سعر محدد. يجب تعيين السعر أولاً",
         "en": "Cannot enroll - section has no price set. Set the section price first",
     },
+    "student_email_taken": {
+        "ar": "البريد الإلكتروني مسجل مسبقاً في البوابة - استخدم بريداً إلكترونياً آخر",
+        "en": "Email is already registered in the portal - use a different email",
+    },
+    "student_phone_taken": {
+        "ar": "رقم الهاتف مسجل مسبقاً في البوابة - استخدم رقم هاتف آخر",
+        "en": "Phone is already registered in the portal - use a different phone number",
+    },
+    "parent_phone_taken": {
+        "ar": "رقم هاتف ولي الأمر مسجل مسبقاً في البوابة - استخدم رقم هاتف آخر",
+        "en": "Parent phone is already registered in the portal - use a different phone number",
+    },
+    "duplicate_record": {
+        "ar": "هذه البيانات متعارضة مع بيانات مسجلة مسبقاً - تحقق من التكرار وحاول مرة أخرى",
+        "en": "This data conflicts with a record that already exists - check for duplicates and try again",
+    },
 }
 
 
