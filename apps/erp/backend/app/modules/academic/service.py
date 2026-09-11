@@ -482,6 +482,15 @@ async def deactivate_section(
 _STUDENT_FIELDS = {"student_code", "full_name", "email", "phone"}
 
 
+def _attach_parent(student: Student, parent: Optional[dict]) -> Student:
+    """Expose the linked parent on the student for the API response."""
+    student.parent_full_name = parent.get("full_name") if parent else None
+    student.parent_email = parent.get("email") if parent else None
+    student.parent_phone = parent.get("phone") if parent else None
+    student.parent_relationship = parent.get("relationship") if parent else None
+    return student
+
+
 async def create_student(db: AsyncSession, data: dict) -> Student:
     if "student_code" in data and data["student_code"]:
         existing = await db.execute(
@@ -578,6 +587,9 @@ async def list_students(
     order = sort_col.asc() if sort_order == "asc" else sort_col.desc()
     result = await db.execute(query.order_by(order).offset(skip).limit(limit))
     items = result.scalars().all()
+    parents = await portal_accounts_service.get_parents_for_students(db, [s.id for s in items])
+    for student in items:
+        _attach_parent(student, parents.get(str(student.id)))
     return {"items": items, "total": total}
 
 
@@ -588,7 +600,8 @@ async def update_student(
     if not student:
         return None
     for key, value in data.items():
-        setattr(student, key, value)
+        if key in _STUDENT_FIELDS:
+            setattr(student, key, value)
     await db.flush()
 
     # Keep the portal account in sync (email/full_name propagate; a phone change
@@ -601,7 +614,20 @@ async def update_student(
             phone=data.get("phone"),
             full_name=data.get("full_name"),
         )
-    return student
+
+    # Parents live in portal.guardians / portal.parent_links, not on students.
+    if all(data.get(k) for k in ("parent_full_name", "parent_phone", "parent_email")):
+        await portal_accounts_service.upsert_parent_portal_account(
+            db,
+            student_id=str(student_id),
+            full_name=data["parent_full_name"],
+            email=data["parent_email"],
+            phone=data["parent_phone"],
+            relationship=data.get("parent_relationship"),
+        )
+
+    parent = await portal_accounts_service.get_parent_for_student(db, str(student_id))
+    return _attach_parent(student, parent)
 
 
 async def delete_student(db: AsyncSession, student_id: uuid.UUID) -> bool:

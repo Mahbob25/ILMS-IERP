@@ -18,6 +18,10 @@ interface Student {
   full_name: string;
   email: string | null;
   phone: string | null;
+  parent_full_name: string | null;
+  parent_phone: string | null;
+  parent_email: string | null;
+  parent_relationship: string | null;
 }
 
 export default function StudentsPage() {
@@ -208,10 +212,10 @@ export default function StudentsPage() {
       full_name: student.full_name,
       email: student.email || "",
       phone: student.phone || "",
-      parent_full_name: "",
-      parent_phone: "",
-      parent_email: "",
-      parent_relationship: "",
+      parent_full_name: student.parent_full_name || "",
+      parent_phone: student.parent_phone || "",
+      parent_email: student.parent_email || "",
+      parent_relationship: student.parent_relationship || "",
     });
     setEditingId(student.id);
     setFormError(null);

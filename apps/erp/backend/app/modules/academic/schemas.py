@@ -149,6 +149,10 @@ class StudentUpdate(BaseModel):
     full_name: Optional[str] = None
     email: Optional[str] = None
     phone: Optional[str] = Field(None, pattern=PHONE_RE, min_length=8, max_length=32)
+    parent_full_name: Optional[str] = None
+    parent_phone: Optional[str] = Field(None, pattern=PHONE_RE, min_length=8, max_length=32)
+    parent_email: Optional[str] = None
+    parent_relationship: Optional[str] = None
 
     @field_validator("email")
     @classmethod
@@ -157,6 +161,29 @@ class StudentUpdate(BaseModel):
             return v
         return v.strip().lower()
 
+    @field_validator("parent_email")
+    @classmethod
+    def normalize_parent_email(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+        return v.strip().lower()
+
+    @model_validator(mode="after")
+    def validate_parent_group(self):
+        # The three identity fields make up a portal account; a partial set would
+        # otherwise be silently dropped on update. Relationship stays optional.
+        parent_fields = [
+            self.parent_full_name,
+            self.parent_phone,
+            self.parent_email,
+        ]
+        present = [f is not None and f != "" for f in parent_fields]
+        if any(present) and not all(present):
+            raise ValueError(
+                "parent_full_name, parent_phone, parent_email must be provided together"
+            )
+        return self
+
 
 class StudentResponse(BaseModel):
     id: uuid.UUID
@@ -164,6 +191,10 @@ class StudentResponse(BaseModel):
     full_name: str
     email: Optional[str] = None
     phone: Optional[str] = None
+    parent_full_name: Optional[str] = None
+    parent_phone: Optional[str] = None
+    parent_email: Optional[str] = None
+    parent_relationship: Optional[str] = None
 
     class Config:
         from_attributes = True

@@ -10,7 +10,7 @@ import logging
 from typing import Any, Optional
 
 from fastapi import HTTPException, status
-from sqlalchemy import text
+from sqlalchemy import bindparam, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.error_messages import get_error_detail
@@ -68,6 +68,54 @@ async def find_portal_user_by_student_id(db: AsyncSession, student_id: str) -> O
         )
     ).mappings().first()
     return dict(row) if row else None
+
+
+_PARENT_SELECT = """
+    SELECT pl.student_id, u.full_name, u.email, u.phone, pl.relationship
+    FROM portal.parent_links pl
+    JOIN portal.users u ON u.id = pl.guardian_id
+"""
+
+
+async def get_parent_for_student(db: AsyncSession, student_id: str) -> Optional[dict[str, Any]]:
+    """Primary linked parent for a student, as editable parent fields."""
+    row = (
+        await db.execute(
+            text(
+                _PARENT_SELECT
+                + """
+                WHERE pl.student_id = :sid
+                ORDER BY pl.verified_at DESC NULLS LAST, u.created_at
+                LIMIT 1
+                """
+            ),
+            {"sid": student_id},
+        )
+    ).mappings().first()
+    return dict(row) if row else None
+
+
+async def get_parents_for_students(
+    db: AsyncSession, student_ids: list[Any]
+) -> dict[str, dict[str, Any]]:
+    """Primary linked parent per student, keyed by student id (one query)."""
+    if not student_ids:
+        return {}
+    rows = await db.execute(
+        text(
+            _PARENT_SELECT
+            + """
+            WHERE pl.student_id IN :ids
+            ORDER BY pl.student_id, pl.verified_at DESC NULLS LAST, u.created_at
+            """
+        ).bindparams(bindparam("ids", expanding=True)),
+        {"ids": list(student_ids)},
+    )
+    parents: dict[str, dict[str, Any]] = {}
+    for row in rows.mappings().all():
+        key = str(row["student_id"])
+        parents.setdefault(key, dict(row))
+    return parents
 
 
 async def create_student_portal_account(
@@ -184,6 +232,62 @@ async def create_parent_portal_account(
     )
     await db.flush()
     return parent
+
+
+async def upsert_parent_portal_account(
+    db: AsyncSession,
+    student_id: str,
+    *,
+    full_name: str,
+    email: str,
+    phone: str,
+    relationship: Optional[str] = None,
+) -> dict[str, Any]:
+    """Create the parent portal account, or update and (re)link an existing one.
+
+    Used when a parent's details are edited from the ERP: an account that already
+    exists for that email has its name (and phone, when free) refreshed instead of
+    being left stale.
+    """
+    existing = await find_portal_user_by_email(db, email)
+    if not existing:
+        return await create_parent_portal_account(
+            db,
+            student_id,
+            full_name=full_name,
+            email=email,
+            phone=phone,
+            relationship=relationship,
+        )
+
+    await _sync_parent_user(db, existing, full_name=full_name, phone=phone)
+    await _upsert_parent_link(
+        db, guardian_id=str(existing["id"]), student_id=student_id, relationship=relationship
+    )
+    await db.flush()
+    return await find_portal_user_by_email(db, email) or existing
+
+
+async def _sync_parent_user(
+    db: AsyncSession, user: dict[str, Any], *, full_name: str, phone: str
+) -> None:
+    sets = ["full_name = :full_name", "updated_at = now()"]
+    params: dict[str, Any] = {"user_id": user["id"], "full_name": full_name}
+    if phone and phone != user.get("phone"):
+        holder = await find_portal_user_by_phone(db, phone)
+        if holder and str(holder["id"]) != str(user["id"]):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=get_error_detail("parent_phone_taken", "ar"),
+            )
+        # The phone doubles as the initial password, so a change re-seeds the hash.
+        sets += ["phone = :phone", "password_hash = :password_hash"]
+        params["phone"] = phone
+        params["password_hash"] = get_password_hash(phone)
+    await db.execute(
+        text(f"UPDATE portal.users SET {', '.join(sets)} WHERE id = :user_id"),
+        params,
+    )
 
 
 async def _upsert_parent_link(
