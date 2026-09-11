@@ -34,7 +34,7 @@ type ReportPayload = {
     cancellation: { cancelled_at: string | null; reason: string; refund_policy: string } | null;
   };
   attendance: {
-    summary: { total_sessions: number; present_count: number; absent_count: number; late_count: number; excused_count: number; attendance_rate: number };
+    summary: { total_sessions: number; present_count: number; absent_count: number; late_count: number; partial_count: number; excused_count: number; attendance_rate: number };
     records: { date: string | null; status: string; session_id: string }[];
   };
   grade: { final_score: number; grade_label: string; notes: string | null; graded_at: string | null; graded_by: string | null } | null;
@@ -81,6 +81,7 @@ export default function StudentSectionReportPage() {
     present: isRtl ? "حاضر" : "Present",
     absent: isRtl ? "غائب" : "Absent",
     late: isRtl ? "متأخر" : "Late",
+    partial: isRtl ? "حضور جزئي" : "Partial",
     excused: isRtl ? "معذور" : "Excused",
     attendanceRate: isRtl ? "نسبة الحضور" : "Rate",
     date: isRtl ? "التاريخ" : "Date",

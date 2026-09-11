@@ -27,6 +27,8 @@ const t = {
     present: "حاضر",
     absent: "غائب",
     late: "متأخر",
+    partial: "حضور جزئي",
+    excused: "معذور",
     none: "لا توجد سجلات حضور بعد.",
     loading: "جاري تحميل الحضور...",
   },
@@ -39,6 +41,7 @@ const t = {
     present: "Present",
     absent: "Absent",
     late: "Late",
+    partial: "Partial",
     none: "No attendance records yet.",
     loading: "Loading attendance...",
   },
@@ -48,6 +51,7 @@ const STATUS_LABEL: Record<string, { ar: string; en: string; cls: string }> = {
   present: { ar: "حاضر", en: "Present", cls: "badge-success" },
   absent: { ar: "غائب", en: "Absent", cls: "badge-warning" },
   late: { ar: "متأخر", en: "Late", cls: "badge-muted" },
+  partial: { ar: "حضور جزئي", en: "Partial", cls: "badge-partial" },
 };
 
 export default function AttendancePage() {
