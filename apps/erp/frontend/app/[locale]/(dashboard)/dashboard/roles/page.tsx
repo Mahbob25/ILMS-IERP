@@ -88,6 +88,7 @@ const PERMISSION_LABELS: Record<string, Record<string, string>> = {
     page_reports: "التقارير",
     page_notifications: "الإشعارات",
     page_wizards: "تسجيل سريع",
+    page_search: "البحث",
   },
   en: {
     page_dashboard: "Dashboard",
@@ -117,6 +118,7 @@ const PERMISSION_LABELS: Record<string, Record<string, string>> = {
     page_reports: "Reports",
     page_notifications: "Notifications",
     page_wizards: "Quick Registration",
+    page_search: "Search",
   },
 };
 

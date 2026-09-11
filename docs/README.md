@@ -14,6 +14,7 @@ Deployment: cloud VM (AWS EC2 / GCP) behind a Cloudflare Tunnel — no public po
 | `architecture/overview.md` | Tech stack, container layout, modules, auth flow, RBAC, key decisions |
 | `architecture/database-schema.md` | Database tables with columns, types, FKs, relationships |
 | `architecture/portal-architecture.md` | **Student & Parent Portal** — isolated BFF + AI service architecture (recommended). Caddy subdomains, cache, auth isolation, diagrams |
+| `architecture/support-impersonation-ticketing-context.md` | **Support Impersonation & Ticketing** — tech stack, auth/RBAC, schemas & audit logging, error handling, sensitive-resource scope |
 | `architecture/memory.md` | Immutable rules — MUST be followed by every session |
 | `architecture/frontend-design-rules.md` | Frontend design language: Professional Minimalist, colors, typography |
 | `architecture/templates-design-rules.md` | Receipt / voucher / certificate template design rules |

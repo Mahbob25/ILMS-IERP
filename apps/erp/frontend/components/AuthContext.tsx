@@ -22,6 +22,7 @@ export interface User {
 interface AuthContextType {
   user: User | null;
   permissions: string[];
+  permissionsLoaded: boolean;
   loading: boolean;
   login: (email: string, password: string) => Promise<User>;
   logout: () => Promise<void>;
@@ -34,6 +35,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [permissions, setPermissions] = useState<string[]>([]);
+  const [permissionsLoaded, setPermissionsLoaded] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
   const isLoggingOut = useRef(false);
   const pendingCheckSession = useRef<Promise<User | null> | null>(null);
@@ -44,6 +46,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setPermissions(res.data.permissions);
     } catch {
       setPermissions([]);
+    } finally {
+      // Marks the list as authoritative: an empty result must not fall back to
+      // the role-name defaults, or revoked permissions would still grant access.
+      setPermissionsLoaded(true);
     }
   }, []);
 
@@ -110,6 +116,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } finally {
       setUser(null);
       setPermissions([]);
+      setPermissionsLoaded(false);
       setLoading(false);
       // The shared login now lives on the marketing site.
       const marketingBase = process.env.NEXT_PUBLIC_MARKETING_URL || "https://aldirasat.com";
@@ -118,8 +125,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const contextValue = useMemo(
-    () => ({ user, permissions, loading, login, logout, checkSession, refreshPermissions }),
-    [user, permissions, loading, login, logout, checkSession, refreshPermissions]
+    () => ({ user, permissions, permissionsLoaded, loading, login, logout, checkSession, refreshPermissions }),
+    [user, permissions, permissionsLoaded, loading, login, logout, checkSession, refreshPermissions]
   );
 
   return (

@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from app.db.session import get_db
 from app.modules.identity.models import User
-from app.modules.identity.dependencies import get_current_user, RoleChecker
+from app.modules.identity.dependencies import get_current_user, RoleChecker, PermissionChecker
 from app.modules.identity.service import create_audit_log
 from app.modules.academic.schemas import (
     CourseCreate, CourseUpdate, CourseResponse,
@@ -260,7 +260,7 @@ async def list_certificates(
     limit: int = Query(50, ge=1, le=10000),
     sort_by: str = Query("issued_at"),
     sort_order: str = Query("desc"),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(PermissionChecker("page_certificates")),
     db: AsyncSession = Depends(get_db)
 ):
     teacher_id = None
@@ -299,7 +299,7 @@ async def list_certificates(
 
 @academic_router.get("/certificates/sections", response_model=list[CertificateSectionOption])
 async def list_certificate_sections(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(PermissionChecker("page_certificates")),
     db: AsyncSession = Depends(get_db)
 ):
     return await certificate_service.list_certificate_sections(db)
@@ -320,7 +320,7 @@ def _section_total_hours(section) -> str:
 @academic_router.get("/certificates/{cert_id}", response_model=CertificateResponse)
 async def get_certificate(
     cert_id: uuid.UUID,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(PermissionChecker("page_certificates")),
     db: AsyncSession = Depends(get_db)
 ):
     cert = await certificate_service.get_certificate(db, cert_id)
@@ -349,7 +349,7 @@ async def get_certificate(
 async def preview_certificate(
     cert_id: uuid.UUID,
     locale: str = Query("ar"),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(PermissionChecker("page_certificates")),
     db: AsyncSession = Depends(get_db)
 ):
     html = await certificate_service.get_certificate_html_content(db, cert_id, locale=locale)
@@ -364,7 +364,7 @@ async def list_student_certificates(
     student_id: uuid.UUID,
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=10000),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(PermissionChecker("page_certificates")),
     db: AsyncSession = Depends(get_db)
 ):
     result = await certificate_service.list_certificates(

@@ -10,6 +10,7 @@ import Select from "@/components/ui/Select";
 import { Loader2, ArrowLeft, Wallet, DollarSign, Plus, X, Award, Eye, FileDown, Check, Clock, AlertCircle, UserX, ChevronDown, ChevronUp, Printer } from "lucide-react";
 import TableContainer from "@/components/ui/TableContainer";
 import CertificatePreview from "@/components/CertificatePreview";
+import { hasPageAccess } from "@/lib/permissions";
 import PendingRefundBadge from "@/components/students/PendingRefundBadge";
 
 interface Student {
@@ -74,7 +75,7 @@ interface AttendanceSummary {
 export default function StudentDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, permissions, permissionsLoaded } = useAuth();
   const locale = (params?.locale as string) || "ar";
   const isRtl = locale === "ar";
   const studentId = params?.id as string;
@@ -231,6 +232,8 @@ export default function StudentDetailPage() {
   const [showUnenrollHistory, setShowUnenrollHistory] = useState(false);
   const [loadingUnenrollHistory, setLoadingUnenrollHistory] = useState(false);
 
+  const canViewCertificates = hasPageAccess(user, permissions, permissionsLoaded, "page_certificates");
+
   const fetchStudent = useCallback(async () => {
     if (!studentId) return;
     try {
@@ -240,7 +243,7 @@ export default function StudentDetailPage() {
         apiClient.get<{ items: CourseSection[]; total: number }>("/academic/course-sections?limit=1000"),
         apiClient.get<{ items: Course[]; total: number }>("/academic/courses?limit=1000"),
         apiClient.get<Payment[]>(`/lms/payments?student_id=${studentId}`),
-        apiClient.get<{ items: any[]; total: number }>(`/academic/students/${studentId}/certificates?limit=100`),
+        apiClient.get<{ items: any[]; total: number }>(`/academic/students/${studentId}/certificates?limit=100`).catch(() => ({ data: { items: [] } })),
         apiClient.get<AttendanceSummary[]>(`/lms/attendance/students/${studentId}/summary`).then(r => r.data).catch(() => [] as AttendanceSummary[]),
         apiClient.get<GradeSummary[]>(`/academic/students/${studentId}/final-grades`).then(r => r.data).catch(() => [] as GradeSummary[]),
         apiClient.get<{ items: any[]; total: number }>(`/academic/students/${studentId}/unenrollment-history?per_page=500`).then(r => r.data).catch(() => ({ items: [] })),
@@ -661,6 +664,7 @@ export default function StudentDetailPage() {
           </div>
           </div>
       </Modal>
+      {canViewCertificates && (
       <div className="card p-5">
           <h3 className="text-sm font-bold text-slate-900 mb-4 flex items-center gap-2">
           <Award size={16} className="text-slate-400" />
@@ -741,6 +745,7 @@ export default function StudentDetailPage() {
           </TableContainer>
         )}
       </div>
+      )}
 
       {/* Unenrollment History */}
       <div className="card overflow-hidden">

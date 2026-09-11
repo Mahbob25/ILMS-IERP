@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { useRouter, useParams, usePathname } from "next/navigation";
 import { useAuth } from "@/components/AuthContext";
+import { hasPageAccess as checkPageAccess } from "@/lib/permissions";
 import { BrandLogo } from "@/components/ui/BrandLogo";
 import WizardDirtyProvider, {
   useWizardDirtyGuard,
@@ -66,7 +67,7 @@ function DashboardLayoutInner({
   const router = useRouter();
   const params = useParams();
   const pathname = usePathname();
-  const { user, permissions, loading, logout } = useAuth();
+  const { user, permissions, permissionsLoaded, loading, logout } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { guardNavigation } = useWizardDirtyGuard();
 
@@ -210,51 +211,8 @@ function DashboardLayoutInner({
     return null;
   }
 
-  // Permission to role fallback mapping (when permissions aren't loaded yet)
-  const PAGE_PERMISSION_MAP: Record<string, string[]> = {
-    page_dashboard: ["superadmin", "manager", "secretary", "teacher", "marketing_manager"],
-    page_users: ["superadmin"],
-    page_employees: ["superadmin", "manager"],
-    page_roles: ["superadmin"],
-    page_courses: ["superadmin", "manager", "secretary", "teacher"],
-    page_sections: ["superadmin", "manager", "secretary", "teacher"],
-    page_certificates: ["superadmin", "manager", "secretary", "teacher"],
-    page_students: ["superadmin", "manager", "secretary"],
-    page_enrollments: ["superadmin", "manager", "secretary", "teacher"],
-    page_attendance: ["superadmin", "manager", "secretary", "teacher"],
-    page_gradebook: ["superadmin", "manager", "secretary", "teacher"],
-    page_payments: ["superadmin", "manager", "secretary"],
-    page_expenses: ["superadmin", "manager", "secretary"],
-    page_financial_records: ["superadmin", "manager", "secretary"],
-    page_revenue: ["superadmin", "manager"],
-    page_teacher_wallet: ["superadmin", "manager", "teacher"],
-    page_daily_closures: ["superadmin", "manager", "secretary"],
-    page_pos: ["superadmin", "manager", "secretary"],
-    page_cashier_refunds: ["superadmin", "manager", "accountant", "secretary"],
-    page_ingestion: ["superadmin", "teacher"],
-    page_health: ["superadmin"],
-    page_backups: ["superadmin"],
-    page_settings: ["superadmin", "manager", "secretary", "teacher"],
-    page_staff_payroll: ["superadmin", "manager", "secretary"],
-    page_reports: ["superadmin", "manager", "secretary"],
-    page_notifications: ["superadmin", "manager", "secretary", "teacher"],
-    page_wizards: ["superadmin", "manager", "secretary"],
-    page_search: ["superadmin", "manager", "secretary", "teacher"],
-    page_content: ["superadmin", "marketing_manager"],
-    page_announcements: ["superadmin", "marketing_manager"],
-    page_contacts: ["superadmin", "marketing_manager"],
-    page_bookings: ["superadmin", "manager", "secretary", "marketing_manager"],
-  };
-
-  const hasPageAccess = (permissionCodename: string): boolean => {
-    if (user?.is_superadmin) return true;
-    const fallbackRoles = PAGE_PERMISSION_MAP[permissionCodename] || [];
-    if (fallbackRoles.includes(user?.role?.name ?? "")) return true;
-    if (permissions.length > 0) {
-      return permissions.includes(permissionCodename);
-    }
-    return false;
-  };
+  const hasPageAccess = (permissionCodename: string): boolean =>
+    checkPageAccess(user, permissions, permissionsLoaded, permissionCodename);
 
   // Centralized route-level guard — prevents direct URL access bypassing the sidebar
   const ROUTE_PERMISSION_MAP: Record<string, string> = {

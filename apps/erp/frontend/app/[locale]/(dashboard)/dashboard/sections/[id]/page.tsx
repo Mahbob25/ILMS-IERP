@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import TableContainer from "@/components/ui/TableContainer";
 import CertificatesTable from "@/components/certificates/CertificatesTable";
+import { hasPageAccess } from "@/lib/permissions";
 import SectionWarningBanner from "@/components/sections/SectionWarningBanner";
 import SectionStatusBadge from "@/components/sections/SectionStatusBadge";
 import FinancialSummary from "@/components/sections/FinancialSummary";
@@ -91,7 +92,7 @@ interface ContractInfo {
 export default function SectionStudentsPage() {
   const params = useParams();
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, permissions, permissionsLoaded } = useAuth();
   const locale = (params?.locale as string) || "ar";
   const isRtl = locale === "ar";
   const sectionId = params?.id as string;
@@ -391,6 +392,8 @@ export default function SectionStudentsPage() {
   };
 
   const canUnenroll = section && (section.status === "active" || section.status === "pending");
+  const canViewCertificates = hasPageAccess(user, permissions, permissionsLoaded, "page_certificates");
+  const canDeleteCertificates = Boolean(user?.is_superadmin || user?.role?.name === "manager");
 
   useEffect(() => {
     fetchData();
@@ -805,6 +808,7 @@ export default function SectionStudentsPage() {
         )}
       </div>
 
+      {canViewCertificates && (
       <div className="card overflow-hidden">
         <button
           onClick={() => setShowCertificates(!showCertificates)}
@@ -825,7 +829,7 @@ export default function SectionStudentsPage() {
               sectionId={sectionId}
               isRtl={isRtl}
               locale={locale}
-              canDelete={Boolean(user?.is_superadmin || user?.role?.name === "manager")}
+              canDelete={canDeleteCertificates}
               showFilters={false}
               showCourseColumn={false}
               refreshKey={certRefreshKey}
@@ -833,6 +837,7 @@ export default function SectionStudentsPage() {
           </div>
         )}
       </div>
+      )}
 
       <CancelSectionModal
         open={showCancelModal}
