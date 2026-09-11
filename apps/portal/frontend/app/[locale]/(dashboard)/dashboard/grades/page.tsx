@@ -148,7 +148,7 @@ export default function GradesPage() {
                     <td className="font-medium text-slate-900">{g.course_name}</td>
                     <td>
                       {g.final_score !== null ? (
-                        <span className="badge badge-success">{g.final_score}</span>
+                        <span className="badge badge-success">{g.final_score}%</span>
                       ) : (
                         <span className="badge badge-muted">—</span>
                       )}
@@ -175,7 +175,7 @@ export default function GradesPage() {
                     <p className="text-slate-400">{s.score}</p>
                     <p className="mt-0.5 font-medium text-slate-700">
                       {g.final_score !== null ? (
-                        <span className="badge badge-success">{g.final_score}</span>
+                        <span className="badge badge-success">{g.final_score}%</span>
                       ) : (
                         <span className="badge badge-muted">—</span>
                       )}

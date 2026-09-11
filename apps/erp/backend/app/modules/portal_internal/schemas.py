@@ -49,3 +49,20 @@ class SectionDTO(BaseModel):
 class ProfileUpdateRequest(BaseModel):
     phone: Optional[str] = None
     locale_pref: Optional[str] = None
+
+
+class SectionFeeDTO(BaseModel):
+    section_id: uuid.UUID
+    course_name: str
+    # None when the enrollment has no derivable price (no override, no history,
+    # no section price) — balance is then unknown rather than zero.
+    net_price: Optional[float] = None
+    total_paid: float = 0.0
+    balance: Optional[float] = None
+
+
+class FeesSummaryDTO(BaseModel):
+    total_net_price: float = 0.0
+    total_paid: float = 0.0
+    balance: float = 0.0
+    sections: List[SectionFeeDTO] = []
