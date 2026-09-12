@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useRef, useState } from "react";
+import React, { useState } from "react";
 import { useRouter, useParams, usePathname } from "next/navigation";
 import { useAuth } from "@/components/AuthContext";
+import { LastUpdatedProvider } from "@/components/LastUpdatedContext";
 import MobileTabBar from "@/components/MobileTabBar";
 import OverflowSheet from "@/components/OverflowSheet";
 import DashboardHeader from "@/components/DashboardHeader";
@@ -16,6 +17,7 @@ import {
   User as UserIcon,
   GraduationCap,
   BookOpen,
+  CalendarRange,
 } from "lucide-react";
 
 export default function PortalDashboardLayout({
@@ -28,7 +30,6 @@ export default function PortalDashboardLayout({
   const pathname = usePathname();
   const { user, loading, logout } = useAuth();
   const [overflowOpen, setOverflowOpen] = useState(false);
-  const mainRef = useRef<HTMLElement>(null);
 
   const locale = (params?.locale as string) || "ar";
   const isRtl = locale === "ar";
@@ -64,7 +65,7 @@ export default function PortalDashboardLayout({
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center gap-3 p-4">
+      <div className="min-h-screen bg-canvas flex flex-col items-center justify-center gap-3 p-4">
         <svg
           className="animate-spin h-8 w-8 text-brand-500"
           fill="none"
@@ -98,63 +99,35 @@ export default function PortalDashboardLayout({
   }
 
   const navigationItems = [
-    {
-      name: t.dashboard,
-      href: `/${locale}/dashboard`,
-      icon: LayoutDashboard,
-    },
-    {
-      name: t.courses,
-      href: `/${locale}/dashboard/courses`,
-      icon: BookOpen,
-    },
-    {
-      name: t.grades,
-      href: `/${locale}/dashboard/grades`,
-      icon: Award,
-    },
-    {
-      name: t.attendance,
-      href: `/${locale}/dashboard/attendance`,
-      icon: CalendarCheck,
-    },
-    {
-      name: t.fees,
-      href: `/${locale}/dashboard/fees`,
-      icon: Wallet,
-    },
-    {
-      name: t.aiExplain,
-      href: `/${locale}/dashboard/ai/explain`,
-      icon: Sparkles,
-    },
-    {
-      name: t.aiRevision,
-      href: `/${locale}/dashboard/ai/revision`,
-      icon: CalendarRangeIcon,
-    },
-    {
-      name: t.settings,
-      href: `/${locale}/dashboard/settings`,
-      icon: UserIcon,
-    },
+    { name: t.dashboard, href: `/${locale}/dashboard`, icon: LayoutDashboard },
+    { name: t.courses, href: `/${locale}/dashboard/courses`, icon: BookOpen },
+    { name: t.grades, href: `/${locale}/dashboard/grades`, icon: Award },
+    { name: t.attendance, href: `/${locale}/dashboard/attendance`, icon: CalendarCheck },
+    { name: t.fees, href: `/${locale}/dashboard/fees`, icon: Wallet },
+    { name: t.aiExplain, href: `/${locale}/dashboard/ai/explain`, icon: Sparkles },
+    { name: t.aiRevision, href: `/${locale}/dashboard/ai/revision`, icon: CalendarRange },
+    { name: t.settings, href: `/${locale}/dashboard/settings`, icon: UserIcon },
   ];
 
   return (
-    <div className="h-screen flex overflow-hidden bg-slate-50">
-      {/* Desktop Sidebar */}
-      <aside className="hidden md:flex md:flex-shrink-0">
-        <div className="w-64 bg-white border-y-0 border-x border-slate-200 flex flex-col">
-          <div className="h-16 flex items-center px-6 border-b border-slate-200 gap-2.5">
-            <div className="w-9 h-9 rounded-full bg-brand-50 border border-brand-100 flex items-center justify-center">
-              <GraduationCap size={18} className="text-brand-600" />
+    <LastUpdatedProvider>
+      <div className="min-h-screen bg-canvas">
+        {/* Side navigation — pinned to the inline-start edge (the right in
+            Arabic), so it stays put while the document scrolls. */}
+        <aside className="hidden lg:flex fixed inset-y-0 start-0 z-40 w-72 flex-col bg-white/85 backdrop-blur-xl border-e border-slate-200/70">
+          <div className="h-[72px] flex items-center gap-3 px-6 shrink-0 border-b border-slate-200/70">
+            <div className="gradient-accent w-10 h-10 rounded-2xl text-white flex items-center justify-center shadow-hero shrink-0">
+              <GraduationCap size={20} />
             </div>
-            <span className="text-lg font-bold tracking-tight text-slate-900">
-              Al-Drasat
-            </span>
+            <div className="min-w-0">
+              <p className="text-base font-bold text-slate-900 leading-none truncate">
+                {isRtl ? "الدراسات" : "Al-Drasat"}
+              </p>
+              <p className="text-[10px] text-slate-400 mt-1 truncate">{t.portalLabel}</p>
+            </div>
           </div>
 
-          <nav className="flex-1 px-4 py-6 space-y-1.5 overflow-y-auto">
+          <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
             {navigationItems.map((item) => {
               const isActive = pathname === item.href;
               const Icon = item.icon;
@@ -162,23 +135,30 @@ export default function PortalDashboardLayout({
                 <button
                   key={item.name}
                   onClick={() => router.push(item.href)}
-                  className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all duration-150 ${
+                  aria-current={isActive ? "page" : undefined}
+                  className={`relative w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-150 ${
                     isActive
-                      ? "bg-brand-50 text-brand-600 border border-brand-100"
-                      : "text-slate-700 hover:text-slate-900 hover:bg-slate-50 border border-transparent"
+                      ? "bg-brand-50 text-brand-700 shadow-sm"
+                      : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
                   }`}
                 >
-                  <Icon size={20} />
-                  <span>{item.name}</span>
+                  {isActive && (
+                    <span
+                      aria-hidden="true"
+                      className="gradient-accent absolute inset-y-1.5 start-0 w-1 rounded-full"
+                    />
+                  )}
+                  <Icon size={19} className="shrink-0" />
+                  <span className="truncate">{item.name}</span>
                 </button>
               );
             })}
           </nav>
 
-          <div className="p-4 border-t border-slate-200 flex flex-col gap-3">
+          <div className="p-4 border-t border-slate-200/70 flex flex-col gap-3">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center border border-slate-200 shrink-0">
-                <UserIcon size={18} className="text-slate-500" />
+              <div className="gradient-accent w-10 h-10 rounded-2xl text-white font-bold text-sm flex items-center justify-center shrink-0">
+                {(user.full_name || "؟").trim().charAt(0).toUpperCase()}
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-semibold text-slate-900 truncate">
@@ -191,50 +171,40 @@ export default function PortalDashboardLayout({
             </div>
             <button
               onClick={logout}
-              className="w-full flex items-center justify-center gap-2 py-2 px-4 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 text-xs font-semibold border border-red-100 transition-all duration-150"
+              className="w-full flex items-center justify-center gap-2 py-2 px-4 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 text-xs font-semibold border border-rose-100 transition-all duration-150"
             >
               <LogOut size={14} />
               <span>{t.logout}</span>
             </button>
           </div>
+        </aside>
+
+        {/* Content column — offset by the sidebar width and the fixed header. */}
+        <div className="lg:ps-72">
+          <DashboardHeader
+            locale={isRtl ? "ar" : "en"}
+            user={user}
+            onOpenOverflow={() => setOverflowOpen(true)}
+          />
+
+          {/* pb-28 keeps the last card clear of the floating bottom nav and its
+              overhanging centre button; lg+ has no bottom nav. */}
+          <main className="pt-[72px] pb-28 lg:pb-12">
+            <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-6">
+              {children}
+            </div>
+          </main>
         </div>
-      </aside>
 
-      {/* Main Column */}
-      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-        {/* Spacer for the fixed header (see DashboardHeader) */}
-        <div className="h-16 shrink-0" />
+        <MobileTabBar locale={isRtl ? "ar" : "en"} />
 
-        <DashboardHeader
-          locale={isRtl ? "ar" : "en"}
+        <OverflowSheet
+          open={overflowOpen}
+          onClose={() => setOverflowOpen(false)}
           user={user}
-          onOpenOverflow={() => setOverflowOpen(true)}
-          scrollRef={mainRef}
+          onLogout={logout}
         />
-
-        {/* pb-28 keeps the last row clear of the floating bottom nav (and its
-            FAB overhang) on mobile; md+ has no tab bar. */}
-        <main
-          ref={mainRef}
-          className="flex-1 overflow-y-auto p-4 pb-28 md:p-6 min-w-0"
-        >
-          {children}
-        </main>
       </div>
-
-      {/* Floating bottom nav (mobile only) */}
-      <MobileTabBar locale={isRtl ? "ar" : "en"} />
-
-      {/* Header overflow sheet/dropdown */}
-      <OverflowSheet
-        open={overflowOpen}
-        onClose={() => setOverflowOpen(false)}
-        user={user}
-        onLogout={logout}
-      />
-    </div>
+    </LastUpdatedProvider>
   );
 }
-
-// Revision Plan uses the CalendarRange icon (matches the page itself).
-import { CalendarRange as CalendarRangeIcon } from "lucide-react";

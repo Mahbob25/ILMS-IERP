@@ -9,6 +9,9 @@ class LinkedStudentDTO(BaseModel):
     student_id: uuid.UUID
     full_name: str
     student_code: str
+    # Earliest enrollments.enrolled_at — when the student joined. None when they
+    # have never been enrolled in a section (the portal hides the badge then).
+    registered_at: Optional[datetime] = None
 
 
 class PortalMeResponse(BaseModel):

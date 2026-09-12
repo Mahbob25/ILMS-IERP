@@ -26,6 +26,17 @@ _ACTIVE_STUDENT = "s.deleted_at IS NULL"
 _ACTIVE_ENROLLMENT = "e.deleted_at IS NULL"
 _ACTIVE_SECTION = "cs.deleted_at IS NULL"
 
+# When the student first registered. `students` has no created_at, so the
+# earliest enrollment is the only signal there is. Withdrawn (soft-deleted)
+# enrollments still count: a student who enrolled and later withdrew did join on
+# that date, and excluding them would erase the date for anyone who has since
+# left. NULL means the student has never been enrolled in a section.
+_FIRST_ENROLLED_AT = """(
+                SELECT MIN(e.enrolled_at)
+                FROM enrollments e
+                WHERE e.student_id = s.id
+            )"""
+
 
 async def get_linked_students(db: AsyncSession, actor_id: str) -> list[dict[str, Any]]:
     """Students the actor may view.
@@ -39,7 +50,8 @@ async def get_linked_students(db: AsyncSession, actor_id: str) -> list[dict[str,
     own = await db.execute(
         text(
             f"""
-            SELECT s.id AS student_id, s.full_name, s.student_code
+            SELECT s.id AS student_id, s.full_name, s.student_code,
+                   {_FIRST_ENROLLED_AT} AS registered_at
             FROM portal.student_links sl
             JOIN students s ON s.id = sl.student_id
             WHERE sl.user_id = :actor_id
@@ -56,7 +68,8 @@ async def get_linked_students(db: AsyncSession, actor_id: str) -> list[dict[str,
     rows = await db.execute(
         text(
             f"""
-            SELECT s.id AS student_id, s.full_name, s.student_code
+            SELECT s.id AS student_id, s.full_name, s.student_code,
+                   {_FIRST_ENROLLED_AT} AS registered_at
             FROM portal.parent_links pl
             JOIN students s ON s.id = pl.student_id
             WHERE pl.guardian_id = :actor_id

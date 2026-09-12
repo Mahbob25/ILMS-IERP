@@ -5,27 +5,36 @@ import { useRouter, useParams } from "next/navigation";
 import { apiClient } from "@/lib/api";
 import { useAuth } from "@/components/AuthContext";
 import { useLinkedStudents } from "@/components/useLinkedStudents";
+import { useLastUpdated } from "@/components/LastUpdatedContext";
 import RefreshButton from "@/components/RefreshButton";
 import Skeleton from "@/components/Skeleton";
 import EmptyState from "@/components/EmptyState";
-import RegisterBand, { type BandFigure } from "@/components/RegisterBand";
+import HeroProfileCard from "@/components/HeroProfileCard";
+import {
+  AttendanceMetricCard,
+  BalanceMetricCard,
+  GradeAverageMetricCard,
+} from "@/components/MetricCards";
+import AttendanceLog, { type AttendanceLogRow } from "@/components/AttendanceLog";
 import AttendanceRibbon from "@/components/AttendanceRibbon";
 import ChildGlanceRow from "@/components/ChildGlanceRow";
 import TranscriptRow from "@/components/TranscriptRow";
-import LedgerStrip from "@/components/LedgerStrip";
+import PaymentsList from "@/components/PaymentsList";
 import AiEntryRow from "@/components/AiEntryRow";
 import { attendanceStats, attendanceBySectionId } from "@/lib/utils/attendance";
 import {
   arCount,
+  chronological,
   dateRange,
   enCount,
   formatDate,
   formatMoney,
+  formatNumber,
   formatPercent,
   formatScore,
   scheduleLabel,
 } from "@/lib/utils/register";
-import { ChevronRight, Users } from "lucide-react";
+import { ChevronLeft, Users } from "lucide-react";
 
 interface AttendanceRecord {
   section_id?: string;
@@ -101,26 +110,34 @@ interface ChildData {
  */
 const EAGER_LIMIT = 4;
 
+/** How many of the most recent sessions the log shows before "view all". */
+const LOG_LIMIT = 6;
+
 const t = {
   ar: {
     greeting: "مرحبًا",
     noStudents: "لا يوجد طلاب مرتبطون بحسابك بعد. يرجى التواصل مع الإدارة.",
-    asOf: "حتى",
     children: "الأبناء",
-    // standing figures
+    overview: "نظرة عامة",
+    // metrics
     attendance: "الحضور",
     courseAverage: "متوسط الدرجات",
     outstanding: "المتبقي",
     averageShort: "المتوسط",
+    activeStatus: "طالب نشط",
+    registered: "مسجل منذ",
     sessions: (n: number) => arCount(n, "جلسة واحدة", "جلستان", "جلسات", "جلسة"),
     coursesGraded: (n: number) => arCount(n, "مقرر مصحح واحد", "مقرران مصححان", "مقررات مصححة", "مقررًا مصححًا"),
     activeCourses: (n: number) => arCount(n, "مقرر واحد نشط", "مقرران نشطان", "مقررات نشطة", "مقررًا نشطًا"),
+    session: (n: number) => `الجلسة ${formatNumber(n, "ar")}`,
     noGrades: "لا توجد درجات مسجلة",
-    settled: "لا يوجد رصيد مستحق",
-    paidOf: (paid: string, total: string) => `${paid} من ${total}`,
+    noAttendance: "لا توجد سجلات حضور بعد.",
+    settled: "مسدد",
+    remaining: "متبقٍ",
     feesUnavailable: "تعذر تحميل الرسوم",
     // sections
     register: "سجل الحضور",
+    viewAllRegister: "عرض السجل كاملًا",
     courses: "المقررات",
     viewAllCourses: "عرض كل المقررات",
     noCurrentCourses: "لا توجد مقررات حالية.",
@@ -130,7 +147,6 @@ const t = {
     teacher: "المعلم",
     finalGrade: "الدرجة النهائية",
     notGraded: "لم يتم التقييم",
-    noAttendance: "لا توجد سجلات حضور بعد.",
     withdrawnOn: "انسحب في",
     reason: "السبب",
     // ledger
@@ -148,20 +164,25 @@ const t = {
   en: {
     greeting: "Welcome",
     noStudents: "No linked students yet. Please contact the administration.",
-    asOf: "As of",
     children: "Children",
+    overview: "Overview",
     attendance: "Attendance",
     courseAverage: "Course average",
     outstanding: "Outstanding",
     averageShort: "Average",
+    activeStatus: "Active student",
+    registered: "Registered",
     sessions: (n: number) => enCount(n, "session", "sessions"),
     coursesGraded: (n: number) => enCount(n, "course graded", "courses graded"),
     activeCourses: (n: number) => enCount(n, "active course", "active courses"),
+    session: (n: number) => `Session ${n}`,
     noGrades: "No grades recorded",
-    settled: "No outstanding balance",
-    paidOf: (paid: string, total: string) => `${paid} of ${total}`,
+    noAttendance: "No attendance records yet.",
+    settled: "Settled",
+    remaining: "Remaining",
     feesUnavailable: "Fees unavailable",
     register: "Attendance register",
+    viewAllRegister: "View the full register",
     courses: "Courses",
     viewAllCourses: "View all courses",
     noCurrentCourses: "No current courses.",
@@ -171,7 +192,6 @@ const t = {
     teacher: "Teacher",
     finalGrade: "Final grade",
     notGraded: "Not graded",
-    noAttendance: "No attendance records yet.",
     withdrawnOn: "Withdrawn on",
     reason: "Reason",
     paid: "Paid",
@@ -191,8 +211,8 @@ const mean = (values: number[]): number | null =>
     ? Math.round((values.reduce((sum, v) => sum + v, 0) / values.length) * 10) / 10
     : null;
 
-/** A ruled sheet section: an eyebrow heading, optional meta, then content. */
-function SheetSection({
+/** A panel: a titled white card, with an optional caption and corner action. */
+function Panel({
   title,
   meta,
   action,
@@ -205,8 +225,8 @@ function SheetSection({
 }) {
   return (
     <section className="card p-5">
-      <div className="flex items-center justify-between gap-3 mb-3">
-        <h2 className="eyebrow">{title}</h2>
+      <div className="flex items-center justify-between gap-3 mb-4">
+        <h2 className="text-sm font-semibold text-slate-900">{title}</h2>
         <div className="flex items-center gap-3">
           {meta && <span className="tabular text-[11px] text-slate-400">{meta}</span>}
           {action}
@@ -223,6 +243,7 @@ export default function DashboardHome() {
   const locale = (params?.locale as string) === "en" ? "en" : "ar";
   const s = t[locale];
   const { user } = useAuth();
+  const { setAsOf } = useLastUpdated();
 
   const { students, selectedId, selectedStudent, loading, refreshing, select, refresh } =
     useLinkedStudents(locale);
@@ -243,7 +264,7 @@ export default function DashboardHome() {
         : { student_id: studentId };
 
       // Settled, so one failing endpoint degrades its own panel rather than
-      // blanking the whole sheet.
+      // blanking the whole dashboard.
       const [att, grd, sec, pay, fee] = await Promise.allSettled([
         apiClient.get<AttendanceRecord[]>("/me/attendance", { params: reqParams }),
         apiClient.get<GradeRow[]>("/me/grades", { params: reqParams }),
@@ -349,83 +370,130 @@ export default function DashboardHome() {
     [selectedData]
   );
 
+  // The newest sessions, each stamped with its position inside its own course.
+  const logRows = useMemo<AttendanceLogRow[]>(() => {
+    const sequence = new Map<AttendanceRecord, number>();
+    for (const list of Object.values(attendanceBySection)) {
+      chronological(list).forEach((record, index) => sequence.set(record, index + 1));
+    }
+    return chronological(attendance)
+      .slice(-LOG_LIMIT)
+      .reverse()
+      .map((record, index) => ({
+        id: `${record.date}-${record.section_id ?? "none"}-${index}`,
+        date: record.date,
+        courseName: record.course_name,
+        sessionNumber: sequence.get(record) ?? null,
+        status: record.status,
+      }));
+  }, [attendance, attendanceBySection]);
+
   const fees = selectedData?.fees || null;
   const busy = loading || (selectedId !== null && !selectedData);
 
-  const figures: BandFigure[] = [
-    {
-      label: s.attendance,
-      value: stats.total ? formatPercent(stats.rate, locale) : "—",
-      hint: stats.total ? s.sessions(stats.total) : s.noAttendance,
-    },
-    {
-      label: s.courseAverage,
-      value: formatScore(average, locale),
-      hint: scoredGrades.length ? s.coursesGraded(scoredGrades.length) : s.noGrades,
-    },
-    {
-      label: s.outstanding,
-      value: fees ? formatMoney(Math.max(0, fees.balance), locale) : "—",
-      hint: fees
-        ? fees.balance > 0
-          ? s.paidOf(
-              formatMoney(fees.total_paid, locale),
-              formatMoney(fees.total_net_price, locale)
-            )
-          : s.settled
-        : s.feesUnavailable,
-    },
-  ];
+  // The header owns the "last updated" indicator, so the page publishes its
+  // timestamp while it is mounted and clears it on the way out.
+  const asOf = selectedData?.asOf ?? null;
+  useEffect(() => {
+    setAsOf(asOf);
+    return () => setAsOf(null);
+  }, [asOf, setAsOf]);
 
   const viewAllCourses = (
     <button
       type="button"
       onClick={() => router.push(`/${locale}/dashboard/courses`)}
-      className="flex items-center gap-1 text-[11px] font-medium text-brand-700 hover:text-brand-800"
+      className="flex items-center gap-1 text-[11px] font-semibold text-brand-700 hover:text-brand-800 transition-colors"
     >
       {s.viewAllCourses}
-      <ChevronRight size={13} className={locale === "ar" ? "rotate-180" : ""} />
+      <ChevronLeft size={13} className={locale === "ar" ? "" : "rotate-180"} />
     </button>
   );
 
   return (
-    <div className="max-w-5xl mx-auto space-y-4">
+    <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-slate-500">
-          {s.greeting}، <span className="text-slate-700">{user?.full_name}</span>
-        </p>
+        <div>
+          <h2 className="text-lg font-bold text-slate-900">{s.overview}</h2>
+          <p className="text-xs text-slate-500 mt-1">
+            {s.greeting}، {user?.full_name}
+          </p>
+        </div>
+        {/* The caption is omitted here — the header carries the timestamp. */}
         <RefreshButton
           locale={locale}
           refreshing={refreshing || dataRefreshing}
           onRefresh={handleRefresh}
-          asOf={selectedData?.asOf ?? null}
+          asOf={null}
         />
       </div>
 
       {busy ? (
         <div className="space-y-4">
-          <Skeleton className="h-40 w-full" />
-          <Skeleton className="h-32 w-full" />
-          <Skeleton className="h-48 w-full" />
+          <Skeleton className="h-40 w-full rounded-2xl" />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <Skeleton className="h-44 rounded-2xl" />
+            <Skeleton className="h-44 rounded-2xl" />
+            <Skeleton className="h-44 rounded-2xl" />
+          </div>
+          <Skeleton className="h-64 w-full rounded-2xl" />
         </div>
       ) : students.length === 0 ? (
         <EmptyState icon={Users} title={s.noStudents} />
       ) : (
         <>
-          <RegisterBand
+          <HeroProfileCard
             name={selectedStudent?.full_name || ""}
             code={selectedStudent?.student_code}
-            asOf={selectedData?.asOf ?? null}
-            meta={s.activeCourses(currentSections.length)}
-            figures={figures}
+            statusLabel={s.activeStatus}
+            coursesLabel={s.activeCourses(currentSections.length)}
+            registeredLabel={s.registered}
+            registeredAt={selectedStudent?.registered_at ?? null}
             locale={locale}
           />
+
+          {/* Metrics — one column on phones, two on tablets, three on desktop. */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <AttendanceMetricCard
+              title={s.attendance}
+              rate={stats.total ? stats.rate : null}
+              sessionsLabel={s.sessions(stats.total)}
+              rangeLabel={dateRange(attendance, locale)}
+              emptyLabel={s.noAttendance}
+              locale={locale}
+            />
+
+            <GradeAverageMetricCard
+              title={s.courseAverage}
+              average={average}
+              gradedLabel={
+                scoredGrades.length ? s.coursesGraded(scoredGrades.length) : s.noGrades
+              }
+              emptyLabel={s.noGrades}
+              locale={locale}
+            />
+
+            <BalanceMetricCard
+              title={s.outstanding}
+              balance={fees ? fees.balance : 0}
+              total={fees ? fees.total_net_price : 0}
+              paid={fees ? fees.total_paid : 0}
+              remainingLabel={s.remaining}
+              settledLabel={s.settled}
+              paidLabel={s.paid}
+              totalLabel={s.total}
+              emptyLabel={s.feesUnavailable}
+              locale={locale}
+            />
+          </div>
 
           {/* Guardian with more than one child: the whole family at a glance,
               and the switcher — every row's data is already loaded. */}
           {students.length > 1 && (
             <section className="card overflow-hidden">
-              <h2 className="eyebrow px-4 pt-4 pb-2">{s.children}</h2>
+              <h2 className="text-sm font-semibold text-slate-900 px-4 pt-4 pb-2">
+                {s.children}
+              </h2>
               {students.map((student) => {
                 const child = data[student.student_id];
                 const childStats = child ? attendanceStats(child.attendance) : null;
@@ -461,7 +529,7 @@ export default function DashboardHome() {
             </section>
           )}
 
-          <SheetSection
+          <Panel
             title={s.register}
             meta={[
               stats.total ? s.sessions(stats.total) : null,
@@ -475,9 +543,32 @@ export default function DashboardHome() {
               locale={locale}
               emptyLabel={s.noAttendance}
             />
-          </SheetSection>
+            <div className="mt-4 pt-4 border-t border-slate-100">
+              <AttendanceLog
+                rows={logRows}
+                locale={locale}
+                sessionLabel={s.session}
+                emptyLabel={attendance.length ? undefined : s.noAttendance}
+                footer={
+                  attendance.length > LOG_LIMIT ? (
+                    <button
+                      type="button"
+                      onClick={() => router.push(`/${locale}/dashboard/attendance`)}
+                      className="w-full flex items-center justify-center gap-1.5 rounded-xl bg-slate-50 hover:bg-brand-50 text-slate-600 hover:text-brand-700 py-2.5 text-xs font-semibold border border-slate-200/70 hover:border-brand-100 transition-colors"
+                    >
+                      {s.viewAllRegister}
+                      <ChevronLeft
+                        size={14}
+                        className={locale === "ar" ? "" : "rotate-180"}
+                      />
+                    </button>
+                  ) : undefined
+                }
+              />
+            </div>
+          </Panel>
 
-          <SheetSection
+          <Panel
             title={s.courses}
             meta={currentSections.length ? s.activeCourses(currentSections.length) : undefined}
             action={viewAllCourses}
@@ -520,42 +611,31 @@ export default function DashboardHome() {
                 })}
               </div>
             )}
-          </SheetSection>
+          </Panel>
 
-          <SheetSection title={s.fees}>
-            {fees ? (
-              <LedgerStrip
-                totalNet={fees.total_net_price}
-                totalPaid={fees.total_paid}
-                balance={fees.balance}
-                hasUnpriced={fees.sections.some((sec) => sec.net_price === null)}
-                payments={selectedData?.payments || []}
-                locale={locale}
-                labels={{
-                  paid: s.paid,
-                  outstanding: s.outstanding,
-                  total: s.total,
-                  settled: s.settled,
-                  unpriced: s.unpriced,
-                  receipts: s.receipts,
-                  noReceipts: s.noReceipts,
-                }}
-              />
-            ) : (
-              <p className="text-xs text-slate-400">{s.feesUnavailable}</p>
-            )}
-          </SheetSection>
+          <Panel title={s.fees}>
+            <p className="eyebrow mb-3">{s.receipts}</p>
+            <PaymentsList
+              payments={selectedData?.payments || []}
+              locale={locale}
+              hasUnpriced={(fees?.sections || []).some((sec) => sec.net_price === null)}
+              labels={{
+                noReceipts: fees ? s.noReceipts : s.feesUnavailable,
+                unpriced: s.unpriced,
+              }}
+            />
+          </Panel>
 
           {/* Institute-wide, so it sits outside the child's own panels. */}
           {announcements.length > 0 && (
-            <SheetSection title={s.announcements}>
+            <Panel title={s.announcements}>
               <ul>
                 {announcements.map((item) => (
                   <li
                     key={item.id}
                     className="flex items-start gap-2.5 py-2.5 border-b border-slate-100 last:border-b-0"
                   >
-                    <span className="w-1 h-1 rounded-full bg-brand-600 mt-2 shrink-0" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-brand-600 mt-1.5 shrink-0" />
                     <p className="flex-1 text-xs leading-relaxed text-slate-700">
                       {locale === "ar" ? item.text_ar : item.text_en}
                     </p>
@@ -567,7 +647,7 @@ export default function DashboardHome() {
                   </li>
                 ))}
               </ul>
-            </SheetSection>
+            </Panel>
           )}
 
           <section className="card px-5 py-2">

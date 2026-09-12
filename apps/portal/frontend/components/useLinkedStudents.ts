@@ -7,6 +7,8 @@ export interface LinkedStudent {
   student_id: string;
   full_name: string;
   student_code: string;
+  /** Earliest enrollment (ISO) — when the student joined. Null if never enrolled. */
+  registered_at: string | null;
 }
 
 interface MeResponse {

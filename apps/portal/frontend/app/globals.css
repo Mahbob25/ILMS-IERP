@@ -6,14 +6,27 @@
 
 @layer base {
   body {
-    @apply bg-slate-50 text-slate-900 antialiased selection:bg-brand-500 selection:text-white;
+    @apply bg-canvas text-slate-900 antialiased selection:bg-brand-500 selection:text-white;
   }
 }
 
 @layer components {
-  /* Professional Minimalist base wrapper — same primitives as the ERP */
+  /* Soft surface — white on the cool canvas, lifted by a wide low shadow
+     rather than a hard border. */
   .card {
-    @apply bg-white shadow-sm border border-slate-200 rounded-xl;
+    @apply bg-white shadow-card border border-slate-200/70 rounded-2xl;
+  }
+
+  /* Translucent surface used by the sticky header and the floating bottom
+     nav, so content scrolling underneath stays hinted at. */
+  .glass-panel {
+    @apply bg-white/70 backdrop-blur-xl border border-white/60;
+  }
+
+  /* The accent surface: hero card, FAB, active nav rail. Diagonal so it reads
+     the same in both directions. */
+  .gradient-accent {
+    @apply bg-gradient-to-br from-blue-600 via-blue-600 to-indigo-500;
   }
 
   .data-table {
@@ -33,15 +46,15 @@
   }
 
   .input-field {
-    @apply w-full text-sm px-3 py-2 rounded-lg bg-white border border-slate-300 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all duration-150;
+    @apply w-full text-sm px-3 py-2 rounded-xl bg-white border border-slate-300 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all duration-150;
   }
 
   .btn-primary {
-    @apply px-4 py-2 text-sm font-semibold rounded-lg text-white bg-brand-600 hover:bg-brand-700 disabled:bg-brand-600/50 disabled:cursor-not-allowed shadow-sm transition-all duration-150 active:scale-[0.98];
+    @apply px-4 py-2 text-sm font-semibold rounded-xl text-white bg-brand-600 hover:bg-brand-700 disabled:bg-brand-600/50 disabled:cursor-not-allowed shadow-sm transition-all duration-150 active:scale-[0.98];
   }
 
   .btn-secondary {
-    @apply px-4 py-2 text-sm font-semibold rounded-lg text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 transition-all duration-150 active:scale-[0.98];
+    @apply px-4 py-2 text-sm font-semibold rounded-xl text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 transition-all duration-150 active:scale-[0.98];
   }
 
   .badge {
@@ -65,9 +78,9 @@
     @apply min-h-11 flex items-center;
   }
 
-  /* ── Register primitives ──────────────────────────────────────────────
-     The dashboard is laid out as a ruled sheet: hairlines carry the
-     structure, so a row never needs its own card, shadow or icon tile. */
+  /* ── Sheet primitives ─────────────────────────────────────────────────
+     Small caps labels that name a block, and the tabular figures that sit
+     under them so digits never shuffle as values change. */
   .eyebrow {
     @apply font-display text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400;
   }
@@ -93,22 +106,6 @@
   }
 }
 
-/* Active-state dot under the bottom nav bar icon — pops in with a tiny overshoot */
-@keyframes dotPop {
-  0% {
-    transform: scale(0);
-  }
-  60% {
-    transform: scale(1.15);
-  }
-  100% {
-    transform: scale(1);
-  }
-}
-.animate-dot-pop {
-  animation: dotPop 0.25s ease-out;
-}
-
 /* Register marks stamp in on first paint — the one orchestrated moment on the
    dashboard. The stagger comes from an inline animation-delay per mark. */
 @keyframes markStamp {
@@ -128,30 +125,10 @@
 /* Respect the OS setting — no stamp, no slide, no pulse. */
 @media (prefers-reduced-motion: reduce) {
   .animate-mark-stamp,
-  .animate-dot-pop,
   .animate-slide-up,
   .animate-fade-in {
     animation: none;
   }
-}
-
-/* True inverted notch for the bottom nav pill.
-   Two mask layers XOR'd together (mask-composite: exclude / -webkit xor):
-   1. radial-gradient — SOLID BLACK inside the 32px circle at the top center,
-      transparent outside (this is the shape being punched out)
-   2. linear-gradient — solid black rectangle covering the whole bar
-   XOR removes the circle from the rectangle, so the notch is real transparent
-   negative space that curves around the bottom half of the elevated FAB.
-   `circle at 50% 0px` keeps it centered and perfectly circular at any width. */
-.navbar-notch {
-  -webkit-mask-image:
-    radial-gradient(circle 32px at 50% 0px, #000 0px, #000 31.5px, transparent 32px),
-    linear-gradient(#000, #000);
-  -webkit-mask-composite: xor;
-  mask-image:
-    radial-gradient(circle 32px at 50% 0px, #000 0px, #000 31.5px, transparent 32px),
-    linear-gradient(#000, #000);
-  mask-composite: exclude;
 }
 
 ::-webkit-scrollbar {

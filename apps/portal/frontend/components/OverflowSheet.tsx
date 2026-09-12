@@ -72,14 +72,14 @@ export default function OverflowSheet({ open, onClose, user, onLogout }: Props) 
         onClick={onClose}
       />
 
-      {/* Sheet (mobile) — anchored bottom, full-width rounded top; dropdown (md+) — anchored top-right */}
+      {/* Sheet (below lg) — anchored bottom, full-width rounded top; dropdown (lg+) — anchored under the avatar on the end side */}
       <div
         ref={sheetRef}
-        className={`absolute bg-white shadow-xl border-slate-200 overflow-hidden flex flex-col ${
-          "bottom-0 inset-x-0 rounded-t-2xl border-t md:bottom-auto md:top-14 md:start-auto md:end-4 md:w-72 md:rounded-2xl md:border"
+        className={`absolute bg-white shadow-soft border-slate-200/70 overflow-hidden flex flex-col ${
+          "bottom-0 inset-x-0 rounded-t-2xl border-t lg:bottom-auto lg:top-[84px] lg:start-auto lg:end-6 lg:w-72 lg:rounded-2xl lg:border"
         }`}
       >
-        <div className="flex items-center justify-between px-5 h-14 border-b border-slate-100 md:hidden">
+        <div className="flex items-center justify-between px-5 h-14 border-b border-slate-100 lg:hidden">
           <span className="text-sm font-semibold text-slate-900">{s.more}</span>
           <button
             onClick={onClose}
@@ -109,7 +109,7 @@ export default function OverflowSheet({ open, onClose, user, onLogout }: Props) 
         <div className="p-2 flex flex-col gap-0.5">
           <button
             onClick={onClose}
-            className="btn-touch w-full gap-3 px-4 py-2.5 rounded-xl text-sm font-medium text-slate-700 hover:text-slate-900 hover:bg-slate-50 transition-colors duration-150 text-start md:hidden"
+            className="btn-touch w-full gap-3 px-4 py-2.5 rounded-xl text-sm font-medium text-slate-700 hover:text-slate-900 hover:bg-slate-50 transition-colors duration-150 text-start lg:hidden"
           >
             <Bell size={18} className="text-slate-400 shrink-0" />
             <span>{s.notifications}</span>

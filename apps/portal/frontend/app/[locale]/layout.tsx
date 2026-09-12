@@ -19,7 +19,7 @@ export default function LocaleLayout({
 
   return (
     <html lang={locale} dir={dir} className="h-full scroll-smooth">
-      <body className={`${fontClass} h-full text-slate-900 bg-slate-50 antialiased`}>
+      <body className={`${fontClass} h-full text-slate-900 bg-canvas antialiased`}>
         <AuthProvider>{children}</AuthProvider>
       </body>
     </html>

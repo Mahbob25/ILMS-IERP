@@ -27,7 +27,7 @@ export default function ChildGlanceRow({ name, code, active, onSelect, figures, 
       aria-current={active ? "true" : undefined}
       className={`w-full text-start px-4 py-3 border-b border-slate-100 border-s-2 transition-colors last:border-b-0 ${
         active
-          ? "bg-ink-50 border-s-brand-600"
+          ? "bg-brand-50/70 border-s-brand-600"
           : "hover:bg-slate-50 border-s-transparent"
       }`}
     >

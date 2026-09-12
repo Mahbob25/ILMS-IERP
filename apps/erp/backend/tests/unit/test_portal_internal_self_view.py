@@ -8,6 +8,7 @@ student-scoped route even after /me returned the student.
 
 import asyncio
 import uuid
+from datetime import datetime, timezone
 from unittest.mock import AsyncMock
 
 from app.modules.portal_internal import service
@@ -80,6 +81,35 @@ def test_guardian_with_no_links_gets_nothing():
     )
 
     assert rows == []
+
+
+def test_linked_students_carry_the_registration_date():
+    """The portal's registration badge has no dedicated column to read.
+
+    `students` has no created_at, so /me derives the date from the earliest
+    enrollment — and it has to be selected on BOTH account branches, or a
+    student viewing their own record would lose the badge a guardian keeps.
+    """
+    registered_at = datetime(2025, 9, 1, tzinfo=timezone.utc)
+    own = {
+        "student_id": uuid.uuid4(),
+        "full_name": "طالب",
+        "student_code": "STU001",
+        "registered_at": registered_at,
+    }
+
+    db = _db(_Result([own]))
+    rows = asyncio.run(service.get_linked_students(db, "actor-id"))
+    assert rows[0]["registered_at"] == registered_at
+    assert "registered_at" in db.sqls[0]
+    assert "min(e.enrolled_at)" in db.sqls[0].lower()
+    # Withdrawals still count — a student who left still joined on that date.
+    assert "e.deleted_at" not in db.sqls[0]
+
+    db = _db(_Result([]), _Result([own]))
+    asyncio.run(service.get_linked_students(db, "actor-id"))
+    assert "registered_at" in db.sqls[1]
+    assert "min(e.enrolled_at)" in db.sqls[1].lower()
 
 
 def test_student_is_linked_accepts_own_record_and_verified_parent_link():

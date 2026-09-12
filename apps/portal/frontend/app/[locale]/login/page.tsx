@@ -44,7 +44,7 @@ export default function PortalSsoPage() {
   }, [ssoLogin, locale, router]);
 
   return (
-    <div className="relative min-h-screen flex items-center justify-center overflow-hidden bg-slate-50 p-4 md:p-8">
+    <div className="relative min-h-screen flex items-center justify-center overflow-hidden bg-canvas p-4 md:p-8">
       <div className="w-full max-w-sm bg-white border border-slate-200 rounded-2xl shadow-xl p-6 md:p-8 relative z-10 text-center">
         <svg
           className="animate-spin h-8 w-8 text-brand-500 mx-auto"

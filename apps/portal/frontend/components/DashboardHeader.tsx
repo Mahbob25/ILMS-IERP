@@ -2,44 +2,57 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import { GraduationCap, Bell } from "lucide-react";
+import { useLastUpdated } from "@/components/LastUpdatedContext";
+import { relativeTime } from "@/lib/utils/time";
 import type { PortalUser } from "@/components/AuthContext";
 
 interface Props {
   locale: "ar" | "en";
   user: PortalUser | null;
   onOpenOverflow: () => void;
-  /** Scroll container to watch (the dashboard <main>). Falls back to window. */
+  /** Scroll container to watch. Falls back to window when omitted. */
   scrollRef?: React.RefObject<HTMLElement | null>;
 }
 
-const HEADER_HEIGHT = 64;
+const HEADER_HEIGHT = 72;
 
 /**
- * Top app header — the fixed "roof" of the portal with a smart
- * hide-on-scroll behavior.
+ * Top app header — the fixed roof of the portal.
  *
- * Left: institute identity (logo icon + short name). Right: notification
- * bell with an unread dot + circular user avatar with initials fallback.
+ * Reading order follows the document direction: on the start side (right in
+ * Arabic) the portal identity and the welcome line, which carries the subtle
+ * "آخر تحديث" indicator published by whichever page is mounted. On the end side
+ * the notification bell and the avatar, which opens the overflow sheet.
  *
- * The avatar opens the overflow sheet (Fees / Revision Plan / logout) so the
- * generic "..." button is gone; the bell is a visual placeholder for now.
+ * Below lg the identity mark is shown here; from lg the sidebar carries it and
+ * this header starts after the sidebar so the two never overlap.
+ *
+ * The greeting uses the given name only — the full name already sits in the
+ * sidebar's user card, and repeating it there would be noise.
  */
-export default function DashboardHeader({ locale, user, onOpenOverflow, scrollRef }: Props) {
+export default function DashboardHeader({
+  locale,
+  user,
+  onOpenOverflow,
+  scrollRef,
+}: Props) {
   const headerRef = useRef<HTMLElement>(null);
   const [hidden, setHidden] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
+  const [isCompact, setIsCompact] = useState(false);
+  const { asOf } = useLastUpdated();
 
-  // Smart hide-on-scroll is mobile-only; on md+ the header stays pinned.
+  // Smart hide-on-scroll is the small-screen behaviour; from lg the header and
+  // sidebar both stay pinned.
   useEffect(() => {
-    const mq = window.matchMedia("(max-width: 767px)");
-    const onChange = (e: MediaQueryListEvent) => setIsMobile(e.matches);
-    setIsMobile(mq.matches);
+    const mq = window.matchMedia("(max-width: 1023px)");
+    const onChange = (e: MediaQueryListEvent) => setIsCompact(e.matches);
+    setIsCompact(mq.matches);
     mq.addEventListener("change", onChange);
     return () => mq.removeEventListener("change", onChange);
   }, []);
 
   useEffect(() => {
-    if (!isMobile) {
+    if (!isCompact) {
       setHidden(false);
       return;
     }
@@ -63,20 +76,26 @@ export default function DashboardHeader({ locale, user, onOpenOverflow, scrollRe
     const target = (scrollRef?.current ?? window) as HTMLElement | Window;
     target.addEventListener("scroll", onScroll, { passive: true });
     return () => target.removeEventListener("scroll", onScroll);
-  }, [isMobile, scrollRef]);
+  }, [isCompact, scrollRef]);
 
   const s =
     locale === "ar"
       ? {
           institute: "الدراسات",
+          welcome: "مرحبًا",
           notifications: "الإشعارات",
           profile: "القائمة",
+          asOf: "آخر تحديث",
         }
       : {
           institute: "Al-Drasat",
+          welcome: "Welcome",
           notifications: "Notifications",
           profile: "Menu",
+          asOf: "Last updated",
         };
+
+  const givenName = (user?.full_name || "").trim().split(/\s+/)[0] || "";
 
   const initials = (() => {
     if (!user?.full_name) return "؟";
@@ -89,41 +108,65 @@ export default function DashboardHeader({ locale, user, onOpenOverflow, scrollRe
   return (
     <header
       ref={headerRef}
-      className={`fixed top-0 left-0 w-full z-50 h-16 bg-white border-b border-slate-200 shadow-sm flex items-center justify-between px-4 md:px-6 transition-transform duration-300 ease-in-out md:translate-y-0 ${
+      className={`glass-panel fixed top-0 inset-x-0 lg:start-72 z-40 h-[72px] border-x-0 border-t-0 border-b border-slate-200/70 shadow-sm transition-transform duration-300 ease-in-out lg:translate-y-0 ${
         hidden ? "-translate-y-full" : "translate-y-0"
       }`}
     >
-      {/* Left — institute identity (swap-able icon for an image/SVG logo) */}
-      <div className="flex items-center gap-2">
-        <div className="w-9 h-9 rounded-full bg-brand-50 border border-brand-100 flex items-center justify-center shrink-0">
-          <GraduationCap size={18} className="text-brand-600" />
+      <div className="h-full px-4 sm:px-6 lg:px-8 flex items-center justify-between gap-3">
+        {/* Start side — identity + welcome + freshness */}
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="gradient-accent lg:hidden w-10 h-10 rounded-2xl text-white flex items-center justify-center shrink-0 shadow-hero">
+            <GraduationCap size={20} />
+          </div>
+          <div className="min-w-0">
+            <h1 className="text-base sm:text-lg font-bold text-slate-900 leading-none truncate">
+              {s.institute}
+            </h1>
+            <div className="flex items-center gap-1.5 mt-1.5 min-w-0 text-[11px] text-slate-500">
+              {givenName && (
+                <span className="truncate">
+                  {s.welcome}،{" "}
+                  <span className="font-semibold text-slate-700">{givenName}</span>
+                </span>
+              )}
+              {asOf && (
+                <>
+                  <span aria-hidden="true" className="text-slate-300">
+                    ·
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 shrink-0">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                    <span className="text-slate-400">{s.asOf}</span>
+                    <span className="tabular text-slate-600">
+                      {relativeTime(asOf, locale)}
+                    </span>
+                  </span>
+                </>
+              )}
+            </div>
+          </div>
         </div>
-        <span className="text-lg font-semibold text-slate-800 leading-none">
-          {s.institute}
-        </span>
-      </div>
 
-      {/* Right — user context & actions */}
-      <div className="flex items-center gap-2 md:gap-3">
-        {/* Notification bell — dot simulates unread; panel ships with Phase 4 */}
-        <button
-          type="button"
-          aria-label={s.notifications}
-          className="relative p-2 rounded-full text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors duration-150"
-        >
-          <Bell size={20} />
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-primary ring-2 ring-white" />
-        </button>
+        {/* End side — actions */}
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          <button
+            type="button"
+            aria-label={s.notifications}
+            className="relative w-10 h-10 rounded-full text-slate-500 hover:text-brand-700 hover:bg-brand-50 transition-colors duration-150 flex items-center justify-center"
+          >
+            <Bell size={19} />
+            <span className="absolute top-2 end-2.5 w-2 h-2 rounded-full bg-brand-600 ring-2 ring-white" />
+          </button>
 
-        {/* User avatar — initials fallback; opens the overflow sheet */}
-        <button
-          type="button"
-          onClick={onOpenOverflow}
-          aria-label={s.profile}
-          className="w-9 h-9 rounded-full bg-brand-50 border border-brand-100 text-brand-600 font-bold text-sm flex items-center justify-center hover:bg-brand-100 transition-colors duration-150"
-        >
-          {initials}
-        </button>
+          <button
+            type="button"
+            onClick={onOpenOverflow}
+            aria-label={s.profile}
+            className="gradient-accent w-10 h-10 rounded-full text-white font-bold text-sm flex items-center justify-center shadow-hero transition-transform duration-150 hover:scale-105 active:scale-95"
+          >
+            {initials}
+          </button>
+        </div>
       </div>
     </header>
   );

@@ -21,6 +21,7 @@ const mePayload = {
       student_id: '22222222-2222-2222-2222-222222222222',
       full_name: 'Student One',
       student_code: 'STU001',
+      registered_at: '2025-09-01T00:00:00+00:00',
     },
   ],
 }
@@ -282,6 +283,9 @@ test.describe('Portal flow (mocked BFF)', () => {
     // A course row carries its teacher, its schedule and its micro ribbon.
     await expect(page.getByText('Mr. Khalid')).toBeVisible()
     await expect(page.locator('.mark-micro')).toHaveCount(2)
+
+    // The registration badge reads /me's registered_at, not the section dates.
+    await expect(page.getByText('مسجل منذ')).toBeVisible()
   })
 
   test('grades page shows course scores', async ({ page }) => {

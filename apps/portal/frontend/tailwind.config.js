@@ -7,18 +7,21 @@ module.exports = {
   theme: {
     extend: {
       colors: {
+        // Page ground — a cool off-white so the white cards read as raised
+        // without a border doing all the work.
+        canvas: '#F4F6FC',
         brand: {
-          50: '#eef2ff',
-          100: '#e0e7ff',
-          200: '#c7d2fe',
-          300: '#a5b4fc',
-          400: '#818cf8',
-          500: '#1E3A8A',
-          600: '#1E3A8A',
-          700: '#4338ca',
-          800: '#3730a3',
-          900: '#312e81',
-          950: '#1e1b4b',
+          50: '#eff6ff',
+          100: '#dbeafe',
+          200: '#bfdbfe',
+          300: '#93c5fd',
+          400: '#60a5fa',
+          500: '#3b82f6',
+          600: '#2563eb',
+          700: '#1d4ed8',
+          800: '#1e40af',
+          900: '#1e3a8a',
+          950: '#172554',
         },
         ai: {
           50: '#f0fdfa',
@@ -33,17 +36,6 @@ module.exports = {
           900: '#134e4a',
           950: '#042f2e',
         },
-        // Register ink — the standfirst band ground and the display figures.
-        // A deeper, less saturated navy than brand/primary so the band reads as
-        // printed ink rather than as a brand surface.
-        ink: {
-          50: '#F4F6FA',
-          100: '#E4E9F2',
-          200: '#C3CCDE',
-          700: '#16294F',
-          900: '#0B1B3A',
-          DEFAULT: '#0B1B3A',
-        },
         // One colour per attendance status, used ONLY by the register ribbon.
         // 700-level so the marks read as stamped rather than as candy.
         mark: {
@@ -54,21 +46,29 @@ module.exports = {
           excused: '#64748B',
         },
         // Semantic alias — the nav bar spec calls for bg-primary / text-primary
-        // tokens. Mapped to the brand ramp (deep sapphire) so nothing hardcodes hex.
+        // tokens. Mapped to the brand ramp so nothing hardcodes hex.
         primary: {
-          50: '#eef2ff',
-          100: '#e0e7ff',
-          200: '#c7d2fe',
-          300: '#a5b4fc',
-          400: '#818cf8',
-          500: '#1E3A8A',
-          600: '#1E3A8A',
-          700: '#4338ca',
-          800: '#3730a3',
-          900: '#312e81',
-          950: '#1e1b4b',
-          DEFAULT: '#1E3A8A',
+          50: '#eff6ff',
+          100: '#dbeafe',
+          200: '#bfdbfe',
+          300: '#93c5fd',
+          400: '#60a5fa',
+          500: '#3b82f6',
+          600: '#2563eb',
+          700: '#1d4ed8',
+          800: '#1e40af',
+          900: '#1e3a8a',
+          950: '#172554',
+          DEFAULT: '#2563eb',
         }
+      },
+      boxShadow: {
+        // Cards sit on the canvas with a low, wide shadow rather than a hard
+        // border — one elevation step, no stacking.
+        card: '0 1px 2px rgba(16, 24, 40, 0.04), 0 6px 20px -10px rgba(16, 24, 40, 0.14)',
+        soft: '0 1px 2px rgba(16, 24, 40, 0.04), 0 12px 32px -16px rgba(16, 24, 40, 0.18)',
+        // Coloured lift under the gradient surfaces (hero, FAB, active nav).
+        hero: '0 12px 28px -12px rgba(37, 99, 235, 0.55)',
       },
       fontFamily: {
         sans: ["Inter", "Plus Jakarta Sans", "system-ui", "sans-serif"],

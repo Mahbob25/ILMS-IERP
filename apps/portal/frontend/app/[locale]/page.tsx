@@ -25,7 +25,7 @@ export default function PortalStatusPage() {
   const s = t[locale];
   const marketingBase = process.env.NEXT_PUBLIC_MARKETING_URL || "https://aldirasat.vercel.app";
   return (
-    <div className="relative min-h-screen flex items-center justify-center overflow-hidden bg-slate-50 p-4 md:p-8">
+    <div className="relative min-h-screen flex items-center justify-center overflow-hidden bg-canvas p-4 md:p-8">
       <div className="absolute top-1/4 left-1/4 -translate-x-1/2 -translate-y-1/2 w-72 md:w-96 h-72 md:h-96 rounded-full bg-brand-500/10 blur-[80px] md:blur-[120px] animate-pulse-slow pointer-events-none" />
       <div className="absolute bottom-1/4 right-1/4 translate-x-1/2 translate-y-1/2 w-72 md:w-96 h-72 md:h-96 rounded-full bg-indigo-500/10 blur-[80px] md:blur-[120px] animate-pulse-slow pointer-events-none" />
 
