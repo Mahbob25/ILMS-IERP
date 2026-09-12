@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { useRouter, useParams, usePathname } from "next/navigation";
 import { useAuth } from "@/components/AuthContext";
+import { useLinkedStudents } from "@/components/useLinkedStudents";
 import { LastUpdatedProvider } from "@/components/LastUpdatedContext";
 import MobileTabBar from "@/components/MobileTabBar";
 import OverflowSheet from "@/components/OverflowSheet";
@@ -33,6 +34,12 @@ export default function PortalDashboardLayout({
 
   const locale = (params?.locale as string) || "ar";
   const isRtl = locale === "ar";
+  const portalLocale: "ar" | "en" = isRtl ? "ar" : "en";
+
+  // The avatar shows the student being viewed. Held until the session is
+  // confirmed — this layout mounts before /auth/me resolves, and an
+  // unauthenticated /me here would trigger a refresh-then-redirect cycle.
+  const { selectedStudent } = useLinkedStudents(portalLocale, !loading && !!user);
 
   const t = {
     ar: {
@@ -182,9 +189,10 @@ export default function PortalDashboardLayout({
         {/* Content column — offset by the sidebar width and the fixed header. */}
         <div className="lg:ps-72">
           <DashboardHeader
-            locale={isRtl ? "ar" : "en"}
+            locale={portalLocale}
             user={user}
             onOpenOverflow={() => setOverflowOpen(true)}
+            avatarUrl={selectedStudent?.photo_url}
           />
 
           {/* pb-28 keeps the last card clear of the floating bottom nav and its

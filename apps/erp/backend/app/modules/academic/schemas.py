@@ -191,6 +191,7 @@ class StudentResponse(BaseModel):
     full_name: str
     email: Optional[str] = None
     phone: Optional[str] = None
+    photo_url: Optional[str] = None
     parent_full_name: Optional[str] = None
     parent_phone: Optional[str] = None
     parent_email: Optional[str] = None

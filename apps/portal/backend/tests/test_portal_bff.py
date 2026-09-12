@@ -602,3 +602,112 @@ async def test_announcements_proxy_erp_down_returns_502(authed_client):
         resp = await authed_client.get("/api/me/announcements")
 
         assert resp.status_code == 502
+
+
+# ── Profile photo upload ─────────────────────────────────────────────────
+
+JPEG_BYTES = b"\xff\xd8\xff\xe0" + b"\x00" * 16
+PHOTO_URL = "/uploads/avatars/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.jpg"
+
+
+def _photo_headers(ip: str = "10.1.1.1") -> dict:
+    """get_client_ip prefers X-Forwarded-For, so each test gets its own
+    rate-limit bucket instead of sharing the endpoint's 5/minute cap."""
+    return {"X-Forwarded-For": ip}
+
+
+def _photo_files(data: bytes = JPEG_BYTES, filename: str = "a.jpg", content_type: str = "image/jpeg"):
+    return {"file": (filename, data, content_type)}
+
+
+@pytest.mark.asyncio
+async def test_photo_upload_requires_auth(client):
+    resp = await client.post(
+        "/api/me/photo",
+        params={"student_id": STUDENT_ID},
+        files=_photo_files(),
+        headers=_photo_headers(),
+    )
+    assert resp.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_photo_upload_forwards_to_erp_and_busts_me_cache(authed_client):
+    from app.services import erp_client as erp_mod
+    from app.services import cache as cache_mod
+
+    with (
+        patch.object(erp_mod.erp_client, "upload_student_photo", new_callable=AsyncMock) as m_up,
+        patch.object(cache_mod.cache, "delete", new_callable=AsyncMock) as m_del,
+    ):
+        m_up.return_value = {"photo_url": PHOTO_URL}
+
+        resp = await authed_client.post(
+            "/api/me/photo",
+            params={"student_id": STUDENT_ID},
+            files=_photo_files(),
+            headers=_photo_headers(),
+        )
+
+        assert resp.status_code == 200
+        assert resp.json()["photo_url"] == PHOTO_URL
+
+        actor, student_id, data, filename, content_type = m_up.await_args.args
+        assert actor == _auth_user()["id"]
+        assert student_id == STUDENT_ID
+        assert data == JPEG_BYTES
+        assert filename == "a.jpg"
+        assert content_type == "image/jpeg"
+
+        # The header and hero card read the photo out of the cached /me payload.
+        assert m_del.await_args.args[0].startswith("cache:me:")
+
+
+@pytest.mark.asyncio
+async def test_photo_upload_rejects_non_image_and_oversized(authed_client):
+    from app.services import erp_client as erp_mod
+
+    with patch.object(erp_mod.erp_client, "upload_student_photo", new_callable=AsyncMock) as m_up:
+        not_image = await authed_client.post(
+            "/api/me/photo",
+            params={"student_id": STUDENT_ID},
+            files=_photo_files(b"hello", "note.txt", "text/plain"),
+            headers=_photo_headers("10.1.1.2"),
+        )
+        assert not_image.status_code == 400
+
+        oversized = await authed_client.post(
+            "/api/me/photo",
+            params={"student_id": STUDENT_ID},
+            files=_photo_files(JPEG_BYTES + b"\x00" * (5 * 1024 * 1024), "big.jpg"),
+            headers=_photo_headers("10.1.1.3"),
+        )
+        assert oversized.status_code == 413
+
+        # Neither reached the ERP.
+        m_up.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_photo_upload_maps_erp_errors(authed_client):
+    from app.services import erp_client as erp_mod
+
+    with patch.object(erp_mod.erp_client, "upload_student_photo", new_callable=AsyncMock) as m_up:
+        m_up.side_effect = erp_mod.ErpClientError(403, "Actor not linked to student")
+        forbidden = await authed_client.post(
+            "/api/me/photo",
+            params={"student_id": STUDENT_ID},
+            files=_photo_files(),
+            headers=_photo_headers("10.1.1.4"),
+        )
+        assert forbidden.status_code == 403
+        assert "not linked" in forbidden.json()["detail"]
+
+        m_up.side_effect = erp_mod.ErpClientError(500, "boom")
+        down = await authed_client.post(
+            "/api/me/photo",
+            params={"student_id": STUDENT_ID},
+            files=_photo_files(),
+            headers=_photo_headers("10.1.1.5"),
+        )
+        assert down.status_code == 502

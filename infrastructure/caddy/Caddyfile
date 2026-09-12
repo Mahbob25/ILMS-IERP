@@ -72,9 +72,18 @@ erp.aldirasat.edu {
 }
 
 portal.aldirasat.edu {
-    # Cap request sizes (portal accepts JSON, never big uploads).
+    # Cap request sizes. The only upload the portal accepts is a profile photo,
+    # which the browser downscales to a few hundred KB first — this sits just
+    # above the app's own 5MB limit so the API's validation reports the error
+    # rather than Caddy closing the connection.
     request_body {
-        max_size 2MB
+        max_size 6MB
+    }
+
+    # Profile photos are stored by the ERP backend but rendered by the portal.
+    handle /uploads/* {
+        encode gzip
+        reverse_proxy {env.BACKEND_URL}
     }
 
     handle /api/* {

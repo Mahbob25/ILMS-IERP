@@ -9,6 +9,7 @@ import Modal from "@/components/Modal";
 import Select from "@/components/ui/Select";
 import { Loader2, ArrowLeft, Wallet, DollarSign, Plus, X, Award, Eye, FileDown, Check, Clock, AlertCircle, CircleDot, UserX, ChevronDown, ChevronUp, Printer } from "lucide-react";
 import TableContainer from "@/components/ui/TableContainer";
+import Avatar from "@/components/ui/Avatar";
 import CertificatePreview from "@/components/CertificatePreview";
 import { hasPageAccess } from "@/lib/permissions";
 import PendingRefundBadge from "@/components/students/PendingRefundBadge";
@@ -18,6 +19,7 @@ interface Student {
   student_code: string;
   full_name: string;
   email: string | null;
+  photo_url: string | null;
 }
 
 interface Course {
@@ -369,6 +371,7 @@ export default function StudentDetailPage() {
           <button onClick={() => router.back()} className="btn-icon" title={t.back}>
             <ArrowLeft size={18} className={isRtl ? "rotate-180" : ""} />
           </button>
+          <Avatar name={student.full_name} photoUrl={student.photo_url} size={64} />
           <div>
             <h2 className="text-xl font-bold text-slate-900">{t.title}: {student.full_name}</h2>
             <p className="text-sm text-slate-500 mt-1">

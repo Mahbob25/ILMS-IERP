@@ -19,6 +19,11 @@ const nextConfig = {
         source: "/api/:path*",
         destination: `${API_ORIGIN}/api/:path*`,
       },
+      {
+        // Profile photos live on the ERP backend's uploads volume.
+        source: "/uploads/:path*",
+        destination: `${API_ORIGIN}/uploads/:path*`,
+      },
     ];
   },
 };

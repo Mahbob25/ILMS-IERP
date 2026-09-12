@@ -11,6 +11,7 @@ import StudentFormFields from "@/components/students/StudentFormFields";
 import { Plus, Pencil, Trash2, Loader2, Eye, AlertCircle, Workflow } from "lucide-react";
 import { sanitizeInput, validateName } from "@/lib/utils/input";
 import TableContainer from '@/components/ui/TableContainer';
+import Avatar from '@/components/ui/Avatar';
 
 interface Student {
   id: string;
@@ -18,6 +19,7 @@ interface Student {
   full_name: string;
   email: string | null;
   phone: string | null;
+  photo_url: string | null;
   parent_full_name: string | null;
   parent_phone: string | null;
   parent_email: string | null;
@@ -399,12 +401,15 @@ export default function StudentsPage() {
                   <tr key={student.id}>
                     <td><span className="badge">{student.student_code}</span></td>
                     <td>
-                      <button
-                        onClick={() => router.push(`/${locale}/dashboard/students/${student.id}`)}
-                        className="font-medium text-brand-600 hover:text-brand-700 hover:underline text-start"
-                      >
-                        {student.full_name}
-                      </button>
+                      <div className="flex items-center gap-2.5">
+                        <Avatar name={student.full_name} photoUrl={student.photo_url} size={32} />
+                        <button
+                          onClick={() => router.push(`/${locale}/dashboard/students/${student.id}`)}
+                          className="font-medium text-brand-600 hover:text-brand-700 hover:underline text-start"
+                        >
+                          {student.full_name}
+                        </button>
+                      </div>
                     </td>
                     <td className="text-slate-600">{student.email || "—"}</td>
                     <td className="text-slate-600">{student.phone || "—"}</td>

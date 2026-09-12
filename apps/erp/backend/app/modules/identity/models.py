@@ -105,6 +105,7 @@ class User(Base):
         index=True
     )
     locale_pref: Mapped[str] = mapped_column(String(10), default="ar", server_default="ar")
+    photo_path: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
     is_superadmin: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     failed_login_attempts: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
@@ -118,6 +119,10 @@ class User(Base):
     @property
     def full_name(self) -> Optional[str]:
         return self.employee.full_name if self.employee else None
+
+    @property
+    def photo_url(self) -> Optional[str]:
+        return f"/uploads/{self.photo_path}" if self.photo_path else None
 
 
 class RefreshToken(Base):

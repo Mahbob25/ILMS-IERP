@@ -1,9 +1,10 @@
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.rate_limit import limiter
+from app.core.storage import delete_file, save_image
 from app.db.session import get_db
 from app.modules.identity.service import create_audit_log
 
@@ -199,6 +200,36 @@ async def internal_profile_update(
         raise HTTPException(status_code=404, detail="Student not found or actor not linked")
     await _write_audit(db, "INTERNAL_PORTAL_ACCESS", actor, request.url.path, True)
     return {"updated": True, "student": student}
+
+
+@internal_router.post("/photo", status_code=200)
+async def internal_photo_upload(
+    request: Request,
+    student_id: str = Query(...),
+    file: UploadFile = File(...),
+    actor_id: str = Depends(verify_service_key),
+    db: AsyncSession = Depends(get_db),
+):
+    """Store a student's profile photo (uploaded from the portal by the student).
+
+    A verified guardian passes ``student_is_linked`` too, so a parent may also set
+    their child's photo — the actor is acting for the student either way.
+    """
+    actor = _require_actor(actor_id)
+    await _verify_student_access(db, actor, student_id)
+
+    try:
+        photo_path = await save_image(file)
+    except ValueError as exc:
+        await _write_audit(db, "INTERNAL_PORTAL_PHOTO_UPDATED", actor, request.url.path, False)
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    previous = await service.set_student_photo(db, student_id, photo_path)
+    if previous:
+        delete_file(previous)
+
+    await _write_audit(db, "INTERNAL_PORTAL_PHOTO_UPDATED", actor, request.url.path, True)
+    return {"photo_url": f"/uploads/{photo_path}"}
 
 
 @internal_router.get("/context")

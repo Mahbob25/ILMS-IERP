@@ -39,6 +39,7 @@ class ErpClient:
         actor_id: str,
         params: Optional[dict[str, Any]] = None,
         json: Optional[dict[str, Any]] = None,
+        files: Optional[dict[str, Any]] = None,
     ) -> Any:
         if not self._service_key:
             raise ErpClientError(500, "ERP_SERVICE_KEY not configured in portal backend")
@@ -47,13 +48,14 @@ class ErpClient:
             "X-Actor-Id": actor_id,
             "Accept": "application/json",
         }
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(timeout=30.0) as client:
             resp = await client.request(
                 method,
                 f"{self._base_url}{_INTERNAL_PREFIX}{path}",
                 headers=headers,
                 params=params,
                 json=json,
+                files=files,
             )
         if resp.status_code >= 400:
             try:
@@ -120,6 +122,23 @@ class ErpClient:
             actor_id,
             params={"student_id": student_id},
             json=body,
+        )
+
+    async def upload_student_photo(
+        self,
+        actor_id: str,
+        student_id: str,
+        file_bytes: bytes,
+        filename: str,
+        content_type: str,
+    ) -> dict[str, Any]:
+        """Forward the student's photo to the ERP, which owns the students row."""
+        return await self._request(
+            "POST",
+            "/photo",
+            actor_id,
+            params={"student_id": student_id},
+            files={"file": (filename, file_bytes, content_type)},
         )
 
 

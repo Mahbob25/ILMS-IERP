@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 import sentry_sdk
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from sentry_sdk.integrations.fastapi import FastApiIntegration
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -15,6 +16,7 @@ from app.core.rate_limit import limiter
 from app.core.config import settings
 from app.core.error_handlers import integrity_error_handler
 from app.core.logging import setup_logging
+from app.core.storage import UPLOAD_DIR
 
 logger = logging.getLogger(__name__)
 
@@ -98,6 +100,13 @@ app.add_middleware(CSRFMiddleware)
 
 # Idempotency middleware — caches POST/PATCH/PUT responses by Idempotency-Key header
 app.add_middleware(IdempotencyMiddleware)
+
+# Profile photos. Only the avatars subdirectory is published — everything else
+# under uploads/ (future receipts, attachments) stays off the public path.
+# Caddy routes /uploads/* here and the frontends rewrite the same prefix.
+_AVATAR_DIR = UPLOAD_DIR / "avatars"
+_AVATAR_DIR.mkdir(parents=True, exist_ok=True)
+app.mount("/uploads/avatars", StaticFiles(directory=_AVATAR_DIR), name="avatars")
 
 # Include routes under /api/v1 prefix
 app.include_router(auth_router, prefix="/api/v1")

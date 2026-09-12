@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from typing import Any, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, Response, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.rate_limit import limiter
@@ -250,3 +250,50 @@ async def patch_profile(
     current_user: dict = Depends(get_current_portal_user),
 ):
     return await _update_profile(request, body, current_user)
+
+
+# Photos are downscaled in the browser before they get here; these are only a
+# backstop against a hand-rolled request. The ERP re-validates the actual bytes.
+MAX_PHOTO_BYTES = 5 * 1024 * 1024
+ALLOWED_PHOTO_TYPES = {"image/jpeg", "image/png", "image/webp"}
+
+
+@portal_router.post("/photo")
+@limiter.limit("5/minute")
+async def upload_photo(
+    request: Request,
+    file: UploadFile = File(...),
+    student_id: str = Query(...),
+    current_user: dict = Depends(get_current_portal_user),
+):
+    """Proxy the student's profile photo to the ERP internal API.
+
+    The BFF owns no student data, so the file is forwarded with the service key
+    and the ERP decides whether this actor may write to this student.
+    """
+    content_type = (file.content_type or "").split(";")[0].strip().lower()
+    if content_type not in ALLOWED_PHOTO_TYPES:
+        raise HTTPException(
+            status_code=400, detail="Unsupported image type — use JPEG, PNG or WebP"
+        )
+
+    data = await file.read(MAX_PHOTO_BYTES + 1)
+    if len(data) > MAX_PHOTO_BYTES:
+        raise HTTPException(status_code=413, detail="Image too large — 5MB maximum")
+
+    try:
+        result = await erp_client.upload_student_photo(
+            str(current_user["id"]),
+            student_id,
+            data,
+            file.filename or "avatar",
+            content_type,
+        )
+    except ErpClientError as e:
+        if e.status_code >= 500:
+            raise HTTPException(status_code=502, detail="ERP temporarily unavailable")
+        raise HTTPException(status_code=e.status_code, detail=e.detail)
+
+    # The header and hero card read the photo out of the cached /me payload.
+    await cache.delete(cache_key("me", str(current_user["id"]), {}))
+    return result

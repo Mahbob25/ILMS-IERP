@@ -38,8 +38,10 @@ RUN useradd -m -u 1000 appuser
 
 COPY --chown=appuser:appuser . .
 
-# Ensure the backups volume mount point is writable by the non-root appuser.
-RUN mkdir -p /app/backups && chown -R 1000:1000 /app/backups
+# Ensure the backups and uploads volume mount points are writable by the
+# non-root appuser. Docker seeds a fresh named volume from these directories,
+# ownership included.
+RUN mkdir -p /app/backups /app/uploads && chown -R 1000:1000 /app/backups /app/uploads
 
 EXPOSE 8000
 

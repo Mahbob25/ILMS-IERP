@@ -445,6 +445,7 @@ export default function DashboardHome() {
           <HeroProfileCard
             name={selectedStudent?.full_name || ""}
             code={selectedStudent?.student_code}
+            photoUrl={selectedStudent?.photo_url}
             statusLabel={s.activeStatus}
             coursesLabel={s.activeCourses(currentSections.length)}
             registeredLabel={s.registered}

@@ -7,6 +7,8 @@ export interface LinkedStudent {
   student_id: string;
   full_name: string;
   student_code: string;
+  /** "/uploads/avatars/…" (rewritten to the ERP host) — null until one is set. */
+  photo_url: string | null;
   /** Earliest enrollment (ISO) — when the student joined. Null if never enrolled. */
   registered_at: string | null;
 }
@@ -20,8 +22,12 @@ interface MeResponse {
  * Shared "who am I + which student am I viewing" state for the read pages.
  * Fetches /me once, keeps the selected student_id, and exposes a refetch that
  * bypasses the BFF cache (?refresh=1) — used by the force-refresh buttons.
+ *
+ * `enabled` lets a caller that renders before the session is confirmed (the
+ * dashboard layout, which is mounted during the auth check) hold off — an
+ * unauthenticated /me would 401 and start a refresh-then-redirect cycle.
  */
-export function useLinkedStudents(locale: "ar" | "en") {
+export function useLinkedStudents(locale: "ar" | "en", enabled = true) {
   const [students, setStudents] = useState<LinkedStudent[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -30,6 +36,10 @@ export function useLinkedStudents(locale: "ar" | "en") {
 
   const load = useCallback(
     async (force = false) => {
+      if (!enabled) {
+        setLoading(false);
+        return;
+      }
       try {
         if (force) setRefreshing(true);
         else setLoading(true);
@@ -50,7 +60,7 @@ export function useLinkedStudents(locale: "ar" | "en") {
         setRefreshing(false);
       }
     },
-    [locale]
+    [locale, enabled]
   );
 
   useEffect(() => {

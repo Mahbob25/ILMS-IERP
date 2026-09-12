@@ -1,11 +1,12 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { apiClient } from "@/lib/api";
 import { useAuth } from "@/components/AuthContext";
 import { useLinkedStudents } from "@/components/useLinkedStudents";
-import { Settings, Bell, Loader2, KeyRound, Globe } from "lucide-react";
+import { prepareImageFile } from "@/lib/image";
+import { Settings, Bell, Loader2, KeyRound, Globe, Camera } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 const t = {
@@ -30,6 +31,13 @@ const t = {
     passwordUpdated: "تم تحديث كلمة المرور بنجاح",
     passwordFailed: "تعذر تحديث كلمة المرور",
     updatePassword: "تحديث كلمة المرور",
+    photoTitle: "الصورة الشخصية",
+    photoHint: "JPG أو PNG أو WebP — حتى 5 ميجابايت",
+    changePhoto: "تغيير الصورة",
+    uploading: "جاري الرفع...",
+    photoUpdated: "تم تحديث الصورة",
+    photoFailed: "تعذر رفع الصورة",
+    noPhotoStudent: "لا يوجد طالب مرتبط لتحديث الصورة.",
   },
   en: {
     title: "Settings",
@@ -52,6 +60,13 @@ const t = {
     passwordUpdated: "Password updated successfully",
     passwordFailed: "Could not update password",
     updatePassword: "Update Password",
+    photoTitle: "Profile photo",
+    photoHint: "JPG, PNG or WebP — up to 5MB",
+    changePhoto: "Change photo",
+    uploading: "Uploading...",
+    photoUpdated: "Photo updated",
+    photoFailed: "Could not upload the photo",
+    noPhotoStudent: "No linked student to update the photo for.",
   },
 };
 
@@ -61,7 +76,7 @@ export default function SettingsPage() {
   const locale = (params?.locale as string) === "en" ? "en" : "ar";
   const s = t[locale];
   const { user } = useAuth();
-  const { selectedId } = useLinkedStudents(locale);
+  const { selectedId, selectedStudent, refresh } = useLinkedStudents(locale);
 
   const [notifEnabled, setNotifEnabled] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -73,6 +88,44 @@ export default function SettingsPage() {
   const [pwConfirm, setPwConfirm] = useState("");
   const [pwSaving, setPwSaving] = useState(false);
   const [pwMessage, setPwMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const [photoSaving, setPhotoSaving] = useState(false);
+  const [photoMessage, setPhotoMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const picked = e.target.files?.[0];
+    // Reset first so re-picking the same file after a failure still fires onChange.
+    e.target.value = "";
+    if (!picked) return;
+
+    if (!selectedId) {
+      setPhotoMessage({ type: "error", text: s.noPhotoStudent });
+      return;
+    }
+
+    setPhotoSaving(true);
+    setPhotoMessage(null);
+    try {
+      const file = await prepareImageFile(picked);
+      const form = new FormData();
+      form.append("file", file);
+      // Explicit multipart: the client defaults to application/json, which
+      // would make axios serialise the FormData into JSON.
+      await apiClient.post("/me/photo", form, {
+        params: { student_id: selectedId },
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      // The header and hero card read the photo from the cached /me payload.
+      await refresh();
+      setPhotoMessage({ type: "success", text: s.photoUpdated });
+    } catch (err: any) {
+      const detail = err?.response?.data?.detail;
+      setPhotoMessage({ type: "error", text: detail || s.photoFailed });
+    } finally {
+      setPhotoSaving(false);
+    }
+  };
 
   // Persist locale preference to the ERP-backed profile write path.
   useEffect(() => {
@@ -136,6 +189,13 @@ export default function SettingsPage() {
     }
   };
 
+  const photoInitials = (() => {
+    const parts = (selectedStudent?.full_name || "").trim().split(/\s+/).filter(Boolean);
+    if (parts.length === 0) return "؟";
+    if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
+    return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
+  })();
+
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       <div>
@@ -144,6 +204,63 @@ export default function SettingsPage() {
           {s.title}
         </h1>
         <p className="text-sm text-slate-500 mt-1">{s.subtitle}</p>
+      </div>
+
+      {/* Profile photo — the student's record, which is what the portal shows. */}
+      <div className="card p-5">
+        <div className="flex items-center gap-4">
+          {selectedStudent?.photo_url ? (
+            <img
+              src={selectedStudent.photo_url}
+              alt={selectedStudent.full_name}
+              className="w-20 h-20 rounded-2xl object-cover border border-slate-200 shrink-0"
+            />
+          ) : (
+            <div
+              aria-hidden="true"
+              className="w-20 h-20 rounded-2xl bg-brand-50 text-brand-700 border border-brand-100 text-xl font-bold flex items-center justify-center shrink-0"
+            >
+              {photoInitials}
+            </div>
+          )}
+
+          <div className="min-w-0 space-y-2">
+            <div>
+              <h2 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+                <Camera className="text-brand-600" size={18} />
+                {s.photoTitle}
+              </h2>
+              <p className="text-xs text-slate-500 mt-1">{s.photoHint}</p>
+            </div>
+
+            <input
+              ref={photoInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              className="hidden"
+              onChange={handlePhotoChange}
+            />
+            <button
+              type="button"
+              onClick={() => photoInputRef.current?.click()}
+              disabled={photoSaving || !selectedId}
+              className="btn-touch px-4 py-2 rounded-xl border text-sm font-semibold bg-white text-slate-700 border-slate-200 hover:bg-slate-50 disabled:opacity-50 inline-flex items-center gap-2"
+            >
+              {photoSaving && <Loader2 size={14} className="animate-spin" />}
+              {photoSaving ? s.uploading : s.changePhoto}
+            </button>
+
+            {photoMessage && (
+              <p
+                className={`text-xs font-medium ${
+                  photoMessage.type === "success" ? "text-emerald-600" : "text-rose-600"
+                }`}
+              >
+                {photoMessage.text}
+              </p>
+            )}
+          </div>
+        </div>
       </div>
 
       <div className="card p-5 flex items-center justify-between">

@@ -2,7 +2,7 @@ import uuid
 import hashlib
 from datetime import datetime, timezone, timedelta
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, status, Response, Request, Cookie, Query, Form
+from fastapi import APIRouter, Depends, HTTPException, status, Response, Request, Cookie, Query, Form, File, UploadFile
 from fastapi.responses import RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
@@ -36,6 +36,7 @@ from app.modules.identity.dependencies import (
 from app.modules.identity import service as identity_service
 from app.core.rate_limit import limiter
 from app.core.config import settings
+from app.core.storage import delete_file, save_image
 
 auth_router = APIRouter(prefix="/auth", tags=["auth"])
 users_router = APIRouter(prefix="/users", tags=["users"])
@@ -517,6 +518,39 @@ async def patch_me(
         select(User).options(joinedload(User.role), joinedload(User.employee)).where(User.id == current_user.id)
     )
     return result.scalar_one()
+
+
+@users_router.post("/me/photo", status_code=status.HTTP_200_OK)
+async def upload_my_photo(
+    request: Request,
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Self-service profile photo.
+
+    Stored on the user rather than the employee so every staff account can have
+    one — a superadmin is not guaranteed an employees row.
+    """
+    try:
+        photo_path = await save_image(file)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
+    previous = current_user.photo_path
+    current_user.photo_path = photo_path
+    await db.flush()
+    if previous:
+        delete_file(previous)
+
+    await identity_service.create_audit_log(
+        db=db,
+        user_id=current_user.id,
+        action="USER_PHOTO_UPDATED",
+        payload={"photo_path": photo_path},
+        ip_address=request.client.host if request.client else None,
+    )
+    return {"photo_url": current_user.photo_url}
 
 
 @users_router.get("/me", response_model=UserResponse)

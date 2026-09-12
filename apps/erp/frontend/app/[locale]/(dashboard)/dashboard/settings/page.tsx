@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/components/AuthContext";
 import { apiClient } from "@/lib/api";
@@ -13,8 +13,11 @@ import {
   CheckCircle2,
   Loader2,
   Building2,
+  Camera,
 } from "lucide-react";
 import { BrandLogo } from "@/components/ui/BrandLogo";
+import Avatar from "@/components/ui/Avatar";
+import { prepareImageFile } from "@/lib/image";
 
 type TabKey = "profile" | "security" | "preferences" | "system";
 
@@ -43,6 +46,12 @@ export default function SettingsPage() {
         superadmin: "مدير خارق",
         locale: "اللغة",
         loading: "جاري التحميل...",
+        photo: "الصورة الشخصية",
+        photoHint: "JPG أو PNG أو WebP — حتى 5 ميجابايت",
+        changePhoto: "تغيير الصورة",
+        uploading: "جاري الرفع...",
+        photoUpdated: "تم تحديث الصورة",
+        photoFailed: "تعذر رفع الصورة",
       },
       security: {
         heading: "تغيير كلمة المرور",
@@ -99,6 +108,12 @@ export default function SettingsPage() {
         superadmin: "Superadmin",
         locale: "Language",
         loading: "Loading...",
+        photo: "Profile photo",
+        photoHint: "JPG, PNG or WebP — up to 5MB",
+        changePhoto: "Change photo",
+        uploading: "Uploading...",
+        photoUpdated: "Photo updated",
+        photoFailed: "Could not upload the photo",
       },
       security: {
         heading: "Change password",
@@ -175,6 +190,43 @@ export default function SettingsPage() {
     };
     return map[user.role?.name] || user.role?.name || "—";
   })();
+
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const [photoSaving, setPhotoSaving] = useState(false);
+  const [photoMsg, setPhotoMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
+
+  const handlePhotoChange = useCallback(
+    async (event: React.ChangeEvent<HTMLInputElement>) => {
+      const picked = event.target.files?.[0];
+      // Reset first so re-picking the same file after a failure still fires onChange.
+      event.target.value = "";
+      if (!picked) return;
+
+      setPhotoSaving(true);
+      setPhotoMsg(null);
+      try {
+        const file = await prepareImageFile(picked);
+        const form = new FormData();
+        form.append("file", file);
+        // Explicit multipart: the client defaults to application/json, which
+        // would make axios serialise the FormData into JSON.
+        await apiClient.post("/users/me/photo", form, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+        await checkSession();
+        setPhotoMsg({ kind: "ok", text: t.profile.photoUpdated });
+      } catch (e: any) {
+        const detail = e?.response?.data?.detail || e?.message || t.profile.photoFailed;
+        const msg = Array.isArray(detail)
+          ? detail.map((d: any) => d.msg || d.detail || JSON.stringify(d)).join(" · ")
+          : String(detail);
+        setPhotoMsg({ kind: "err", text: msg });
+      } finally {
+        setPhotoSaving(false);
+      }
+    },
+    [checkSession, t]
+  );
 
   const [localePref, setLocalePref] = useState<string>(user?.locale_pref || locale);
   const [prefsSaving, setPrefsSaving] = useState(false);
@@ -302,6 +354,43 @@ export default function SettingsPage() {
             <UserIcon size={16} className="text-slate-400" />
             {t.profile.heading}
           </h2>
+
+          <div className="flex items-center gap-4 pb-5 border-b border-slate-100">
+            <Avatar name={user?.full_name || ""} photoUrl={user?.photo_url} size={72} />
+            <div className="space-y-2">
+              <label className="text-xs font-semibold text-slate-500">{t.profile.photo}</label>
+              <input
+                ref={photoInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="hidden"
+                onChange={handlePhotoChange}
+              />
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => photoInputRef.current?.click()}
+                  disabled={photoSaving}
+                  className="btn-secondary inline-flex items-center gap-2"
+                >
+                  {photoSaving ? <Loader2 size={14} className="animate-spin" /> : <Camera size={14} />}
+                  {photoSaving ? t.profile.uploading : t.profile.changePhoto}
+                </button>
+                <p className="text-[11px] text-slate-400">{t.profile.photoHint}</p>
+              </div>
+              {photoMsg && (
+                <p
+                  className={`flex items-center gap-1.5 text-xs font-medium ${
+                    photoMsg.kind === "ok" ? "text-emerald-600" : "text-red-600"
+                  }`}
+                >
+                  {photoMsg.kind === "ok" ? <CheckCircle2 size={13} /> : <AlertCircle size={13} />}
+                  {photoMsg.text}
+                </p>
+              )}
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div>
               <label className="text-xs font-semibold text-slate-500">{t.profile.fullName}</label>

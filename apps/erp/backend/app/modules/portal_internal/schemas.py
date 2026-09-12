@@ -9,6 +9,8 @@ class LinkedStudentDTO(BaseModel):
     student_id: uuid.UUID
     full_name: str
     student_code: str
+    # "/uploads/avatars/…" — the frontends rewrite that prefix to the ERP host.
+    photo_url: Optional[str] = None
     # Earliest enrollments.enrolled_at — when the student joined. None when they
     # have never been enrolled in a section (the portal hides the badge then).
     registered_at: Optional[datetime] = None

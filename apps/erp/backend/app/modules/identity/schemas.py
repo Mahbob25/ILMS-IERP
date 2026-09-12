@@ -125,6 +125,7 @@ class UserResponse(BaseModel):
     id: uuid.UUID
     email: EmailStr
     full_name: Optional[str] = None
+    photo_url: Optional[str] = None
     locale_pref: str
     is_active: bool
     is_superadmin: bool

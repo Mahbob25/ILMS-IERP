@@ -7,6 +7,8 @@ import { formatDate } from "@/lib/utils/register";
 interface Props {
   name: string;
   code?: string | null;
+  /** Profile photo for the identity tile — initials stand in when absent. */
+  photoUrl?: string | null;
   /** e.g. "٣ مقررات نشطة" — the standing of the student being viewed. */
   coursesLabel: string;
   statusLabel: string;
@@ -27,6 +29,7 @@ interface Props {
 export default function HeroProfileCard({
   name,
   code,
+  photoUrl,
   coursesLabel,
   statusLabel,
   registeredLabel,
@@ -55,9 +58,17 @@ export default function HeroProfileCard({
 
       <div className="relative p-5 md:p-6">
         <div className="flex items-center gap-4">
-          <div className="w-14 h-14 md:w-16 md:h-16 rounded-2xl bg-white/15 border border-white/25 backdrop-blur-sm flex items-center justify-center text-lg md:text-xl font-bold shrink-0">
-            {initials}
-          </div>
+          {photoUrl ? (
+            <img
+              src={photoUrl}
+              alt={name}
+              className="w-14 h-14 md:w-16 md:h-16 rounded-2xl object-cover border border-white/30 shadow-hero shrink-0"
+            />
+          ) : (
+            <div className="w-14 h-14 md:w-16 md:h-16 rounded-2xl bg-white/15 border border-white/25 backdrop-blur-sm flex items-center justify-center text-lg md:text-xl font-bold shrink-0">
+              {initials}
+            </div>
+          )}
 
           <div className="min-w-0 flex-1">
             <h2 className="text-lg md:text-xl font-bold truncate">{name}</h2>

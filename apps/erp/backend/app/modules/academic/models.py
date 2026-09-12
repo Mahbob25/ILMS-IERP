@@ -179,10 +179,15 @@ class Student(Base):
     full_name: Mapped[str] = mapped_column(String(255), nullable=False)
     email: Mapped[str | None] = mapped_column(String(255), nullable=True)
     phone: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    photo_path: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     enrollments: Mapped[list["Enrollment"]] = relationship(back_populates="student")
     certificates: Mapped[list["Certificate"]] = relationship(back_populates="student", cascade="all, delete-orphan")
+
+    @property
+    def photo_url(self) -> Optional[str]:
+        return f"/uploads/{self.photo_path}" if self.photo_path else None
 
 
 class Enrollment(Base):

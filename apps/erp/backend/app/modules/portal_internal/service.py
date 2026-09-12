@@ -37,6 +37,10 @@ _FIRST_ENROLLED_AT = """(
                 WHERE e.student_id = s.id
             )"""
 
+# The public URL the frontends rewrite to the ERP host. NULL when the student has
+# no photo, so the UI falls back to initials.
+_PHOTO_URL = "CASE WHEN s.photo_path IS NULL THEN NULL ELSE '/uploads/' || s.photo_path END"
+
 
 async def get_linked_students(db: AsyncSession, actor_id: str) -> list[dict[str, Any]]:
     """Students the actor may view.
@@ -51,6 +55,7 @@ async def get_linked_students(db: AsyncSession, actor_id: str) -> list[dict[str,
         text(
             f"""
             SELECT s.id AS student_id, s.full_name, s.student_code,
+                   {_PHOTO_URL} AS photo_url,
                    {_FIRST_ENROLLED_AT} AS registered_at
             FROM portal.student_links sl
             JOIN students s ON s.id = sl.student_id
@@ -69,6 +74,7 @@ async def get_linked_students(db: AsyncSession, actor_id: str) -> list[dict[str,
         text(
             f"""
             SELECT s.id AS student_id, s.full_name, s.student_code,
+                   {_PHOTO_URL} AS photo_url,
                    {_FIRST_ENROLLED_AT} AS registered_at
             FROM portal.parent_links pl
             JOIN students s ON s.id = pl.student_id
@@ -282,6 +288,28 @@ async def update_profile(
 
     await db.flush()
     return await get_student(db, student_id)
+
+
+async def set_student_photo(
+    db: AsyncSession, student_id: str, photo_path: str
+) -> Optional[str]:
+    """Point the student at a new photo.
+
+    Returns the previous path so the caller can delete the now-orphaned file.
+    """
+    previous = (
+        await db.execute(
+            text("SELECT photo_path FROM students WHERE id = :sid"),
+            {"sid": student_id},
+        )
+    ).scalar_one_or_none()
+
+    await db.execute(
+        text("UPDATE students SET photo_path = :path WHERE id = :sid"),
+        {"path": photo_path, "sid": student_id},
+    )
+    await db.flush()
+    return previous
 
 
 async def student_is_linked(db: AsyncSession, actor_id: str, student_id: str) -> bool:

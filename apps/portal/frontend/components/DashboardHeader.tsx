@@ -10,6 +10,8 @@ interface Props {
   locale: "ar" | "en";
   user: PortalUser | null;
   onOpenOverflow: () => void;
+  /** Photo for the avatar button — the selected student's, when there is one. */
+  avatarUrl?: string | null;
   /** Scroll container to watch. Falls back to window when omitted. */
   scrollRef?: React.RefObject<HTMLElement | null>;
 }
@@ -34,6 +36,7 @@ export default function DashboardHeader({
   locale,
   user,
   onOpenOverflow,
+  avatarUrl,
   scrollRef,
 }: Props) {
   const headerRef = useRef<HTMLElement>(null);
@@ -162,9 +165,13 @@ export default function DashboardHeader({
             type="button"
             onClick={onOpenOverflow}
             aria-label={s.profile}
-            className="gradient-accent w-10 h-10 rounded-full text-white font-bold text-sm flex items-center justify-center shadow-hero transition-transform duration-150 hover:scale-105 active:scale-95"
+            className="gradient-accent w-10 h-10 rounded-full text-white font-bold text-sm flex items-center justify-center shadow-hero transition-transform duration-150 hover:scale-105 active:scale-95 overflow-hidden"
           >
-            {initials}
+            {avatarUrl ? (
+              <img src={avatarUrl} alt="" className="w-full h-full object-cover" />
+            ) : (
+              initials
+            )}
           </button>
         </div>
       </div>
