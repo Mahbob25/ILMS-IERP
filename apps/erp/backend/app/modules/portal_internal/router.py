@@ -36,17 +36,26 @@ async def _write_audit(
     """Best-effort inline audit write — never let auditing break the request.
 
     Uses the request's own session so the row commits with the request
-    transaction. The actor is a portal.users.id which does NOT exist in the
-    ERP users table (audit_logs.user_id FK), so it is recorded in the JSONB
-    payload and user_id is left null.
+    transaction, but writes it inside a SAVEPOINT. `create_audit_log` flushes,
+    and a failed flush leaves the session deactivated, so unguarded the failure
+    was not actually contained: get_db()'s commit then raised
+    PendingRollbackError and 500'd the whole request — the opposite of this
+    function's contract. The savepoint rolls back only the audit row, which also
+    keeps it safe on /profile, where a plain rollback() would discard the
+    caller's update.
+
+    The actor is a portal.users.id which does NOT exist in the ERP users table
+    (audit_logs.user_id FK), so it is recorded in the JSONB payload and user_id
+    is left null.
     """
     try:
-        await create_audit_log(
-            db,
-            action=action,
-            user_id=None,
-            payload={"path": path, "ok": ok, "actor_id": actor_id},
-        )
+        async with db.begin_nested():
+            await create_audit_log(
+                db,
+                action=action,
+                user_id=None,
+                payload={"path": path, "ok": ok, "actor_id": actor_id},
+            )
     except Exception:
         logger.warning("audit write failed for %s", action, exc_info=True)
 
