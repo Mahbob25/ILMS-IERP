@@ -467,3 +467,138 @@ def test_cache_key_deterministic():
     k2 = cache_key("grades", "s1", {"x": 1, "student_id": "s1"})
     assert k1 == k2
     assert k1.startswith("cache:grades:s1:")
+
+
+# ── Fees (balance) proxy ─────────────────────────────────────────────────
+
+STUDENT_ID = "22222222-2222-2222-2222-222222222222"
+
+FEES_PAYLOAD = {
+    "total_net_price": 1000.0,
+    "total_paid": 750.0,
+    "balance": 250.0,
+    "sections": [
+        {
+            "section_id": "33333333-3333-3333-3333-333333333333",
+            "course_name": "Math",
+            "net_price": 1000.0,
+            "total_paid": 750.0,
+            "balance": 250.0,
+        }
+    ],
+}
+
+
+@pytest.mark.asyncio
+async def test_fees_proxy_requires_auth(client):
+    resp = await client.get("/api/me/fees", params={"student_id": STUDENT_ID})
+    # No portal cookie → 401 from get_current_portal_user
+    assert resp.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_fees_proxy_returns_balance_summary(authed_client):
+    from app.services import erp_client as erp_mod
+    from app.services import cache as cache_mod
+
+    with (
+        patch.object(erp_mod.erp_client, "get_fees", new_callable=AsyncMock) as m_fees,
+        patch.object(cache_mod.cache, "get", new_callable=AsyncMock) as m_get,
+        patch.object(cache_mod.cache, "set", new_callable=AsyncMock),
+    ):
+        m_get.return_value = None
+        m_fees.return_value = FEES_PAYLOAD
+
+        resp = await authed_client.get("/api/me/fees", params={"student_id": STUDENT_ID})
+
+        assert resp.status_code == 200
+        assert resp.headers.get("x-cache") == "MISS"
+        body = resp.json()
+        assert body["balance"] == 250.0
+        assert body["sections"][0]["course_name"] == "Math"
+        m_fees.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_fees_proxy_erp_down_returns_502(authed_client):
+    from app.services import erp_client as erp_mod
+    from app.services import cache as cache_mod
+
+    with (
+        patch.object(erp_mod.erp_client, "get_fees", new_callable=AsyncMock) as m_fees,
+        patch.object(cache_mod.cache, "get", new_callable=AsyncMock) as m_get,
+        patch.object(cache_mod.cache, "set", new_callable=AsyncMock),
+    ):
+        m_get.return_value = None
+        m_fees.side_effect = erp_mod.ErpClientError(500, "boom")
+        resp = await authed_client.get(
+            "/api/me/fees", params={"student_id": STUDENT_ID}
+        )
+        assert resp.status_code == 502
+
+
+# ── Announcements proxy ──────────────────────────────────────────────────
+
+ANNOUNCEMENTS_PAYLOAD = [
+    {
+        "id": "44444444-4444-4444-4444-444444444444",
+        "text_ar": "تسجيل الفصل القادم يبدأ الأحد",
+        "text_en": "Next term registration opens Sunday",
+        "sort_order": 1,
+        "created_at": "2026-09-11T09:30:00+00:00",
+    }
+]
+
+
+@pytest.mark.asyncio
+async def test_announcements_proxy_requires_auth(client):
+    resp = await client.get("/api/me/announcements")
+    # No portal cookie → 401 from get_current_portal_user
+    assert resp.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_announcements_proxy_shares_one_cache_entry(authed_client):
+    """Notices are institute-wide, not student-scoped — one cache entry for all."""
+    from app.services import erp_client as erp_mod
+    from app.services import cache as cache_mod
+
+    with (
+        patch.object(
+            erp_mod.erp_client, "get_announcements", new_callable=AsyncMock
+        ) as m_ann,
+        patch.object(cache_mod.cache, "get", new_callable=AsyncMock) as m_get,
+        patch.object(cache_mod.cache, "set", new_callable=AsyncMock) as m_set,
+    ):
+        m_get.return_value = None
+        m_ann.return_value = ANNOUNCEMENTS_PAYLOAD
+
+        resp = await authed_client.get("/api/me/announcements")
+
+        assert resp.status_code == 200
+        assert resp.headers.get("x-cache") == "MISS"
+        assert resp.json()[0]["text_ar"].startswith("تسجيل")
+        # The actor is still forwarded to the ERP (for the audit row)...
+        assert m_ann.await_args.args[0]
+        # ...but the cache key is fixed, so every account shares one entry.
+        assert m_set.await_args.args[0].startswith("cache:announcements:global:")
+
+
+@pytest.mark.asyncio
+async def test_announcements_proxy_erp_down_returns_502(authed_client):
+    from app.services import erp_client as erp_mod
+    from app.services import cache as cache_mod
+
+    with (
+        patch.object(
+            erp_mod.erp_client, "get_announcements", new_callable=AsyncMock
+        ) as m_ann,
+        patch.object(cache_mod.cache, "get", new_callable=AsyncMock) as m_get,
+        patch.object(cache_mod.cache, "set", new_callable=AsyncMock),
+    ):
+        m_get.return_value = None
+        m_ann.side_effect = erp_mod.ErpClientError(500, "boom")
+
+        resp = await authed_client.get("/api/me/announcements")
+
+        assert resp.status_code == 502

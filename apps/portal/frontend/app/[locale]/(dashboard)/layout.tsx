@@ -15,6 +15,7 @@ import {
   LogOut,
   User as UserIcon,
   GraduationCap,
+  BookOpen,
 } from "lucide-react";
 
 export default function PortalDashboardLayout({
@@ -36,6 +37,7 @@ export default function PortalDashboardLayout({
     ar: {
       logout: "تسجيل الخروج",
       dashboard: "نظرة عامة",
+      courses: "مقرراتي",
       grades: "الدرجات",
       attendance: "الحضور",
       fees: "الرسوم الدراسية",
@@ -48,6 +50,7 @@ export default function PortalDashboardLayout({
     en: {
       logout: "Log Out",
       dashboard: "Overview",
+      courses: "My Courses",
       grades: "Grades",
       attendance: "Attendance",
       fees: "Tuition Fees",
@@ -99,6 +102,11 @@ export default function PortalDashboardLayout({
       name: t.dashboard,
       href: `/${locale}/dashboard`,
       icon: LayoutDashboard,
+    },
+    {
+      name: t.courses,
+      href: `/${locale}/dashboard/courses`,
+      icon: BookOpen,
     },
     {
       name: t.grades,
@@ -204,7 +212,14 @@ export default function PortalDashboardLayout({
           scrollRef={mainRef}
         />
 
-        <main ref={mainRef} className="flex-1 overflow-y-auto p-4 md:p-6 min-w-0">{children}</main>
+        {/* pb-28 keeps the last row clear of the floating bottom nav (and its
+            FAB overhang) on mobile; md+ has no tab bar. */}
+        <main
+          ref={mainRef}
+          className="flex-1 overflow-y-auto p-4 pb-28 md:p-6 min-w-0"
+        >
+          {children}
+        </main>
       </div>
 
       {/* Floating bottom nav (mobile only) */}

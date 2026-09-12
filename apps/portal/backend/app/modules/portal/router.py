@@ -162,6 +162,40 @@ async def get_sections(
     )
 
 
+@portal_router.get("/fees")
+@limiter.limit("60/minute")
+async def get_fees(
+    request: Request,
+    response: Response,
+    student_id: str = Query(...),
+    current_user: dict = Depends(get_current_portal_user),
+):
+    """Fees owed vs paid — per-section balance + totals (dashboard tile)."""
+    params = {"student_id": student_id}
+    return await _read_cached(
+        request, response, "fees", student_id, params,
+        lambda: erp_client.get_fees(str(current_user["id"]), student_id),
+    )
+
+
+@portal_router.get("/announcements")
+@limiter.limit("60/minute")
+async def get_announcements(
+    request: Request,
+    response: Response,
+    current_user: dict = Depends(get_current_portal_user),
+):
+    """Institute-wide announcements (dashboard notices).
+
+    Not student-scoped, but ``_read_cached`` keys on (resource, student_id), so
+    a fixed 'global' pseudo-key is used — one cache entry shared by all accounts.
+    """
+    return await _read_cached(
+        request, response, "announcements", "global", None,
+        lambda: erp_client.get_announcements(str(current_user["id"])),
+    )
+
+
 async def _update_profile(
     request: Request,
     body: ProfileUpdateRequest,

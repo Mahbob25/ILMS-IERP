@@ -615,6 +615,26 @@ async def _load_enrollment_for_student_section(
     return enrollment_result.unique().scalar_one_or_none()
 
 
+def attendance_totals(counts: dict[str, int]) -> tuple[int, int, int, int, int, int, float]:
+    """Derive attendance figures from grouped-per-status record counts.
+
+    Returns ``(present, absent, late, partial, excused, total, rate)``.
+
+    "partial" means the student attended part of the session, so it counts as
+    attended alongside "present" for the attendance rate. The portal dashboard
+    mirrors this rule — change both together.
+    """
+    present = int(counts.get("present", 0))
+    absent = int(counts.get("absent", 0))
+    late = int(counts.get("late", 0))
+    partial = int(counts.get("partial", 0))
+    excused = int(counts.get("excused", 0))
+    total = present + absent + late + partial + excused
+    attended = present + partial
+    rate = round(attended / total * 100, 1) if total else 0.0
+    return present, absent, late, partial, excused, total, rate
+
+
 async def get_student_section_report(
     db: AsyncSession,
     student_id: uuid.UUID,
@@ -676,12 +696,15 @@ async def get_student_section_report(
         .group_by(AttendanceRecord.status)
     )
     counts = {status: cnt for status, cnt in attendance_summary_rows.all()}
-    present_count = int(counts.get("present", 0))
-    absent_count = int(counts.get("absent", 0))
-    late_count = int(counts.get("late", 0))
-    excused_count = int(counts.get("excused", 0))
-    total_sessions = present_count + absent_count + late_count + excused_count
-    attendance_rate = round(present_count / total_sessions * 100, 1) if total_sessions else 0.0
+    (
+        present_count,
+        absent_count,
+        late_count,
+        partial_count,
+        excused_count,
+        total_sessions,
+        attendance_rate,
+    ) = attendance_totals(counts)
 
     detail_cap = 500
     detail_result = await db.execute(
@@ -806,6 +829,7 @@ async def get_student_section_report(
                 "present_count": present_count,
                 "absent_count": absent_count,
                 "late_count": late_count,
+                "partial_count": partial_count,
                 "excused_count": excused_count,
                 "attendance_rate": attendance_rate,
             },

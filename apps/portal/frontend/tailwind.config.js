@@ -33,6 +33,26 @@ module.exports = {
           900: '#134e4a',
           950: '#042f2e',
         },
+        // Register ink — the standfirst band ground and the display figures.
+        // A deeper, less saturated navy than brand/primary so the band reads as
+        // printed ink rather than as a brand surface.
+        ink: {
+          50: '#F4F6FA',
+          100: '#E4E9F2',
+          200: '#C3CCDE',
+          700: '#16294F',
+          900: '#0B1B3A',
+          DEFAULT: '#0B1B3A',
+        },
+        // One colour per attendance status, used ONLY by the register ribbon.
+        // 700-level so the marks read as stamped rather than as candy.
+        mark: {
+          present: '#047857',
+          absent: '#B91C1C',
+          late: '#B45309',
+          partial: '#6D28D9',
+          excused: '#64748B',
+        },
         // Semantic alias — the nav bar spec calls for bg-primary / text-primary
         // tokens. Mapped to the brand ramp (deep sapphire) so nothing hardcodes hex.
         primary: {
@@ -53,6 +73,12 @@ module.exports = {
       fontFamily: {
         sans: ["Inter", "Plus Jakarta Sans", "system-ui", "sans-serif"],
         arabic: ["IBM Plex Sans Arabic", "Cairo", "system-ui", "sans-serif"],
+        // Display — headings and the standing figures. Geometric Kufic reads
+        // institutional and keeps the sheet from looking like every other portal.
+        display: ['"Noto Kufi Arabic"', '"IBM Plex Sans Arabic"', "system-ui", "sans-serif"],
+        // Utility — codes, receipt numbers, class times. Monospaced so digits
+        // never shuffle as values change.
+        mono: ['"IBM Plex Mono"', "ui-monospace", "SFMono-Regular", "monospace"],
       },
       animation: {
         'fade-in': 'fadeIn 0.5s ease-out',

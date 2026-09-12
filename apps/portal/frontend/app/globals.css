@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&family=Noto+Kufi+Arabic:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -56,10 +56,40 @@
   .badge-warning {
     @apply bg-amber-50 text-amber-600 border border-amber-100;
   }
+  .badge-partial {
+    @apply bg-violet-50 text-violet-600 border border-violet-100;
+  }
 
   /* Minimum 44px touch target for tappable rows/buttons (Apple HIG / Android) */
   .btn-touch {
     @apply min-h-11 flex items-center;
+  }
+
+  /* ── Register primitives ──────────────────────────────────────────────
+     The dashboard is laid out as a ruled sheet: hairlines carry the
+     structure, so a row never needs its own card, shadow or icon tile. */
+  .eyebrow {
+    @apply font-display text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400;
+  }
+
+  /* The three ledger-line figures. Tabular so digits align across the band
+     and down the guardian glance rail. */
+  .standing-figure {
+    @apply font-display font-bold leading-none;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* One session mark in the attendance ribbon. Both sizes are fixed so a
+     wrapped lane stays on a strict grid. */
+  .mark {
+    @apply inline-flex items-center justify-center shrink-0 w-4 h-4 rounded-[4px] text-[10px] font-semibold leading-none select-none;
+  }
+  .mark-micro {
+    @apply inline-flex items-center justify-center shrink-0 w-2.5 h-2.5 rounded-[3px] text-[7px] font-semibold leading-none select-none;
   }
 }
 
@@ -77,6 +107,32 @@
 }
 .animate-dot-pop {
   animation: dotPop 0.25s ease-out;
+}
+
+/* Register marks stamp in on first paint — the one orchestrated moment on the
+   dashboard. The stagger comes from an inline animation-delay per mark. */
+@keyframes markStamp {
+  0% {
+    opacity: 0;
+    transform: scale(0.55) translateY(-3px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+.animate-mark-stamp {
+  animation: markStamp 0.3s cubic-bezier(0.2, 0.9, 0.3, 1.35) both;
+}
+
+/* Respect the OS setting — no stamp, no slide, no pulse. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-mark-stamp,
+  .animate-dot-pop,
+  .animate-slide-up,
+  .animate-fade-in {
+    animation: none;
+  }
 }
 
 /* True inverted notch for the bottom nav pill.
