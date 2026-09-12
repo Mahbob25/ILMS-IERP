@@ -69,7 +69,7 @@ async def get_student_attendance_summary(db: AsyncSession, student_id: uuid.UUID
     section_map: dict[uuid.UUID, dict[str, int]] = {}
     for session_id, section_id, status, cnt in rows:
         if section_id not in section_map:
-            section_map[section_id] = {"total_sessions": 0, "present_count": 0, "absent_count": 0, "late_count": 0, "partial_count": 0, "excused_count": 0}
+            section_map[section_id] = {"total_sessions": 0, "present_count": 0, "absent_count": 0, "late_count": 0, "excused_count": 0}
         section_map[section_id]["total_sessions"] += cnt
         key = f"{status}_count"
         if key in section_map[section_id]:
@@ -96,7 +96,6 @@ async def get_student_attendance_summary(db: AsyncSession, student_id: uuid.UUID
             "present_count": data["present_count"],
             "absent_count": data["absent_count"],
             "late_count": data["late_count"],
-            "partial_count": data["partial_count"],
             "excused_count": data["excused_count"],
         }
         for section_id, data in section_map.items()

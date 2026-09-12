@@ -8,7 +8,7 @@ import RefreshButton from "@/components/RefreshButton";
 import Select from "@/components/ui/Select";
 import EmptyState from "@/components/EmptyState";
 import { sanitizeInput } from "@/lib/utils/input";
-import { Loader2, Check, X, Clock, AlertCircle, CircleDot } from "lucide-react";
+import { Loader2, Check, X, Clock, AlertCircle } from "lucide-react";
 import { getLocalDateString } from "@/lib/dates";
 import TableContainer from '@/components/ui/TableContainer';
 
@@ -19,7 +19,7 @@ interface Enrollment { id: string; student_id: string; section_id: string; }
 interface AttendanceSession { id: string; section_id: string; date: string; }
 interface AttendanceRecord { id: string; session_id: string; student_id: string; status: string; }
 
-const STATUS_OPTIONS = ["present", "absent", "late", "partial", "excused"];
+const STATUS_OPTIONS = ["present", "absent", "late", "excused"];
 
 export default function AttendancePage() {
   const params = useParams();
@@ -42,7 +42,6 @@ export default function AttendancePage() {
       present: "حاضر",
       absent: "غائب",
       late: "متأخر",
-      partial: "حضور جزئي",
       excused: "معذور",
       save: "حفظ",
       loading: "جاري التحميل...",
@@ -63,7 +62,6 @@ export default function AttendancePage() {
       present: "Present",
       absent: "Absent",
       late: "Late",
-      partial: "Partial",
       excused: "Excused",
       save: "Save",
       loading: "Loading...",
@@ -178,7 +176,6 @@ export default function AttendancePage() {
       case "present": return <Check size={14} className="text-emerald-500" />;
       case "absent": return <X size={14} className="text-red-500" />;
       case "late": return <Clock size={14} className="text-amber-500" />;
-      case "partial": return <CircleDot size={14} className="text-violet-500" />;
       case "excused": return <AlertCircle size={14} className="text-blue-500" />;
       default: return null;
     }

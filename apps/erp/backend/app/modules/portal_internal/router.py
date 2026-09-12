@@ -11,7 +11,6 @@ from . import service
 from .dependencies import verify_service_key
 from .schemas import (
     AttendanceDTO,
-    FeesSummaryDTO,
     GradeDTO,
     LinkedStudentDTO,
     PaymentDTO,
@@ -135,20 +134,6 @@ async def internal_sections(
     rows = await service.get_sections(db, student_id)
     await _write_audit(db, "INTERNAL_PORTAL_ACCESS", actor, request.url.path, True)
     return [SectionDTO(**r) for r in rows]
-
-
-@internal_router.get("/fees", response_model=FeesSummaryDTO)
-async def internal_fees(
-    request: Request,
-    student_id: str = Query(...),
-    actor_id: str = Depends(verify_service_key),
-    db: AsyncSession = Depends(get_db),
-):
-    actor = _require_actor(actor_id)
-    await _verify_student_access(db, actor, student_id)
-    summary = await service.get_fees_summary(db, student_id)
-    await _write_audit(db, "INTERNAL_PORTAL_ACCESS", actor, request.url.path, True)
-    return FeesSummaryDTO(**summary)
 
 
 @internal_router.post("/profile", status_code=200)

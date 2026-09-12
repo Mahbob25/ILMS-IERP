@@ -31,7 +31,7 @@ type ReportPayload = {
     cancellation: { cancelled_at: string | null; reason: string; refund_policy: string } | null;
   };
   attendance: {
-    summary: { total_sessions: number; present_count: number; absent_count: number; late_count: number; partial_count: number; excused_count: number; attendance_rate: number };
+    summary: { total_sessions: number; present_count: number; absent_count: number; late_count: number; excused_count: number; attendance_rate: number };
     records: { date: string | null; status: string; session_id: string }[];
   };
   grade: { final_score: number; grade_label: string; notes: string | null; graded_at: string | null; graded_by: string | null } | null;
@@ -55,7 +55,6 @@ function StatusBadge({ status, isRtl }: { status: string; isRtl: boolean }) {
     present: { label: isRtl ? "حاضر" : "Present", cls: "bg-emerald-50 text-emerald-700 border-emerald-200" },
     absent: { label: isRtl ? "غائب" : "Absent", cls: "bg-red-50 text-red-700 border-red-200" },
     late: { label: isRtl ? "متأخر" : "Late", cls: "bg-amber-50 text-amber-700 border-amber-200" },
-    partial: { label: isRtl ? "حضور جزئي" : "Partial", cls: "bg-violet-50 text-violet-700 border-violet-200" },
     excused: { label: isRtl ? "معذور" : "Excused", cls: "bg-blue-50 text-blue-700 border-blue-200" },
   };
   const entry = map[status] || { label: status, cls: "bg-slate-50 text-slate-600 border-slate-200" };
@@ -129,7 +128,6 @@ export default function StudentSectionPrintSheet({ t, isRtl, instituteName, payl
               <span className="px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">{t.present}: {summary.present_count}</span>
               <span className="px-2 py-1 rounded-full bg-red-50 text-red-700 border border-red-200">{t.absent}: {summary.absent_count}</span>
               <span className="px-2 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200">{t.late}: {summary.late_count}</span>
-              <span className="px-2 py-1 rounded-full bg-violet-50 text-violet-700 border border-violet-200">{t.partial}: {summary.partial_count}</span>
               <span className="px-2 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200">{t.excused}: {summary.excused_count}</span>
               <span className="px-2 py-1 rounded-full bg-slate-900 text-white">{t.attendanceRate}: {summary.attendance_rate}%</span>
             </div>

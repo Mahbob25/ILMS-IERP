@@ -7,7 +7,7 @@ import { useAuth } from "@/components/AuthContext";
 import RefreshButton from "@/components/RefreshButton";
 import Modal from "@/components/Modal";
 import Select from "@/components/ui/Select";
-import { Loader2, ArrowLeft, Wallet, DollarSign, Plus, X, Award, Eye, FileDown, Check, Clock, AlertCircle, CircleDot, UserX, ChevronDown, ChevronUp, Printer } from "lucide-react";
+import { Loader2, ArrowLeft, Wallet, DollarSign, Plus, X, Award, Eye, FileDown, Check, Clock, AlertCircle, UserX, ChevronDown, ChevronUp, Printer } from "lucide-react";
 import TableContainer from "@/components/ui/TableContainer";
 import CertificatePreview from "@/components/CertificatePreview";
 import { hasPageAccess } from "@/lib/permissions";
@@ -69,7 +69,6 @@ interface AttendanceSummary {
   present_count: number;
   absent_count: number;
   late_count: number;
-  partial_count: number;
   excused_count: number;
 }
 
@@ -124,7 +123,6 @@ export default function StudentDetailPage() {
       present: "حاضر",
       absent: "غائب",
       late: "متأخر",
-      partial: "حضور جزئي",
       excused: "معذور",
       sessions: "جلسة",
       unenrollHistory: "سجل إلغاء التسجيل",
@@ -189,7 +187,6 @@ export default function StudentDetailPage() {
       present: "Present",
       absent: "Absent",
       late: "Late",
-      partial: "Partial",
       excused: "Excused",
       sessions: "sessions",
       unenrollHistory: "Unenrollment History",
@@ -331,7 +328,6 @@ export default function StudentDetailPage() {
       case "present": return <Check size={12} className="text-emerald-500" />;
       case "absent": return <X size={12} className="text-red-500" />;
       case "late": return <Clock size={12} className="text-amber-500" />;
-      case "partial": return <CircleDot size={12} className="text-violet-500" />;
       case "excused": return <AlertCircle size={12} className="text-blue-500" />;
       default: return null;
     }
@@ -578,9 +574,6 @@ export default function StudentDetailPage() {
                         </span>
                         <span className="flex items-center gap-1 text-amber-600">
                           {attendanceIcon("late")} {att.late_count}
-                        </span>
-                        <span className="flex items-center gap-1 text-violet-600">
-                          {attendanceIcon("partial")} {att.partial_count}
                         </span>
                         <span className="flex items-center gap-1 text-blue-600">
                           {attendanceIcon("excused")} {att.excused_count}

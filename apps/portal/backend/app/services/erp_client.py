@@ -87,12 +87,6 @@ class ErpClient:
             "GET", "/payments", actor_id, params={"student_id": student_id}
         )
 
-    async def get_fees(self, actor_id: str, student_id: str) -> dict[str, Any]:
-        """Fees owed vs paid (per-section balance + totals) for a student."""
-        return await self._request(
-            "GET", "/fees", actor_id, params={"student_id": student_id}
-        )
-
     async def get_sections(self, actor_id: str, student_id: str) -> list[dict[str, Any]]:
         return await self._request(
             "GET", "/sections", actor_id, params={"student_id": student_id}

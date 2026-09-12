@@ -15,7 +15,6 @@ import {
   LogOut,
   User as UserIcon,
   GraduationCap,
-  BookOpen,
 } from "lucide-react";
 
 export default function PortalDashboardLayout({
@@ -37,7 +36,6 @@ export default function PortalDashboardLayout({
     ar: {
       logout: "تسجيل الخروج",
       dashboard: "نظرة عامة",
-      courses: "مقرراتي",
       grades: "الدرجات",
       attendance: "الحضور",
       fees: "الرسوم الدراسية",
@@ -50,7 +48,6 @@ export default function PortalDashboardLayout({
     en: {
       logout: "Log Out",
       dashboard: "Overview",
-      courses: "My Courses",
       grades: "Grades",
       attendance: "Attendance",
       fees: "Tuition Fees",
@@ -102,11 +99,6 @@ export default function PortalDashboardLayout({
       name: t.dashboard,
       href: `/${locale}/dashboard`,
       icon: LayoutDashboard,
-    },
-    {
-      name: t.courses,
-      href: `/${locale}/dashboard/courses`,
-      icon: BookOpen,
     },
     {
       name: t.grades,

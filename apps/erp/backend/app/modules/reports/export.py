@@ -112,7 +112,6 @@ _COL_LABELS: dict[str, tuple[str, str]] = {
     "present": ("حاضر", "Present"),
     "absent": ("غائب", "Absent"),
     "late": ("متأخر", "Late"),
-    "partial": ("حضور جزئي", "Partial"),
     "excused": ("معذور", "Excused"),
     "total_sessions": ("الجلسات", "Sessions"),
     "final_score": ("الدرجة النهائية", "Final Score"),
@@ -763,8 +762,6 @@ def _sections_student_section_report(payload: dict) -> list[Section]:
         summary.get("absent_count", 0),
         summary.get("late_count", 0),
         summary.get("excused_count", 0),
-        # Appended (not inserted) so existing consumers keep their column order.
-        summary.get("partial_count", 0),
         summary.get("attendance_rate", 0),
     ]]
 
@@ -819,7 +816,7 @@ def _sections_student_section_report(payload: dict) -> list[Section]:
         (
             "ملخص الحضور",
             "Attendance Summary",
-            ["total_sessions", "present", "absent", "late", "excused", "partial", "attendance_rate"],
+            ["total_sessions", "present", "absent", "late", "excused", "attendance_rate"],
             attendance_summary,
         ),
         (

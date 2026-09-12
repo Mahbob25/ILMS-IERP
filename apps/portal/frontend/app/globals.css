@@ -56,9 +56,6 @@
   .badge-warning {
     @apply bg-amber-50 text-amber-600 border border-amber-100;
   }
-  .badge-partial {
-    @apply bg-violet-50 text-violet-600 border border-violet-100;
-  }
 
   /* Minimum 44px touch target for tappable rows/buttons (Apple HIG / Android) */
   .btn-touch {

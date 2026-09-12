@@ -55,7 +55,6 @@ export default function AttendancePrintSheet({
               <th className="px-2 py-2 text-center font-semibold text-slate-700 border-e border-slate-200 w-14">{t.present}</th>
               <th className="px-2 py-2 text-center font-semibold text-slate-700 border-e border-slate-200 w-14">{t.absent}</th>
               <th className="px-2 py-2 text-center font-semibold text-slate-700 border-e border-slate-200 w-14">{t.late}</th>
-              <th className="px-2 py-2 text-center font-semibold text-slate-700 border-e border-slate-200 w-14">{t.partial}</th>
               <th className="px-2 py-2 text-center font-semibold text-slate-700 border-e border-slate-200 w-14">{t.excused}</th>
               <th className="px-3 py-2 text-start font-semibold text-slate-700 w-28">{t.notes}</th>
             </tr>
@@ -63,7 +62,7 @@ export default function AttendancePrintSheet({
           <tbody>
             {students.length === 0 ? (
               <tr>
-                <td colSpan={9} className="px-4 py-8 text-center text-slate-500">
+                <td colSpan={8} className="px-4 py-8 text-center text-slate-500">
                   {t.empty}
                 </td>
               </tr>
@@ -73,9 +72,6 @@ export default function AttendancePrintSheet({
                   <td className="px-2 py-2.5 text-center text-slate-600 border-e border-slate-200">{idx + 1}</td>
                   <td className="px-3 py-2.5 font-medium text-slate-900 border-e border-slate-200">{s.full_name}</td>
                   <td className="px-3 py-2.5 text-slate-600 border-e border-slate-200">{s.student_code}</td>
-                  <td className="px-2 py-2.5 border-e border-slate-200">
-                    <div className="mx-auto w-5 h-5 rounded border border-slate-300 bg-white" />
-                  </td>
                   <td className="px-2 py-2.5 border-e border-slate-200">
                     <div className="mx-auto w-5 h-5 rounded border border-slate-300 bg-white" />
                   </td>

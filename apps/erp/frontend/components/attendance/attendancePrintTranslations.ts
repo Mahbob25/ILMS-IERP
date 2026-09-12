@@ -16,7 +16,6 @@ export function getAttendancePrintTranslations(locale: string) {
     present: isAr ? "حاضر" : "Present",
     absent: isAr ? "غائب" : "Absent",
     late: isAr ? "متأخر" : "Late",
-    partial: isAr ? "حضور جزئي" : "Partial",
     excused: isAr ? "معذور" : "Excused",
     notes: isAr ? "ملاحظات" : "Notes",
     signatureTeacher: isAr ? "توقيع المدرس" : "Teacher Signature",

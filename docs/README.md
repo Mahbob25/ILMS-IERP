@@ -23,7 +23,6 @@ Deployment: cloud VM (AWS EC2 / GCP) behind a Cloudflare Tunnel — no public po
 | `guides/user-testing-guide.md` | Arabic 7-day user testing guide (`.html`/`.pdf` also available; regenerate via `scripts/build_testing_guide.py`) |
 | `operations/active-task.md` | What's being worked on right now |
 | `operations/changelog.md` | Version history |
-| `operations/known-issues.md` | Tracked known issues, deliberate deferrals, and tech debt (with what each would take to fix) |
 | `operations/cloud-deploy.md` | Cloud VM deployment guide: provision, tunnel, deploy, backup |
 | `operations/deletion-log.md` | Record of removed code and dependencies |
 

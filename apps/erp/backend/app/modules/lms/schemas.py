@@ -41,7 +41,6 @@ class StudentAttendanceSummary(BaseModel):
     present_count: int
     absent_count: int
     late_count: int
-    partial_count: int
     excused_count: int
 
 
