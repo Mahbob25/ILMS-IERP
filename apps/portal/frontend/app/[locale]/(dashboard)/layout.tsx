@@ -6,6 +6,7 @@ import { useAuth } from "@/components/AuthContext";
 import { useLinkedStudents } from "@/components/useLinkedStudents";
 import { LastUpdatedProvider } from "@/components/LastUpdatedContext";
 import MobileTabBar from "@/components/MobileTabBar";
+import BrandMark from "@/components/BrandMark";
 import OverflowSheet from "@/components/OverflowSheet";
 import DashboardHeader from "@/components/DashboardHeader";
 import {
@@ -16,7 +17,6 @@ import {
   Sparkles,
   LogOut,
   User as UserIcon,
-  GraduationCap,
   BookOpen,
   CalendarRange,
 } from "lucide-react";
@@ -123,9 +123,7 @@ export default function PortalDashboardLayout({
             Arabic), so it stays put while the document scrolls. */}
         <aside className="hidden lg:flex fixed inset-y-0 start-0 z-40 w-72 flex-col bg-white/85 backdrop-blur-xl border-e border-slate-200/70">
           <div className="h-[72px] flex items-center gap-3 px-6 shrink-0 border-b border-slate-200/70">
-            <div className="gradient-accent w-10 h-10 rounded-2xl text-white flex items-center justify-center shadow-hero shrink-0">
-              <GraduationCap size={20} />
-            </div>
+            <BrandMark />
             <div className="min-w-0">
               <p className="text-base font-bold text-slate-900 leading-none truncate">
                 {isRtl ? "الدراسات" : "Al-Drasat"}

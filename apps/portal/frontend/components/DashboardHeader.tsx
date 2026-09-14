@@ -1,9 +1,10 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import { GraduationCap, Bell } from "lucide-react";
+import { Bell } from "lucide-react";
 import { useLastUpdated } from "@/components/LastUpdatedContext";
 import { relativeTime } from "@/lib/utils/time";
+import BrandMark from "@/components/BrandMark";
 import type { PortalUser } from "@/components/AuthContext";
 
 interface Props {
@@ -26,8 +27,9 @@ const HEADER_HEIGHT = 72;
  * "آخر تحديث" indicator published by whichever page is mounted. On the end side
  * the notification bell and the avatar, which opens the overflow sheet.
  *
- * Below lg the identity mark is shown here; from lg the sidebar carries it and
- * this header starts after the sidebar so the two never overlap.
+ * Below lg the brand mark and the institute name are shown here; from lg the
+ * sidebar carries both and this header starts after the sidebar, so the two
+ * never overlap. Hiding the mark alone left the name duplicated on desktop.
  *
  * The greeting uses the given name only — the full name already sits in the
  * sidebar's user card, and repeating it there would be noise.
@@ -118,14 +120,12 @@ export default function DashboardHeader({
       <div className="h-full px-4 sm:px-6 lg:px-8 flex items-center justify-between gap-3">
         {/* Start side — identity + welcome + freshness */}
         <div className="flex items-center gap-3 min-w-0">
-          <div className="gradient-accent lg:hidden w-10 h-10 rounded-2xl text-white flex items-center justify-center shrink-0 shadow-hero">
-            <GraduationCap size={20} />
-          </div>
+          <BrandMark className="w-10 h-10 lg:hidden" />
           <div className="min-w-0">
-            <h1 className="text-base sm:text-lg font-bold text-slate-900 leading-none truncate">
+            <h1 className="lg:hidden text-base sm:text-lg font-bold text-slate-900 leading-none truncate">
               {s.institute}
             </h1>
-            <div className="flex items-center gap-1.5 mt-1.5 min-w-0 text-[11px] text-slate-500">
+            <div className="flex items-center gap-1.5 mt-1.5 lg:mt-0 min-w-0 text-[11px] text-slate-500">
               {givenName && (
                 <span className="truncate">
                   {s.welcome}،{" "}
