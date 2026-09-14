@@ -1,7 +1,9 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import { Bell } from "lucide-react";
+import { nextHeaderState, type HeaderScrollState } from "@/lib/headerScroll";
 import { useLastUpdated } from "@/components/LastUpdatedContext";
 import { relativeTime } from "@/lib/utils/time";
 import BrandMark from "@/components/BrandMark";
@@ -31,6 +33,10 @@ const HEADER_HEIGHT = 72;
  * sidebar carries both and this header starts after the sidebar, so the two
  * never overlap. Hiding the mark alone left the name duplicated on desktop.
  *
+ * Below lg it also hides itself on a downward scroll and returns on an upward
+ * one. Because it lives in the layout it survives route changes, so it must
+ * reset on navigation — the decision itself is in lib/headerScroll.
+ *
  * The greeting uses the given name only — the full name already sits in the
  * sidebar's user card, and repeating it there would be noise.
  */
@@ -42,8 +48,12 @@ export default function DashboardHeader({
   scrollRef,
 }: Props) {
   const headerRef = useRef<HTMLElement>(null);
+  const pathname = usePathname();
   const [hidden, setHidden] = useState(false);
   const [isCompact, setIsCompact] = useState(false);
+  // Kept in a ref, not the closure, so the listener always decides from the
+  // latest offset rather than from the values captured when it was attached.
+  const scrollState = useRef<HeaderScrollState>({ lastY: 0, hidden: false });
   const { asOf } = useLastUpdated();
 
   // Smart hide-on-scroll is the small-screen behaviour; from lg the header and
@@ -62,26 +72,36 @@ export default function DashboardHeader({
       return;
     }
 
-    let lastY = 0;
-    const MIN_DELTA = 6;
+    const headerHeight = headerRef.current?.offsetHeight ?? HEADER_HEIGHT;
 
     const onScroll = () => {
-      const currentY = scrollRef?.current ? scrollRef.current.scrollTop : window.scrollY;
-      if (Math.abs(currentY - lastY) < MIN_DELTA) return;
-
-      if (currentY > lastY && currentY > HEADER_HEIGHT) {
-        setHidden(true);
-      } else if (currentY < lastY) {
-        setHidden(false);
+      const y = scrollRef?.current ? scrollRef.current.scrollTop : window.scrollY;
+      const next = nextHeaderState(scrollState.current, y, headerHeight);
+      if (
+        next.hidden === scrollState.current.hidden &&
+        next.lastY === scrollState.current.lastY
+      ) {
+        return;
       }
-      lastY = currentY;
+      scrollState.current = next;
+      setHidden(next.hidden);
     };
 
-    onScroll();
+    // Sync to wherever the page already is WITHOUT deciding to hide. This runs
+    // on every route change too: navigation resets the document scroll to the
+    // top, and because this header lives in the layout it is NOT remounted
+    // between dashboard pages — without the reset it stayed translated off
+    // screen from the previous page's scroll while the new page sat at the top.
+    scrollState.current = {
+      lastY: Math.max(0, scrollRef?.current ? scrollRef.current.scrollTop : window.scrollY),
+      hidden: false,
+    };
+    setHidden(false);
+
     const target = (scrollRef?.current ?? window) as HTMLElement | Window;
     target.addEventListener("scroll", onScroll, { passive: true });
     return () => target.removeEventListener("scroll", onScroll);
-  }, [isCompact, scrollRef]);
+  }, [isCompact, scrollRef, pathname]);
 
   const s =
     locale === "ar"
