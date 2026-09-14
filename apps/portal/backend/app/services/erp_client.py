@@ -141,5 +141,14 @@ class ErpClient:
             files={"file": (filename, file_bytes, content_type)},
         )
 
+    async def delete_student_photo(self, actor_id: str, student_id: str) -> dict[str, Any]:
+        """Clear the student's photo — the ERP owns the students row."""
+        return await self._request(
+            "DELETE",
+            "/photo",
+            actor_id,
+            params={"student_id": student_id},
+        )
+
 
 erp_client = ErpClient()

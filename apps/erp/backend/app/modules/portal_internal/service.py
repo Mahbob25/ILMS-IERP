@@ -291,11 +291,13 @@ async def update_profile(
 
 
 async def set_student_photo(
-    db: AsyncSession, student_id: str, photo_path: str
+    db: AsyncSession, student_id: str, photo_path: Optional[str]
 ) -> Optional[str]:
-    """Point the student at a new photo.
+    """Point the student at a new photo, or clear it when ``photo_path`` is None.
 
     Returns the previous path so the caller can delete the now-orphaned file.
+    The explicit cast is what lets the parameter be NULL — without a target type
+    an untyped parameter with no value is ambiguous to Postgres.
     """
     previous = (
         await db.execute(
@@ -305,7 +307,7 @@ async def set_student_photo(
     ).scalar_one_or_none()
 
     await db.execute(
-        text("UPDATE students SET photo_path = :path WHERE id = :sid"),
+        text("UPDATE students SET photo_path = CAST(:path AS varchar) WHERE id = :sid"),
         {"path": photo_path, "sid": student_id},
     )
     await db.flush()

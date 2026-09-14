@@ -553,6 +553,33 @@ async def upload_my_photo(
     return {"photo_url": current_user.photo_url}
 
 
+@users_router.delete("/me/photo", status_code=status.HTTP_200_OK)
+async def delete_my_photo(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Remove the current user's profile photo — the UI falls back to initials.
+
+    Idempotent: with no photo set this is a no-op, so a double-click cannot fail
+    the second time.
+    """
+    previous = current_user.photo_path
+    if previous:
+        current_user.photo_path = None
+        await db.flush()
+        delete_file(previous)
+
+        await identity_service.create_audit_log(
+            db=db,
+            user_id=current_user.id,
+            action="USER_PHOTO_REMOVED",
+            payload={"photo_path": previous},
+            ip_address=request.client.host if request.client else None,
+        )
+    return {"photo_url": None}
+
+
 @users_router.get("/me", response_model=UserResponse)
 async def get_me(current_user: User = Depends(get_current_user)):
     return current_user

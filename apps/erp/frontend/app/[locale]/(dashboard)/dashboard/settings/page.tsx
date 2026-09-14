@@ -14,6 +14,7 @@ import {
   Loader2,
   Building2,
   Camera,
+  Trash2,
 } from "lucide-react";
 import { BrandLogo } from "@/components/ui/BrandLogo";
 import Avatar from "@/components/ui/Avatar";
@@ -52,6 +53,8 @@ export default function SettingsPage() {
         uploading: "جاري الرفع...",
         photoUpdated: "تم تحديث الصورة",
         photoFailed: "تعذر رفع الصورة",
+        removePhoto: "إزالة الصورة",
+        photoRemoved: "تمت إزالة الصورة",
       },
       security: {
         heading: "تغيير كلمة المرور",
@@ -114,6 +117,8 @@ export default function SettingsPage() {
         uploading: "Uploading...",
         photoUpdated: "Photo updated",
         photoFailed: "Could not upload the photo",
+        removePhoto: "Remove photo",
+        photoRemoved: "Photo removed",
       },
       security: {
         heading: "Change password",
@@ -227,6 +232,21 @@ export default function SettingsPage() {
     },
     [checkSession, t]
   );
+
+  const handlePhotoRemove = useCallback(async () => {
+    setPhotoSaving(true);
+    setPhotoMsg(null);
+    try {
+      await apiClient.delete("/users/me/photo");
+      await checkSession();
+      setPhotoMsg({ kind: "ok", text: t.profile.photoRemoved });
+    } catch (e: any) {
+      const detail = e?.response?.data?.detail || e?.message || t.profile.photoFailed;
+      setPhotoMsg({ kind: "err", text: String(detail) });
+    } finally {
+      setPhotoSaving(false);
+    }
+  }, [checkSession, t]);
 
   const [localePref, setLocalePref] = useState<string>(user?.locale_pref || locale);
   const [prefsSaving, setPrefsSaving] = useState(false);
@@ -366,7 +386,7 @@ export default function SettingsPage() {
                 className="hidden"
                 onChange={handlePhotoChange}
               />
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 flex-wrap">
                 <button
                   type="button"
                   onClick={() => photoInputRef.current?.click()}
@@ -376,6 +396,17 @@ export default function SettingsPage() {
                   {photoSaving ? <Loader2 size={14} className="animate-spin" /> : <Camera size={14} />}
                   {photoSaving ? t.profile.uploading : t.profile.changePhoto}
                 </button>
+                {user?.photo_url && (
+                  <button
+                    type="button"
+                    onClick={handlePhotoRemove}
+                    disabled={photoSaving}
+                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-red-600 hover:text-red-700 disabled:opacity-50"
+                  >
+                    <Trash2 size={13} />
+                    {t.profile.removePhoto}
+                  </button>
+                )}
                 <p className="text-[11px] text-slate-400">{t.profile.photoHint}</p>
               </div>
               {photoMsg && (

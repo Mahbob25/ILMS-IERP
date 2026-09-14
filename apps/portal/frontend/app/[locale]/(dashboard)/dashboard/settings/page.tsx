@@ -6,7 +6,7 @@ import { apiClient } from "@/lib/api";
 import { useAuth } from "@/components/AuthContext";
 import { useLinkedStudents } from "@/components/useLinkedStudents";
 import { prepareImageFile } from "@/lib/image";
-import { Settings, Bell, Loader2, KeyRound, Globe, Camera } from "lucide-react";
+import { Settings, Bell, Loader2, KeyRound, Globe, Camera, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 const t = {
@@ -37,6 +37,8 @@ const t = {
     uploading: "جاري الرفع...",
     photoUpdated: "تم تحديث الصورة",
     photoFailed: "تعذر رفع الصورة",
+    removePhoto: "إزالة الصورة",
+    photoRemoved: "تمت إزالة الصورة",
     noPhotoStudent: "لا يوجد طالب مرتبط لتحديث الصورة.",
   },
   en: {
@@ -66,6 +68,8 @@ const t = {
     uploading: "Uploading...",
     photoUpdated: "Photo updated",
     photoFailed: "Could not upload the photo",
+    removePhoto: "Remove photo",
+    photoRemoved: "Photo removed",
     noPhotoStudent: "No linked student to update the photo for.",
   },
 };
@@ -119,6 +123,27 @@ export default function SettingsPage() {
       // The header and hero card read the photo from the cached /me payload.
       await refresh();
       setPhotoMessage({ type: "success", text: s.photoUpdated });
+    } catch (err: any) {
+      const detail = err?.response?.data?.detail;
+      setPhotoMessage({ type: "error", text: detail || s.photoFailed });
+    } finally {
+      setPhotoSaving(false);
+    }
+  };
+
+  const handlePhotoRemove = async () => {
+    if (!selectedId) {
+      setPhotoMessage({ type: "error", text: s.noPhotoStudent });
+      return;
+    }
+
+    setPhotoSaving(true);
+    setPhotoMessage(null);
+    try {
+      await apiClient.delete("/me/photo", { params: { student_id: selectedId } });
+      // The header and hero card read the photo from the cached /me payload.
+      await refresh();
+      setPhotoMessage({ type: "success", text: s.photoRemoved });
     } catch (err: any) {
       const detail = err?.response?.data?.detail;
       setPhotoMessage({ type: "error", text: detail || s.photoFailed });
@@ -240,15 +265,28 @@ export default function SettingsPage() {
               className="hidden"
               onChange={handlePhotoChange}
             />
-            <button
-              type="button"
-              onClick={() => photoInputRef.current?.click()}
-              disabled={photoSaving || !selectedId}
-              className="btn-touch px-4 py-2 rounded-xl border text-sm font-semibold bg-white text-slate-700 border-slate-200 hover:bg-slate-50 disabled:opacity-50 inline-flex items-center gap-2"
-            >
-              {photoSaving && <Loader2 size={14} className="animate-spin" />}
-              {photoSaving ? s.uploading : s.changePhoto}
-            </button>
+            <div className="flex items-center gap-3 flex-wrap">
+              <button
+                type="button"
+                onClick={() => photoInputRef.current?.click()}
+                disabled={photoSaving || !selectedId}
+                className="btn-touch px-4 py-2 rounded-xl border text-sm font-semibold bg-white text-slate-700 border-slate-200 hover:bg-slate-50 disabled:opacity-50 inline-flex items-center gap-2"
+              >
+                {photoSaving && <Loader2 size={14} className="animate-spin" />}
+                {photoSaving ? s.uploading : s.changePhoto}
+              </button>
+              {selectedStudent?.photo_url && (
+                <button
+                  type="button"
+                  onClick={handlePhotoRemove}
+                  disabled={photoSaving}
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-rose-600 hover:text-rose-700 disabled:opacity-50"
+                >
+                  <Trash2 size={13} />
+                  {s.removePhoto}
+                </button>
+              )}
+            </div>
 
             {photoMessage && (
               <p

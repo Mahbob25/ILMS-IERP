@@ -711,3 +711,64 @@ async def test_photo_upload_maps_erp_errors(authed_client):
             headers=_photo_headers("10.1.1.5"),
         )
         assert down.status_code == 502
+
+
+@pytest.mark.asyncio
+async def test_photo_delete_requires_auth(client):
+    resp = await client.delete(
+        "/api/me/photo",
+        params={"student_id": STUDENT_ID},
+        headers=_photo_headers(),
+    )
+    assert resp.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_photo_delete_forwards_to_erp_and_busts_me_cache(authed_client):
+    from app.services import erp_client as erp_mod
+    from app.services import cache as cache_mod
+
+    with (
+        patch.object(
+            erp_mod.erp_client, "delete_student_photo", new_callable=AsyncMock
+        ) as m_remove,
+        patch.object(cache_mod.cache, "delete", new_callable=AsyncMock) as m_del,
+    ):
+        m_remove.return_value = {"photo_url": None}
+
+        resp = await authed_client.delete(
+            "/api/me/photo",
+            params={"student_id": STUDENT_ID},
+            headers=_photo_headers("10.1.2.1"),
+        )
+
+        assert resp.status_code == 200
+        assert resp.json()["photo_url"] is None
+        assert m_remove.await_args.args == (_auth_user()["id"], STUDENT_ID)
+
+        # The header and hero card read the photo out of the cached /me payload.
+        assert m_del.await_args.args[0].startswith("cache:me:")
+
+
+@pytest.mark.asyncio
+async def test_photo_delete_maps_erp_errors(authed_client):
+    from app.services import erp_client as erp_mod
+
+    with patch.object(
+        erp_mod.erp_client, "delete_student_photo", new_callable=AsyncMock
+    ) as m_remove:
+        m_remove.side_effect = erp_mod.ErpClientError(403, "Actor not linked to student")
+        forbidden = await authed_client.delete(
+            "/api/me/photo",
+            params={"student_id": STUDENT_ID},
+            headers=_photo_headers("10.1.2.2"),
+        )
+        assert forbidden.status_code == 403
+
+        m_remove.side_effect = erp_mod.ErpClientError(500, "boom")
+        down = await authed_client.delete(
+            "/api/me/photo",
+            params={"student_id": STUDENT_ID},
+            headers=_photo_headers("10.1.2.3"),
+        )
+        assert down.status_code == 502

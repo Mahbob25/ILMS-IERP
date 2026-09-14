@@ -22,12 +22,110 @@ def test_internal_router_paths():
     assert "/internal/portal/payments" in paths
     assert "/internal/portal/sections" in paths
     assert "/internal/portal/profile" in paths
+    assert "/internal/portal/photo" in paths
 
 
 def test_internal_router_methods():
-    by_path = {r.path: r for r in internal_router.routes}
-    assert "GET" in by_path["/internal/portal/me"].methods
-    assert "POST" in by_path["/internal/portal/profile"].methods
+    # Collect per path — /internal/portal/photo is registered twice (upload and
+    # remove), so keying a dict by path alone would silently drop one of them.
+    methods_by_path: dict[str, set] = {}
+    for route in internal_router.routes:
+        methods_by_path.setdefault(route.path, set()).update(route.methods)
+
+    assert "GET" in methods_by_path["/internal/portal/me"]
+    assert "POST" in methods_by_path["/internal/portal/profile"]
+    assert {"POST", "DELETE"} <= methods_by_path["/internal/portal/photo"]
+
+
+def test_photo_delete_clears_the_column_and_removes_the_file():
+    """DELETE /photo must null the column AND unlink the stored file.
+
+    Clearing without unlinking would orphan every replaced photo on the volume;
+    unlinking without clearing would leave the DB pointing at a deleted file.
+    """
+    from app.modules.portal_internal import router as portal_router
+    from app.modules.portal_internal import service as portal_service
+
+    with (
+        patch.object(portal_service, "get_student", new_callable=AsyncMock) as m_get,
+        patch.object(portal_service, "student_is_linked", new_callable=AsyncMock) as m_linked,
+        patch.object(portal_service, "set_student_photo", new_callable=AsyncMock) as m_set,
+        patch.object(portal_router, "_write_audit", new_callable=AsyncMock),
+        patch.object(portal_router, "delete_file") as m_delete,
+    ):
+        from fastapi import FastAPI
+        from httpx import ASGITransport, AsyncClient
+
+        settings.ERP_SERVICE_KEY = "test_service_key_for_smoke"
+        m_get.return_value = {"id": "22222222-2222-2222-2222-222222222222"}
+        m_linked.return_value = True
+        m_set.return_value = "avatars/old.jpg"
+
+        app = FastAPI()
+        app.include_router(internal_router, prefix="/api/v1")
+
+        async def run():
+            transport = ASGITransport(app=app)
+            async with AsyncClient(transport=transport, base_url="http://test") as c:
+                r = await c.delete(
+                    "/api/v1/internal/portal/photo"
+                    "?student_id=22222222-2222-2222-2222-222222222222",
+                    headers={
+                        "X-Service-Key": settings.ERP_SERVICE_KEY,
+                        "X-Actor-Id": "11111111-1111-1111-1111-111111111111",
+                    },
+                )
+                return r.status_code, r.json()
+
+        status, body = asyncio.run(run())
+
+    assert status == 200
+    assert body["photo_url"] is None
+    # Cleared by passing None...
+    assert m_set.await_args.args[2] is None
+    # ...and the previous file is unlinked.
+    m_delete.assert_called_once_with("avatars/old.jpg")
+
+
+def test_photo_delete_removes_no_file_when_none_was_set():
+    """A no-op removal (already cleared) must not touch the volume."""
+    from app.modules.portal_internal import router as portal_router
+    from app.modules.portal_internal import service as portal_service
+
+    with (
+        patch.object(portal_service, "get_student", new_callable=AsyncMock) as m_get,
+        patch.object(portal_service, "student_is_linked", new_callable=AsyncMock) as m_linked,
+        patch.object(portal_service, "set_student_photo", new_callable=AsyncMock) as m_set,
+        patch.object(portal_router, "_write_audit", new_callable=AsyncMock),
+        patch.object(portal_router, "delete_file") as m_delete,
+    ):
+        from fastapi import FastAPI
+        from httpx import ASGITransport, AsyncClient
+
+        settings.ERP_SERVICE_KEY = "test_service_key_for_smoke"
+        m_get.return_value = {"id": "22222222-2222-2222-2222-222222222222"}
+        m_linked.return_value = True
+        m_set.return_value = None
+
+        app = FastAPI()
+        app.include_router(internal_router, prefix="/api/v1")
+
+        async def run():
+            transport = ASGITransport(app=app)
+            async with AsyncClient(transport=transport, base_url="http://test") as c:
+                r = await c.delete(
+                    "/api/v1/internal/portal/photo"
+                    "?student_id=22222222-2222-2222-2222-222222222222",
+                    headers={
+                        "X-Service-Key": settings.ERP_SERVICE_KEY,
+                        "X-Actor-Id": "11111111-1111-1111-1111-111111111111",
+                    },
+                )
+                return r.status_code
+
+        assert asyncio.run(run()) == 200
+
+    m_delete.assert_not_called()
 
 
 def test_verify_service_key_401_when_missing():

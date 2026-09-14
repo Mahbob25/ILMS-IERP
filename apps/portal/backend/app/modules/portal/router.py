@@ -297,3 +297,22 @@ async def upload_photo(
     # The header and hero card read the photo out of the cached /me payload.
     await cache.delete(cache_key("me", str(current_user["id"]), {}))
     return result
+
+
+@portal_router.delete("/photo")
+@limiter.limit("10/minute")
+async def delete_photo(
+    request: Request,
+    student_id: str = Query(...),
+    current_user: dict = Depends(get_current_portal_user),
+):
+    """Remove the student's profile photo — the portal falls back to initials."""
+    try:
+        result = await erp_client.delete_student_photo(str(current_user["id"]), student_id)
+    except ErpClientError as e:
+        if e.status_code >= 500:
+            raise HTTPException(status_code=502, detail="ERP temporarily unavailable")
+        raise HTTPException(status_code=e.status_code, detail=e.detail)
+
+    await cache.delete(cache_key("me", str(current_user["id"]), {}))
+    return result

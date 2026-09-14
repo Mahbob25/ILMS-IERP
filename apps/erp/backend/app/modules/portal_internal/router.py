@@ -232,6 +232,29 @@ async def internal_photo_upload(
     return {"photo_url": f"/uploads/{photo_path}"}
 
 
+@internal_router.delete("/photo", status_code=200)
+async def internal_photo_delete(
+    request: Request,
+    student_id: str = Query(...),
+    actor_id: str = Depends(verify_service_key),
+    db: AsyncSession = Depends(get_db),
+):
+    """Clear the student's profile photo (the portal falls back to initials).
+
+    Audited unconditionally, unlike the ERP staff route: this router's audit rows
+    are a call log, so a no-op removal still deserves a record.
+    """
+    actor = _require_actor(actor_id)
+    await _verify_student_access(db, actor, student_id)
+
+    previous = await service.set_student_photo(db, student_id, None)
+    if previous:
+        delete_file(previous)
+
+    await _write_audit(db, "INTERNAL_PORTAL_PHOTO_REMOVED", actor, request.url.path, True)
+    return {"photo_url": None}
+
+
 @internal_router.get("/context")
 async def internal_context(
     request: Request,

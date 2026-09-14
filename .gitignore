@@ -44,6 +44,11 @@ Thumbs.db
 # --- Alembic ---
 alembic/versions/*.pyc
 
+# --- Runtime uploads ---
+# Profile photos are user content written at runtime, never source. Scoped to
+# avatars/ because uploads/certificates/ holds sample files that ARE tracked.
+apps/erp/backend/uploads/avatars/
+
 # --- OS ---
 .DS_Store
 Thumbs.db
