@@ -100,7 +100,8 @@ require_teacher = require_role("teacher")
 
 
 class PermissionChecker:
-    """FastAPI dependency to check page-level permissions from the DB."""
+    """FastAPI dependency to check page-level permissions — uses a Redis TTL cache
+    to avoid a DB query on every authenticated request."""
     def __init__(self, permission_codename: str):
         self.permission_codename = permission_codename
 
@@ -112,17 +113,12 @@ class PermissionChecker:
         if current_user.is_superadmin:
             return current_user
 
-        result = await db.execute(
-            select(RolePermission)
-            .join(Permission, RolePermission.permission_id == Permission.id)
-            .where(
-                RolePermission.role_id == current_user.role_id,
-                Permission.codename == self.permission_codename,
-            )
-        )
-        if not result.first():
+        from app.core.permissions_cache import get_cached_role_permissions
+        user_perms = await get_cached_role_permissions(db, str(current_user.role_id))
+        if self.permission_codename not in user_perms:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=f"Access denied: Missing permission '{self.permission_codename}'"
             )
         return current_user
+

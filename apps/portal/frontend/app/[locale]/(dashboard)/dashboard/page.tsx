@@ -263,30 +263,43 @@ export default function DashboardHome() {
         ? { student_id: studentId, refresh: "1" }
         : { student_id: studentId };
 
-      // Settled, so one failing endpoint degrades its own panel rather than
-      // blanking the whole dashboard.
-      const [att, grd, sec, pay, fee] = await Promise.allSettled([
-        apiClient.get<AttendanceRecord[]>("/me/attendance", { params: reqParams }),
-        apiClient.get<GradeRow[]>("/me/grades", { params: reqParams }),
-        apiClient.get<SectionRow[]>("/me/sections", { params: reqParams }),
-        apiClient.get<PaymentRow[]>("/me/payments", { params: reqParams }),
-        apiClient.get<FeesSummary>("/me/fees", { params: reqParams }),
-      ]);
+      try {
+        const res = await apiClient.get<ChildData>("/me/summary", { params: reqParams });
+        const asOfHeader = res.headers?.["x-data-as-of"];
+        return {
+          attendance: res.data?.attendance || [],
+          grades: res.data?.grades || [],
+          sections: res.data?.sections || [],
+          payments: res.data?.payments || [],
+          fees: res.data?.fees || null,
+          asOf: typeof asOfHeader === "string" ? asOfHeader : null,
+        };
+      } catch {
+        // Settled fallback, so one failing endpoint degrades its own panel rather than
+        // blanking the whole dashboard.
+        const [att, grd, sec, pay, fee] = await Promise.allSettled([
+          apiClient.get<AttendanceRecord[]>("/me/attendance", { params: reqParams }),
+          apiClient.get<GradeRow[]>("/me/grades", { params: reqParams }),
+          apiClient.get<SectionRow[]>("/me/sections", { params: reqParams }),
+          apiClient.get<PaymentRow[]>("/me/payments", { params: reqParams }),
+          apiClient.get<FeesSummary>("/me/fees", { params: reqParams }),
+        ]);
 
-      const settled = [att, grd, sec, pay, fee].find((r) => r.status === "fulfilled");
-      const asOfHeader =
-        settled && settled.status === "fulfilled"
-          ? settled.value.headers?.["x-data-as-of"]
-          : undefined;
+        const settled = [att, grd, sec, pay, fee].find((r) => r.status === "fulfilled");
+        const asOfHeader =
+          settled && settled.status === "fulfilled"
+            ? settled.value.headers?.["x-data-as-of"]
+            : undefined;
 
-      return {
-        attendance: att.status === "fulfilled" ? att.value.data || [] : [],
-        grades: grd.status === "fulfilled" ? grd.value.data || [] : [],
-        sections: sec.status === "fulfilled" ? sec.value.data || [] : [],
-        payments: pay.status === "fulfilled" ? pay.value.data || [] : [],
-        fees: fee.status === "fulfilled" ? fee.value.data : null,
-        asOf: typeof asOfHeader === "string" ? asOfHeader : null,
-      };
+        return {
+          attendance: att.status === "fulfilled" ? att.value.data || [] : [],
+          grades: grd.status === "fulfilled" ? grd.value.data || [] : [],
+          sections: sec.status === "fulfilled" ? sec.value.data || [] : [],
+          payments: pay.status === "fulfilled" ? pay.value.data || [] : [],
+          fees: fee.status === "fulfilled" ? fee.value.data : null,
+          asOf: typeof asOfHeader === "string" ? asOfHeader : null,
+        };
+      }
     },
     []
   );

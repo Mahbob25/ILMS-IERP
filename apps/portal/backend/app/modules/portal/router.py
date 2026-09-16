@@ -178,6 +178,27 @@ async def get_fees(
     )
 
 
+@portal_router.get("/summary")
+@limiter.limit("60/minute")
+async def get_student_summary(
+    request: Request,
+    response: Response,
+    student_id: str = Query(...),
+    current_user: dict = Depends(get_current_portal_user),
+):
+    """Single composite request replacing 5 chatty sub-resource calls."""
+    params = {"student_id": student_id}
+    return await _read_cached(
+        request,
+        response,
+        "summary",
+        student_id,
+        params,
+        lambda: erp_client.get_student_summary(str(current_user["id"]), student_id),
+    )
+
+
+
 @portal_router.get("/announcements")
 @limiter.limit("60/minute")
 async def get_announcements(

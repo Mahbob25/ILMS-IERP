@@ -1,6 +1,6 @@
 import uuid
 from datetime import date, datetime, time
-from typing import Generic, Optional, TypeVar
+from typing import Any, Generic, Optional, TypeVar
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 T = TypeVar("T")
@@ -459,3 +459,53 @@ class CertificateSectionOption(BaseModel):
     course_code: Optional[str] = None
     start_date: Optional[date] = None
     certificate_count: int
+
+
+class StudentFullProfileResponse(BaseModel):
+    student: StudentResponse
+    enrollments: list[EnrollmentResponse] = []
+    sections: list[CourseSectionResponse] = []
+    courses: list[CourseResponse] = []
+    payments: list[dict[str, Any]] = []
+    certificates: list[dict[str, Any]] = []
+    attendance_summary: list[dict[str, Any]] = []
+    grade_summaries: list[StudentGradeSummary] = []
+    unenrollments: list[dict[str, Any]] = []
+    payment_summaries: dict[str, Any] = {}
+
+    class Config:
+        from_attributes = True
+
+
+# --- Lightweight Lookups ---
+class CourseLookupResponse(BaseModel):
+    id: uuid.UUID
+    name: str
+    code: str
+    label: str
+
+    class Config:
+        from_attributes = True
+
+
+class SectionLookupResponse(BaseModel):
+    id: uuid.UUID
+    course_id: uuid.UUID
+    course_name: str
+    label: str
+    status: str
+    price: Optional[float] = None
+
+    class Config:
+        from_attributes = True
+
+
+class StudentLookupResponse(BaseModel):
+    id: uuid.UUID
+    full_name: str
+    student_code: str
+    label: str
+
+    class Config:
+        from_attributes = True
+

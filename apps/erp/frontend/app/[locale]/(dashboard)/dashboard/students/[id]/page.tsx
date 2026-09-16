@@ -242,51 +242,89 @@ export default function StudentDetailPage() {
   const fetchStudent = useCallback(async () => {
     if (!studentId) return;
     try {
-      const [studRes, enrollRes, sectRes, courseRes, payRes, certRes, attRes, gradeRes, unenrollRes] = await Promise.all([
-        apiClient.get<{ items: Student[]; total: number }>("/academic/students?limit=1000"),
-        apiClient.get<{ items: Enrollment[]; total: number }>(`/academic/enrollments?student_id=${studentId}&limit=1000`),
-        apiClient.get<{ items: CourseSection[]; total: number }>("/academic/course-sections?limit=1000"),
-        apiClient.get<{ items: Course[]; total: number }>("/academic/courses?limit=1000"),
-        apiClient.get<Payment[]>(`/lms/payments?student_id=${studentId}`),
-        apiClient.get<{ items: any[]; total: number }>(`/academic/students/${studentId}/certificates?limit=100`).catch(() => ({ data: { items: [] } })),
-        apiClient.get<AttendanceSummary[]>(`/lms/attendance/students/${studentId}/summary`).then(r => r.data).catch(() => [] as AttendanceSummary[]),
-        apiClient.get<GradeSummary[]>(`/academic/students/${studentId}/final-grades`).then(r => r.data).catch(() => [] as GradeSummary[]),
-        apiClient.get<{ items: any[]; total: number }>(`/academic/students/${studentId}/unenrollment-history?per_page=500`).then(r => r.data).catch(() => ({ items: [] })),
-      ]);
+      // ISSUE-2 FIX: single composite call replacing 9 parallel HTTP requests
+      const res = await apiClient.get<{
+        student: Student;
+        enrollments: Enrollment[];
+        sections: CourseSection[];
+        courses: Course[];
+        payments: Payment[];
+        certificates: any[];
+        attendance_summary: AttendanceSummary[];
+        grade_summaries: GradeSummary[];
+        unenrollments: any[];
+        payment_summaries: Record<string, PaymentSummary>;
+      }>(`/academic/students/${studentId}/full-profile`);
 
-      const found = studRes.data.items.find((s) => s.id === studentId) || null;
-      setStudent(found);
-      setAllStudents(studRes.data.items);
-      setEnrollments(enrollRes.data.items);
-      setSections(sectRes.data.items);
-      setCourses(courseRes.data.items);
-      setPayments(payRes.data);
-      setCertificates(certRes.data.items);
-      setAttendanceSummary(attRes);
-      setGradeSummaries(gradeRes);
-      const items = unenrollRes?.items || [];
+      const data = res.data;
+      setStudent(data.student);
+      setAllStudents(data.student ? [data.student] : []);
+      setEnrollments(data.enrollments || []);
+      setSections(data.sections || []);
+      setCourses(data.courses || []);
+      setPayments(data.payments || []);
+      setCertificates(data.certificates || []);
+      setAttendanceSummary(data.attendance_summary || []);
+      setGradeSummaries(data.grade_summaries || []);
+      const items = data.unenrollments || [];
       setUnenrollHistory(items);
       const map: Record<string, any> = {};
       for (const rec of items) {
         if (rec.enrollment_id) map[rec.enrollment_id] = rec;
       }
       setUnenrollMap(map);
+      setSummaries(data.payment_summaries || {});
       setLoading(false);
-
-      const summaryMap: Record<string, PaymentSummary> = {};
-      for (const enrollment of enrollRes.data.items) {
-        try {
-          const sumRes = await apiClient.get<PaymentSummary>(
-            `/lms/payments/summary/${enrollment.id}`
-          );
-          summaryMap[enrollment.id] = sumRes.data;
-        } catch {
-          // skip
-        }
-      }
-      setSummaries(summaryMap);
     } catch (e) {
-      console.error(e);
+      // Fallback to individual requests if composite endpoint unavailable
+      console.error("full-profile endpoint failed, falling back to individual requests:", e);
+      try {
+        const [studRes, enrollRes, sectRes, courseRes, payRes, certRes, attRes, gradeRes, unenrollRes] = await Promise.all([
+          apiClient.get<{ items: Student[]; total: number }>("/academic/students?limit=1000"),
+          apiClient.get<{ items: Enrollment[]; total: number }>(`/academic/enrollments?student_id=${studentId}&limit=1000`),
+          apiClient.get<{ items: CourseSection[]; total: number }>("/academic/course-sections?limit=1000"),
+          apiClient.get<{ items: Course[]; total: number }>("/academic/courses?limit=1000"),
+          apiClient.get<Payment[]>(`/lms/payments?student_id=${studentId}`),
+          apiClient.get<{ items: any[]; total: number }>(`/academic/students/${studentId}/certificates?limit=100`).catch(() => ({ data: { items: [] } })),
+          apiClient.get<AttendanceSummary[]>(`/lms/attendance/students/${studentId}/summary`).then(r => r.data).catch(() => [] as AttendanceSummary[]),
+          apiClient.get<GradeSummary[]>(`/academic/students/${studentId}/final-grades`).then(r => r.data).catch(() => [] as GradeSummary[]),
+          apiClient.get<{ items: any[]; total: number }>(`/academic/students/${studentId}/unenrollment-history?per_page=500`).then(r => r.data).catch(() => ({ items: [] })),
+        ]);
+
+        const found = studRes.data.items.find((s) => s.id === studentId) || null;
+        setStudent(found);
+        setAllStudents(studRes.data.items);
+        setEnrollments(enrollRes.data.items);
+        setSections(sectRes.data.items);
+        setCourses(courseRes.data.items);
+        setPayments(payRes.data);
+        setCertificates(certRes.data.items);
+        setAttendanceSummary(attRes);
+        setGradeSummaries(gradeRes);
+        const items = unenrollRes?.items || [];
+        setUnenrollHistory(items);
+        const map: Record<string, any> = {};
+        for (const rec of items) {
+          if (rec.enrollment_id) map[rec.enrollment_id] = rec;
+        }
+        setUnenrollMap(map);
+        setLoading(false);
+
+        const summaryMap: Record<string, PaymentSummary> = {};
+        for (const enrollment of enrollRes.data.items) {
+          try {
+            const sumRes = await apiClient.get<PaymentSummary>(
+              `/lms/payments/summary/${enrollment.id}`
+            );
+            summaryMap[enrollment.id] = sumRes.data;
+          } catch {
+            // skip
+          }
+        }
+        setSummaries(summaryMap);
+      } catch (fallbackErr) {
+        console.error(fallbackErr);
+      }
     } finally {
       setLoading(false);
     }

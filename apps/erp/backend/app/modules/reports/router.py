@@ -2,7 +2,7 @@ from datetime import date
 from typing import Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from fastapi.responses import HTMLResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -190,8 +190,11 @@ async def export_report_print(
 
 @reports_router.get("/catalog", response_model=ReportCatalogResponse)
 async def get_report_catalog(
+    response: Response,
     current_user: User = Depends(PermissionChecker("page_reports")),
 ) -> ReportCatalogResponse:
+    # Report catalog rarely changes — allow browsers and proxies to cache for 10 minutes.
+    response.headers["Cache-Control"] = "private, max-age=600, stale-while-revalidate=3600"
     return await reports_service.list_report_catalog()
 
 

@@ -445,3 +445,20 @@ async def get_fees_summary(db: AsyncSession, student_id: str) -> dict[str, Any]:
         "balance": float(total_net - total_paid),
         "sections": sections,
     }
+
+
+async def get_full_student_summary(db: AsyncSession, student_id: str) -> dict[str, Any]:
+    """Single-pass retrieval for student attendance, grades, sections, payments, and fees."""
+    attendance = await get_attendance(db, student_id)
+    grades = await get_grades(db, student_id)
+    sections = await get_sections(db, student_id)
+    payments = await get_payments(db, student_id)
+    fees = await get_fees_summary(db, student_id)
+    return {
+        "attendance": attendance,
+        "grades": grades,
+        "sections": sections,
+        "payments": payments,
+        "fees": fees,
+    }
+

@@ -554,7 +554,228 @@ async def get_student(db: AsyncSession, student_id: uuid.UUID) -> Optional[Stude
     result = await db.execute(
         select(Student).where(Student.id == student_id, Student.deleted_at.is_(None))
     )
-    return result.scalar_one_or_none()
+    student = result.scalar_one_or_none()
+    if student:
+        parents = await portal_accounts_service.get_parents_for_students(db, [student.id])
+        _attach_parent(student, parents.get(str(student.id)))
+    return student
+
+
+def _section_duration_text(section) -> str:
+    if section and section.start_date and section.end_date:
+        return f"{section.start_date.strftime('%Y-%m-%d')} – {section.end_date.strftime('%Y-%m-%d')}"
+    return ""
+
+
+def _section_total_hours(section) -> str:
+    if section and section.class_duration_minutes:
+        return f"{section.class_duration_minutes / 60:.1f}h"
+    return ""
+
+
+def _serialize_unenrollment_record(r) -> dict:
+    section = r.section
+    course_name = section.course.name if section and section.course else ""
+    section_name = section.name if section and hasattr(section, "name") else (course_name or str(r.section_id)[:8])
+    student_name = r.student.full_name if r.student else ""
+    unenrolled_by_name = r.unenrolled_by_user.full_name if r.unenrolled_by_user else ""
+    return {
+        "id": str(r.id),
+        "enrollment_id": str(r.enrollment_id),
+        "section_id": str(r.section_id),
+        "student_id": str(r.student_id),
+        "unenrolled_by": str(r.unenrolled_by),
+        "unenrolled_at": r.unenrolled_at.isoformat() if r.unenrolled_at else None,
+        "reason": r.reason,
+        "refund_policy": r.refund_policy,
+        "total_paid": float(r.total_paid) if r.total_paid is not None else 0.0,
+        "teacher_share_reversed": float(r.teacher_share_reversed) if r.teacher_share_reversed is not None else 0.0,
+        "refund_authorized_amount": float(r.refund_authorized_amount) if r.refund_authorized_amount is not None else 0.0,
+        "has_attendance_records": r.has_attendance_records,
+        "has_grades": r.has_grades,
+        "notes": r.notes,
+        "student_name": student_name,
+        "section_name": section_name,
+        "course_name": course_name,
+        "unenrolled_by_name": unenrolled_by_name,
+    }
+
+
+async def get_student_full_profile(db: AsyncSession, student_id: uuid.UUID) -> Optional[dict]:
+    """Single aggregated profile query avoiding 9+ separate frontend HTTP requests."""
+    student = await get_student(db, student_id)
+    if not student:
+        return None
+
+    # 1. Enrollments with derived pricing
+    enrollments_data = await list_enrollments(db, student_id=student_id, limit=500)
+    enrollments = enrollments_data["items"]
+    enrolled_sec_ids = [e.section_id for e in enrollments if e.section_id]
+
+    # 2. Sections: enrolled sections + active/pending sections for quick enroll dropdown
+    sec_query = (
+        select(CourseSection)
+        .where(
+            or_(
+                CourseSection.id.in_(enrolled_sec_ids) if enrolled_sec_ids else False,
+                CourseSection.status.in_(["active", "pending"]),
+            ),
+            CourseSection.deleted_at.is_(None),
+        )
+        .order_by(CourseSection.created_at.desc())
+        .limit(200)
+    )
+    sec_res = await db.execute(sec_query)
+    sections = sec_res.scalars().all()
+
+    # 3. Courses for these sections
+    course_ids = {s.course_id for s in sections if s.course_id}
+    if course_ids:
+        c_res = await db.execute(
+            select(Course).where(Course.id.in_(course_ids), Course.deleted_at.is_(None))
+        )
+        courses = c_res.scalars().all()
+    else:
+        courses = []
+
+    # 4. Payments
+    from app.modules.lms import financial_service
+    payments = await financial_service.list_payments(db, student_id=student_id)
+    payments_serialized = [
+        {
+            "id": p.id,
+            "enrollment_id": p.enrollment_id,
+            "amount": float(p.amount) if p.amount is not None else 0.0,
+            "date": p.date.isoformat() if p.date else None,
+            "receipt_number": p.receipt_number,
+            "payment_method": p.payment_method,
+            "created_at": p.created_at.isoformat() if p.created_at else None,
+        }
+        for p in payments
+    ]
+
+    # 5. Payment summaries per enrollment (batch-loaded to eliminate client waterfall)
+    payment_summaries = {}
+    for e in enrollments:
+        try:
+            p_sum = await financial_service.get_student_payment_summary(db, e.id)
+            payment_summaries[str(e.id)] = p_sum
+        except Exception:
+            pass
+
+    # 6. Certificates
+    from app.modules.academic import certificate_service
+    certs_data = await certificate_service.list_certificates(db, student_id=student_id, limit=100)
+    certificates = []
+    for cert in certs_data.get("items", []):
+        sec = cert.section
+        certificates.append({
+            "id": cert.id,
+            "student_id": cert.student_id,
+            "section_id": cert.section_id,
+            "certificate_number": cert.certificate_number,
+            "course_name": cert.course_name,
+            "student_name": cert.student_name,
+            "issued_at": cert.issued_at,
+            "final_score": float(cert.final_score) if cert.final_score is not None else None,
+            "grade_label": cert.grade_label,
+            "student_id_no": cert.student_id_no,
+            "student_code": cert.extra_data.get("student_code") if cert.extra_data else None,
+            "course_code": cert.extra_data.get("course_code") if cert.extra_data else None,
+            "duration_text": _section_duration_text(sec),
+            "total_hours": _section_total_hours(sec),
+        })
+
+    # 7. Attendance summary
+    from app.modules.lms import service as lms_service
+    att_summary = await lms_service.get_student_attendance_summary(db, student_id)
+    att_serialized = [
+        {
+            "section_id": a.section_id,
+            "total_sessions": a.total_sessions,
+            "present_count": a.present_count,
+            "late_count": a.late_count,
+            "absent_count": a.absent_count,
+            "attendance_rate": a.attendance_rate,
+        }
+        for a in att_summary
+    ]
+
+    # 8. Grade summaries
+    grade_summaries = await get_student_final_grades(db, student_id)
+
+    # 9. Unenrollment history
+    from app.modules.academic import unenrollment_service
+    unenroll_data = await unenrollment_service.get_unenrollment_history(
+        db, student_id=student_id, per_page=100
+    )
+    unenrollments = [_serialize_unenrollment_record(r) for r in unenroll_data.get("items", [])]
+
+    return {
+        "student": student,
+        "enrollments": enrollments,
+        "sections": sections,
+        "courses": courses,
+        "payments": payments_serialized,
+        "certificates": certificates,
+        "attendance_summary": att_serialized,
+        "grade_summaries": grade_summaries,
+        "unenrollments": unenrollments,
+        "payment_summaries": payment_summaries,
+    }
+
+
+async def lookup_courses(db: AsyncSession) -> list[dict]:
+    """Lightweight lookup list of active courses for dropdown selectors."""
+    result = await db.execute(
+        select(Course.id, Course.name, Course.code)
+        .where(Course.deleted_at.is_(None))
+        .order_by(Course.name.asc())
+    )
+    return [
+        {"id": row.id, "name": row.name, "code": row.code, "label": f"{row.name} ({row.code})"}
+        for row in result.all()
+    ]
+
+
+async def lookup_sections(db: AsyncSession) -> list[dict]:
+    """Lightweight lookup list of active sections for dropdown selectors."""
+    result = await db.execute(
+        select(CourseSection.id, CourseSection.course_id, Course.name, CourseSection.status, CourseSection.price)
+        .join(Course, CourseSection.course_id == Course.id)
+        .where(CourseSection.deleted_at.is_(None), CourseSection.status.in_(["active", "pending"]))
+        .order_by(Course.name.asc())
+    )
+    return [
+        {
+            "id": row.id,
+            "course_id": row.course_id,
+            "course_name": row.name,
+            "status": row.status,
+            "price": float(row.price) if row.price is not None else None,
+            "label": f"{row.name} ({row.status})",
+        }
+        for row in result.all()
+    ]
+
+
+async def lookup_students(db: AsyncSession) -> list[dict]:
+    """Lightweight lookup list of students for search pickers and dropdowns."""
+    result = await db.execute(
+        select(Student.id, Student.full_name, Student.student_code)
+        .where(Student.deleted_at.is_(None))
+        .order_by(Student.full_name.asc())
+    )
+    return [
+        {
+            "id": row.id,
+            "full_name": row.full_name,
+            "student_code": row.student_code,
+            "label": f"{row.full_name} ({row.student_code})",
+        }
+        for row in result.all()
+    ]
+
 
 
 async def find_student_by_code(

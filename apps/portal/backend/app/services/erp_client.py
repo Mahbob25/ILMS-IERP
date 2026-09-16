@@ -95,6 +95,13 @@ class ErpClient:
             "GET", "/fees", actor_id, params={"student_id": student_id}
         )
 
+    async def get_student_summary(self, actor_id: str, student_id: str) -> dict[str, Any]:
+        """Composite summary: attendance, grades, sections, payments, and fees."""
+        return await self._request(
+            "GET", "/summary", actor_id, params={"student_id": student_id}
+        )
+
+
     async def get_announcements(self, actor_id: str) -> list[dict[str, Any]]:
         """Institute-wide announcements — not scoped to a student."""
         return await self._request("GET", "/announcements", actor_id)

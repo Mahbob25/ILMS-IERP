@@ -93,3 +93,12 @@ class FeesSummaryDTO(BaseModel):
     total_paid: float = 0.0
     balance: float = 0.0
     sections: List[SectionFeeDTO] = []
+
+
+class StudentSummaryDTO(BaseModel):
+    attendance: List[AttendanceDTO] = []
+    grades: List[GradeDTO] = []
+    sections: List[SectionDTO] = []
+    payments: List[PaymentDTO] = []
+    fees: Optional[FeesSummaryDTO] = None
+

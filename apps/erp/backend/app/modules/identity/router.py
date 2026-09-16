@@ -884,9 +884,14 @@ async def set_role_permissions(
             action="ROLE_PERMISSIONS_UPDATED",
             payload={"role_id": str(role_id)}
         )
+        # Invalidate the Redis TTL cache so the change is effective immediately.
+        from app.core.permissions_cache import invalidate_role_permissions
+        await invalidate_role_permissions(str(role_id))
         return RolePermissionsResponse(role_id=role_id, permission_codenames=data.permission_codenames)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
 
 
 # --- Deprecated /users/employees redirect (backward compat) ---

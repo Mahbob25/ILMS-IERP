@@ -19,6 +19,8 @@ from app.modules.academic.schemas import (
     CertificateSectionOption,
     UnenrollmentPreviewResponse, UnenrollRequest, UnenrollmentRecordResponse,
     PaginatedResponse,
+    StudentFullProfileResponse,
+    CourseLookupResponse, SectionLookupResponse, StudentLookupResponse,
 )
 from app.modules.academic import service as academic_service
 from app.modules.academic import certificate_service
@@ -540,6 +542,58 @@ async def delete_student(
     deleted = await academic_service.delete_student(db, student_id)
     if not deleted:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Student not found")
+
+
+@academic_router.get("/students/{student_id}/full-profile", response_model=StudentFullProfileResponse)
+async def get_student_full_profile(
+    student_id: uuid.UUID,
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary", "teacher"])),
+    db: AsyncSession = Depends(get_db),
+):
+    """Consolidated profile endpoint containing student bio, enrollments,
+    joined section/course names, payments, certificates, attendance, and grades."""
+    profile = await academic_service.get_student_full_profile(db, student_id)
+    if not profile:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Student not found")
+    return profile
+
+
+@academic_router.get("/students/{student_id}", response_model=StudentResponse)
+async def get_student(
+    student_id: uuid.UUID,
+    current_user: User = Depends(RoleChecker(allowed_roles=["superadmin", "manager", "secretary", "teacher"])),
+    db: AsyncSession = Depends(get_db),
+):
+    student = await academic_service.get_student(db, student_id)
+    if not student:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Student not found")
+    return student
+
+
+# --- Lightweight Lookups ---
+@academic_router.get("/lookups/courses", response_model=list[CourseLookupResponse])
+async def lookup_courses(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await academic_service.lookup_courses(db)
+
+
+@academic_router.get("/lookups/sections", response_model=list[SectionLookupResponse])
+async def lookup_sections(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await academic_service.lookup_sections(db)
+
+
+@academic_router.get("/lookups/students", response_model=list[StudentLookupResponse])
+async def lookup_students(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await academic_service.lookup_students(db)
+
 
 
 # --- Enrollments ---

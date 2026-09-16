@@ -20,6 +20,7 @@ from .schemas import (
     PortalMeResponse,
     ProfileUpdateRequest,
     SectionDTO,
+    StudentSummaryDTO,
 )
 
 logger = logging.getLogger(__name__)
@@ -177,6 +178,23 @@ async def internal_fees(
     summary = await service.get_fees_summary(db, student_id)
     await _write_audit(db, "INTERNAL_PORTAL_ACCESS", actor, request.url.path, True)
     return FeesSummaryDTO(**summary)
+
+
+@internal_router.get("/summary", response_model=StudentSummaryDTO)
+@internal_router.get("/student-summary", response_model=StudentSummaryDTO)
+async def internal_student_summary(
+    request: Request,
+    student_id: str = Query(...),
+    actor_id: str = Depends(verify_service_key),
+    db: AsyncSession = Depends(get_db),
+):
+    """Batch retrieval of attendance, grades, sections, payments, and fees in one DB pass."""
+    actor = _require_actor(actor_id)
+    await _verify_student_access(db, actor, student_id)
+    summary = await service.get_full_student_summary(db, student_id)
+    await _write_audit(db, "INTERNAL_PORTAL_SUMMARY_ACCESS", actor, request.url.path, True)
+    return summary
+
 
 
 @internal_router.post("/profile", status_code=200)
