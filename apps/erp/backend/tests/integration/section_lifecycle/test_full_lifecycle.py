@@ -11,12 +11,13 @@ from app.modules.academic.cancellation_service import cancel_section
 DATE_TODAY = date(2026, 7, 10)
 
 
-def result_mock(scalar_one_or_none=None, scalars_all=None, scalar=0):
+def result_mock(scalar_one_or_none=None, scalars_all=None, scalar=0, rows_all=None):
     m = Mock()
     m.scalar_one_or_none.return_value = scalar_one_or_none
     s = Mock()
     s.all.return_value = scalars_all if scalars_all is not None else []
     m.scalars.return_value = s
+    m.all.return_value = rows_all if rows_all is not None else (scalars_all if scalars_all is not None else [])
     m.scalar.return_value = scalar
     m.unique.return_value = m
     return m
@@ -80,21 +81,17 @@ class TestFullLifecycle:
 
         exec_order = [
             result_mock(scalar_one_or_none=section),  # get_course_section
-            result_mock(scalar=1),  # enrolled count
-            result_mock(scalar=1),  # graded count
             result_mock(scalars_all=[enrollment]),  # enrollments
-            result_mock(scalar=Decimal("500")),  # payment sum
-            result_mock(scalar_one_or_none=None),  # config
-            result_mock(scalars_all=[enrollment]),  # second enrollment query
+            result_mock(rows_all=[(enrollment.id, Decimal("500"))]),  # payment sum batch
         ]
 
         mock_db.execute = AsyncMock(side_effect=exec_order)
-        mock_db.scalar = AsyncMock(return_value=1)
+        mock_db.scalar = AsyncMock(side_effect=[1, 1])
         mock_db.flush = AsyncMock()
 
         with patch("app.modules.academic.service._is_date_closed", AsyncMock(return_value=False)):
             with patch("app.modules.academic.service._get_config_bool", AsyncMock(return_value=True)):
-                with patch("app.modules.academic.service.create_certificate", AsyncMock()):
+                with patch("app.modules.academic.service.create_certificates_batch", AsyncMock()):
                     result = await complete_section(mock_db, section.id, mock_user)
 
         assert result is not None
@@ -166,22 +163,22 @@ class TestFullLifecycle:
         exec_order = [
             result_mock(scalar_one_or_none=section),  # get_course_section
             result_mock(scalars_all=[enrollment]),  # enrollments for payment check
-            result_mock(scalars_all=[enrollment]),  # enrollments for certificates
+            result_mock(rows_all=[(enrollment.id, Decimal("500"))]),  # payment batch
         ]
 
         mock_db.execute = AsyncMock(side_effect=exec_order)
-        mock_db.scalar = AsyncMock(side_effect=[2, 1, Decimal("500")])
+        mock_db.scalar = AsyncMock(side_effect=[2, 1])
         mock_db.add = Mock()
         mock_db.flush = AsyncMock()
 
         with patch("app.modules.academic.service._is_date_closed", AsyncMock(return_value=False)):
             with patch("app.modules.academic.service._get_config_bool", AsyncMock(return_value=True)):
-                with patch("app.modules.academic.service.create_certificate", AsyncMock()):
+                with patch("app.modules.academic.service.create_certificates_batch", AsyncMock()):
                     with patch("app.modules.academic.service._get_ungraded_students", AsyncMock(return_value=[{"full_name": "Ungraded Student"}])):
                         result = await complete_section(
-                        mock_db, section.id, mock_user,
-                        force=True, force_reason="Emergency manager override",
-                    )
+                            mock_db, section.id, mock_user,
+                            force=True, force_reason="Emergency manager override",
+                        )
 
         assert result is not None
         assert result.status == "completed"
