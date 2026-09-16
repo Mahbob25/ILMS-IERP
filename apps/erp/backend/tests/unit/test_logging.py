@@ -32,11 +32,11 @@ async def test_certificate_creation_failure_logged():
 
     db = AsyncMock()
     db.get = AsyncMock(return_value=section)
-    db.execute = AsyncMock()
-    db.execute.return_value = MagicMock(
-        scalars=MagicMock(return_value=MagicMock(all=MagicMock(return_value=[enrollment])))
-    )
-    db.scalar = AsyncMock(side_effect=[None, 1, 1, Decimal("500"), None])
+    db.execute = AsyncMock(side_effect=[
+        MagicMock(scalars=MagicMock(return_value=MagicMock(all=MagicMock(return_value=[enrollment])))), # completion enrollments
+        MagicMock(all=MagicMock(return_value=[(enrollment.id, Decimal("500"))])), # payments total
+    ])
+    db.scalar = AsyncMock(side_effect=[None, 1, 1, None])
     db.add = AsyncMock()
     db.flush = AsyncMock()
 
@@ -47,7 +47,7 @@ async def test_certificate_creation_failure_logged():
         with patch("app.modules.academic.service.ledger_activate_contract", AsyncMock()):
             with patch("app.modules.academic.service.ledger_finalize_grades", AsyncMock()):
                 with patch("app.modules.academic.service.ledger_settle_contract", AsyncMock()):
-                    with patch("app.modules.academic.service.create_certificate") as mock_create:
+                    with patch("app.modules.academic.service.create_certificates_batch") as mock_create:
                         mock_create.side_effect = Exception("Template rendering failed")
 
                         with patch("app.modules.academic.service.logger") as mock_logger:
@@ -68,8 +68,10 @@ async def test_ledger_finalize_failure_logged():
     student_id = uuid.uuid4()
     graded_by = uuid.uuid4()
 
-    db.execute = AsyncMock()
-    db.execute.return_value = MagicMock(scalar_one_or_none=MagicMock(return_value=None))
+    db.execute = AsyncMock(side_effect=[
+        MagicMock(scalars=MagicMock(return_value=MagicMock(all=MagicMock(return_value=[])))),
+        MagicMock(scalar_one_or_none=MagicMock(return_value=None)),
+    ])
     db.add = AsyncMock()
     db.flush = AsyncMock()
     db.scalar = AsyncMock(side_effect=[1, 1])
@@ -86,6 +88,7 @@ async def test_ledger_finalize_failure_logged():
             mock_logger.error.assert_called_once()
             log_msg = mock_logger.error.call_args[0][0]
             assert "Failed to finalize grades" in log_msg
+
 
 
 @pytest.mark.asyncio

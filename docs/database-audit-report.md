@@ -8,8 +8,9 @@
 
 ## CRITICAL
 
-### Issue 1: N+1 Query in `set_final_grades_bulk` — SELECT per grade + per-grade notification query
+### Issue 1: N+1 Query in `set_final_grades_bulk` — SELECT per grade + per-grade notification query `[FIXED]`
 
+**Status:** FIXED (2026-09-16)  
 **File:** `app/modules/academic/service.py:907-961`
 
 **Anti-Pattern:** The loop calls `set_final_grade()` per student, which issues a `SELECT ... WHERE section_id=? AND student_id=?` (line 882-888) each iteration. Then it re-queries the section (line 926) inside the loop for the notification check. For a section with 30 students, this produces ~60+ queries instead of 2-3.
@@ -60,8 +61,9 @@ async def set_final_grades_bulk(db, section_id, grades, graded_by):
 
 ---
 
-### Issue 2: N+1 in `complete_section` — per-enrollment certificate creation + per-enrollment payment sum
+### Issue 2: N+1 in `complete_section` — per-enrollment certificate creation + per-enrollment payment sum `[FIXED]`
 
+**Status:** FIXED (2026-09-16)  
 **File:** `app/modules/academic/service.py:304-431`
 
 **Anti-Pattern:** Two separate N+1 clusters in one function:
@@ -387,10 +389,10 @@ pending_students = total_students - enrolled_count
 
 ## Summary Table
 
-| # | Severity | File | Lines | Pattern | Est. Gain |
-|---|----------|------|-------|---------|-----------|
-| 1 | CRITICAL | academic/service.py | 907-961 | N+1 per-grade SELECT+re-SELECT | ~95% query reduction |
-| 2 | CRITICAL | academic/service.py | 304-431 | N+1 per-enrollment payment sum + cert | ~90 query reduction |
+| # | Severity | File | Lines | Pattern | Est. Gain | Status |
+|---|----------|------|-------|---------|-----------|--------|
+| 1 | CRITICAL | academic/service.py | 907-961 | N+1 per-grade SELECT+re-SELECT | ~95% query reduction | **FIXED** |
+| 2 | CRITICAL | academic/service.py | 304-431 | N+1 per-enrollment payment sum + cert | ~90 query reduction | **FIXED** |
 | 3 | CRITICAL | lms/financial_service.py | 281-308 | N+1 wallet per teacher | 20x fewer queries |
 | 4 | CRITICAL | academic/section_startup_checks.py | 170-195 | N+1 payment sum per enrollment | ~95% for daily job |
 | 5 | WARNING | reports/service.py | 148-192 | Over-fetch + Python filter | 2 queries to 1, no full ORM |

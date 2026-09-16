@@ -121,6 +121,83 @@ async def create_certificate(
     return cert
 
 
+async def create_certificates_batch(
+    db: AsyncSession,
+    enrollments: list[Enrollment],
+    user_id: Optional[uuid.UUID] = None,
+) -> list[Certificate]:
+    if not enrollments:
+        return []
+
+    section_id = enrollments[0].section_id
+    student_ids = [e.student_id for e in enrollments if e.student_id]
+
+    existing_result = await db.execute(
+        select(Certificate.student_id).where(
+            Certificate.section_id == section_id,
+            Certificate.student_id.in_(student_ids),
+            Certificate.deleted_at.is_(None),
+        )
+    )
+    existing_student_ids = set(existing_result.scalars().all())
+
+    to_create = [e for e in enrollments if e.student_id not in existing_student_ids]
+    if not to_create:
+        return []
+
+    fg_result = await db.execute(
+        select(FinalGrade).where(
+            FinalGrade.section_id == section_id,
+            FinalGrade.student_id.in_([e.student_id for e in to_create]),
+        )
+    )
+    grades_map = {fg.student_id: fg for fg in fg_result.scalars().all()}
+
+    year = datetime.now(timezone.utc).year
+    count_result = await db.execute(
+        select(func.count(Certificate.id)).where(
+            extract('year', Certificate.issued_at) == year,
+            Certificate.deleted_at.is_(None)
+        )
+    )
+    base_count = count_result.scalar() or 0
+    now = datetime.now(timezone.utc)
+
+    created_certs = []
+    for idx, enrollment in enumerate(to_create, start=1):
+        section = enrollment.section
+        course = section.course
+        student = enrollment.student
+
+        final_grade = grades_map.get(student.id)
+        final_score = final_grade.final_score if final_grade else None
+        grade_label_text = get_grade_label(final_grade.final_score) if final_grade else None
+
+        cert_number = f"CERT-{year}-{base_count + idx:06d}"
+        cert = Certificate(
+            student_id=student.id,
+            section_id=section.id,
+            enrollment_id=enrollment.id,
+            certificate_number=cert_number,
+            course_name=course.name,
+            student_name=student.full_name,
+            issued_at=now,
+            final_score=final_score,
+            grade_label=grade_label_text,
+            student_id_no=student.student_code,
+            extra_data={
+                "course_code": course.code,
+                "student_code": student.student_code,
+            },
+        )
+        db.add(cert)
+        created_certs.append(cert)
+
+    await db.flush()
+    return created_certs
+
+
+
 async def get_certificate(db: AsyncSession, cert_id: uuid.UUID) -> Optional[Certificate]:
     result = await db.execute(
         select(Certificate)

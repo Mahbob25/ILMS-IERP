@@ -23,7 +23,7 @@ from app.modules.academic.models import (
     SectionPriceRecord,
     DailyJobsLog,
 )
-from app.modules.academic.certificate_service import create_certificate, get_grade_label
+from app.modules.academic.certificate_service import create_certificate, create_certificates_batch, get_grade_label
 from app.modules.academic.pricing import (
     apply_discount,
     get_enrollment_price_components_batch,
@@ -340,7 +340,12 @@ async def complete_section(
     # Payment balance check
     unpaid_students = []
     enrollments_result = await db.execute(
-        select(Enrollment).where(
+        select(Enrollment)
+        .options(
+            joinedload(Enrollment.student),
+            joinedload(Enrollment.section).joinedload(CourseSection.course),
+        )
+        .where(
             Enrollment.section_id == section_id,
             Enrollment.deleted_at.is_(None),
         )
@@ -351,17 +356,27 @@ async def complete_section(
         completion_enrollments,
         sections_by_id={section.id: section},
     )
+    enrollment_ids = [e.id for e in completion_enrollments]
+    total_paid_map = {}
+    if enrollment_ids:
+        total_paid_rows = await db.execute(
+            select(Payment.enrollment_id, func.coalesce(func.sum(Payment.amount), Decimal("0")))
+            .where(Payment.enrollment_id.in_(enrollment_ids))
+            .group_by(Payment.enrollment_id)
+        )
+        total_paid_map = {row[0]: Decimal(str(row[1])) for row in total_paid_rows.all()}
+
     for enrollment in completion_enrollments:
         components = price_components.get(enrollment.id) or {}
         net_price = components.get("net_price") or Decimal("0")
-        total_paid = await _sum_payments_for_enrollment(db, enrollment.id)
+        total_paid = total_paid_map.get(enrollment.id, Decimal("0"))
         balance = net_price - total_paid
 
         if balance > 0:
-            student = await db.get(Student, enrollment.student_id)
+            student = enrollment.student
             unpaid_students.append({
                 "student_id": str(student.id),
-                "student_name": student.full_name,
+                "student_name": student.full_name if student else "",
                 "balance": float(balance),
             })
 
@@ -411,21 +426,11 @@ async def complete_section(
     section.status = "completed"
 
     # Certificates
-    enrollments_result = await db.execute(
-        select(Enrollment)
-        .where(Enrollment.section_id == section_id, Enrollment.deleted_at.is_(None))
-        .options(
-            joinedload(Enrollment.student),
-            joinedload(Enrollment.section).joinedload(CourseSection.course),
-        )
-    )
-    for enrollment in enrollments_result.scalars().all():
-        try:
-            await create_certificate(db, enrollment, user_id=current_user.id)
-        except Exception as e:
-            logger.error("Certificate creation failed for student %s in section %s: %s",
-                         enrollment.student_id, section_id, str(e))
-            raise
+    try:
+        await create_certificates_batch(db, completion_enrollments, user_id=current_user.id)
+    except Exception as e:
+        logger.error("Certificate creation failed for section %s: %s", section_id, str(e))
+        raise
 
     await db.flush()
     return section
@@ -910,17 +915,44 @@ async def set_final_grades_bulk(
     grades: list[dict],
     graded_by: uuid.UUID,
 ) -> list[FinalGrade]:
-    results = []
-    for g in grades:
-        fg = await set_final_grade(
-            db,
-            section_id=section_id,
-            student_id=g["student_id"],
-            final_score=g["final_score"],
-            graded_by=graded_by,
-            notes=g.get("notes"),
+    if not grades:
+        return []
+
+    student_ids = [g["student_id"] for g in grades]
+
+    existing_result = await db.execute(
+        select(FinalGrade).where(
+            FinalGrade.section_id == section_id,
+            FinalGrade.student_id.in_(student_ids),
         )
+    )
+    existing_map = {fg.student_id: fg for fg in existing_result.scalars().all()}
+
+    now = datetime.now(timezone.utc)
+    results = []
+
+    for g in grades:
+        s_id = g["student_id"]
+        if s_id in existing_map:
+            fg = existing_map[s_id]
+            fg.final_score = g["final_score"]
+            fg.graded_by = graded_by
+            fg.graded_at = now
+            fg.notes = g.get("notes")
+        else:
+            fg = FinalGrade(
+                section_id=section_id,
+                student_id=s_id,
+                final_score=g["final_score"],
+                graded_by=graded_by,
+                notes=g.get("notes"),
+                graded_at=now,
+            )
+            db.add(fg)
+            existing_map[s_id] = fg
         results.append(fg)
+
+    await db.flush()
 
     # Fire grade_submitted notification to the section's teacher (best-effort)
     section = await get_course_section(db, section_id)
