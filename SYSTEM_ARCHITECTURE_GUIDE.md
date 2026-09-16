@@ -60,7 +60,7 @@ flowchart TB
 
     subgraph Vercel["Vercel Edge (CDN + SSR)"]
         ERPFe["ERP Frontend\nNext.js\napps/erp/frontend"]:::fe
-        PortalFe["Portal Frontend\nNext.js\napps/portal/frontend"]:::fe
+        PortalFe["Portal Frontend\nNext.js\napps/portal/frontend"]:::fe`
         Mktg["Marketing Site\nNext.js\napps/marketing"]:::fe
     end
 
