@@ -12,14 +12,27 @@ settings_router = APIRouter(prefix="/settings", tags=["settings"])
 
 @settings_router.get("/system", response_model=SystemSettingsResponse)
 async def get_system_settings(
+    request: Request,
     response: Response,
     current_user: User = Depends(RoleChecker(allowed_roles=["superadmin"])),
     db: AsyncSession = Depends(get_db),
 ):
+    from app.core.http_cache import (
+        compute_etag,
+        etag_payload,
+        is_not_modified,
+        not_modified_response,
+        set_cache_headers,
+    )
+
     data = await settings_service.get_system_settings(db)
     # Cache system settings at the browser/proxy level for 10 minutes,
     # while allowing stale serving for up to 1 hour during background revalidation.
-    response.headers["Cache-Control"] = "private, max-age=600, stale-while-revalidate=3600"
+    # Repeat visits revalidate with If-None-Match and receive 304 on no change.
+    etag = compute_etag(etag_payload(data))
+    if is_not_modified(request, etag):
+        return not_modified_response(etag)
+    set_cache_headers(response, etag)
     return data
 
 

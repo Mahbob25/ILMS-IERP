@@ -201,22 +201,16 @@ export default function PaymentsPage() {
     try {
       const [studentsRes, coursesRes, sectionsRes, enrollmentsRes] =
         await Promise.all([
-          apiClient.get<{ items: Student[]; total: number }>(
-            "/academic/students?limit=1000",
-          ),
-          apiClient.get<{ items: Course[]; total: number }>(
-            "/academic/courses?limit=1000",
-          ),
-          apiClient.get<{ items: CourseSection[]; total: number }>(
-            "/academic/course-sections?limit=1000",
-          ),
+          apiClient.get<Student[]>("/academic/lookups/students"),
+          apiClient.get<Course[]>("/academic/lookups/courses"),
+          apiClient.get<CourseSection[]>("/academic/lookups/sections"),
           apiClient.get<{ items: Enrollment[]; total: number }>(
             "/academic/enrollments?limit=1000",
           ),
         ]);
-      setStudents(studentsRes.data.items);
-      setCourses(coursesRes.data.items);
-      setSections(sectionsRes.data.items);
+      setStudents(studentsRes.data);
+      setCourses(coursesRes.data);
+      setSections(sectionsRes.data);
       setEnrollments(enrollmentsRes.data.items);
     } catch (e) {
       setFetchError("Failed to load reference data");

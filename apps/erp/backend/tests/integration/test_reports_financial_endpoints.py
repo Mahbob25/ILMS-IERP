@@ -258,7 +258,9 @@ class TestFinancialReportEndpoints:
     def test_catalog_allowed_with_permission(self, app_factory, secretary_user, mock_db):
         granted_db = Mock()
         granted_db.execute = AsyncMock(return_value=Mock())
-        granted_db.execute.return_value.first.return_value = Mock()
+        # PermissionChecker reads role codenames via fetchall() (see
+        # app.core.permissions_cache) — grant page_reports.
+        granted_db.execute.return_value.fetchall.return_value = [("page_reports",)]
         app = app_factory(current_user=secretary_user, override_get_db=False)
         app.dependency_overrides[get_db] = lambda: granted_db
 

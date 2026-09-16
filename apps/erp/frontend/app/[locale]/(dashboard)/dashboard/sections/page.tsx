@@ -124,17 +124,11 @@ export default function SectionsPage() {
 
   const fetchLookups = useCallback(async () => {
     const [coursesRes, teachersRes, studentsRes] = await Promise.all([
-      apiClient
-        .get<{ items: Course[]; total: number }>("/academic/courses?limit=1000")
-        .catch(() => null),
+      apiClient.get<Course[]>("/academic/lookups/courses").catch(() => null),
       apiClient.get<any[]>("/users/teachers").catch(() => null),
-      apiClient
-        .get<{ items: Student[]; total: number }>(
-          "/academic/students?limit=1000",
-        )
-        .catch(() => null),
+      apiClient.get<Student[]>("/academic/lookups/students").catch(() => null),
     ]);
-    if (coursesRes) setCourses(coursesRes.data.items);
+    if (coursesRes) setCourses(coursesRes.data);
     if (teachersRes) {
       setTeachers(teachersRes.data);
       const defMap: Record<
@@ -149,7 +143,7 @@ export default function SectionsPage() {
       });
       setTeacherDefaultMap(defMap);
     }
-    if (studentsRes) setStudents(studentsRes.data.items);
+    if (studentsRes) setStudents(studentsRes.data);
   }, []);
 
   const fetchSections = useCallback(

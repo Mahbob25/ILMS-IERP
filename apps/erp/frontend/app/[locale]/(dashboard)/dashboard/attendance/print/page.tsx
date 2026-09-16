@@ -37,15 +37,15 @@ export default function AttendancePrintPage() {
     }
     try {
       const [sectRes, courseRes, enrRes, teachersRes, settingsRes] = await Promise.all([
-        apiClient.get<{ items: CourseSection[]; total: number }>("/academic/course-sections?limit=1000").catch(() => null),
-        apiClient.get<{ items: Course[]; total: number }>("/academic/courses?limit=1000").catch(() => null),
+        apiClient.get<CourseSection>(`/academic/course-sections/${sectionId}`).catch(() => null),
+        apiClient.get<Course[]>("/academic/lookups/courses").catch(() => null),
         apiClient.get<{ items: Enrollment[]; total: number }>(`/academic/enrollments?section_id=${sectionId}&limit=1000`).catch(() => null),
         apiClient.get<any[]>("/users/teachers").catch(() => null),
         apiClient.get<{ institute_name?: string }>("/settings").catch(() => null),
       ]);
 
-      const section = sectRes?.data.items.find((s) => s.id === sectionId) || null;
-      const course = section && courseRes ? courseRes.data.items.find((c) => c.id === section.course_id) : null;
+      const section = sectRes?.data || null;
+      const course = section && courseRes ? courseRes.data.find((c) => c.id === section.course_id) : null;
       if (course) setCourseName(`${course.name} (${course.code})`);
       if (section) {
         const parts = [section.classroom, section.class_time].filter(Boolean).join(" · ");
@@ -61,9 +61,9 @@ export default function AttendancePrintPage() {
       const enrollments = enrRes?.data.items || [];
       const studentIds = enrollments.map((e) => e.student_id);
       if (studentIds.length > 0) {
-        const studRes = await apiClient.get<{ items: Student[]; total: number }>("/academic/students?limit=1000").catch(() => null);
+        const studRes = await apiClient.get<Student[]>("/academic/lookups/students").catch(() => null);
         if (studRes) {
-          const filtered = studRes.data.items.filter((s) => studentIds.includes(s.id));
+          const filtered = studRes.data.filter((s) => studentIds.includes(s.id));
           filtered.sort((a, b) => a.full_name.localeCompare(b.full_name, locale === "ar" ? "ar" : "en"));
           setStudents(filtered);
         }

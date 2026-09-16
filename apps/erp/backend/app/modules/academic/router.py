@@ -1,7 +1,7 @@
 import uuid
 from datetime import date, timedelta
 from typing import Optional
-from fastapi import APIRouter, Body, Depends, HTTPException, Query, status, Request
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Response, status, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from app.db.session import get_db
@@ -571,28 +571,76 @@ async def get_student(
 
 
 # --- Lightweight Lookups ---
+# Lookup lists change rarely and are identical for every caller, so they carry
+# Cache-Control + weak ETag validators. Repeat visits revalidate with
+# If-None-Match and receive 304 with an empty body instead of the full list.
 @academic_router.get("/lookups/courses", response_model=list[CourseLookupResponse])
 async def lookup_courses(
+    request: Request,
+    response: Response,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    return await academic_service.lookup_courses(db)
+    from app.core.http_cache import (
+        compute_etag,
+        etag_payload,
+        is_not_modified,
+        not_modified_response,
+        set_cache_headers,
+    )
+
+    items = await academic_service.lookup_courses(db)
+    etag = compute_etag(etag_payload(items))
+    if is_not_modified(request, etag):
+        return not_modified_response(etag)
+    set_cache_headers(response, etag)
+    return items
 
 
 @academic_router.get("/lookups/sections", response_model=list[SectionLookupResponse])
 async def lookup_sections(
+    request: Request,
+    response: Response,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    return await academic_service.lookup_sections(db)
+    from app.core.http_cache import (
+        compute_etag,
+        etag_payload,
+        is_not_modified,
+        not_modified_response,
+        set_cache_headers,
+    )
+
+    items = await academic_service.lookup_sections(db)
+    etag = compute_etag(etag_payload(items))
+    if is_not_modified(request, etag):
+        return not_modified_response(etag)
+    set_cache_headers(response, etag)
+    return items
 
 
 @academic_router.get("/lookups/students", response_model=list[StudentLookupResponse])
 async def lookup_students(
+    request: Request,
+    response: Response,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    return await academic_service.lookup_students(db)
+    from app.core.http_cache import (
+        compute_etag,
+        etag_payload,
+        is_not_modified,
+        not_modified_response,
+        set_cache_headers,
+    )
+
+    items = await academic_service.lookup_students(db)
+    etag = compute_etag(etag_payload(items))
+    if is_not_modified(request, etag):
+        return not_modified_response(etag)
+    set_cache_headers(response, etag)
+    return items
 
 
 

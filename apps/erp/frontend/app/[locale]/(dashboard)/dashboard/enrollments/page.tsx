@@ -175,13 +175,13 @@ export default function EnrollmentsPage() {
 
   const fetchLookups = useCallback(async () => {
     const [studentRes, sectionRes, courseRes] = await Promise.all([
-      apiClient.get<{ items: Student[]; total: number }>("/academic/students?limit=1000").catch(() => null),
-      apiClient.get<{ items: CourseSection[]; total: number }>("/academic/course-sections?limit=1000").catch(() => null),
-      apiClient.get<{ items: Course[]; total: number }>("/academic/courses?limit=1000").catch(() => null),
+      apiClient.get<Student[]>("/academic/lookups/students").catch(() => null),
+      apiClient.get<CourseSection[]>("/academic/lookups/sections").catch(() => null),
+      apiClient.get<Course[]>("/academic/lookups/courses").catch(() => null),
     ]);
-    if (studentRes) setStudents(studentRes.data.items);
-    if (sectionRes) setSections(sectionRes.data.items);
-    if (courseRes) setCourses(courseRes.data.items);
+    if (studentRes) setStudents(studentRes.data);
+    if (sectionRes) setSections(sectionRes.data);
+    if (courseRes) setCourses(courseRes.data);
   }, []);
 
   const fetchEnrollments = useCallback(async (searchTerm = "", pageNum = 1) => {

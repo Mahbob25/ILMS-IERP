@@ -12,7 +12,7 @@ import { Loader2, Check, X, Clock, AlertCircle, CircleDot } from "lucide-react";
 import { getLocalDateString } from "@/lib/dates";
 import TableContainer from '@/components/ui/TableContainer';
 
-interface CourseSection { id: string; course_id: string; teacher_id: string; }
+interface CourseSection { id: string; course_id: string; teacher_id?: string; status?: string; }
 interface Course { id: string; name: string; code: string; }
 interface Student { id: string; student_code: string; full_name: string; }
 interface Enrollment { id: string; student_id: string; section_id: string; }
@@ -91,11 +91,13 @@ export default function AttendancePage() {
   const fetchData = useCallback(async () => {
     try {
       const [sectRes, courseRes] = await Promise.all([
-        apiClient.get<{ items: CourseSection[]; total: number }>("/academic/course-sections?limit=1000&status=active"),
-        apiClient.get<{ items: Course[]; total: number }>("/academic/courses?limit=1000"),
+        apiClient.get<CourseSection[]>("/academic/lookups/sections"),
+        apiClient.get<Course[]>("/academic/lookups/courses"),
       ]);
-      setSections(sectRes.data.items);
-      setCourses(courseRes.data.items);
+      // Lookups return active + pending sections; this page only schedules
+      // attendance for active ones.
+      setSections(sectRes.data.filter((s) => !s.status || s.status === "active"));
+      setCourses(courseRes.data);
     } catch (e: any) {
       setFetchError(e?.message || "Failed to load data");
     } finally {
@@ -119,8 +121,8 @@ export default function AttendancePage() {
 
         const studentIds = enrRes.data.items.map((e) => e.student_id);
         if (studentIds.length > 0) {
-          const studRes = await apiClient.get<{ items: Student[]; total: number }>("/academic/students?limit=1000").catch(() => null);
-          setStudents(studRes ? studRes.data.items.filter((s) => studentIds.includes(s.id)) : []);
+          const studRes = await apiClient.get<Student[]>("/academic/lookups/students").catch(() => null);
+          setStudents(studRes ? studRes.data.filter((s) => studentIds.includes(s.id)) : []);
         } else {
           setStudents([]);
         }

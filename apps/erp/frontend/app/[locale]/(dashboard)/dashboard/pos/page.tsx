@@ -182,8 +182,8 @@ export default function POSPage() {
 
   const fetchStudents = useCallback(async () => {
     try {
-      const res = await apiClient.get<{ items: Student[]; total: number }>("/academic/students?limit=1000");
-      setStudents(res.data.items);
+      const res = await apiClient.get<Student[]>("/academic/lookups/students");
+      setStudents(res.data);
     } catch {
       setFetchError("Failed to load students");
     }
@@ -191,8 +191,8 @@ export default function POSPage() {
 
   const fetchCourses = useCallback(async () => {
     try {
-      const res = await apiClient.get<{ items: Course[]; total: number }>("/academic/courses?limit=1000");
-      setCourses(res.data.items);
+      const res = await apiClient.get<Course[]>("/academic/lookups/courses");
+      setCourses(res.data);
     } catch {
       setFetchError("Failed to load courses");
     }
@@ -200,8 +200,8 @@ export default function POSPage() {
 
   const fetchCourseSections = useCallback(async () => {
     try {
-      const res = await apiClient.get<{ items: CourseSection[]; total: number }>("/academic/course-sections?limit=1000");
-      setCourseSections(res.data.items);
+      const res = await apiClient.get<CourseSection[]>("/academic/lookups/sections");
+      setCourseSections(res.data);
     } catch {
       setFetchError("Failed to load course sections");
     }
