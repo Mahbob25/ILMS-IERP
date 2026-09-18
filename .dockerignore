@@ -1,0 +1,24 @@
+# Root build context is used by the promo-worker image only
+# (all other services build from their own subdirectory).
+# The repo root is ~2.5GB (frontend node_modules, caches, prototypes),
+# so exclude everything except what the worker Dockerfile COPYs.
+# Without this, `docker compose build promo-worker` uploads gigabytes
+# to the daemon and appears to hang at "exporting" with no output.
+
+**
+!apps/
+!apps/erp/
+!apps/erp/backend/
+!apps/erp/backend/requirements.txt
+!apps/erp/backend/app/
+!apps/erp/backend/app/**
+!apps/erp/backend/alembic.ini
+!infrastructure/
+!infrastructure/promo-templates/
+!infrastructure/promo-templates/**
+
+# Re-exclude weight inside the kept trees (caches, tests, local state).
+apps/erp/backend/app/**/__pycache__/
+apps/erp/backend/app/**/__pycache__/**
+*.pyc
+*.pyo
