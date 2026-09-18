@@ -40,11 +40,14 @@ COPY infrastructure/promo-templates /templates
 # Brand kit travels with the backend module copy above
 # (app/modules/promo/brand_kit.json, version recorded on every render).
 
-RUN useradd -m -u 1000 appuser \
+# node:22-slim already ships a user on UID 1000 (`node`) — reuse that UID so
+# files written to the shared uploads_data volume match the backend's appuser
+# (also UID 1000). Only create appuser when UID 1000 is not already taken.
+RUN if ! id -u 1000 >/dev/null 2>&1; then useradd -m -u 1000 appuser; fi \
     && mkdir -p /app/uploads/promos /tmp/promo-work \
     && chown -R 1000:1000 /app/uploads /tmp/promo-work
 
-USER appuser
+USER 1000
 
 HEALTHCHECK --interval=60s --timeout=10s --start-period=30s --retries=3 \
   CMD python3 -c "import app.modules.promo.worker, app.modules.promo.service, redis, sqlalchemy; print('promo-worker ok')"
