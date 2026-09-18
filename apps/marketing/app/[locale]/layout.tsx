@@ -16,10 +16,8 @@ export default function LocaleLayout({
   const dir = locale === "ar" ? "rtl" : "ltr";
 
   return (
-    <html lang={locale} dir={dir} className="h-full scroll-smooth">
-      <body className="h-full bg-[#FFFBF0] antialiased">
-        {children}
-      </body>
-    </html>
+    <div dir={dir} className="h-full">
+      {children}
+    </div>
   );
 }

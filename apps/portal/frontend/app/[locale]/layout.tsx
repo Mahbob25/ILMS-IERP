@@ -1,10 +1,4 @@
-import "@/app/globals.css";
 import { AuthProvider } from "@/components/AuthContext";
-
-export const metadata = {
-  title: "Al-Drasat Student Portal",
-  description: "بوابة الطلاب وأولياء الأمور - Al-Drasat Student & Parent Portal",
-};
 
 export default function LocaleLayout({
   children,
@@ -15,13 +9,13 @@ export default function LocaleLayout({
 }) {
   const locale = params?.locale || "ar";
   const dir = locale === "ar" ? "rtl" : "ltr";
-  const fontClass = locale === "ar" ? "font-arabic leading-relaxed" : "font-sans leading-normal";
+  // Arabic styling comes from <body> in the root layout; only non-Arabic
+  // locales need a font/leading override on the wrapper.
+  const fontClass = locale === "ar" ? "" : "font-sans leading-normal";
 
   return (
-    <html lang={locale} dir={dir} className="h-full scroll-smooth">
-      <body className={`${fontClass} h-full text-slate-900 bg-canvas antialiased`}>
-        <AuthProvider>{children}</AuthProvider>
-      </body>
-    </html>
+    <div dir={dir} className={`${fontClass} h-full`}>
+      <AuthProvider>{children}</AuthProvider>
+    </div>
   );
 }
