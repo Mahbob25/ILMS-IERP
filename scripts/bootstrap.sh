@@ -672,6 +672,14 @@ frontend_list() {
 boot_pid_dir() { printf '%s/.bootstrap/pids' "$REPO_ROOT"; }
 boot_log_dir() { printf '%s/.bootstrap/logs' "$REPO_ROOT"; }
 
+pipe_to_root_shell() { # pipe_to_root_shell <url> — run a remote setup script as root
+  if [ -n "$SUDO" ]; then
+    curl -fsSL "$1" | $SUDO -E bash -
+  else
+    curl -fsSL "$1" | bash -
+  fi
+}
+
 ensure_node() {
   if command -v node >/dev/null 2>&1 && command -v npm >/dev/null 2>&1; then
     local major
@@ -685,12 +693,12 @@ ensure_node() {
   info "Installing Node.js 20 LTS"
   case "$OS" in
     debian|wsl)
-      curl -fsSL https://deb.nodesource.com/setup_20.x | $SUDO -E bash - \
+      pipe_to_root_shell https://deb.nodesource.com/setup_20.x \
         || fail "NodeSource setup failed — check network."
       apt_install nodejs
       ;;
     rhel)
-      curl -fsSL https://rpm.nodesource.com/setup_20.x | $SUDO -E bash - \
+      pipe_to_root_shell https://rpm.nodesource.com/setup_20.x \
         || fail "NodeSource setup failed — check network."
       $SUDO dnf install -y nodejs || fail "dnf nodejs install failed."
       ;;
