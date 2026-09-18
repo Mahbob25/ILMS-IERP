@@ -42,6 +42,7 @@ import {
   Mail,
   LayoutDashboard,
   KeyRound,
+  Clapperboard,
 } from "lucide-react";
 import NotificationBell from "@/components/notifications/NotificationBell";
 import GlobalSearch from "@/components/search/GlobalSearch";
@@ -92,6 +93,7 @@ function DashboardLayoutInner({
         announcements: "الإعلانات",
         contacts: "رسائل التواصل",
         bookings: "الحجوزات",
+        promoStudio: "استوديو البرومو",
         employees: "الموظفين",
         roles: "الأدوار",
         users: "المستخدمين",
@@ -138,6 +140,7 @@ function DashboardLayoutInner({
         announcements: "Announcements",
         contacts: "Contacts",
         bookings: "Bookings",
+        promoStudio: "Promo Studio",
         employees: "Employees",
         roles: "Roles",
         users: "User Management",
@@ -252,6 +255,7 @@ function DashboardLayoutInner({
     "dashboard/announcements": "page_announcements",
     "dashboard/contacts": "page_contacts",
     "dashboard/bookings": "page_bookings",
+    "dashboard/promo-studio": "page_promo_studio",
   };
 
   const routeKey = pathname.split("/").slice(2).join("/").replace(/\/$/, "");
@@ -439,6 +443,12 @@ function DashboardLayoutInner({
       href: `/${locale}/dashboard/contacts`,
       icon: Mail,
       permission: "page_contacts",
+    },
+    {
+      name: t.menu.promoStudio,
+      href: `/${locale}/dashboard/promo-studio`,
+      icon: Clapperboard,
+      permission: "page_promo_studio",
     },
     {
       name: t.menu.notifications,

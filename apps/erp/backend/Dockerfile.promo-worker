@@ -1,0 +1,52 @@
+# Promo render worker — Chrome + ffmpeg + hyperframes, templates baked in.
+# node:22-slim + Python for the worker loop (shares the ERP backend package).
+# No host ports. Joins lims-internal. Concurrency 1 (renders ~60s wall).
+FROM node:22-slim
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONUNBUFFERED=1 \
+    PROMO_RENDERER=hyperframes \
+    PROMO_TEMPLATE_DIR=/templates/course-ad-v1
+
+WORKDIR /app
+
+# Chrome (hyperframes capture) + ffmpeg (poster bake) + python (worker loop).
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      python3 python3-pip python3-venv \
+      ffmpeg \
+      chromium \
+      ca-certificates curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && ln -sf /usr/bin/chromium /usr/bin/google-chrome 2>/dev/null || true
+
+ENV CHROME_PATH=/usr/bin/chromium \
+    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+
+# Hyperframes CLI for `check` + `render` (pinned; streaming mode mandatory).
+RUN npm install -g hyperframes 2>/dev/null || npm install -g @heygen/hyperframes 2>/dev/null || true
+
+# Python deps for the worker loop (redis, sqlalchemy, pydantic — same as backend).
+# Strict: a broken dependency set must fail the build, not boot a dead worker.
+COPY apps/erp/backend/requirements.txt /tmp/requirements.txt
+RUN pip3 install --no-cache-dir --break-system-packages -r /tmp/requirements.txt
+
+# Backend package (worker imports app.modules.promo.worker + app.core.*).
+COPY apps/erp/backend/app /app/app
+COPY apps/erp/backend/alembic.ini /app/alembic.ini
+
+# Templates baked in for deterministic re-renders.
+COPY infrastructure/promo-templates /templates
+
+# Brand kit travels with the backend module copy above
+# (app/modules/promo/brand_kit.json, version recorded on every render).
+
+RUN useradd -m -u 1000 appuser \
+    && mkdir -p /app/uploads/promos /tmp/promo-work \
+    && chown -R 1000:1000 /app/uploads /tmp/promo-work
+
+USER appuser
+
+HEALTHCHECK --interval=60s --timeout=10s --start-period=30s --retries=3 \
+  CMD python3 -c "import app.modules.promo.worker, app.modules.promo.service, redis, sqlalchemy; print('promo-worker ok')"
+
+CMD ["python3", "-m", "app.modules.promo.worker"]

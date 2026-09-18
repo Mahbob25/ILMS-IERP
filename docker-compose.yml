@@ -122,6 +122,7 @@ services:
       PORTAL_SSO_SECRET: ${PORTAL_SSO_SECRET:-}
       PORTAL_FRONTEND_URL: ${PORTAL_FRONTEND_URL:-https://aldirasat-portal.vercel.app}
       BACKUP_DIR: /app/backups
+      PROMO_MONTHLY_QUOTA: ${PROMO_MONTHLY_QUOTA:-20}
     depends_on:
       database:
         condition: service_healthy
@@ -141,6 +142,40 @@ services:
         limits:
           cpus: '2.0'
           memory: 2G
+
+  # Promo render worker — claims `promo:render` (Redis Streams), Chrome+ffmpeg.
+  # No host ports. Concurrency 1. Templates baked into the image so every
+  # re-render is deterministic; brand kit travels with the backend copy.
+  promo-worker:
+    build:
+      context: .
+      dockerfile: ./apps/erp/backend/Dockerfile.promo-worker
+    container_name: lims_promo_worker
+    restart: always
+    environment:
+      TZ: ${TIMEZONE:-Asia/Riyadh}
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-lims}:${POSTGRES_PASSWORD:-lims_secure_pass}@database:5432/${POSTGRES_DB:-lims}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-local_dev_only_insecure_change_me}
+      REDIS_URL: ${REDIS_URL:-redis://:lims_secure_redis_pass@redis:6379/0}
+      PROMO_MONTHLY_QUOTA: ${PROMO_MONTHLY_QUOTA:-20}
+      PROMO_RENDERER: ${PROMO_RENDERER:-hyperframes}
+      ERP_SERVICE_KEY: ${ERP_SERVICE_KEY:-}
+    depends_on:
+      database:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+    volumes:
+      - uploads_data:/app/uploads
+    networks:
+      - lims-internal
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 3G
 
   caddy:
     image: caddy:latest

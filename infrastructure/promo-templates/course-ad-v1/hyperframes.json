@@ -1,0 +1,34 @@
+{
+  "$schema": "https://hyperframes.heygen.com/schema/hyperframes.json",
+  "registry": "https://raw.githubusercontent.com/heygen-com/hyperframes/main/registry",
+  "name": "course-ad-v1",
+  "version": "1.0.0",
+  "format": "landscape",
+  "width": 1920,
+  "height": 1080,
+  "duration": 21,
+  "locales": ["ar", "en"],
+  "tones": ["cinematic", "clean"],
+  "paths": {
+    "blocks": "compositions",
+    "components": "compositions/components",
+    "assets": "assets"
+  },
+  "media": {
+    "autoProxy": true
+  },
+  "variables": [
+    {"id": "locale", "type": "enum", "options": ["ar", "en"]},
+    {"id": "tone", "type": "enum", "options": ["cinematic", "clean"]},
+    {"id": "heroL1", "type": "string", "maxLength": 24},
+    {"id": "heroL2", "type": "string", "maxLength": 32},
+    {"id": "heroL3", "type": "string", "maxLength": 28},
+    {"id": "cta", "type": "string", "maxLength": 26},
+    {"id": "kicker", "type": "string", "maxLength": 60},
+    {"id": "micro", "type": "string", "maxLength": 80},
+    {"id": "rows", "type": "json"},
+    {"id": "cards", "type": "json"},
+    {"id": "stats", "type": "json"},
+    {"id": "music", "type": "string"}
+  ]
+}

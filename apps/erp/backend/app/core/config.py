@@ -76,6 +76,18 @@ class Settings(BaseSettings):
     # Where staff land after login (browser form POST path).
     ERP_FRONTEND_URL: str = "https://aldirasat-erp.vercel.app"
 
+    # ── Promo Studio (course ad v1) ─────────────────────────────────
+    # Monthly high-render budget per workspace. Quota counter lives in Redis
+    # (`promo:quota:{YYYY-MM}`) — no new table. Renders beyond the quota get
+    # 429 + Retry-After.
+    PROMO_MONTHLY_QUOTA: int = 20
+    # Renderer mode for the promo worker: `hyperframes` (real Chrome+ffmpeg
+    # pipeline) or `fake` (deterministic stub for tests/local dev).
+    PROMO_RENDERER: str = "hyperframes"
+    # Template root baked into the worker image; repo fallback is resolved
+    # by the worker when the env is empty.
+    PROMO_TEMPLATE_DIR: str = ""
+
     @model_validator(mode="after")
     def validate_required_settings(self):
         if not self.DATABASE_URL:

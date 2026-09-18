@@ -1,0 +1,32 @@
+{
+  "brand_kit_version": 1,
+  "tokens": {
+    "primary": "#2563EB",
+    "deep": "#1E3A8A",
+    "sky": "#0EA5E9",
+    "paper": "#FFFFFF",
+    "tint": "#EFF4FE",
+    "ink": "#0F172A",
+    "muted": "#475569",
+    "gold": "#F59E0B",
+    "success": "#10B981",
+    "danger": "#EF4444"
+  },
+  "fonts": {
+    "display_ar": "assets/fonts/arabic-display.woff2",
+    "body_latin": "Inter",
+    "mono": "ui-monospace, Menlo, Consolas, monospace"
+  },
+  "logo": {
+    "path": "assets/brand/logo.svg",
+    "path_ar": "assets/brand/logo-ar.svg",
+    "position": "outro-center",
+    "notes": "Fixed position/size on every ad. Never rescaled by wizard input."
+  },
+  "rules": [
+    "Wizard exposes no color, font, or layout controls.",
+    "Tones vary pacing/music/transitions/wording only — never identity.",
+    "Gold highlight-swipe is the signature moment and appears exactly once per ad.",
+    "Rebrand by editing this file and bumping brand_kit_version."
+  ]
+}

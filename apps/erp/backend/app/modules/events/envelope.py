@@ -21,6 +21,14 @@ EVENT_READY = "ready"
 EVENT_NOTIFICATION_CREATED = "notification.created"
 EVENT_NOTIFICATION_UPDATED = "notification.updated"
 
+# Promo Studio render lifecycle — rides the same per-user stream as
+# notifications (no new transport). Each payload carries `render_id` so the
+# wizard can filter to its own render.
+EVENT_PROMO_RENDER_STARTED = "promo.render.started"
+EVENT_PROMO_RENDER_PROGRESS = "promo.render.progress"
+EVENT_PROMO_RENDER_DONE = "promo.render.done"
+EVENT_PROMO_RENDER_FAILED = "promo.render.failed"
+
 # Reserved for real-time chat — in a future phase it rides this same stream as
 # further ``chat.*`` types, with no transport work. Kept as a comment so the
 # namespace is obviously spoken for.

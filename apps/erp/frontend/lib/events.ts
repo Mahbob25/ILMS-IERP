@@ -28,6 +28,11 @@ export type StreamEventHandler = (event: ServerEvent) => void;
 export const EVENT_READY = "ready";
 export const NOTIFICATION_CREATED = "notification.created";
 export const NOTIFICATION_UPDATED = "notification.updated";
+// Promo Studio render lifecycle — same per-user stream, filtered by render_id.
+export const PROMO_RENDER_STARTED = "promo.render.started";
+export const PROMO_RENDER_PROGRESS = "promo.render.progress";
+export const PROMO_RENDER_DONE = "promo.render.done";
+export const PROMO_RENDER_FAILED = "promo.render.failed";
 
 const STREAM_URL = "/api/v1/events/stream";
 const BASE_RECONNECT_MS = 1_000;

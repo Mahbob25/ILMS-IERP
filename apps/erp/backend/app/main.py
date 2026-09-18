@@ -48,6 +48,7 @@ from app.modules.settings.router import settings_router
 from app.modules.search.router import search_router
 from app.modules.bookings.router import bookings_router
 from app.modules.content.router import content_router
+from app.modules.promo.router import promo_router
 from app.modules.contacts.router import contacts_router
 from app.modules.portal_internal.router import internal_router
 from app.modules.portal_accounts.router import portal_accounts_router
@@ -104,9 +105,16 @@ app.add_middleware(IdempotencyMiddleware)
 # Profile photos. Only the avatars subdirectory is published — everything else
 # under uploads/ (future receipts, attachments) stays off the public path.
 # Caddy routes /uploads/* here and the frontends rewrite the same prefix.
-_AVATAR_DIR = UPLOAD_DIR / "avatars"
-_AVATAR_DIR.mkdir(parents=True, exist_ok=True)
-app.mount("/uploads/avatars", StaticFiles(directory=_AVATAR_DIR), name="avatars")
+_AvatarLegacy = UPLOAD_DIR / "avatars"
+_AvatarLegacy.mkdir(parents=True, exist_ok=True)
+app.mount("/uploads/avatars", StaticFiles(directory=_AvatarLegacy), name="avatars")
+
+# Promo Studio renders (mp4/poster per render id). Served read-only under the
+# same /uploads/* Caddy route — no new ingress. Directory entries are created
+# by the promo worker, never by user upload.
+_PROMO_DIR = UPLOAD_DIR / "promos"
+_PROMO_DIR.mkdir(parents=True, exist_ok=True)
+app.mount("/uploads/promos", StaticFiles(directory=_PROMO_DIR), name="promos")
 
 # Include routes under /api/v1 prefix
 app.include_router(auth_router, prefix="/api/v1")
@@ -125,6 +133,7 @@ app.include_router(settings_router, prefix="/api/v1")
 app.include_router(search_router, prefix="/api/v1")
 app.include_router(bookings_router, prefix="/api/v1")
 app.include_router(content_router, prefix="/api/v1")
+app.include_router(promo_router, prefix="/api/v1")
 app.include_router(contacts_router, prefix="/api/v1")
 app.include_router(internal_router, prefix="/api/v1")
 app.include_router(portal_accounts_router, prefix="/api/v1")

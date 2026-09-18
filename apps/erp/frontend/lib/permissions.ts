@@ -39,6 +39,7 @@ export const PAGE_PERMISSION_MAP: Record<string, string[]> = {
   page_wizards: ["superadmin", "manager", "secretary"],
   page_search: ["superadmin", "manager", "secretary", "teacher"],
   page_content: ["superadmin", "marketing_manager"],
+  page_promo_studio: ["superadmin", "marketing_manager"],
   page_announcements: ["superadmin", "marketing_manager"],
   page_contacts: ["superadmin", "marketing_manager"],
   page_bookings: ["superadmin", "manager", "secretary", "marketing_manager"],
