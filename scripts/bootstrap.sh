@@ -798,7 +798,7 @@ start_frontends() {
     # setsid makes the server a process-group leader so --stop kills the whole
     # npm+next tree, not just the npm wrapper.
     # shellcheck disable=SC2086
-    (cd "$REPO_ROOT/$dir" && $setsid_bin nohup npm run dev ${args:-} >"$logf" 2>&1 < /dev/null & echo $! > "$pidfile")
+    (cd "$REPO_ROOT/$dir" && $setsid_bin nohup npm run dev -- ${args:-} >"$logf" 2>&1 < /dev/null & echo $! > "$pidfile")
     sleep 2
     if ! kill -0 "$(cat "$pidfile")" 2>/dev/null; then
       warn "$name: process died immediately — last lines of $logf:"
