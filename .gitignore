@@ -20,7 +20,7 @@ node_modules/
 .npm-cache/
 .next/
 out/
-
+brag-output*
 # --- Environment files ---
 .env
 .env.local
