@@ -44,6 +44,8 @@ NO_TUNNEL=0
 WITH_CRON=0
 CHECK_ONLY=0
 QUIET=0
+FULL_LOCAL=0
+STOP=0
 
 OS="unknown"
 IS_WSL=0
@@ -91,6 +93,13 @@ Options:
   --no-tunnel      Forward to setup.sh: force local mode even with TUNNEL_TOKEN
   --with-cron      Install the daily 03:00 backup cron (Linux only, skipped
                    on WSL / Git Bash with a note)
+  --full-local   Dev backend (implies --dev) PLUS all three frontends via
+                 npm dev (erp :3000, portal :3001, marketing :3002):
+                 writes .env.local files, npm installs, starts servers with
+                 PIDs in .bootstrap/pids, waits for health, prints URLs.
+                 Needs Node 18+ (auto-installed with --install-deps).
+  --stop         Stop frontend dev servers started by --full-local and exit.
+                 Backend containers keep running.
   --check-only     Print the preflight report and exit (changes nothing)
   --quiet          Reduce output
   -h, --help       Show this help
@@ -98,6 +107,8 @@ Options:
 Examples:
   Fresh VM:   bash bootstrap.sh --install-deps --yes --with-cron
   WSL dev:    bash scripts/bootstrap.sh --dev
+  Full local: bash scripts/bootstrap.sh --full-local --install-deps
+  Stop dev:   bash scripts/bootstrap.sh --stop
   Prod VM:    bash scripts/bootstrap.sh --prod --install-deps --yes --with-cron
 EOF
   exit 0
@@ -120,6 +131,8 @@ parse_args() {
       --fresh) FRESH=1 ;;
       --no-tunnel) NO_TUNNEL=1 ;;
       --with-cron) WITH_CRON=1 ;;
+      --full-local) FULL_LOCAL=1 ;;
+      --stop) STOP=1 ;;
       --check-only) CHECK_ONLY=1 ;;
       --quiet) QUIET=1 ;;
       -h|--help) usage ;;
@@ -128,8 +141,11 @@ parse_args() {
     esac
     shift
   done
-  if [ "$MODE_WANT" = "dev" ] && [ "$NO_TUNNEL" = "1" ]; then
-    : # --dev already implies local; explicit --no-tunnel is redundant but fine
+  if [ "$FULL_LOCAL" = "1" ]; then
+    if [ "$MODE_WANT" = "prod" ]; then
+      fail "--full-local cannot be combined with --prod (frontends run against a local backend)."
+    fi
+    MODE_WANT="dev" # full-local always brings its own local backend
   fi
 }
 
@@ -544,19 +560,42 @@ fill_env_gaps() {
     info "Set ENVIRONMENT=$([ "$MODE" = "prod" ] && echo production || echo development) (was empty)"
     changed=1
   fi
-  cors=$(get_env CORS_ORIGINS)
-  if [ "$MODE" = "local" ]; then
-    case ",$cors," in
-      *"http://localhost:3000"*|*"http://localhost:80"*)
-        ;;
-      *)
-        [ -z "$cors" ] && cors="http://localhost:80,http://localhost:3000" \
-          || cors="$cors,http://localhost:80,http://localhost:3000"
-        set_env CORS_ORIGINS "$cors"
-        info "Added localhost origins to CORS_ORIGINS (dev browser access)"
+
+  # Full-local runs the portal dev server on :3001, so the ERP's SSO ticket
+  # redirect must point there. Only an empty value or the stock vercel.app
+  # default is overridden — a custom URL is left alone.
+  if [ "$FULL_LOCAL" = "1" ]; then
+    local pfu
+    pfu=$(get_env PORTAL_FRONTEND_URL)
+    case "$pfu" in
+      ""|"https://aldirasat-portal.vercel.app")
+        set_env PORTAL_FRONTEND_URL "http://localhost:3001"
+        info "Set PORTAL_FRONTEND_URL=http://localhost:3001 (local SSO tickets)"
         changed=1
         ;;
+      *) info "PORTAL_FRONTEND_URL is custom ($pfu) — leaving it for local SSO" ;;
     esac
+  fi
+  cors=$(get_env CORS_ORIGINS)
+  if [ "$MODE" = "local" ]; then
+    # Backend on :80 plus every locally-run frontend. Full-local additionally
+    # serves the portal (:3001) and marketing (:3002) dev servers to browsers.
+    local want="http://localhost:80,http://localhost:3000" o cors_changed=0
+    [ "$FULL_LOCAL" = "1" ] && want="$want,http://localhost:3001,http://localhost:3002"
+    for o in $(printf '%s' "$want" | tr ',' ' '); do
+      case ",$cors," in
+        *",$o,"*) ;;
+        *)
+          [ -z "$cors" ] && cors="$o" || cors="$cors,$o"
+          cors_changed=1
+          ;;
+      esac
+    done
+    if [ "$cors_changed" = "1" ]; then
+      set_env CORS_ORIGINS "$cors"
+      info "Ensured local origins in CORS_ORIGINS (browser -> Caddy dev access)"
+      changed=1
+    fi
   else
     if [ -n "$PUBLIC_IP" ]; then
       case ",$cors," in
@@ -620,12 +659,239 @@ install_cron() {
     || warn "Could not install cron — add manually: $line"
 }
 
+# ── Full-local frontends (npm dev for all three apps) ──────────────────────
+# erp :3000 (Next default), portal :3001 (in its dev script), marketing :3002
+# (explicit -p: its default would collide with the ERP on :3000).
+frontend_list() {
+  printf '%s\n' \
+    "erp|apps/erp/frontend|3000|" \
+    "portal|apps/portal/frontend|3001|" \
+    "marketing|apps/marketing|3002|-p 3002"
+}
+
+boot_pid_dir() { printf '%s/.bootstrap/pids' "$REPO_ROOT"; }
+boot_log_dir() { printf '%s/.bootstrap/logs' "$REPO_ROOT"; }
+
+ensure_node() {
+  if command -v node >/dev/null 2>&1 && command -v npm >/dev/null 2>&1; then
+    local major
+    major=$(node --version 2>/dev/null | sed 's/^v//; s/\..*//')
+    case "$major" in ''|*[!0-9]*) fail "Cannot parse the node version — reinstall Node 20 LTS." ;; esac
+    [ "$major" -ge 18 ] || fail "Node v$major is too old (Next.js 14 needs 18+, 20 LTS recommended)."
+    ok "Node $(node --version) + npm available"
+    return 0
+  fi
+  [ "$INSTALL_DEPS" = "1" ] || fail "Node.js 20 LTS is required for --full-local. Fix: re-run with --install-deps (or install Node 20 manually)."
+  info "Installing Node.js 20 LTS"
+  case "$OS" in
+    debian|wsl)
+      curl -fsSL https://deb.nodesource.com/setup_20.x | $SUDO -E bash - \
+        || fail "NodeSource setup failed — check network."
+      apt_install nodejs
+      ;;
+    rhel)
+      curl -fsSL https://rpm.nodesource.com/setup_20.x | $SUDO -E bash - \
+        || fail "NodeSource setup failed — check network."
+      $SUDO dnf install -y nodejs || fail "dnf nodejs install failed."
+      ;;
+    fedora) $SUDO dnf install -y nodejs npm || fail "dnf nodejs install failed." ;;
+    arch) $SUDO pacman -Sy --noconfirm nodejs npm || fail "pacman nodejs install failed." ;;
+    alpine) $SUDO apk add nodejs npm || fail "apk nodejs install failed." ;;
+    *) fail "Cannot auto-install Node on '$OS'. Install Node 20 LTS manually (Windows: winget install -e --id OpenJS.NodeJS.LTS), then re-run." ;;
+  esac
+  command -v node >/dev/null 2>&1 && command -v npm >/dev/null 2>&1 \
+    || fail "Node install did not land on PATH. Open a fresh shell and re-run."
+  ok "Node $(node --version) installed"
+}
+
+frontend_env_for() { # frontend_env_for <app> — prints KEY=VALUE lines
+  case "$1" in
+    erp) printf '%s\n' \
+      "API_ORIGIN=http://localhost" \
+      "NEXT_PUBLIC_API_URL=http://localhost/api/v1" \
+      "NEXT_PUBLIC_PORTAL_URL=http://localhost:3001" \
+      "NEXT_PUBLIC_MARKETING_URL=http://localhost:3002" ;;
+    portal) printf '%s\n' \
+      "API_ORIGIN=http://localhost" \
+      "NEXT_PUBLIC_API_URL=http://localhost/api" \
+      "NEXT_PUBLIC_ERP_URL=http://localhost:3000" \
+      "NEXT_PUBLIC_MARKETING_URL=http://localhost:3002" ;;
+    marketing) printf '%s\n' \
+      "API_ORIGIN=http://localhost" \
+      "NEXT_PUBLIC_ERP_URL=http://localhost:3000" \
+      "NEXT_PUBLIC_PORTAL_URL=http://localhost:3001" ;;
+  esac
+}
+
+ensure_frontend_env() {
+  local name dir port args f kv k want have
+  while IFS='|' read -r name dir port args; do
+    f="$REPO_ROOT/$dir/.env.local"
+    if [ ! -f "$f" ]; then
+      frontend_env_for "$name" > "$f"
+      info "Wrote $dir/.env.local (local API + cross-app URLs)"
+      continue
+    fi
+    while IFS= read -r kv; do
+      [ -n "$kv" ] || continue
+      k="${kv%%=*}"; want="${kv#*=}"
+      have=$(grep -E "^${k}=" "$f" 2>/dev/null | head -1 | cut -d= -f2-)
+      if [ -z "$have" ]; then
+        warn "$dir/.env.local lacks $k (want: $want) — add it, or delete the file and re-run to regenerate."
+      elif [ "$have" != "$want" ]; then
+        warn "$dir/.env.local: $k=$have (full-local wants: $want)."
+      fi
+    done <<< "$(frontend_env_for "$name")"
+  done <<< "$(frontend_list)"
+  ok "Frontend env files checked (.env.local is never overwritten)"
+}
+
+install_frontend_deps() {
+  local name dir port args
+  while IFS='|' read -r name dir port args; do
+    if [ -d "$REPO_ROOT/$dir/node_modules" ]; then
+      ok "$name: node_modules present — skipping install"
+      continue
+    fi
+    info "$name: installing dependencies (first run takes a few minutes)"
+    if [ -f "$REPO_ROOT/$dir/package-lock.json" ]; then
+      (cd "$REPO_ROOT/$dir" && npm ci --no-audit --no-fund) \
+        || (cd "$REPO_ROOT/$dir" && npm install --no-audit --no-fund) \
+        || fail "$name: npm install failed — see output above."
+    else
+      (cd "$REPO_ROOT/$dir" && npm install --no-audit --no-fund) \
+        || fail "$name: npm install failed — see output above."
+    fi
+    ok "$name: dependencies installed"
+  done <<< "$(frontend_list)"
+}
+
+port_open() { # port_open <port> — 0 when something answers on localhost
+  curl -s -o /dev/null -m 3 "http://localhost:$1" 2>/dev/null
+}
+
+start_frontends() {
+  local name dir port args pidfile logf setsid_bin=""
+  mkdir -p "$(boot_pid_dir)" "$(boot_log_dir)"
+  command -v setsid >/dev/null 2>&1 && setsid_bin="setsid"
+  while IFS='|' read -r name dir port args; do
+    pidfile="$(boot_pid_dir)/$name.pid"
+    logf="$(boot_log_dir)/$name.log"
+    if [ -f "$pidfile" ] && kill -0 "$(cat "$pidfile" 2>/dev/null)" 2>/dev/null; then
+      ok "$name: already started by bootstrap (pid $(cat "$pidfile"))"
+      continue
+    fi
+    [ -f "$pidfile" ] && rm -f "$pidfile"
+    if port_open "$port"; then
+      ok "$name: port $port already serves something — leaving it alone (stop it first if stale)"
+      continue
+    fi
+    log "Starting $name dev server (-> http://localhost:$port, log .bootstrap/logs/$name.log)"
+    # setsid makes the server a process-group leader so --stop kills the whole
+    # npm+next tree, not just the npm wrapper.
+    # shellcheck disable=SC2086
+    (cd "$REPO_ROOT/$dir" && $setsid_bin nohup npm run dev ${args:-} >"$logf" 2>&1 < /dev/null & echo $! > "$pidfile")
+    sleep 2
+    if ! kill -0 "$(cat "$pidfile")" 2>/dev/null; then
+      warn "$name: process died immediately — last lines of $logf:"
+      tail -15 "$logf" 2>/dev/null || true
+      rm -f "$pidfile"
+      return 1
+    fi
+  done <<< "$(frontend_list)"
+  return 0
+}
+
+wait_frontends() {
+  local name dir port args i failed=""
+  while IFS='|' read -r name dir port args; do
+    i=0
+    while [ "$i" -lt 120 ]; do
+      if port_open "$port"; then
+        ok "$name up at http://localhost:$port"
+        break
+      fi
+      i=$((i + 3))
+      sleep 3
+    done
+    if ! port_open "$port"; then
+      failed="${failed}${name} "
+      warn "$name did not answer on :$port within 120s — last log lines:"
+      tail -20 "$(boot_log_dir)/$name.log" 2>/dev/null || true
+    fi
+  done <<< "$(frontend_list)"
+  if [ -n "$failed" ]; then
+    fail "Frontend(s) failed to start: ${failed% }. Logs: .bootstrap/logs/. (Backend stack is still up.)"
+  fi
+  return 0
+}
+
+run_frontends() {
+  ensure_node
+  ensure_frontend_env
+  install_frontend_deps
+  start_frontends || return 1
+  wait_frontends
+}
+
+stop_frontends() {
+  local name dir port args pidfile pid
+  if [ ! -d "$(boot_pid_dir)" ]; then
+    info "No frontend PIDs recorded — nothing started by bootstrap."
+    return 0
+  fi
+  while IFS='|' read -r name dir port args; do
+    pidfile="$(boot_pid_dir)/$name.pid"
+    if [ -f "$pidfile" ]; then
+      pid=$(cat "$pidfile" 2>/dev/null || echo "")
+      if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+        kill -- "-$pid" 2>/dev/null || kill "$pid" 2>/dev/null || true
+        sleep 1
+        if kill -0 "$pid" 2>/dev/null; then
+          warn "$name (pid $pid) did not stop — kill it manually: kill $pid"
+        else
+          ok "$name stopped"
+        fi
+      else
+        info "$name: pid file stale — already gone"
+      fi
+      rm -f "$pidfile"
+    elif port_open "$port"; then
+      warn "$name: port $port serves something not started by bootstrap — leaving it (stop manually if stale)."
+    else
+      info "$name: not running"
+    fi
+  done <<< "$(frontend_list)"
+  return 0
+}
+
+stop_repo_locate() {
+  local c
+  for c in "$PWD" "${CLONE_DIR:-}"; do
+    if [ -n "$c" ] && [ -d "$c" ] && has_repo_marker "$c"; then
+      REPO_ROOT="$(cd "$c" && pwd)"
+      cd "$REPO_ROOT" || fail "Cannot cd to $REPO_ROOT"
+      return 0
+    fi
+  done
+  fail "No repo found here. cd into the clone (or pass --dir) and retry."
+}
+
 # ── Final report: public URL + debug guide ─────────────────────────────────
 print_footer() {
   local base_local="http://localhost"
   printf '\n%s%sBootstrap complete — stack is up%s\n' "$BOLD" "$GREEN" "$RESET"
   printf '  Local API health : %s/api/v1/health\n' "$base_local"
   printf '  Database         : localhost:5431 (postgres) / Redis: lims_redis :6379 (password auth, see .env)\n'
+  if [ "$FULL_LOCAL" = "1" ]; then
+    printf '\n%s%sFrontends (npm dev)%s\n' "$BOLD" "$BLUE" "$RESET"
+    printf '  ERP:       http://localhost:3000\n'
+    printf '  Portal:    http://localhost:3001\n'
+    printf '  Marketing: http://localhost:3002\n'
+    printf '  Logs:      .bootstrap/logs/<app>.log\n'
+    printf '  Stop:      bash scripts/bootstrap.sh --stop   (backend keeps running)\n'
+    printf '  Dev logins: seeded accounts printed by setup.sh on first start (manager@institute.dev, secretary@institute.dev, teacher@institute.dev)\n'
+  fi
 
   printf '\n%s%sPublic URL%s\n' "$BOLD" "$BLUE" "$RESET"
   if [ "$MODE" = "prod" ]; then
@@ -708,6 +974,14 @@ check_only_report() {
     printf '  Tunnel  : unknown (no repo yet)\n'
   fi
   printf '  Mode    : %s\n' "$([ "$MODE_WANT" = "auto" ] && echo 'auto (token -> prod, else local)' || echo "$MODE_WANT")"
+  if command -v node >/dev/null 2>&1; then
+    printf '  Node    : %s\n' "$(node --version 2>/dev/null || echo present)"
+  elif [ "$FULL_LOCAL" = "1" ]; then
+    printf '  Node    : MISSING (required for --full-local; re-run with --install-deps)\n'
+  else
+    printf '  Node    : missing (only needed for --full-local)\n'
+  fi
+  [ "$FULL_LOCAL" = "1" ] && printf '  Frontends: would write .env.local, npm install, and start erp:3000 portal:3001 marketing:3002 (PIDs in .bootstrap/pids)\n'
   printf '  Cron    : %s\n' "$([ "$WITH_CRON" = "1" ] && echo 'would install daily 03:00 backup' || echo 'not requested (add --with-cron on prod)')"
 
   printf '\nWould run: preflight -> install (only with --install-deps) -> clone/pull -> .env gaps -> setup.sh -> URL + debug report.\n'
@@ -719,6 +993,12 @@ main() {
   self_crlf_fix "$@"
   log "LIMS bootstrap — $([ "$CHECK_ONLY" = "1" ] && echo 'preflight only' || echo 'host prep + deploy')"
   detect_os
+
+  if [ "$STOP" = "1" ]; then
+    stop_repo_locate
+    stop_frontends
+    exit 0
+  fi
 
   # Light repo locate for --check-only so the report knows the state.
   if [ "$CHECK_ONLY" = "1" ]; then
@@ -791,6 +1071,11 @@ main() {
     warn "  docker compose ps; docker compose logs --tail=50 backend"
     warn "  docker compose -f docker-compose.portal.yml logs --tail=50 portal-backend"
     exit "$SETUP_RC"
+  fi
+
+  # ── 6b. Full-local frontends (npm dev for all three apps) ──
+  if [ "$FULL_LOCAL" = "1" ]; then
+    run_frontends || exit $?
   fi
 
   # ── 7. Optional production extras + final report ──

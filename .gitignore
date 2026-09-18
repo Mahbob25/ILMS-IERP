@@ -76,3 +76,6 @@ cookies*.txt
 
 # --- Misc ---
 *.sqlite3
+
+# --- bootstrap.sh --full-local runtime (frontend PIDs + dev logs) ---
+.bootstrap/
