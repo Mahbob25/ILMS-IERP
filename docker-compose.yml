@@ -18,6 +18,12 @@ networks:
   lims-internal:
     name: lims-internal
     driver: bridge
+    # Re-enable container-to-container traffic. No-op on normal Docker (ICC
+    # defaults to on), but GitHub Codespaces runs its daemon with --icc=false,
+    # which silently drops bridge traffic between services (backend -> database
+    # times out while published host ports still work).
+    driver_opts:
+      com.docker.network.bridge.enable_icc: "true"
 
 services:
   database:
